@@ -14,7 +14,7 @@ const path = require('node:path');
 const F = require('./framework');
 
 const DIR = __dirname;
-const SHARED_FILES = new Set(['framework.js', 'assumptions.js', 'check-shared.js', 'curve.js']);
+const SHARED_FILES = new Set(['framework.js', 'assumptions.js', 'check-shared.js', 'curve.js', 'lifecycle.js', 'integrate.js']);
 const num = (n) => String(n).replace('.', '\\.').replace(/^0\\\./, '0?\\.');
 
 const RULES = [

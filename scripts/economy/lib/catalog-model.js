@@ -38,18 +38,25 @@ const ENV = envMix();
 
 const matches = (qualities, t) => qualities.some((q) => (t.qualities || []).includes(q));
 
+/** Engine rule today: a Lucky roll is an item 20% of the time (cast.js drawTemplates). */
+const LUCKY_ITEM_SHARE = 0.2;
+
 /**
  * Distribution of one draw: [{ kind: 'fish'|'item', template, rarity, p }].
  * @param {string} biome capitalised biome name
  * @param {string[]} qualities cast qualities (weak/strong)
  * @param {object} table normalised rarity probabilities
+ * @param {object} [opts] { fish: species list override (e.g. a proposed biome ladder),
+ *   luckyItemShare: share of Lucky rolls that are items (default: today's engine rule, 0.2) }
  */
-function drawDistribution(biome, qualities, table) {
+function drawDistribution(biome, qualities, table, opts = {}) {
+	const pool = opts.fish ? opts.fish.map((f) => ({ weather: 'all', season: 'all', qualities: ['weak'], ...f, rarity: String(f.rarity).toLowerCase() })) : FISH;
+	const itemShare = Number.isFinite(opts.luckyItemShare) ? Math.min(1, Math.max(0, opts.luckyItemShare)) : LUCKY_ITEM_SHARE;
 	const acc = new Map();
 	for (const env of ENV) {
 		const byRarity = {};
 		for (const r of RARITIES) {
-			byRarity[r] = FISH.filter((f) => f.biome === biome && f.rarity === r && [env.weather, 'all'].includes(f.weather) && [env.season, 'all'].includes(f.season) && matches(qualities, f));
+			byRarity[r] = pool.filter((f) => f.biome === biome && f.rarity === r && [env.weather, 'all'].includes(f.weather) && [env.season, 'all'].includes(f.season) && matches(qualities, f));
 		}
 		const items = LUCKY_ITEMS;
 		// Acceptance probability of a rolled rarity (one attempt).
@@ -58,7 +65,7 @@ function drawDistribution(biome, qualities, table) {
 			const fishOk = byRarity[r].length > 0 ? 1 : 0;
 			if (r === 'lucky') {
 				const itemOk = items.length ? items.filter((i) => matches(qualities, i)).length / items.length : 0;
-				accept[r] = 0.8 * fishOk + 0.2 * itemOk;
+				accept[r] = (1 - itemShare) * fishOk + itemShare * itemOk;
 			}
 			else {
 				accept[r] = fishOk;
@@ -69,7 +76,7 @@ function drawDistribution(biome, qualities, table) {
 		for (const r of RARITIES) {
 			const pr = ((table[r] || 0) * accept[r]) / mass;
 			if (!pr) continue;
-			const fishShare = r === 'lucky' ? (0.8 * (byRarity[r].length ? 1 : 0)) / accept[r] : 1;
+			const fishShare = r === 'lucky' ? ((1 - itemShare) * (byRarity[r].length ? 1 : 0)) / accept[r] : 1;
 			for (const f of byRarity[r]) {
 				const key = `fish:${f.name}`;
 				const cur = acc.get(key) || { kind: 'fish', template: f, rarity: r, p: 0 };
@@ -109,4 +116,7 @@ function summarize(dist, { value = currentValue, xpWeight = null } = {}) {
 	return { rarity, fishShare: fishP, valuePerDraw: valueSum, valuePerFish: fishP ? valueSum / fishP : 0, xpWeightPerDraw: xpW, strongOnlyShare: strongP };
 }
 
-module.exports = { FISH, LUCKY_ITEMS, ENV, RARITY_FACTOR, currentValue, drawDistribution, summarize };
+/** Catalog fish a box or pool could award: species of a biome (optionally one rarity), any weather/season. */
+const catchableFish = (biome, rarity = null) => FISH.filter((f) => f.biome === biome && (!rarity || f.rarity === String(rarity).toLowerCase()));
+
+module.exports = { FISH, LUCKY_ITEMS, LUCKY_ITEM_SHARE, ENV, RARITY_FACTOR, currentValue, drawDistribution, summarize, catchableFish };

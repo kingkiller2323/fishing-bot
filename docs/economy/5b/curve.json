@@ -1,8 +1,9 @@
 {
- "frameworkVersion": "5b.2",
- "sharedDigest": "26bbca823c8b2b8b",
+ "frameworkVersion": "5b.3",
+ "sharedDigest": "e73d1be6aec26cdd",
+ "model": "provisional",
  "gearPathSource": "provisional",
- "method": "exact analytic model; provisional normal rod path; level-scaled daily XP (60 x level); rod tiers bought after saving 1.5 h of stage income",
+ "method": "shared lifecycle core; provisional normal rod path; level-scaled daily XP (60 x level); rod tiers bought after saving 1.5 h of stage income",
  "targets": {
   "20": [
    5,
@@ -33,6 +34,52 @@
    "50": 42.73,
    "60": 66.35
   }
+ },
+ "framework": {
+  "quartic": 0.0475,
+  "regular": {
+   "10": 1.35,
+   "20": 5.62,
+   "30": 13.5,
+   "40": 25.52,
+   "50": 42.73,
+   "60": 66.35
+  },
+  "windows": {
+   "20": {
+    "hours": 5.62,
+    "window": [
+     5,
+     6
+    ],
+    "ok": true
+   },
+   "30": {
+    "hours": 13.5,
+    "window": [
+     12,
+     15
+    ],
+    "ok": true
+   },
+   "40": {
+    "hours": 25.52,
+    "window": [
+     24,
+     30
+    ],
+    "ok": true
+   },
+   "50": {
+    "hours": 42.73,
+    "window": [
+     40,
+     45
+    ],
+    "ok": true
+   }
+  },
+  "allInWindow": true
  },
  "thresholds": {
   "10": {
@@ -68,15 +115,15 @@
   "casual": {
    "10": {
     "hours": 1.47,
-    "day": 8
+    "day": 7
    },
    "20": {
     "hours": 5.22,
-    "day": 26
+    "day": 25
    },
    "30": {
     "hours": 11.25,
-    "day": 55
+    "day": 54
    },
    "40": {
     "hours": 20.03,
@@ -84,11 +131,11 @@
    },
    "50": {
     "hours": 32.3,
-    "day": 156
+    "day": 155
    },
    "60": {
     "hours": 48.97,
-    "day": 236
+    "day": 235
    }
   },
   "regular": {
@@ -102,11 +149,11 @@
    },
    "30": {
     "hours": 13.5,
-    "day": 19
+    "day": 18
    },
    "40": {
     "hours": 25.52,
-    "day": 35
+    "day": 34
    },
    "50": {
     "hours": 42.73,
@@ -514,5 +561,10 @@
     "60": 92.98
    }
   }
- ]
+ ],
+ "regularArchetype": {
+  "minutesPerDay": 45,
+  "overheadS": 4,
+  "daysPerWeek": 7
+ }
 }
