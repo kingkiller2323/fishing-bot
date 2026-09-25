@@ -1,4 +1,4 @@
-const { Client, Partials, Collection, GatewayIntentBits } = require("discord.js");
+const { Client, Collection, GatewayIntentBits } = require("discord.js");
 const config = require('../config');
 const commands = require("../handlers/commands");
 const events = require("../handlers/events");
@@ -22,8 +22,9 @@ module.exports = class extends Client {
 
     constructor() {
         super({
-            intents: [Object.keys(GatewayIntentBits)],
-            partials: [Object.keys(Partials)],
+            // Slash commands, buttons, select menus, modals and autocomplete arrive as interactions,
+            // which only need the Guilds intent (guild/channel cache). No privileged intents.
+            intents: [GatewayIntentBits.Guilds],
             presence: {
                 activities: [{
                     name: 'fishing',

@@ -5,5 +5,5 @@ server
 .vscode
 
 # DO NOT REMOVE THESE FOR SECURITY
-src/config.js
+# (src/config.js is tracked: it reads every secret/ID from environment variables)
 .env
