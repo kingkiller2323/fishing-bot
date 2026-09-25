@@ -8,6 +8,7 @@ const { castLine, applyCastResult, recoverPendingCasts } = require('../../../eng
 const { withUserLock } = require('../../../engine/userLock');
 const { remainingMs, startCooldown } = require('../../../engine/cooldown');
 const { COOLDOWN } = require('../../../engine/balance');
+const { formatMeasure } = require('../../../engine/presentation');
 
 /**
  * One cast: decide everything (castLine), then persist it once (applyCastResult).
@@ -29,7 +30,6 @@ const cast = (interaction, userId) => withUserLock(userId, async () => {
 
 // Presentation helpers for the catch embed.
 const RARITY_ORDER = Object.keys(branding.rarityColors);
-const formatMeasure = (n) => n.toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 2 : 1 });
 
 const formatCatch = (f) => {
 	const count = f.count > 1 ? ` ×${f.count}` : '';

@@ -13,7 +13,7 @@ function breakdown(line, format, label) {
 }
 
 /** Builds the private stats view (plain data -> embed fields). */
-function privateStatsFields({ stats, lastCast, lastSale = null }) {
+function privateStatsFields({ stats, lastCast, lastSale = null, gachaPity = null }) {
 	const fields = [];
 	if (stats.status !== 'ok') {
 		fields.push({ name: 'Fishing', value: stats.failure?.message || 'Unavailable right now.' });
@@ -55,14 +55,25 @@ function privateStatsFields({ stats, lastCast, lastSale = null }) {
 		fields.push({ name: 'Last sale (you received)', value: breakdown(sale, money, label) });
 	}
 
+	// Gacha luck (private; box reveals never show it).
+	const gacha = stats.modifiers.gacha?.stats || {};
+	const gachaParts = [['rareFind', 'Rare Find'], ['luck', 'Luck'], ['trophyChance', 'Trophy']]
+		.filter(([k]) => gacha[k]).map(([k, n]) => `${n} +${Math.round(gacha[k] * 100)}%`);
+	if (gachaParts.length) fields.push({ name: 'Box luck', value: gachaParts.join(' · ') });
+
 	// Pity is never shown during play; only here, privately, when it is active for the profile.
 	const pity = stats.pity?.config;
 	if (pity) {
 		const c = stats.pity.counters || {};
 		const lines = Object.entries(pity).map(([name, rule]) => `${name === 'lucky' ? 'Lucky' : 'Legendary+'}: ${c[rule.counter] || 0} casts since last · boost from ${rule.softStart} · guaranteed at ${rule.hard}`);
+		const boxes = Object.entries(gachaPity || {}).filter(([, v]) => Number.isFinite(v));
+		if (boxes.length) lines.push(`Boxes: ${boxes.map(([k, v]) => `${k.split(':')[0]} ${v}`).join(' · ')} opens since Legendary+`);
 		fields.push({ name: 'Pity', value: lines.join('\n') });
 	}
 	return fields;
 }
 
-module.exports = { privateStatsFields };
+/** Size/weight display used by every public card (1 decimal, 2 below 10). */
+const formatMeasure = (n) => n.toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 2 : 1 });
+
+module.exports = { privateStatsFields, formatMeasure };

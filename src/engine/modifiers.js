@@ -213,7 +213,7 @@ function resolveModifiers({ profile, rod, rodParts = null, bait = null, baitAppl
 			xpWithoutProfile: eventMult.questXp || 1,
 			cashWithoutProfile: eventMult.questCash || 1,
 		},
-		gachaLuck: profile.multipliers.gachaLuck * (1 + buffsResult.gacha),
+		gacha: { stats: { ...(profile.gacha?.stats || {}) }, buffBonus: buffsResult.gacha },
 		durabilityCostPerFish: DURABILITY.costPerFish * (1 - stats.durabilityEfficiency),
 		cooldownMs: Math.max(COOLDOWN.minMs, Math.round(COOLDOWN.fishMs * (1 - stats.fishingSpeed))),
 		rarity: { base: buildTable(profile.rarityTable), table },

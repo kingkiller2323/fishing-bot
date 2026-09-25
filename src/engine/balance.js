@@ -5,7 +5,7 @@
 // Engine code reads from here; it never hard-codes multipliers.
 const config = require('../config');
 
-const BALANCE_VERSION = '3.1.0';
+const BALANCE_VERSION = '3.2.0';
 
 /** Rarity tiers, lowest to highest. Keys match rod/bait `weights` objects. */
 const RARITIES = ['common', 'uncommon', 'rare', 'ultra', 'giant', 'legendary', 'lucky'];
@@ -63,6 +63,21 @@ const FOUNDER_PITY = {
 };
 
 /**
+ * Founder gacha luck. Phase 3 multiplied every Rare-and-above weight by 3 (Rare/Ultra/Giant/
+ * Legendary/Lucky alike). As stats this is Rare Find, Trophy and Luck at least +200% each; Luck is
+ * raised to +400% so Legendary/Lucky pulls improve more than Rare/Ultra (see Phase 4 report).
+ */
+const FOUNDER_GACHA_STATS = { rareFind: 2.0, trophyChance: 2.0, luck: 4.0 };
+
+/**
+ * Founder gacha pity, tracked per box: opens without a Legendary+ reward. Rules whose tiers a box
+ * cannot award are skipped for that box.
+ */
+const FOUNDER_GACHA_PITY = {
+	legendaryPlus: { counter: 'legendaryPlus', tiers: ['legendary', 'lucky'], softStart: 4, rampPerCast: 0.04, maxBonus: 0.5, hard: 10 },
+};
+
+/**
  * Player profiles (hierarchy):
  *   normal  - the intended competitive game. Stays at the pre-V2 baseline until the Phase 5 balance pass.
  *   founder - intentionally overpowered personal profile (FOUNDER_IDS / dev override). Never competitive.
@@ -76,9 +91,10 @@ const PROFILES = {
 		competitiveEligible: true,
 		rarityTable: NORMAL_RARITY_TABLE,
 		stats: {},
-		multipliers: { xp: 1, sell: 1, questXp: 1, questCash: 1, gachaLuck: 1 },
+		multipliers: { xp: 1, sell: 1, questXp: 1, questCash: 1 },
 		limits: { maxDraws: 5, maxPerDraw: 3 },
 		pity: null,
+		gacha: { stats: {}, pity: null },
 	},
 	founder: {
 		competitiveEligible: false,
@@ -87,17 +103,19 @@ const PROFILES = {
 		// Extra draws rolled per cast instead of a fixed +2: same average (+2.0), natural-looking
 		// catches (starter rod: 1-5 fish, mostly 2-4).
 		bonusDraws: { 0: 0.10, 1: 0.25, 2: 0.30, 3: 0.25, 4: 0.10 },
-		multipliers: { xp: 5, sell: 10, questXp: 5, questCash: 5, gachaLuck: 3 },
+		multipliers: { xp: 5, sell: 10, questXp: 5, questCash: 5 },
 		limits: { maxDraws: 8, maxPerDraw: 5 },
 		pity: FOUNDER_PITY,
+		gacha: { stats: FOUNDER_GACHA_STATS, pity: FOUNDER_GACHA_PITY },
 	},
 	test: {
 		competitiveEligible: false,
 		rarityTable: NORMAL_RARITY_TABLE,
 		stats: { durabilityEfficiency: 0.9, fishingSpeed: 0.75 },
-		multipliers: { xp: 1, sell: 1, questXp: 1, questCash: 1, gachaLuck: 1 },
+		multipliers: { xp: 1, sell: 1, questXp: 1, questCash: 1 },
 		limits: { maxDraws: 20, maxPerDraw: 20 },
 		pity: null,
+		gacha: { stats: {}, pity: null },
 	},
 };
 
@@ -174,6 +192,8 @@ module.exports = {
 	COOLDOWN,
 	STAT_CAPS,
 	FOUNDER_PITY,
+	FOUNDER_GACHA_STATS,
+	FOUNDER_GACHA_PITY,
 	PROFILES,
 	PART_RARITY_STATS,
 	QUICK_FISHING_SPEED,

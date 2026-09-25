@@ -26,16 +26,15 @@ const { Pond } = require('../schemas/PondSchema');
 const { Cast } = require('../schemas/CastSchema');
 const { WeatherPattern } = require('../class/WeatherPattern');
 const { Season } = require('../class/Season');
-const { Utils } = require('../class/Utils');
 const { rng } = require('./rng');
 const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, levelForXp, activeEvent } = require('./balance');
 const { resolveModifiers, rollDraws } = require('./modifiers');
 const { applyPity, roll, toPercent } = require('./rarity');
+const { oid, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
 const MAX_DRAW_ATTEMPTS = 25;
 const RARITY_ORDER = ['Common', 'Uncommon', 'Rare', 'Ultra', 'Giant', 'Legendary', 'Lucky'];
-const APPLIED_CASTS_KEEP = 50;
 const POND_WARNING_AT = 250;
 
 /** Thrown when a cast cannot produce any fish (misconfigured catalog), instead of looping forever. */
@@ -49,9 +48,6 @@ class NoCatchError extends Error {
 
 const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
-// Fields that belong to a stored document itself and must not be copied into a clone.
-const DOC_OWN_FIELDS = ['_id', '__v', 'createdAt', 'updatedAt', 'appliedCasts'];
-const copyFields = (doc) => Object.fromEntries(Object.entries(doc).filter(([key]) => !DOC_OWN_FIELDS.includes(key)));
 
 /**
  * Picks catalog templates for each draw: roll a rarity from the cast's probability table, pick an
@@ -233,9 +229,7 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 	for (const { template, count } of stacks) {
 		const t = plain(template);
 		if (t.type === 'fish') {
-			const size = parseFloat((await Utils.binomialRandomInRange(10, 0.5, t.minSize, t.maxSize)).toFixed(3));
-			const weight = parseFloat((await Utils.binomialRandomInRange(10, 0.5, t.minWeight, t.maxWeight)).toFixed(3));
-			const rawValue = parseInt(await require('../class/Fish').Fish.calculateSellValue(t.baseValue, size, weight, t.rarity), 10);
+			const { size, weight, rawValue } = await rollFishStats(t);
 			// Sell bonuses (gear, event, profile) are baked into the stored value; cash buffs apply at sale.
 			// reward.base = what the same catch is worth without the profile; final = stored value.
 			const value = Math.round(rawValue * modifiers.sell.multiplier);
@@ -245,25 +239,10 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 			const locked = autoLockSpecies.includes(t.name.toLowerCase());
 			catches.push({ kind: 'fish', id: fishId, templateId: String(t._id), name: t.name, rarity: t.rarity, type: t.type, count, size, weight, rawValue, value, reward, qualities: t.qualities || [], biome: t.biome, icon: t.icon, locked, autoLocked: locked });
 
-			const fields = copyFields(t);
-			fishDocs.push({
-				...fields,
-				_id: fishId,
-				__t: 'FishData',
-				user: String(userId),
-				obtained: now.getTime(),
-				count,
-				size,
-				weight,
-				value,
-				valueBase,
-				guild: guildId || fields.guild,
-				locked,
-				castId,
-				profile: profile.name,
-				balanceVersion: BALANCE_VERSION,
-				competitiveEligible: modifiers.competitiveEligible,
-			});
+			fishDocs.push(buildFishDoc({
+				template: t, id: fishId, userId, guildId, count, size, weight, value, valueBase, locked, now,
+				meta: { castId, profile: profile.name, balanceVersion: BALANCE_VERSION, competitiveEligible: modifiers.competitiveEligible },
+			}));
 		}
 		else {
 			// Lucky draw returned a catalog item: granted after the commit.
@@ -385,62 +364,6 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 // ---------------------------------------------------------------------------------------------
 // Persistence
 
-const oid = (id) => (id instanceof ObjectId ? id : new ObjectId(String(id)));
-const guardPush = (castId) => ({ appliedCasts: { $each: [castId], $slice: -APPLIED_CASTS_KEEP } });
-
-// How each catalog type is stored when granted (mirrors User.sendToInventory + Utils.clone).
-const GRANT_TYPES = {
-	rod: { t: 'RodData', array: 'rods', stack: false, extra: { fishCaught: 0 } },
-	customrod: { t: 'CustomRodData', array: 'rods', stack: false, extra: { fishCaught: 0 } },
-	bait: { t: 'BaitData', array: 'baits', stack: true },
-	buff: { t: 'BuffData', array: 'buffs', stack: true },
-	gacha: { t: 'GachaData', array: 'gacha', stack: true },
-	license: { t: 'LicenseData', array: 'items', stack: 'ifCount' },
-	part_rod: { t: 'PartRodData', array: 'items', stack: 'ifCount' },
-	part_reel: { t: 'PartReelData', array: 'items', stack: 'ifCount' },
-	part_hook: { t: 'PartHookData', array: 'items', stack: 'ifCount' },
-	part_handle: { t: 'PartHandleData', array: 'items', stack: 'ifCount' },
-	default: { t: 'ItemData', array: 'items', stack: 'ifCount' },
-};
-
-/** Grants a catalog item exactly once per grant key (stacks like sendToInventory). */
-async function grantItem(userId, grant, session) {
-	const opts = session ? { session } : {};
-	const items = ItemData.collection;
-	const users = UserModel.collection;
-
-	// Already applied (either as a new stack or an increment of an existing one)?
-	const done = await items.findOne({ user: userId, appliedCasts: grant.key }, opts);
-	if (done) {
-		const info = GRANT_TYPES[done.type] || GRANT_TYPES.default;
-		await users.updateOne({ userId }, { $addToSet: { [`inventory.${info.array}`]: done._id } }, opts);
-		return;
-	}
-
-	const template = await Item.collection.findOne({ _id: oid(grant.templateId) }, opts);
-	if (!template) return;
-	const info = GRANT_TYPES[template.type] || GRANT_TYPES.default;
-
-	if (info.stack) {
-		const userDoc = await users.findOne({ userId }, { ...opts, projection: { [`inventory.${info.array}`]: 1 } });
-		const owned = userDoc?.inventory?.[info.array] || [];
-		const existing = owned.length ? await items.findOne({ _id: { $in: owned }, name: template.name }, opts) : null;
-		if (existing && (info.stack === true || existing.count)) {
-			await items.updateOne({ _id: existing._id, appliedCasts: { $ne: grant.key } }, { $inc: { count: grant.count }, $push: guardPush(grant.key) }, opts);
-			return;
-		}
-	}
-
-	const fields = copyFields(template);
-	const now = new Date();
-	try {
-		await items.insertOne({ ...fields, ...(info.extra || {}), _id: oid(grant.newId), __t: info.t, user: userId, obtained: Date.now(), count: grant.count, appliedCasts: [grant.key], createdAt: now, updatedAt: now }, opts);
-	}
-	catch (error) {
-		if (error.code !== 11000) throw error;
-	}
-	await users.updateOne({ userId }, { $addToSet: { [`inventory.${info.array}`]: oid(grant.newId) } }, opts);
-}
 
 /** Runs every write of a cast. Each step is idempotent; `fault(step)` lets tests inject failures. */
 async function writeCast(result, { session, fault }) {
@@ -449,16 +372,7 @@ async function writeCast(result, { session, fault }) {
 	const now = new Date();
 
 	await fault('fish');
-	if (result.writes.fishDocs.length > 0) {
-		const docs = result.writes.fishDocs.map((d) => ({ ...d, _id: oid(d._id), createdAt: now, updatedAt: now }));
-		try {
-			await FishData.collection.insertMany(docs, { ...opts, ordered: false });
-		}
-		catch (error) {
-			const errors = error.writeErrors || (error.code ? [error] : []);
-			if (!errors.length || errors.some((e) => (e.code ?? e.err?.code) !== 11000)) throw error;
-		}
-	}
+	await insertFishDocs(result.writes.fishDocs, session);
 
 	await fault('rod');
 	await ItemData.collection.updateOne(

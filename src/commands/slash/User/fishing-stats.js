@@ -25,7 +25,12 @@ module.exports = {
 				new EmbedBuilder()
 					.setTitle('🎣 Your fishing stats')
 					.setColor(branding.color)
-					.addFields(privateStatsFields({ stats, lastCast: last?.result, lastSale: userDoc?.stats?.lastSale }))
+					.addFields(privateStatsFields({
+						stats,
+						lastCast: last?.result,
+						lastSale: userDoc?.stats?.lastSale,
+						gachaPity: userDoc?.pity?.gacha instanceof Map ? Object.fromEntries(userDoc.pity.gacha) : userDoc?.pity?.gacha,
+					}))
 					.setFooter({ text: `${branding.name} · only you can see this` }),
 			],
 		});

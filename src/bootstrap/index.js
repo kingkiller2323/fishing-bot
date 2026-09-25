@@ -181,6 +181,12 @@ async function validate() {
 	}
 	if (gaps.length > 0) problems.push(`base fish grid incomplete: ${gaps.slice(0, 5).join(', ')}${gaps.length > 5 ? ', ...' : ''}`);
 
+	// Every catalog box must have a valid Gacha V2 definition with non-empty reward pools.
+	const { validateBoxes } = require('../engine/gacha');
+	const boxNames = (await Item.find({ type: 'gacha', ...CATALOG }).select('name').lean()).map((b) => b.name);
+	const gacha = await validateBoxes(boxNames);
+	problems.push(...gacha.problems);
+
 	for (const name of REQUIRED_ITEMS) {
 		if (!await Item.exists({ name, ...CATALOG })) problems.push(`required item "${name}" is missing`);
 	}
@@ -235,6 +241,9 @@ async function bootstrap() {
 	const { recoverPendingCasts } = require('../engine/cast');
 	const recovered = await recoverPendingCasts();
 	if (recovered > 0) log(`Recovered ${recovered} interrupted cast(s).`, 'warn');
+	const { recoverPendingOpens } = require('../engine/gacha');
+	const recoveredOpens = await recoverPendingOpens();
+	if (recoveredOpens > 0) log(`Recovered ${recoveredOpens} interrupted box opening(s).`, 'warn');
 	log(`Bootstrap complete in ${Date.now() - started}ms.`, 'done');
 }
 

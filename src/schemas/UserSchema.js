@@ -119,6 +119,8 @@ const UserSchema = new Schema ({
 		castsSinceLegendary: { type: Number, default: 0 },
 		castsSinceLucky: { type: Number, default: 0 },
 		gachaSinceHighTier: { type: Number, default: 0 },
+		// Gacha pity counters per box and rule: '<boxId>:<rule>' -> opens since the tier.
+		gacha: { type: Map, of: Number, default: undefined },
 	},
 	// Automatic protection of future catches. Individual protection is FishData.locked.
 	// `species` is undefined on accounts created before this existed (see bootstrap migration).
