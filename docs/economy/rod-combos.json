@@ -1,0 +1,1149 @@
+{
+ "combos": 2450,
+ "minLevel": 20,
+ "levels": [
+  20,
+  30,
+  40,
+  50,
+  60,
+  70
+ ],
+ "fishPerCastDistribution": {
+  "4": 60,
+  "6": 70,
+  "8": 70,
+  "9": 100,
+  "10": 10,
+  "12": 210,
+  "15": 1930
+ },
+ "bestAtLevel": {
+  "20": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Trolling Reel",
+    "Barbed Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Trolling Reel (Ultra)",
+    "Barbed Hook (Common)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 20,
+   "fishPerCast": 10,
+   "draws": 5,
+   "perDraw": 2,
+   "strong": true,
+   "durability": 10500,
+   "repairCost": 20000,
+   "castsPerLife": 1050,
+   "lifetimeCasts": 4200,
+   "cooldownMs": 4500,
+   "stats": {
+    "rareFind": 0.4,
+    "luck": 0.25,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.1
+   },
+   "expectedCratesForParts": 458
+  },
+  "30": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Barbed Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Barbed Hook (Common)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 30,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 7500,
+   "repairCost": 30000,
+   "castsPerLife": 500,
+   "lifetimeCasts": 2000,
+   "cooldownMs": 4250,
+   "stats": {
+    "rareFind": 0.35,
+    "luck": 0.2,
+    "trophyChance": 0.1,
+    "sellBonus": 0,
+    "fishingSpeed": 0.15000000000000002
+   },
+   "expectedCratesForParts": 321,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "40": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Fly Fishing Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Fly Fishing Reel (Ultra)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 40,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 13000,
+   "repairCost": 40000,
+   "castsPerLife": 866,
+   "lifetimeCasts": 3464,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.55,
+    "luck": 0.35,
+    "trophyChance": 0.3,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 558,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "50": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "60": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "70": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "80": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  }
+ },
+ "cheapestMaxAtLevel": {
+  "20": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Trolling Reel",
+    "Barbed Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Trolling Reel (Ultra)",
+    "Barbed Hook (Common)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 20,
+   "fishPerCast": 10,
+   "draws": 5,
+   "perDraw": 2,
+   "strong": true,
+   "durability": 10500,
+   "repairCost": 20000,
+   "castsPerLife": 1050,
+   "lifetimeCasts": 4200,
+   "cooldownMs": 4500,
+   "stats": {
+    "rareFind": 0.4,
+    "luck": 0.25,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.1
+   },
+   "expectedCratesForParts": 458
+  },
+  "30": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Barbed Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Barbed Hook (Common)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 30,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 7500,
+   "repairCost": 30000,
+   "castsPerLife": 500,
+   "lifetimeCasts": 2000,
+   "cooldownMs": 4250,
+   "stats": {
+    "rareFind": 0.35,
+    "luck": 0.2,
+    "trophyChance": 0.1,
+    "sellBonus": 0,
+    "fishingSpeed": 0.15000000000000002
+   },
+   "expectedCratesForParts": 321,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "40": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Fly Fishing Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Fly Fishing Reel (Ultra)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 40,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 13000,
+   "repairCost": 40000,
+   "castsPerLife": 866,
+   "lifetimeCasts": 3464,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.55,
+    "luck": 0.35,
+    "trophyChance": 0.3,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 558,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "50": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "60": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "70": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  },
+  "80": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Centerpin Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Centerpin Reel (Rare)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.5,
+    "luck": 0.3,
+    "trophyChance": 0.2,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 461,
+   "cheapest15": {
+    "names": [
+     "Bamboo Rod Piece",
+     "Jigging Reel",
+     "Barbed Hook",
+     "Wooden Handle"
+    ],
+    "parts": [
+     "Bamboo Rod Piece (Uncommon)",
+     "Jigging Reel (Rare)",
+     "Barbed Hook (Common)",
+     "Wooden Handle (Common)"
+    ],
+    "level": 30,
+    "fishPerCast": 15,
+    "draws": 5,
+    "perDraw": 3,
+    "strong": true,
+    "durability": 5000,
+    "repairCost": 30000,
+    "castsPerLife": 333,
+    "lifetimeCasts": 1332,
+    "cooldownMs": 4750,
+    "stats": {
+     "rareFind": 0.15,
+     "luck": 0.05,
+     "trophyChance": 0,
+     "sellBonus": 0,
+     "fishingSpeed": 0.05
+    },
+    "expectedCratesForParts": 62
+   }
+  }
+ },
+ "cheapestAt20": {
+  "4": {
+   "names": [
+    "Wooden Rod Piece",
+    "Plastic Reel",
+    "Barbed Hook",
+    "Wooden Handle"
+   ],
+   "parts": [
+    "Wooden Rod Piece (Common)",
+    "Plastic Reel (Common)",
+    "Barbed Hook (Common)",
+    "Wooden Handle (Common)"
+   ],
+   "level": 20,
+   "fishPerCast": 4,
+   "draws": 2,
+   "perDraw": 2,
+   "strong": false,
+   "durability": 2300,
+   "repairCost": 20000,
+   "castsPerLife": 575,
+   "lifetimeCasts": 2300,
+   "cooldownMs": 5000,
+   "stats": {
+    "rareFind": 0,
+    "luck": 0,
+    "trophyChance": 0,
+    "sellBonus": 0,
+    "fishingSpeed": 0
+   },
+   "expectedCratesForParts": 8
+  },
+  "6": {
+   "names": [
+    "Bamboo Rod Piece",
+    "Plastic Reel",
+    "Barbed Hook",
+    "Wooden Handle"
+   ],
+   "parts": [
+    "Bamboo Rod Piece (Uncommon)",
+    "Plastic Reel (Common)",
+    "Barbed Hook (Common)",
+    "Wooden Handle (Common)"
+   ],
+   "level": 20,
+   "fishPerCast": 6,
+   "draws": 3,
+   "perDraw": 2,
+   "strong": false,
+   "durability": 2800,
+   "repairCost": 20000,
+   "castsPerLife": 466,
+   "lifetimeCasts": 1864,
+   "cooldownMs": 5000,
+   "stats": {
+    "rareFind": 0.05,
+    "luck": 0,
+    "trophyChance": 0,
+    "sellBonus": 0,
+    "fishingSpeed": 0
+   },
+   "expectedCratesForParts": 11
+  },
+  "8": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Plastic Reel",
+    "Barbed Hook",
+    "Wooden Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Plastic Reel (Common)",
+    "Barbed Hook (Common)",
+    "Wooden Handle (Common)"
+   ],
+   "level": 20,
+   "fishPerCast": 8,
+   "draws": 4,
+   "perDraw": 2,
+   "strong": false,
+   "durability": 3800,
+   "repairCost": 20000,
+   "castsPerLife": 475,
+   "lifetimeCasts": 1900,
+   "cooldownMs": 4750,
+   "stats": {
+    "rareFind": 0.1,
+    "luck": 0.05,
+    "trophyChance": 0,
+    "sellBonus": 0,
+    "fishingSpeed": 0.05
+   },
+   "expectedCratesForParts": 61
+  },
+  "10": {
+   "names": [
+    "Fiberglass Rod Piece",
+    "Trolling Reel",
+    "Barbed Hook",
+    "Wooden Handle"
+   ],
+   "parts": [
+    "Fiberglass Rod Piece (Rare)",
+    "Trolling Reel (Ultra)",
+    "Barbed Hook (Common)",
+    "Wooden Handle (Common)"
+   ],
+   "level": 20,
+   "fishPerCast": 10,
+   "draws": 5,
+   "perDraw": 2,
+   "strong": true,
+   "durability": 8000,
+   "repairCost": 20000,
+   "castsPerLife": 800,
+   "lifetimeCasts": 3200,
+   "cooldownMs": 4750,
+   "stats": {
+    "rareFind": 0.25,
+    "luck": 0.15,
+    "trophyChance": 0.1,
+    "sellBonus": 0,
+    "fishingSpeed": 0.05
+   },
+   "expectedCratesForParts": 314
+  }
+ },
+ "representative": {
+  "Custom (Common parts)": {
+   "names": [
+    "Wooden Rod Piece",
+    "Plastic Reel",
+    "Barbed Hook",
+    "Wooden Handle"
+   ],
+   "parts": [
+    "Wooden Rod Piece (Common)",
+    "Plastic Reel (Common)",
+    "Barbed Hook (Common)",
+    "Wooden Handle (Common)"
+   ],
+   "level": 20,
+   "fishPerCast": 4,
+   "draws": 2,
+   "perDraw": 2,
+   "strong": false,
+   "durability": 2300,
+   "repairCost": 20000,
+   "castsPerLife": 575,
+   "lifetimeCasts": 2300,
+   "cooldownMs": 5000,
+   "stats": {
+    "rareFind": 0,
+    "luck": 0,
+    "trophyChance": 0,
+    "sellBonus": 0,
+    "fishingSpeed": 0
+   },
+   "expectedCratesForParts": 8
+  },
+  "Custom (Uncommon parts)": {
+   "names": [
+    "Bamboo Rod Piece",
+    "Aluminum Reel",
+    "Circle Hook",
+    "Cork Handle"
+   ],
+   "parts": [
+    "Bamboo Rod Piece (Uncommon)",
+    "Aluminum Reel (Uncommon)",
+    "Circle Hook (Uncommon)",
+    "Cork Handle (Uncommon)"
+   ],
+   "level": 20,
+   "fishPerCast": 6,
+   "draws": 3,
+   "perDraw": 2,
+   "strong": true,
+   "durability": 4500,
+   "repairCost": 20000,
+   "castsPerLife": 750,
+   "lifetimeCasts": 3000,
+   "cooldownMs": 5000,
+   "stats": {
+    "rareFind": 0.2,
+    "luck": 0,
+    "trophyChance": 0,
+    "sellBonus": 0,
+    "fishingSpeed": 0
+   },
+   "expectedCratesForParts": 17
+  },
+  "Custom (Rare parts)": {
+   "names": [
+    "Graphite Rod Piece",
+    "Jigging Reel",
+    "Treble Hook",
+    "EVA Handle"
+   ],
+   "parts": [
+    "Graphite Rod Piece (Rare)",
+    "Jigging Reel (Rare)",
+    "Treble Hook (Rare)",
+    "EVA Handle (Rare)"
+   ],
+   "level": 50,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 10000,
+   "repairCost": 50000,
+   "castsPerLife": 666,
+   "lifetimeCasts": 2664,
+   "cooldownMs": 4500,
+   "stats": {
+    "rareFind": 0.4,
+    "luck": 0.2,
+    "trophyChance": 0,
+    "sellBonus": 0,
+    "fishingSpeed": 0.1
+   },
+   "expectedCratesForParts": 127
+  },
+  "Custom (Ultra parts)": {
+   "names": [
+    "Carbon Fiber Rod Piece",
+    "Fly Fishing Reel",
+    "Jig Hook",
+    "Carbon Fiber Handle"
+   ],
+   "parts": [
+    "Carbon Fiber Rod Piece (Ultra)",
+    "Fly Fishing Reel (Ultra)",
+    "Jig Hook (Ultra)",
+    "Carbon Fiber Handle (Ultra)"
+   ],
+   "level": 60,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 14500,
+   "repairCost": 60000,
+   "castsPerLife": 966,
+   "lifetimeCasts": 3864,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 0.6,
+    "luck": 0.4,
+    "trophyChance": 0.4,
+    "sellBonus": 0,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 633
+  },
+  "Custom (Legendary parts)": {
+   "names": [
+    "Composite Rod Piece",
+    "Sage Green Reel",
+    "Worm Hook",
+    "Composite Handle"
+   ],
+   "parts": [
+    "Composite Rod Piece (Legendary)",
+    "Sage Green Reel (Legendary)",
+    "Worm Hook (Legendary)",
+    "Composite Handle (Legendary)"
+   ],
+   "level": 70,
+   "fishPerCast": 15,
+   "draws": 5,
+   "perDraw": 3,
+   "strong": true,
+   "durability": 20000,
+   "repairCost": 70000,
+   "castsPerLife": 1333,
+   "lifetimeCasts": 5332,
+   "cooldownMs": 4000,
+   "stats": {
+    "rareFind": 1,
+    "luck": 0.8,
+    "trophyChance": 0.6,
+    "sellBonus": 0.2,
+    "fishingSpeed": 0.2
+   },
+   "expectedCratesForParts": 2109
+  }
+ }
+}

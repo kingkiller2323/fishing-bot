@@ -1,0 +1,1006 @@
+{
+ "proposal": {
+  "curve": {
+   "base": 100,
+   "extraAfter": 20,
+   "extra": 400
+  },
+  "biomes": {
+   "ocean": {
+    "level": 0,
+    "permit": 0,
+    "targetValuePerFish": 25
+   },
+   "river": {
+    "level": 10,
+    "permit": 5000,
+    "targetValuePerFish": 40
+   },
+   "lake": {
+    "level": 20,
+    "permit": 25000,
+    "targetValuePerFish": 60
+   },
+   "pond": {
+    "level": 30,
+    "permit": 75000,
+    "targetValuePerFish": 85
+   },
+   "coast": {
+    "level": 40,
+    "permit": 200000,
+    "targetValuePerFish": 115
+   },
+   "swamp": {
+    "level": 50,
+    "permit": 500000,
+    "targetValuePerFish": 150
+   }
+  },
+  "xpByRarity": {
+   "common": 1,
+   "uncommon": 1.2,
+   "rare": 1.5,
+   "ultra": 2,
+   "giant": 2.5,
+   "legendary": 4,
+   "lucky": 6
+  },
+  "rods": {
+   "old": {
+    "label": "Old Rod (unbreakable)",
+    "level": 0,
+    "fishPerCast": 1,
+    "rarityUplift": 1,
+    "cooldownMs": 5000,
+    "repairCost": 0,
+    "durability": "unbreakable",
+    "box": null,
+    "boxes": 0
+   },
+   "t1": {
+    "label": "Tier 1 crafted (Common/Uncommon parts)",
+    "level": 20,
+    "fishPerCast": 1.15,
+    "rarityUplift": 1.03,
+    "cooldownMs": 5000,
+    "repairCost": 2500,
+    "durability": 3000,
+    "box": "Fishing Crate",
+    "boxes": 12
+   },
+   "t2": {
+    "label": "Tier 2 crafted (Rare parts)",
+    "level": 30,
+    "fishPerCast": 1.3,
+    "rarityUplift": 1.08,
+    "cooldownMs": 4750,
+    "repairCost": 10000,
+    "durability": 5000,
+    "box": "Pro Tackle Crate",
+    "boxes": 5
+   },
+   "t3": {
+    "label": "Tier 3 crafted (Ultra parts)",
+    "level": 40,
+    "fishPerCast": 1.45,
+    "rarityUplift": 1.12,
+    "cooldownMs": 4500,
+    "repairCost": 30000,
+    "durability": 7500,
+    "box": "Master Tackle Crate",
+    "boxes": 4
+   },
+   "t4": {
+    "label": "Tier 4 crafted (Legendary+ parts)",
+    "level": 50,
+    "fishPerCast": 1.6,
+    "rarityUplift": 1.18,
+    "cooldownMs": 4250,
+    "repairCost": 75000,
+    "durability": 10000,
+    "box": "Master Tackle Crate",
+    "boxes": 10
+   }
+  },
+  "boxes": {
+   "Fishing Crate": {
+    "price": 2500,
+    "note": "Common-Rare parts and bait (today $750)"
+   },
+   "Pro Tackle Crate": {
+    "price": 25000,
+    "note": "NEW: rarity floor Rare, parts only"
+   },
+   "Master Tackle Crate": {
+    "price": 150000,
+    "note": "NEW: rarity floor Ultra, parts only"
+   }
+  },
+  "daily": {
+   "cashPerLevel": 200,
+   "xpPerLevel": 60,
+   "box": "Daily Box"
+  },
+  "streakCrateLiquid": 350,
+  "licenses": {
+   "basic": {
+    "price": 150000,
+    "level": 15
+   },
+   "advanced": {
+    "price": 750000,
+    "level": 30
+   },
+   "expert": {
+    "price": 2500000,
+    "level": 45
+   }
+  }
+ },
+ "curve": {
+  "10": {
+   "current": 10000,
+   "proposed": 10000
+  },
+  "20": {
+   "current": 40000,
+   "proposed": 40000
+  },
+  "30": {
+   "current": 90000,
+   "proposed": 130000
+  },
+  "40": {
+   "current": 160000,
+   "proposed": 320000
+  },
+  "50": {
+   "current": 250000,
+   "proposed": 610000
+  },
+  "60": {
+   "current": 360000,
+   "proposed": 1000000
+  },
+  "70": {
+   "current": 490000,
+   "proposed": 1490000
+  },
+  "80": {
+   "current": 640000,
+   "proposed": 2080000
+  }
+ },
+ "rates": [
+  {
+   "biome": "ocean",
+   "tier": "old",
+   "fishPerCast": 1,
+   "xpPerCast": 18.4,
+   "valuePerCast": 25,
+   "xpPerHour": 7365,
+   "cashPerHour": 10000
+  },
+  {
+   "biome": "ocean",
+   "tier": "t1",
+   "fishPerCast": 1.15,
+   "xpPerCast": 21.8,
+   "valuePerCast": 29.6,
+   "xpPerHour": 8723,
+   "cashPerHour": 11845
+  },
+  {
+   "biome": "ocean",
+   "tier": "t2",
+   "fishPerCast": 1.3,
+   "xpPerCast": 25.8,
+   "valuePerCast": 35.1,
+   "xpPerHour": 10635,
+   "cashPerHour": 14441
+  },
+  {
+   "biome": "ocean",
+   "tier": "t3",
+   "fishPerCast": 1.45,
+   "xpPerCast": 29.9,
+   "valuePerCast": 40.6,
+   "xpPerHour": 12664,
+   "cashPerHour": 17195
+  },
+  {
+   "biome": "ocean",
+   "tier": "t4",
+   "fishPerCast": 1.6,
+   "xpPerCast": 34.8,
+   "valuePerCast": 47.2,
+   "xpPerHour": 15168,
+   "cashPerHour": 20596
+  },
+  {
+   "biome": "river",
+   "tier": "old",
+   "fishPerCast": 1,
+   "xpPerCast": 18.5,
+   "valuePerCast": 40,
+   "xpPerHour": 7389,
+   "cashPerHour": 16000
+  },
+  {
+   "biome": "river",
+   "tier": "t1",
+   "fishPerCast": 1.15,
+   "xpPerCast": 21.9,
+   "valuePerCast": 47.4,
+   "xpPerHour": 8752,
+   "cashPerHour": 18952
+  },
+  {
+   "biome": "river",
+   "tier": "t2",
+   "fishPerCast": 1.3,
+   "xpPerCast": 25.9,
+   "valuePerCast": 56.2,
+   "xpPerHour": 10670,
+   "cashPerHour": 23106
+  },
+  {
+   "biome": "river",
+   "tier": "t3",
+   "fishPerCast": 1.45,
+   "xpPerCast": 30,
+   "valuePerCast": 65,
+   "xpPerHour": 12705,
+   "cashPerHour": 27512
+  },
+  {
+   "biome": "river",
+   "tier": "t4",
+   "fishPerCast": 1.6,
+   "xpPerCast": 34.9,
+   "valuePerCast": 75.5,
+   "xpPerHour": 15218,
+   "cashPerHour": 32954
+  },
+  {
+   "biome": "lake",
+   "tier": "old",
+   "fishPerCast": 1,
+   "xpPerCast": 18.8,
+   "valuePerCast": 60,
+   "xpPerHour": 7509,
+   "cashPerHour": 24000
+  },
+  {
+   "biome": "lake",
+   "tier": "t1",
+   "fishPerCast": 1.15,
+   "xpPerCast": 22.2,
+   "valuePerCast": 71.1,
+   "xpPerHour": 8895,
+   "cashPerHour": 28428
+  },
+  {
+   "biome": "lake",
+   "tier": "t2",
+   "fishPerCast": 1.3,
+   "xpPerCast": 26.4,
+   "valuePerCast": 84.2,
+   "xpPerHour": 10844,
+   "cashPerHour": 34659
+  },
+  {
+   "biome": "lake",
+   "tier": "t3",
+   "fishPerCast": 1.45,
+   "xpPerCast": 30.5,
+   "valuePerCast": 97.4,
+   "xpPerHour": 12912,
+   "cashPerHour": 41269
+  },
+  {
+   "biome": "lake",
+   "tier": "t4",
+   "fishPerCast": 1.6,
+   "xpPerCast": 35.4,
+   "valuePerCast": 113.3,
+   "xpPerHour": 15466,
+   "cashPerHour": 49431
+  },
+  {
+   "biome": "pond",
+   "tier": "old",
+   "fishPerCast": 1,
+   "xpPerCast": 18.8,
+   "valuePerCast": 85,
+   "xpPerHour": 7518,
+   "cashPerHour": 34000
+  },
+  {
+   "biome": "pond",
+   "tier": "t1",
+   "fishPerCast": 1.15,
+   "xpPerCast": 22.3,
+   "valuePerCast": 100.7,
+   "xpPerHour": 8905,
+   "cashPerHour": 40273
+  },
+  {
+   "biome": "pond",
+   "tier": "t2",
+   "fishPerCast": 1.3,
+   "xpPerCast": 26.4,
+   "valuePerCast": 119.3,
+   "xpPerHour": 10857,
+   "cashPerHour": 49100
+  },
+  {
+   "biome": "pond",
+   "tier": "t3",
+   "fishPerCast": 1.45,
+   "xpPerCast": 30.5,
+   "valuePerCast": 138,
+   "xpPerHour": 12927,
+   "cashPerHour": 58464
+  },
+  {
+   "biome": "pond",
+   "tier": "t4",
+   "fishPerCast": 1.6,
+   "xpPerCast": 35.5,
+   "valuePerCast": 160.5,
+   "xpPerHour": 15484,
+   "cashPerHour": 70028
+  },
+  {
+   "biome": "coast",
+   "tier": "old",
+   "fishPerCast": 1,
+   "xpPerCast": 18.9,
+   "valuePerCast": 115,
+   "xpPerHour": 7550,
+   "cashPerHour": 46000
+  },
+  {
+   "biome": "coast",
+   "tier": "t1",
+   "fishPerCast": 1.15,
+   "xpPerCast": 22.4,
+   "valuePerCast": 136.2,
+   "xpPerHour": 8943,
+   "cashPerHour": 54487
+  },
+  {
+   "biome": "coast",
+   "tier": "t2",
+   "fishPerCast": 1.3,
+   "xpPerCast": 26.5,
+   "valuePerCast": 161.5,
+   "xpPerHour": 10903,
+   "cashPerHour": 66429
+  },
+  {
+   "biome": "coast",
+   "tier": "t3",
+   "fishPerCast": 1.45,
+   "xpPerCast": 30.7,
+   "valuePerCast": 186.8,
+   "xpPerHour": 12982,
+   "cashPerHour": 79098
+  },
+  {
+   "biome": "coast",
+   "tier": "t4",
+   "fishPerCast": 1.6,
+   "xpPerCast": 35.6,
+   "valuePerCast": 217.1,
+   "xpPerHour": 15550,
+   "cashPerHour": 94743
+  },
+  {
+   "biome": "swamp",
+   "tier": "old",
+   "fishPerCast": 1,
+   "xpPerCast": 18.4,
+   "valuePerCast": 150,
+   "xpPerHour": 7344,
+   "cashPerHour": 60000
+  },
+  {
+   "biome": "swamp",
+   "tier": "t1",
+   "fishPerCast": 1.15,
+   "xpPerCast": 21.7,
+   "valuePerCast": 177.7,
+   "xpPerHour": 8699,
+   "cashPerHour": 71070
+  },
+  {
+   "biome": "swamp",
+   "tier": "t2",
+   "fishPerCast": 1.3,
+   "xpPerCast": 25.8,
+   "valuePerCast": 210.6,
+   "xpPerHour": 10605,
+   "cashPerHour": 86647
+  },
+  {
+   "biome": "swamp",
+   "tier": "t3",
+   "fishPerCast": 1.45,
+   "xpPerCast": 29.8,
+   "valuePerCast": 243.6,
+   "xpPerHour": 12628,
+   "cashPerHour": 103172
+  },
+  {
+   "biome": "swamp",
+   "tier": "t4",
+   "fishPerCast": 1.6,
+   "xpPerCast": 34.7,
+   "valuePerCast": 283.2,
+   "xpPerHour": 15125,
+   "cashPerHour": 123578
+  }
+ ],
+ "players": {
+  "casual": {
+   "name": "casual",
+   "arch": {
+    "minutesPerDay": 12.5,
+    "overheadS": 7
+   },
+   "milestones": {
+    "level10": {
+     "day": 7,
+     "hours": 1.4
+    },
+    "biome:river": {
+     "day": 7,
+     "hours": 1.4,
+     "level": 10
+    },
+    "level20": {
+     "day": 22,
+     "hours": 4.42
+    },
+    "rod:t1": {
+     "day": 22,
+     "hours": 4.42,
+     "level": 20
+    },
+    "biome:lake": {
+     "day": 22,
+     "hours": 4.42,
+     "level": 20
+    },
+    "license:basic": {
+     "day": 37,
+     "hours": 7.5,
+     "level": 25
+    },
+    "level30": {
+     "day": 53,
+     "hours": 10.88
+    },
+    "rod:t2": {
+     "day": 53,
+     "hours": 10.88,
+     "level": 30
+    },
+    "biome:pond": {
+     "day": 53,
+     "hours": 10.92,
+     "level": 30
+    }
+   },
+   "timeline": [
+    {
+     "day": 1,
+     "hoursPlayed": 0.2,
+     "level": 3,
+     "money": 2113,
+     "tier": "old",
+     "biome": "ocean"
+    },
+    {
+     "day": 7,
+     "hoursPlayed": 1.5,
+     "level": 10,
+     "money": 16450,
+     "tier": "old",
+     "biome": "river"
+    },
+    {
+     "day": 14,
+     "hoursPlayed": 2.9,
+     "level": 15,
+     "money": 53200,
+     "tier": "old",
+     "biome": "river"
+    },
+    {
+     "day": 30,
+     "hoursPlayed": 6.3,
+     "level": 23,
+     "money": 121886,
+     "tier": "t1",
+     "biome": "lake"
+    },
+    {
+     "day": 60,
+     "hoursPlayed": 12.5,
+     "level": 31,
+     "money": 101906,
+     "tier": "t2",
+     "biome": "pond"
+    },
+    {
+     "day": 90,
+     "hoursPlayed": 18.8,
+     "level": 37,
+     "money": 541351,
+     "tier": "t2",
+     "biome": "pond"
+    }
+   ],
+   "sources": {
+    "fishSales": 471774,
+    "dailyQuests": 456200,
+    "streak": 31500
+   },
+   "sinks": {
+    "permits": 105000,
+    "crates": 155000,
+    "repairs": 8123,
+    "licenses": 150000
+   }
+  },
+  "regular": {
+   "name": "regular",
+   "arch": {
+    "minutesPerDay": 45,
+    "overheadS": 4
+   },
+   "milestones": {
+    "level10": {
+     "day": 2,
+     "hours": 1.3
+    },
+    "biome:river": {
+     "day": 2,
+     "hours": 1.3,
+     "level": 10
+    },
+    "level20": {
+     "day": 7,
+     "hours": 4.77
+    },
+    "rod:t1": {
+     "day": 7,
+     "hours": 4.77,
+     "level": 20
+    },
+    "biome:lake": {
+     "day": 7,
+     "hours": 4.77,
+     "level": 20
+    },
+    "license:basic": {
+     "day": 13,
+     "hours": 9.15,
+     "level": 26
+    },
+    "level30": {
+     "day": 18,
+     "hours": 13
+    },
+    "rod:t2": {
+     "day": 18,
+     "hours": 13,
+     "level": 30
+    },
+    "biome:pond": {
+     "day": 19,
+     "hours": 13.77,
+     "level": 30
+    },
+    "rod:t3": {
+     "day": 37,
+     "hours": 27,
+     "level": 40
+    },
+    "level40": {
+     "day": 37,
+     "hours": 27.02
+    },
+    "biome:coast": {
+     "day": 37,
+     "hours": 27.55,
+     "level": 40
+    },
+    "license:advanced": {
+     "day": 51,
+     "hours": 37.67,
+     "level": 46
+    },
+    "level50": {
+     "day": 60,
+     "hours": 44.42
+    },
+    "biome:swamp": {
+     "day": 60,
+     "hours": 44.42,
+     "level": 50
+    },
+    "rod:t4": {
+     "day": 75,
+     "hours": 55.9,
+     "level": 55
+    }
+   },
+   "timeline": [
+    {
+     "day": 1,
+     "hoursPlayed": 0.8,
+     "level": 7,
+     "money": 8050,
+     "tier": "old",
+     "biome": "ocean"
+    },
+    {
+     "day": 7,
+     "hoursPlayed": 5.3,
+     "level": 20,
+     "money": 40872,
+     "tier": "t1",
+     "biome": "lake"
+    },
+    {
+     "day": 14,
+     "hoursPlayed": 10.5,
+     "level": 27,
+     "money": 73956,
+     "tier": "t1",
+     "biome": "lake"
+    },
+    {
+     "day": 30,
+     "hoursPlayed": 22.5,
+     "level": 37,
+     "money": 497283,
+     "tier": "t2",
+     "biome": "pond"
+    },
+    {
+     "day": 60,
+     "hoursPlayed": 45,
+     "level": 50,
+     "money": 315766,
+     "tier": "t3",
+     "biome": "swamp"
+    },
+    {
+     "day": 90,
+     "hoursPlayed": 67.5,
+     "level": 60,
+     "money": 1625428,
+     "tier": "t4",
+     "biome": "swamp"
+    }
+   ],
+   "sources": {
+    "fishSales": 4963394,
+    "dailyQuests": 740400,
+    "streak": 31500
+   },
+   "sinks": {
+    "permits": 805000,
+    "crates": 2255000,
+    "repairs": 149866,
+    "licenses": 900000
+   }
+  },
+  "active": {
+   "name": "active",
+   "arch": {
+    "minutesPerDay": 120,
+    "overheadS": 3
+   },
+   "milestones": {
+    "level10": {
+     "day": 1,
+     "hours": 1.2
+    },
+    "biome:river": {
+     "day": 1,
+     "hours": 1.2,
+     "level": 10
+    },
+    "level20": {
+     "day": 3,
+     "hours": 4.6
+    },
+    "rod:t1": {
+     "day": 3,
+     "hours": 4.6,
+     "level": 20
+    },
+    "biome:lake": {
+     "day": 3,
+     "hours": 4.6,
+     "level": 20
+    },
+    "license:basic": {
+     "day": 5,
+     "hours": 9.3,
+     "level": 26
+    },
+    "level30": {
+     "day": 7,
+     "hours": 12.98
+    },
+    "rod:t2": {
+     "day": 7,
+     "hours": 12.98,
+     "level": 30
+    },
+    "biome:pond": {
+     "day": 8,
+     "hours": 14,
+     "level": 30
+    },
+    "level40": {
+     "day": 14,
+     "hours": 27.28
+    },
+    "rod:t3": {
+     "day": 14,
+     "hours": 27.28,
+     "level": 40
+    },
+    "biome:coast": {
+     "day": 14,
+     "hours": 27.78,
+     "level": 40
+    },
+    "license:advanced": {
+     "day": 19,
+     "hours": 37.63,
+     "level": 46
+    },
+    "level50": {
+     "day": 23,
+     "hours": 45.37
+    },
+    "biome:swamp": {
+     "day": 23,
+     "hours": 45.37,
+     "level": 50
+    },
+    "rod:t4": {
+     "day": 28,
+     "hours": 55.55,
+     "level": 54
+    },
+    "license:expert": {
+     "day": 39,
+     "hours": 76.28,
+     "level": 63
+    }
+   },
+   "timeline": [
+    {
+     "day": 1,
+     "hoursPlayed": 2,
+     "level": 12,
+     "money": 23450,
+     "tier": "old",
+     "biome": "river"
+    },
+    {
+     "day": 7,
+     "hoursPlayed": 14,
+     "level": 30,
+     "money": 72001,
+     "tier": "t2",
+     "biome": "lake"
+    },
+    {
+     "day": 14,
+     "hoursPlayed": 28,
+     "level": 40,
+     "money": 19132,
+     "tier": "t3",
+     "biome": "coast"
+    },
+    {
+     "day": 30,
+     "hoursPlayed": 60,
+     "level": 56,
+     "money": 698640,
+     "tier": "t4",
+     "biome": "swamp"
+    },
+    {
+     "day": 60,
+     "hoursPlayed": 120,
+     "level": 78,
+     "money": 6694629,
+     "tier": "t4",
+     "biome": "swamp"
+    },
+    {
+     "day": 90,
+     "hoursPlayed": 180,
+     "level": 95,
+     "money": 15305419,
+     "tier": "t4",
+     "biome": "swamp"
+    }
+   ],
+   "sources": {
+    "fishSales": 21419650,
+    "dailyQuests": 1155400,
+    "streak": 31500
+   },
+   "sinks": {
+    "permits": 805000,
+    "crates": 2255000,
+    "repairs": 841131,
+    "licenses": 3400000
+   }
+  },
+  "grinder": {
+   "name": "grinder",
+   "arch": {
+    "minutesPerDay": 300,
+    "overheadS": 2
+   },
+   "milestones": {
+    "level10": {
+     "day": 1,
+     "hours": 1.05
+    },
+    "biome:river": {
+     "day": 1,
+     "hours": 1.05,
+     "level": 10
+    },
+    "level20": {
+     "day": 1,
+     "hours": 4.22
+    },
+    "rod:t1": {
+     "day": 1,
+     "hours": 4.22,
+     "level": 20
+    },
+    "biome:lake": {
+     "day": 1,
+     "hours": 4.22,
+     "level": 20
+    },
+    "license:basic": {
+     "day": 2,
+     "hours": 8.57,
+     "level": 26
+    },
+    "level30": {
+     "day": 3,
+     "hours": 11.83
+    },
+    "rod:t2": {
+     "day": 3,
+     "hours": 11.83,
+     "level": 30
+    },
+    "biome:pond": {
+     "day": 3,
+     "hours": 12.88,
+     "level": 31
+    },
+    "rod:t3": {
+     "day": 6,
+     "hours": 25,
+     "level": 40
+    },
+    "level40": {
+     "day": 6,
+     "hours": 25.02
+    },
+    "biome:coast": {
+     "day": 6,
+     "hours": 25.32,
+     "level": 40
+    },
+    "license:advanced": {
+     "day": 7,
+     "hours": 34.22,
+     "level": 45
+    },
+    "level50": {
+     "day": 9,
+     "hours": 41.5
+    },
+    "biome:swamp": {
+     "day": 9,
+     "hours": 41.5,
+     "level": 50
+    },
+    "rod:t4": {
+     "day": 11,
+     "hours": 50.27,
+     "level": 54
+    },
+    "license:expert": {
+     "day": 14,
+     "hours": 68.75,
+     "level": 63
+    }
+   },
+   "timeline": [
+    {
+     "day": 1,
+     "hoursPlayed": 5,
+     "level": 21,
+     "money": 47438,
+     "tier": "t1",
+     "biome": "lake"
+    },
+    {
+     "day": 7,
+     "hoursPlayed": 35,
+     "level": 46,
+     "money": 229544,
+     "tier": "t3",
+     "biome": "coast"
+    },
+    {
+     "day": 14,
+     "hoursPlayed": 70,
+     "level": 63,
+     "money": 695628,
+     "tier": "t4",
+     "biome": "swamp"
+    },
+    {
+     "day": 30,
+     "hoursPlayed": 150,
+     "level": 90,
+     "money": 13444124,
+     "tier": "t4",
+     "biome": "swamp"
+    },
+    {
+     "day": 60,
+     "hoursPlayed": 300,
+     "level": 125,
+     "money": 37535304,
+     "tier": "t4",
+     "biome": "swamp"
+    },
+    {
+     "day": 90,
+     "hoursPlayed": 450,
+     "level": 151,
+     "money": 61807084,
+     "tier": "t4",
+     "biome": "swamp"
+    }
+   ],
+   "sources": {
+    "fishSales": 69262117,
+    "dailyQuests": 1839600,
+    "streak": 31500
+   },
+   "sinks": {
+    "permits": 805000,
+    "crates": 2255000,
+    "repairs": 2866133,
+    "licenses": 3400000
+   }
+  }
+ }
+}

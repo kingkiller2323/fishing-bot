@@ -1,0 +1,6878 @@
+{
+ "generatedFrom": {
+  "measurements": "2026-09-25T19:14:41.772Z",
+  "castsPerScenario": 1000,
+  "balanceVersion": "3.2.0"
+ },
+ "stages": {
+  "old": {
+   "label": "Old Rod",
+   "measured": "Old Rod",
+   "fishPerCast": 1,
+   "level": 0,
+   "crates": 0,
+   "durability": 1000,
+   "repairCost": 1000
+  },
+  "c20": {
+   "label": "Cheapest 6-fish crafted rod (Lv 20): Bamboo Rod Piece (Uncommon) + Plastic Reel (Common) + Barbed Hook (Common) + Wooden Handle (Common)",
+   "measured": "Custom (Common parts)",
+   "founderMeasured": "Custom (Uncommon parts)",
+   "fishPerCast": 6,
+   "founderFishPerCast": 10.000000000000002,
+   "level": 20,
+   "crates": 11,
+   "durability": 2800,
+   "repairCost": 20000,
+   "cooldownMs": 5000
+  },
+  "c30": {
+   "label": "Cheapest 15-fish crafted rod (Lv 30): Bamboo Rod Piece (Uncommon) + Jigging Reel (Rare) + Barbed Hook (Common) + Wooden Handle (Common)",
+   "measured": "Custom (Uncommon parts)",
+   "founderMeasured": "Custom (Rare parts)",
+   "fishPerCast": 15,
+   "founderFishPerCast": 20.700000000000003,
+   "level": 30,
+   "crates": 62,
+   "durability": 5000,
+   "repairCost": 30000,
+   "cooldownMs": 4750
+  }
+ },
+ "rates": [
+  {
+   "key": "ocean|Old Rod|-|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.8,
+   "xpFinalPerCast": 16.8,
+   "valuePerCast": 37.4,
+   "valueFinalPerCast": 37.4,
+   "valuePerFish": 37.4,
+   "castsPerHour": 400,
+   "xpPerHour": 6739,
+   "xpFinalPerHour": 6739,
+   "cashPerHour": 14953,
+   "cashFinalPerHour": 14953,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 72,
+    "uncommon": 21.4,
+    "rare": 4.6,
+    "ultra": 1.2,
+    "giant": 0.6,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 19.7,
+    "uncommon": 48.6,
+    "rare": 76.2,
+    "ultra": 248.3,
+    "giant": 1017.5,
+    "legendary": 120.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Worm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 35.7,
+   "valueFinalPerCast": 35.7,
+   "valuePerFish": 35.7,
+   "castsPerHour": 400,
+   "xpPerHour": 6814,
+   "xpFinalPerHour": 6814,
+   "cashPerHour": 14270,
+   "cashFinalPerHour": 14270,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 68.2,
+    "uncommon": 25.1,
+    "rare": 4.8,
+    "ultra": 1.1,
+    "giant": 0.7,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 17.3,
+    "uncommon": 40.5,
+    "rare": 79,
+    "ultra": 247.8,
+    "giant": 1012.7,
+    "legendary": 96
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Minnow|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 35.9,
+   "valueFinalPerCast": 35.9,
+   "valuePerFish": 35.9,
+   "castsPerHour": 400,
+   "xpPerHour": 6792,
+   "xpFinalPerHour": 6792,
+   "cashPerHour": 14354,
+   "cashFinalPerHour": 14354,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "rare": 4.7,
+    "common": 70,
+    "uncommon": 23.6,
+    "legendary": 0.5,
+    "giant": 0.5,
+    "ultra": 0.7
+   },
+   "valueByRarityPerFish": {
+    "rare": 54.2,
+    "common": 22.6,
+    "uncommon": 41.1,
+    "legendary": 120.6,
+    "giant": 1098.4,
+    "ultra": 246.6
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Shrimp|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 96.2,
+   "valueFinalPerCast": 96.2,
+   "valuePerFish": 96.2,
+   "castsPerHour": 400,
+   "xpPerHour": 6760,
+   "xpFinalPerHour": 6760,
+   "cashPerHour": 38492,
+   "cashFinalPerHour": 38492,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.5,
+    "uncommon": 24.6,
+    "rare": 4.1,
+    "giant": 0.4,
+    "ultra": 1.3,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 21.6,
+    "uncommon": 232.6,
+    "rare": 309.2,
+    "giant": 1036.3,
+    "ultra": 505.1,
+    "legendary": 587
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Spinner|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 42.4,
+   "xpFinalPerCast": 42.4,
+   "valuePerCast": 203.1,
+   "valueFinalPerCast": 203.1,
+   "valuePerFish": 101.6,
+   "castsPerHour": 400,
+   "xpPerHour": 16974,
+   "xpFinalPerHour": 16974,
+   "cashPerHour": 81254,
+   "cashFinalPerHour": 81254,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 68.6,
+    "uncommon": 25.5,
+    "rare": 4.3,
+    "ultra": 1.2,
+    "giant": 0.3,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 20.7,
+    "uncommon": 223.6,
+    "rare": 331.2,
+    "ultra": 502.3,
+    "giant": 1165.7,
+    "legendary": 6550
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Fly|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.9,
+   "xpFinalPerCast": 20.9,
+   "valuePerCast": 35.9,
+   "valueFinalPerCast": 35.9,
+   "valuePerFish": 35.9,
+   "castsPerHour": 400,
+   "xpPerHour": 8363,
+   "xpFinalPerHour": 8363,
+   "cashPerHour": 14375,
+   "cashFinalPerHour": 14375,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 24.6,
+    "common": 67.8,
+    "ultra": 1.2,
+    "rare": 5.8,
+    "giant": 0.4,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 43.7,
+    "common": 21.1,
+    "ultra": 250,
+    "rare": 64.2,
+    "giant": 979.5,
+    "legendary": 116
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Bloodworm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.8,
+   "xpFinalPerCast": 20.8,
+   "valuePerCast": 126.7,
+   "valueFinalPerCast": 126.7,
+   "valuePerFish": 126.7,
+   "castsPerHour": 400,
+   "xpPerHour": 8311,
+   "xpFinalPerHour": 8311,
+   "cashPerHour": 50692,
+   "cashFinalPerHour": 50692,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 24.8,
+    "common": 63.5,
+    "rare": 9.4,
+    "ultra": 1.8,
+    "legendary": 0.4,
+    "giant": 0.1
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 235.6,
+    "common": 18.8,
+    "rare": 309.7,
+    "ultra": 729.8,
+    "legendary": 3242.5,
+    "giant": 1158
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 50.4,
+   "xpFinalPerCast": 50.4,
+   "valuePerCast": 214,
+   "valueFinalPerCast": 214,
+   "valuePerFish": 107,
+   "castsPerHour": 400,
+   "xpPerHour": 20141,
+   "xpFinalPerHour": 20141,
+   "cashPerHour": 85590,
+   "cashFinalPerHour": 85590,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 65.6,
+    "uncommon": 24.2,
+    "rare": 8.1,
+    "ultra": 1.7,
+    "giant": 0.4
+   },
+   "valueByRarityPerFish": {
+    "common": 20.9,
+    "uncommon": 213.6,
+    "rare": 329,
+    "ultra": 630.4,
+    "giant": 1052.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Magic Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 84.7,
+   "xpFinalPerCast": 84.7,
+   "valuePerCast": 257.5,
+   "valueFinalPerCast": 257.5,
+   "valuePerFish": 128.8,
+   "castsPerHour": 400,
+   "xpPerHour": 33894,
+   "xpFinalPerHour": 33894,
+   "cashPerHour": 103005,
+   "cashFinalPerHour": 103005,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 61.6,
+    "uncommon": 24.5,
+    "giant": 0.7,
+    "rare": 11.2,
+    "ultra": 1.8,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 20.7,
+    "uncommon": 205.2,
+    "giant": 1046.7,
+    "rare": 352.7,
+    "ultra": 689.5,
+    "legendary": 3260.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.2,
+   "xpFinalPerCast": 17.2,
+   "valuePerCast": 38.8,
+   "valueFinalPerCast": 38.8,
+   "valuePerFish": 38.8,
+   "castsPerHour": 400,
+   "xpPerHour": 6894,
+   "xpFinalPerHour": 6894,
+   "cashPerHour": 15518,
+   "cashFinalPerHour": 15518,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 24.1,
+    "common": 69.5,
+    "rare": 4.5,
+    "ultra": 0.9,
+    "legendary": 0.4,
+    "giant": 0.6
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 46.3,
+    "common": 22.6,
+    "rare": 69.3,
+    "ultra": 251,
+    "legendary": 128.5,
+    "giant": 1005.2
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|Strong Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.2,
+   "xpFinalPerCast": 17.2,
+   "valuePerCast": 101.2,
+   "valueFinalPerCast": 101.2,
+   "valuePerFish": 101.2,
+   "castsPerHour": 400,
+   "xpPerHour": 6875,
+   "xpFinalPerHour": 6875,
+   "cashPerHour": 40496,
+   "cashFinalPerHour": 40496,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.9,
+    "uncommon": 24.2,
+    "giant": 0.6,
+    "rare": 4,
+    "ultra": 0.6,
+    "lucky": 0.1,
+    "legendary": 0.6
+   },
+   "valueByRarityPerFish": {
+    "common": 20.8,
+    "uncommon": 220,
+    "giant": 1092,
+    "rare": 245.2,
+    "ultra": 362.7,
+    "legendary": 2483.2
+   },
+   "itemsPerCast": 0.001,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Common parts)|-|normal",
+   "fishPerCast": 4,
+   "xpPerCast": 68,
+   "xpFinalPerCast": 68,
+   "valuePerCast": 151.2,
+   "valueFinalPerCast": 151.2,
+   "valuePerFish": 37.8,
+   "castsPerHour": 400,
+   "xpPerHour": 27204,
+   "xpFinalPerHour": 27204,
+   "cashPerHour": 60487,
+   "cashFinalPerHour": 60487,
+   "durabilityPerCast": 4,
+   "rarity": {
+    "common": 69.8,
+    "uncommon": 23.9,
+    "ultra": 1.35,
+    "rare": 4.2,
+    "giant": 0.55,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 20.4,
+    "uncommon": 46.3,
+    "ultra": 251.4,
+    "rare": 76.1,
+    "giant": 1035.2,
+    "legendary": 108.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Uncommon parts)|-|normal",
+   "fishPerCast": 6,
+   "xpPerCast": 102,
+   "xpFinalPerCast": 102,
+   "valuePerCast": 653.5,
+   "valueFinalPerCast": 653.5,
+   "valuePerFish": 108.9,
+   "castsPerHour": 400,
+   "xpPerHour": 40809,
+   "xpFinalPerHour": 40809,
+   "cashPerHour": 261403,
+   "cashFinalPerHour": 261403,
+   "durabilityPerCast": 6,
+   "rarity": {
+    "ultra": 1.2,
+    "uncommon": 24.7,
+    "common": 67.7,
+    "rare": 5.8,
+    "legendary": 0.233,
+    "giant": 0.367
+   },
+   "valueByRarityPerFish": {
+    "ultra": 679.8,
+    "uncommon": 229.3,
+    "common": 20.3,
+    "rare": 347.2,
+    "legendary": 2735.6,
+    "giant": 1043.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Rare parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.5,
+   "xpFinalPerCast": 254.5,
+   "valuePerCast": 1584.1,
+   "valueFinalPerCast": 1584.1,
+   "valuePerFish": 105.6,
+   "castsPerHour": 424,
+   "xpPerHour": 107770,
+   "xpFinalPerHour": 107770,
+   "cashPerHour": 670893,
+   "cashFinalPerHour": 670893,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 67.22,
+    "ultra": 1.14,
+    "rare": 7.02,
+    "uncommon": 23.88,
+    "giant": 0.48,
+    "legendary": 0.24,
+    "lucky": 0.02
+   },
+   "valueByRarityPerFish": {
+    "common": 20.4,
+    "ultra": 626.4,
+    "rare": 317.2,
+    "uncommon": 214.8,
+    "giant": 1059.8,
+    "legendary": 2350.6,
+    "lucky": 2307
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Ultra parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.8,
+   "xpFinalPerCast": 254.8,
+   "valuePerCast": 1758.7,
+   "valueFinalPerCast": 1758.7,
+   "valuePerFish": 117.2,
+   "castsPerHour": 450,
+   "xpPerHour": 114641,
+   "xpFinalPerHour": 114641,
+   "cashPerHour": 791419,
+   "cashFinalPerHour": 791419,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 67.04,
+    "rare": 7.18,
+    "uncommon": 23.24,
+    "ultra": 1.64,
+    "giant": 0.64,
+    "lucky": 0.02,
+    "legendary": 0.24
+   },
+   "valueByRarityPerFish": {
+    "common": 20.3,
+    "rare": 311.5,
+    "uncommon": 222.5,
+    "ultra": 621,
+    "giant": 1103.8,
+    "lucky": 3658,
+    "legendary": 4829.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Legendary parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.5,
+   "xpFinalPerCast": 254.5,
+   "valuePerCast": 2331.1,
+   "valueFinalPerCast": 2331.1,
+   "valuePerFish": 155.4,
+   "castsPerHour": 450,
+   "xpPerHour": 114531,
+   "xpFinalPerHour": 114531,
+   "cashPerHour": 1048978,
+   "cashFinalPerHour": 1048978,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 64.5,
+    "uncommon": 23.32,
+    "rare": 9.18,
+    "ultra": 1.72,
+    "giant": 0.8,
+    "legendary": 0.48
+   },
+   "valueByRarityPerFish": {
+    "common": 24,
+    "uncommon": 264.5,
+    "rare": 413.3,
+    "ultra": 699.6,
+    "giant": 1335.5,
+    "legendary": 3663.6
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Old Rod|-|founder",
+   "fishPerCast": 2.98,
+   "xpPerCast": 50.6,
+   "xpFinalPerCast": 253,
+   "valuePerCast": 475.7,
+   "valueFinalPerCast": 4756.9,
+   "valuePerFish": 159.8,
+   "castsPerHour": 600,
+   "xpPerHour": 30363,
+   "xpFinalPerHour": 151815,
+   "cashPerHour": 285413,
+   "cashFinalPerHour": 2854134,
+   "durabilityPerCast": 1.1,
+   "rarity": {
+    "common": 31.855,
+    "uncommon": 27.587,
+    "rare": 19.657,
+    "ultra": 9.644,
+    "giant": 5.108,
+    "legendary": 4.603,
+    "lucky": 1.546
+   },
+   "valueByRarityPerFish": {
+    "common": 21,
+    "uncommon": 41.1,
+    "rare": 75.7,
+    "ultra": 249.9,
+    "giant": 1021.7,
+    "legendary": 120.7,
+    "lucky": 2917.9
+   },
+   "itemsPerCast": 0.007,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Legendary parts)|-|founder",
+   "fishPerCast": 40,
+   "xpPerCast": 680.1,
+   "xpFinalPerCast": 3400.7,
+   "valuePerCast": 23432.4,
+   "valueFinalPerCast": 234312.2,
+   "valuePerFish": 585.8,
+   "castsPerHour": 655,
+   "xpPerHour": 445181,
+   "xpFinalPerHour": 2225906,
+   "cashPerHour": 15337541,
+   "cashFinalPerHour": 153367972,
+   "durabilityPerCast": 10,
+   "rarity": {
+    "lucky": 1.125,
+    "uncommon": 21.1,
+    "rare": 29.263,
+    "common": 22.712,
+    "ultra": 15.175,
+    "legendary": 4.725,
+    "giant": 5.9
+   },
+   "valueByRarityPerFish": {
+    "lucky": 1623.5,
+    "uncommon": 278.7,
+    "rare": 389.1,
+    "common": 25.7,
+    "ultra": 767.4,
+    "legendary": 4127.8,
+    "giant": 1314.6
+   },
+   "itemsPerCast": 0.085,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|-|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 91.1,
+   "valueFinalPerCast": 91.1,
+   "valuePerFish": 91.1,
+   "castsPerHour": 400,
+   "xpPerHour": 6769,
+   "xpFinalPerHour": 6769,
+   "cashPerHour": 36433,
+   "cashFinalPerHour": 36433,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.9,
+    "uncommon": 24.3,
+    "rare": 4.1,
+    "giant": 0.7,
+    "ultra": 0.9,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 80.3,
+    "uncommon": 85.7,
+    "rare": 45.4,
+    "giant": 1655.7,
+    "ultra": 68.9,
+    "legendary": 37
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Worm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.2,
+   "xpFinalPerCast": 17.2,
+   "valuePerCast": 91.6,
+   "valueFinalPerCast": 91.6,
+   "valuePerFish": 91.6,
+   "castsPerHour": 400,
+   "xpPerHour": 6871,
+   "xpFinalPerHour": 6871,
+   "cashPerHour": 36658,
+   "cashFinalPerHour": 36658,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.8,
+    "uncommon": 24.1,
+    "ultra": 0.6,
+    "rare": 4.5,
+    "giant": 0.6,
+    "legendary": 0.4
+   },
+   "valueByRarityPerFish": {
+    "common": 80.7,
+    "uncommon": 91,
+    "ultra": 64.5,
+    "rare": 54.1,
+    "giant": 1731.7,
+    "legendary": 35.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Minnow|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 114.1,
+   "valueFinalPerCast": 114.1,
+   "valuePerFish": 114.1,
+   "castsPerHour": 400,
+   "xpPerHour": 6791,
+   "xpFinalPerHour": 6791,
+   "cashPerHour": 45631,
+   "cashFinalPerHour": 45631,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.4,
+    "uncommon": 23.5,
+    "rare": 5.3,
+    "ultra": 0.7,
+    "giant": 1,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 64.4,
+    "uncommon": 133.3,
+    "rare": 338.5,
+    "ultra": 119.9,
+    "giant": 1697.6,
+    "legendary": 2329
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Shrimp|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.2,
+   "xpFinalPerCast": 17.2,
+   "valuePerCast": 85.5,
+   "valueFinalPerCast": 85.5,
+   "valuePerFish": 85.5,
+   "castsPerHour": 400,
+   "xpPerHour": 6864,
+   "xpFinalPerHour": 6864,
+   "cashPerHour": 34198,
+   "cashFinalPerHour": 34198,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 70.7,
+    "ultra": 1,
+    "uncommon": 22.5,
+    "rare": 5.2,
+    "giant": 0.4,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 80.6,
+    "ultra": 65.4,
+    "uncommon": 85.8,
+    "rare": 37.3,
+    "giant": 1629.5,
+    "legendary": 32
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Spinner|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 42.1,
+   "xpFinalPerCast": 42.1,
+   "valuePerCast": 210.3,
+   "valueFinalPerCast": 210.3,
+   "valuePerFish": 105.2,
+   "castsPerHour": 400,
+   "xpPerHour": 16843,
+   "xpFinalPerHour": 16843,
+   "cashPerHour": 84130,
+   "cashFinalPerHour": 84130,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 69.8,
+    "uncommon": 23.7,
+    "rare": 5.2,
+    "ultra": 0.9,
+    "giant": 0.4
+   },
+   "valueByRarityPerFish": {
+    "common": 65.1,
+    "uncommon": 134,
+    "rare": 368.2,
+    "ultra": 206.1,
+    "giant": 1743.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Fly|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 21.1,
+   "xpFinalPerCast": 21.1,
+   "valuePerCast": 123.7,
+   "valueFinalPerCast": 123.7,
+   "valuePerFish": 123.7,
+   "castsPerHour": 400,
+   "xpPerHour": 8428,
+   "xpFinalPerHour": 8428,
+   "cashPerHour": 49498,
+   "cashFinalPerHour": 49498,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 65.6,
+    "uncommon": 21.4,
+    "rare": 10.4,
+    "ultra": 1.7,
+    "giant": 0.4,
+    "legendary": 0.4,
+    "lucky": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 64.4,
+    "uncommon": 135.9,
+    "rare": 359.8,
+    "ultra": 254.2,
+    "giant": 1664.5,
+    "legendary": 647.5,
+    "lucky": 1459
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Bloodworm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.7,
+   "xpFinalPerCast": 20.7,
+   "valuePerCast": 90.6,
+   "valueFinalPerCast": 90.6,
+   "valuePerFish": 90.6,
+   "castsPerHour": 400,
+   "xpPerHour": 8284,
+   "xpFinalPerHour": 8284,
+   "cashPerHour": 36232,
+   "cashFinalPerHour": 36232,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 66.5,
+    "uncommon": 26.9,
+    "rare": 4.8,
+    "legendary": 0.3,
+    "ultra": 0.9,
+    "giant": 0.6
+   },
+   "valueByRarityPerFish": {
+    "common": 80.6,
+    "uncommon": 88.6,
+    "rare": 58.8,
+    "legendary": 35.3,
+    "ultra": 65.1,
+    "giant": 1604.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 51.4,
+   "xpFinalPerCast": 51.4,
+   "valuePerCast": 245.2,
+   "valueFinalPerCast": 245.2,
+   "valuePerFish": 122.6,
+   "castsPerHour": 400,
+   "xpPerHour": 20541,
+   "xpFinalPerHour": 20541,
+   "cashPerHour": 98063,
+   "cashFinalPerHour": 98063,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 65.8,
+    "uncommon": 21.9,
+    "rare": 9.6,
+    "ultra": 1.9,
+    "giant": 0.5,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "common": 65.2,
+    "uncommon": 129.3,
+    "rare": 370.6,
+    "ultra": 152.5,
+    "giant": 1692.4,
+    "legendary": 1469.7
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Magic Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 84.8,
+   "xpFinalPerCast": 84.8,
+   "valuePerCast": 297.4,
+   "valueFinalPerCast": 297.4,
+   "valuePerFish": 148.7,
+   "castsPerHour": 400,
+   "xpPerHour": 33936,
+   "xpFinalPerHour": 33936,
+   "cashPerHour": 118948,
+   "cashFinalPerHour": 118948,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 61,
+    "rare": 11.7,
+    "uncommon": 22.5,
+    "ultra": 2.9,
+    "giant": 1.2,
+    "legendary": 0.6,
+    "lucky": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 66.8,
+    "rare": 359.9,
+    "uncommon": 134.9,
+    "ultra": 210.1,
+    "giant": 1744.3,
+    "legendary": 1150.7,
+    "lucky": 1529
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.1,
+   "xpFinalPerCast": 17.1,
+   "valuePerCast": 86.8,
+   "valueFinalPerCast": 86.8,
+   "valuePerFish": 86.8,
+   "castsPerHour": 400,
+   "xpPerHour": 6844,
+   "xpFinalPerHour": 6844,
+   "cashPerHour": 34738,
+   "cashFinalPerHour": 34738,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 65.9,
+    "uncommon": 26,
+    "rare": 5.8,
+    "ultra": 1,
+    "giant": 0.5,
+    "legendary": 0.8
+   },
+   "valueByRarityPerFish": {
+    "common": 80.6,
+    "uncommon": 82.6,
+    "rare": 48.4,
+    "ultra": 62.8,
+    "giant": 1703,
+    "legendary": 34.6
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|Strong Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.3,
+   "xpFinalPerCast": 17.3,
+   "valuePerCast": 115.1,
+   "valueFinalPerCast": 115.1,
+   "valuePerFish": 115.1,
+   "castsPerHour": 400,
+   "xpPerHour": 6913,
+   "xpFinalPerHour": 6913,
+   "cashPerHour": 46047,
+   "cashFinalPerHour": 46047,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 68.5,
+    "uncommon": 23.6,
+    "rare": 4.6,
+    "legendary": 1.4,
+    "ultra": 1.3,
+    "giant": 0.6
+   },
+   "valueByRarityPerFish": {
+    "common": 67.2,
+    "uncommon": 128.4,
+    "rare": 336.9,
+    "legendary": 828.6,
+    "ultra": 166.8,
+    "giant": 1581.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Common parts)|-|normal",
+   "fishPerCast": 4,
+   "xpPerCast": 68.1,
+   "xpFinalPerCast": 68.1,
+   "valuePerCast": 363.4,
+   "valueFinalPerCast": 363.4,
+   "valuePerFish": 90.8,
+   "castsPerHour": 400,
+   "xpPerHour": 27232,
+   "xpFinalPerHour": 27232,
+   "cashPerHour": 145342,
+   "cashFinalPerHour": 145342,
+   "durabilityPerCast": 4,
+   "rarity": {
+    "common": 68.95,
+    "uncommon": 24.75,
+    "rare": 4.45,
+    "ultra": 1.15,
+    "legendary": 0.15,
+    "giant": 0.55
+   },
+   "valueByRarityPerFish": {
+    "common": 80.1,
+    "uncommon": 94.3,
+    "rare": 57.4,
+    "ultra": 63.5,
+    "legendary": 36,
+    "giant": 1627.4
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Uncommon parts)|-|normal",
+   "fishPerCast": 6,
+   "xpPerCast": 102.1,
+   "xpFinalPerCast": 102.1,
+   "valuePerCast": 636.4,
+   "valueFinalPerCast": 636.4,
+   "valuePerFish": 106.1,
+   "castsPerHour": 400,
+   "xpPerHour": 40824,
+   "xpFinalPerHour": 40824,
+   "cashPerHour": 254555,
+   "cashFinalPerHour": 254555,
+   "durabilityPerCast": 6,
+   "rarity": {
+    "common": 67.433,
+    "uncommon": 25.067,
+    "giant": 0.3,
+    "rare": 5.633,
+    "ultra": 1.3,
+    "legendary": 0.233,
+    "lucky": 0.033
+   },
+   "valueByRarityPerFish": {
+    "common": 65.6,
+    "uncommon": 134.7,
+    "giant": 1672,
+    "rare": 336.7,
+    "ultra": 179.3,
+    "legendary": 643.4,
+    "lucky": 833
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Rare parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.6,
+   "xpFinalPerCast": 254.6,
+   "valuePerCast": 1755.3,
+   "valueFinalPerCast": 1755.3,
+   "valuePerFish": 117,
+   "castsPerHour": 424,
+   "xpPerHour": 107834,
+   "xpFinalPerHour": 107834,
+   "cashPerHour": 743424,
+   "cashFinalPerHour": 743424,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 66.82,
+    "uncommon": 23.66,
+    "rare": 7.14,
+    "giant": 0.64,
+    "ultra": 1.38,
+    "legendary": 0.36
+   },
+   "valueByRarityPerFish": {
+    "common": 65.2,
+    "uncommon": 130.2,
+    "rare": 346.2,
+    "giant": 1712.9,
+    "ultra": 186.7,
+    "legendary": 1223.4
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Ultra parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.5,
+   "xpFinalPerCast": 254.5,
+   "valuePerCast": 1720.1,
+   "valueFinalPerCast": 1720.1,
+   "valuePerFish": 114.7,
+   "castsPerHour": 450,
+   "xpPerHour": 114518,
+   "xpFinalPerHour": 114518,
+   "cashPerHour": 774052,
+   "cashFinalPerHour": 774052,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 65.58,
+    "uncommon": 24.44,
+    "giant": 0.56,
+    "rare": 7.62,
+    "ultra": 1.58,
+    "legendary": 0.22
+   },
+   "valueByRarityPerFish": {
+    "common": 64.9,
+    "uncommon": 131.7,
+    "giant": 1657.5,
+    "rare": 343.4,
+    "ultra": 143.1,
+    "legendary": 997.2
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Legendary parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.3,
+   "xpFinalPerCast": 254.3,
+   "valuePerCast": 2246.2,
+   "valueFinalPerCast": 2246.2,
+   "valuePerFish": 149.7,
+   "castsPerHour": 450,
+   "xpPerHour": 114427,
+   "xpFinalPerHour": 114427,
+   "cashPerHour": 1010795,
+   "cashFinalPerHour": 1010795,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 64.9,
+    "rare": 9.14,
+    "uncommon": 22.94,
+    "ultra": 1.76,
+    "giant": 0.74,
+    "legendary": 0.48,
+    "lucky": 0.04
+   },
+   "valueByRarityPerFish": {
+    "common": 77.7,
+    "rare": 405.7,
+    "uncommon": 153.6,
+    "ultra": 276.9,
+    "giant": 2061,
+    "legendary": 1325,
+    "lucky": 1316.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "river|Old Rod|-|founder",
+   "fishPerCast": 2.94,
+   "xpPerCast": 49.8,
+   "xpFinalPerCast": 249.1,
+   "valuePerCast": 455.5,
+   "valueFinalPerCast": 4554.7,
+   "valuePerFish": 154.8,
+   "castsPerHour": 600,
+   "xpPerHour": 29887,
+   "xpFinalPerHour": 149433,
+   "cashPerHour": 273283,
+   "cashFinalPerHour": 2732826,
+   "durabilityPerCast": 1.1,
+   "rarity": {
+    "common": 32.937,
+    "uncommon": 27.124,
+    "rare": 19.409,
+    "ultra": 9.959,
+    "legendary": 4.351,
+    "giant": 4.589,
+    "lucky": 1.632
+   },
+   "valueByRarityPerFish": {
+    "common": 80.5,
+    "uncommon": 91.7,
+    "rare": 45.3,
+    "ultra": 64.2,
+    "legendary": 34.3,
+    "giant": 1681.8,
+    "lucky": 588.5
+   },
+   "itemsPerCast": 0.01,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Legendary parts)|-|founder",
+   "fishPerCast": 40,
+   "xpPerCast": 680.5,
+   "xpFinalPerCast": 3402.7,
+   "valuePerCast": 16049.9,
+   "valueFinalPerCast": 160499.9,
+   "valuePerFish": 401.2,
+   "castsPerHour": 655,
+   "xpPerHour": 445442,
+   "xpFinalPerHour": 2227212,
+   "cashPerHour": 10505360,
+   "cashFinalPerHour": 105054467,
+   "durabilityPerCast": 10,
+   "rarity": {
+    "uncommon": 20.875,
+    "rare": 28.075,
+    "common": 24.137,
+    "ultra": 14.713,
+    "giant": 5.775,
+    "legendary": 5.063,
+    "lucky": 1.363
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 155.6,
+    "rare": 418.5,
+    "common": 78.4,
+    "ultra": 233.7,
+    "giant": 2032.4,
+    "legendary": 1270.4,
+    "lucky": 1193.8
+   },
+   "itemsPerCast": 0.09,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|-|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.2,
+   "xpFinalPerCast": 17.2,
+   "valuePerCast": 61.1,
+   "valueFinalPerCast": 61.1,
+   "valuePerFish": 61.1,
+   "castsPerHour": 400,
+   "xpPerHour": 6873,
+   "xpFinalPerHour": 6873,
+   "cashPerHour": 24444,
+   "cashFinalPerHour": 24444,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 67.8,
+    "uncommon": 26.8,
+    "rare": 4,
+    "giant": 0.2,
+    "ultra": 1,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 21.6,
+    "uncommon": 87.3,
+    "rare": 34.8,
+    "giant": 5003,
+    "ultra": 1085.7,
+    "legendary": 402.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Worm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 61.6,
+   "valueFinalPerCast": 61.6,
+   "valuePerFish": 61.6,
+   "castsPerHour": 400,
+   "xpPerHour": 6753,
+   "xpFinalPerHour": 6753,
+   "cashPerHour": 24625,
+   "cashFinalPerHour": 24625,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.6,
+    "ultra": 1.3,
+    "uncommon": 23.7,
+    "rare": 5.1,
+    "giant": 0.3
+   },
+   "valueByRarityPerFish": {
+    "common": 20.4,
+    "ultra": 1133.2,
+    "uncommon": 72.4,
+    "rare": 8.6,
+    "giant": 5020.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Minnow|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.2,
+   "xpFinalPerCast": 17.2,
+   "valuePerCast": 144.5,
+   "valueFinalPerCast": 144.5,
+   "valuePerFish": 144.5,
+   "castsPerHour": 400,
+   "xpPerHour": 6871,
+   "xpFinalPerHour": 6871,
+   "cashPerHour": 57783,
+   "cashFinalPerHour": 57783,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 25.5,
+    "common": 66.8,
+    "ultra": 1.5,
+    "rare": 4.6,
+    "giant": 1.2,
+    "lucky": 0.1,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 100.9,
+    "common": 38.6,
+    "ultra": 813.3,
+    "rare": 165.9,
+    "giant": 5806.7,
+    "lucky": 72,
+    "legendary": 1111
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Shrimp|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 60.3,
+   "valueFinalPerCast": 60.3,
+   "valuePerFish": 60.3,
+   "castsPerHour": 400,
+   "xpPerHour": 6746,
+   "xpFinalPerHour": 6746,
+   "cashPerHour": 24117,
+   "cashFinalPerHour": 24117,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 23,
+    "common": 69.5,
+    "giant": 0.3,
+    "ultra": 1,
+    "rare": 5.9,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 81.1,
+    "common": 20.9,
+    "giant": 4961.3,
+    "ultra": 1089.9,
+    "rare": 8.9,
+    "legendary": 260.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Spinner|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 41.8,
+   "xpFinalPerCast": 41.8,
+   "valuePerCast": 152.2,
+   "valueFinalPerCast": 152.2,
+   "valuePerFish": 76.1,
+   "castsPerHour": 400,
+   "xpPerHour": 16720,
+   "xpFinalPerHour": 16720,
+   "cashPerHour": 60894,
+   "cashFinalPerHour": 60894,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "uncommon": 25.8,
+    "common": 68.6,
+    "rare": 4.6,
+    "giant": 0.3,
+    "ultra": 0.7
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 93.7,
+    "common": 34,
+    "rare": 135.7,
+    "giant": 5417,
+    "ultra": 873.7
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Fly|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.7,
+   "xpFinalPerCast": 20.7,
+   "valuePerCast": 134.4,
+   "valueFinalPerCast": 134.4,
+   "valuePerFish": 134.4,
+   "castsPerHour": 400,
+   "xpPerHour": 8290,
+   "xpFinalPerHour": 8290,
+   "cashPerHour": 53747,
+   "cashFinalPerHour": 53747,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 25.1,
+    "common": 62.1,
+    "rare": 9.5,
+    "giant": 0.9,
+    "ultra": 2,
+    "legendary": 0.4
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 100.6,
+    "common": 35.4,
+    "rare": 184.1,
+    "giant": 5542.8,
+    "ultra": 794.5,
+    "legendary": 968
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Bloodworm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.7,
+   "xpFinalPerCast": 20.7,
+   "valuePerCast": 54.9,
+   "valueFinalPerCast": 54.9,
+   "valuePerFish": 54.9,
+   "castsPerHour": 400,
+   "xpPerHour": 8291,
+   "xpFinalPerHour": 8291,
+   "cashPerHour": 21971,
+   "cashFinalPerHour": 21971,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 65.5,
+    "uncommon": 27.5,
+    "legendary": 0.7,
+    "rare": 5.6,
+    "ultra": 0.5,
+    "giant": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 20,
+    "uncommon": 84,
+    "legendary": 361.7,
+    "rare": 30.9,
+    "ultra": 1009.6,
+    "giant": 4710
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 50.7,
+   "xpFinalPerCast": 50.7,
+   "valuePerCast": 195.8,
+   "valueFinalPerCast": 195.8,
+   "valuePerFish": 97.9,
+   "castsPerHour": 400,
+   "xpPerHour": 20296,
+   "xpFinalPerHour": 20296,
+   "cashPerHour": 78315,
+   "cashFinalPerHour": 78315,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "rare": 10.6,
+    "uncommon": 23.5,
+    "common": 63.2,
+    "ultra": 2,
+    "legendary": 0.3,
+    "giant": 0.4
+   },
+   "valueByRarityPerFish": {
+    "rare": 156.7,
+    "uncommon": 87.6,
+    "common": 34.1,
+    "ultra": 691.4,
+    "legendary": 891.7,
+    "giant": 5663
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Magic Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 84.6,
+   "xpFinalPerCast": 84.6,
+   "valuePerCast": 239.9,
+   "valueFinalPerCast": 239.9,
+   "valuePerFish": 120,
+   "castsPerHour": 400,
+   "xpPerHour": 33854,
+   "xpFinalPerHour": 33854,
+   "cashPerHour": 95964,
+   "cashFinalPerHour": 95964,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 64.4,
+    "uncommon": 22.5,
+    "rare": 10.2,
+    "giant": 0.6,
+    "ultra": 1.7,
+    "legendary": 0.6
+   },
+   "valueByRarityPerFish": {
+    "common": 36.6,
+    "uncommon": 101,
+    "rare": 186.7,
+    "giant": 5428,
+    "ultra": 716.9,
+    "legendary": 1647.7
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.1,
+   "xpFinalPerCast": 17.1,
+   "valuePerCast": 61.2,
+   "valueFinalPerCast": 61.2,
+   "valuePerFish": 61.2,
+   "castsPerHour": 400,
+   "xpPerHour": 6850,
+   "xpFinalPerHour": 6850,
+   "cashPerHour": 24484,
+   "cashFinalPerHour": 24484,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 68.9,
+    "rare": 4.9,
+    "uncommon": 24.4,
+    "ultra": 0.7,
+    "giant": 0.4,
+    "legendary": 0.6,
+    "lucky": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 20.9,
+    "rare": 19.1,
+    "uncommon": 71,
+    "ultra": 1130.7,
+    "giant": 4633,
+    "legendary": 335.2,
+    "lucky": 74
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|Strong Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 107.5,
+   "valueFinalPerCast": 107.5,
+   "valuePerFish": 107.5,
+   "castsPerHour": 400,
+   "xpPerHour": 6779,
+   "xpFinalPerHour": 6779,
+   "cashPerHour": 43000,
+   "cashFinalPerHour": 43000,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 66,
+    "uncommon": 25.5,
+    "rare": 5.8,
+    "legendary": 1.2,
+    "ultra": 1,
+    "lucky": 0.1,
+    "giant": 0.4
+   },
+   "valueByRarityPerFish": {
+    "common": 39,
+    "uncommon": 96.2,
+    "rare": 172.5,
+    "legendary": 1153.9,
+    "ultra": 1005.5,
+    "lucky": 85,
+    "giant": 5813.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Common parts)|-|normal",
+   "fishPerCast": 4,
+   "xpPerCast": 68,
+   "xpFinalPerCast": 68,
+   "valuePerCast": 295.9,
+   "valueFinalPerCast": 295.9,
+   "valuePerFish": 74,
+   "castsPerHour": 400,
+   "xpPerHour": 27196,
+   "xpFinalPerHour": 27196,
+   "cashPerHour": 118379,
+   "cashFinalPerHour": 118379,
+   "durabilityPerCast": 4,
+   "rarity": {
+    "uncommon": 25.05,
+    "common": 69.3,
+    "rare": 3.9,
+    "ultra": 1,
+    "giant": 0.55,
+    "legendary": 0.15,
+    "lucky": 0.05
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 82.8,
+    "common": 21.9,
+    "rare": 7.4,
+    "ultra": 1098.7,
+    "giant": 4771.5,
+    "legendary": 366.7,
+    "lucky": 59
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Uncommon parts)|-|normal",
+   "fishPerCast": 6,
+   "xpPerCast": 102.2,
+   "xpFinalPerCast": 102.2,
+   "valuePerCast": 588.5,
+   "valueFinalPerCast": 588.5,
+   "valuePerFish": 98.1,
+   "castsPerHour": 400,
+   "xpPerHour": 40880,
+   "xpFinalPerHour": 40880,
+   "cashPerHour": 235381,
+   "cashFinalPerHour": 235381,
+   "durabilityPerCast": 6,
+   "rarity": {
+    "common": 69.367,
+    "ultra": 0.933,
+    "rare": 6.8,
+    "uncommon": 22.167,
+    "giant": 0.533,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 37.3,
+    "ultra": 774.1,
+    "rare": 181.8,
+    "uncommon": 98.4,
+    "giant": 5475.4,
+    "legendary": 789
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Rare parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.7,
+   "xpFinalPerCast": 254.7,
+   "valuePerCast": 1439.8,
+   "valueFinalPerCast": 1439.8,
+   "valuePerFish": 96,
+   "castsPerHour": 424,
+   "xpPerHour": 107875,
+   "xpFinalPerHour": 107875,
+   "cashPerHour": 609779,
+   "cashFinalPerHour": 609779,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 68.38,
+    "uncommon": 23.18,
+    "rare": 6.38,
+    "ultra": 1.32,
+    "giant": 0.54,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 34.9,
+    "uncommon": 88.2,
+    "rare": 180,
+    "ultra": 672.6,
+    "giant": 5481.4,
+    "legendary": 840.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Ultra parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.3,
+   "xpFinalPerCast": 254.3,
+   "valuePerCast": 1570.9,
+   "valueFinalPerCast": 1570.9,
+   "valuePerFish": 104.7,
+   "castsPerHour": 450,
+   "xpPerHour": 114426,
+   "xpFinalPerHour": 114426,
+   "cashPerHour": 706915,
+   "cashFinalPerHour": 706915,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 65.62,
+    "uncommon": 24.42,
+    "rare": 7.92,
+    "giant": 0.6,
+    "ultra": 1.28,
+    "legendary": 0.14,
+    "lucky": 0.02
+   },
+   "valueByRarityPerFish": {
+    "common": 36.2,
+    "uncommon": 98,
+    "rare": 187.1,
+    "giant": 5347.6,
+    "ultra": 709.2,
+    "legendary": 736.6,
+    "lucky": 63
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Legendary parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 255.4,
+   "xpFinalPerCast": 255.4,
+   "valuePerCast": 2051.3,
+   "valueFinalPerCast": 2051.3,
+   "valuePerFish": 136.8,
+   "castsPerHour": 450,
+   "xpPerHour": 114917,
+   "xpFinalPerHour": 114917,
+   "cashPerHour": 923081,
+   "cashFinalPerHour": 923081,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "uncommon": 23.14,
+    "common": 65,
+    "rare": 9.04,
+    "ultra": 1.62,
+    "giant": 0.78,
+    "legendary": 0.36,
+    "lucky": 0.06
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 108.2,
+    "common": 42.2,
+    "rare": 173.5,
+    "ultra": 931.6,
+    "giant": 6452,
+    "legendary": 873.1,
+    "lucky": 65.3
+   },
+   "itemsPerCast": 0.003,
+   "failures": {}
+  },
+  {
+   "key": "lake|Old Rod|-|founder",
+   "fishPerCast": 3.02,
+   "xpPerCast": 51.4,
+   "xpFinalPerCast": 256.9,
+   "valuePerCast": 1150.1,
+   "valueFinalPerCast": 11501.4,
+   "valuePerFish": 380.2,
+   "castsPerHour": 600,
+   "xpPerHour": 30823,
+   "xpFinalPerHour": 154116,
+   "cashPerHour": 690082,
+   "cashFinalPerHour": 6900816,
+   "durabilityPerCast": 1.1,
+   "rarity": {
+    "uncommon": 28.992,
+    "rare": 18.744,
+    "common": 32.165,
+    "giant": 4.529,
+    "ultra": 9.752,
+    "legendary": 4.331,
+    "lucky": 1.488
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 75,
+    "rare": 23.6,
+    "common": 22.1,
+    "giant": 4880.5,
+    "ultra": 1131.7,
+    "legendary": 336.9,
+    "lucky": 62.7
+   },
+   "itemsPerCast": 0.009,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Legendary parts)|-|founder",
+   "fishPerCast": 40,
+   "xpPerCast": 681,
+   "xpFinalPerCast": 3404.9,
+   "valuePerCast": 26385.1,
+   "valueFinalPerCast": 263836.7,
+   "valuePerFish": 659.6,
+   "castsPerHour": 655,
+   "xpPerHour": 445733,
+   "xpFinalPerHour": 2228665,
+   "cashPerHour": 17270224,
+   "cashFinalPerHour": 172693100,
+   "durabilityPerCast": 10,
+   "rarity": {
+    "uncommon": 20.738,
+    "rare": 29.175,
+    "ultra": 14.188,
+    "common": 23.738,
+    "legendary": 5.1,
+    "giant": 5.95,
+    "lucky": 1.113
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 110.8,
+    "rare": 218.2,
+    "ultra": 849.2,
+    "common": 42.3,
+    "legendary": 1062,
+    "giant": 6511.9,
+    "lucky": 74.6
+   },
+   "itemsPerCast": 0.075,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|-|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 47,
+   "valueFinalPerCast": 47,
+   "valuePerFish": 47,
+   "castsPerHour": 400,
+   "xpPerHour": 6810,
+   "xpFinalPerHour": 6810,
+   "cashPerHour": 18789,
+   "cashFinalPerHour": 18789,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 67.6,
+    "uncommon": 25.5,
+    "legendary": 0.3,
+    "rare": 4.9,
+    "ultra": 1.2,
+    "giant": 0.5
+   },
+   "valueByRarityPerFish": {
+    "common": 38.8,
+    "uncommon": 50.8,
+    "legendary": 292.3,
+    "rare": 39.7,
+    "ultra": 179.1,
+    "giant": 561.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Worm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 44.9,
+   "valueFinalPerCast": 44.9,
+   "valuePerFish": 44.9,
+   "castsPerHour": 400,
+   "xpPerHour": 6818,
+   "xpFinalPerHour": 6818,
+   "cashPerHour": 17967,
+   "cashFinalPerHour": 17967,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 67.1,
+    "uncommon": 26.5,
+    "ultra": 0.9,
+    "giant": 0.5,
+    "rare": 4.9,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 38.1,
+    "uncommon": 47.5,
+    "ultra": 195.1,
+    "giant": 559,
+    "rare": 39.7,
+    "legendary": 261
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Minnow|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 51,
+   "valueFinalPerCast": 51,
+   "valuePerFish": 51,
+   "castsPerHour": 400,
+   "xpPerHour": 6816,
+   "xpFinalPerHour": 6816,
+   "cashPerHour": 20392,
+   "cashFinalPerHour": 20392,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 66.9,
+    "uncommon": 25.6,
+    "rare": 5.3,
+    "ultra": 0.9,
+    "giant": 1.1,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 30.3,
+    "uncommon": 47.2,
+    "rare": 57.6,
+    "ultra": 129.3,
+    "giant": 1170.1,
+    "legendary": 754.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Shrimp|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.2,
+   "xpFinalPerCast": 17.2,
+   "valuePerCast": 48,
+   "valueFinalPerCast": 48,
+   "valuePerFish": 48,
+   "castsPerHour": 400,
+   "xpPerHour": 6881,
+   "xpFinalPerHour": 6881,
+   "cashPerHour": 19210,
+   "cashFinalPerHour": 19210,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.7,
+    "ultra": 2,
+    "uncommon": 21.1,
+    "rare": 6,
+    "giant": 0.8,
+    "legendary": 0.4
+   },
+   "valueByRarityPerFish": {
+    "common": 37.8,
+    "ultra": 191.6,
+    "uncommon": 46.4,
+    "rare": 38.7,
+    "giant": 574.9,
+    "legendary": 282.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Spinner|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 41.8,
+   "xpFinalPerCast": 41.8,
+   "valuePerCast": 84.8,
+   "valueFinalPerCast": 84.8,
+   "valuePerFish": 42.4,
+   "castsPerHour": 400,
+   "xpPerHour": 16706,
+   "xpFinalPerHour": 16706,
+   "cashPerHour": 33911,
+   "cashFinalPerHour": 33911,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 69.3,
+    "uncommon": 25,
+    "ultra": 1.3,
+    "rare": 3.6,
+    "giant": 0.3,
+    "legendary": 0.5
+   },
+   "valueByRarityPerFish": {
+    "common": 31.2,
+    "uncommon": 45.8,
+    "ultra": 130.8,
+    "rare": 46.3,
+    "giant": 1171,
+    "legendary": 492.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Fly|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.8,
+   "xpFinalPerCast": 20.8,
+   "valuePerCast": 40.6,
+   "valueFinalPerCast": 40.6,
+   "valuePerFish": 40.6,
+   "castsPerHour": 400,
+   "xpPerHour": 8338,
+   "xpFinalPerHour": 8338,
+   "cashPerHour": 16245,
+   "cashFinalPerHour": 16245,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 64.7,
+    "uncommon": 23.2,
+    "rare": 9.8,
+    "ultra": 2.1,
+    "giant": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 31,
+    "uncommon": 40.7,
+    "rare": 64,
+    "ultra": 137,
+    "giant": 985
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Bloodworm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.9,
+   "xpFinalPerCast": 20.9,
+   "valuePerCast": 46.5,
+   "valueFinalPerCast": 46.5,
+   "valuePerFish": 46.5,
+   "castsPerHour": 400,
+   "xpPerHour": 8366,
+   "xpFinalPerHour": 8366,
+   "cashPerHour": 18616,
+   "cashFinalPerHour": 18616,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 21.5,
+    "common": 70.9,
+    "rare": 5.4,
+    "ultra": 1.3,
+    "giant": 0.4,
+    "legendary": 0.5
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 49.9,
+    "common": 38.5,
+    "rare": 39.3,
+    "ultra": 189.5,
+    "giant": 623.5,
+    "legendary": 286.2
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 50.7,
+   "xpFinalPerCast": 50.7,
+   "valuePerCast": 84,
+   "valueFinalPerCast": 84,
+   "valuePerFish": 42,
+   "castsPerHour": 400,
+   "xpPerHour": 20266,
+   "xpFinalPerHour": 20266,
+   "cashPerHour": 33580,
+   "cashFinalPerHour": 33580,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 65.5,
+    "uncommon": 23.5,
+    "rare": 7.9,
+    "ultra": 2.1,
+    "giant": 0.8,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 30.8,
+    "uncommon": 38.8,
+    "rare": 45.1,
+    "ultra": 137.1,
+    "giant": 664.4,
+    "legendary": 476
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Magic Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 83.7,
+   "xpFinalPerCast": 83.7,
+   "valuePerCast": 99.8,
+   "valueFinalPerCast": 99.8,
+   "valuePerFish": 49.9,
+   "castsPerHour": 400,
+   "xpPerHour": 33493,
+   "xpFinalPerHour": 33493,
+   "cashPerHour": 39935,
+   "cashFinalPerHour": 39935,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 59.6,
+    "legendary": 0.8,
+    "uncommon": 23.8,
+    "rare": 12.3,
+    "ultra": 2.7,
+    "giant": 0.8
+   },
+   "valueByRarityPerFish": {
+    "common": 32.5,
+    "legendary": 558.1,
+    "uncommon": 40.4,
+    "rare": 61.6,
+    "ultra": 124.7,
+    "giant": 691.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 49.7,
+   "valueFinalPerCast": 49.7,
+   "valuePerFish": 49.7,
+   "castsPerHour": 400,
+   "xpPerHour": 6756,
+   "xpFinalPerHour": 6756,
+   "cashPerHour": 19898,
+   "cashFinalPerHour": 19898,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 25.3,
+    "common": 67.2,
+    "legendary": 0.8,
+    "rare": 4.6,
+    "giant": 0.7,
+    "ultra": 1.2,
+    "lucky": 0.2
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 51.6,
+    "common": 38.8,
+    "legendary": 290.5,
+    "rare": 39.8,
+    "giant": 562.1,
+    "ultra": 184.7,
+    "lucky": 159.5
+   },
+   "itemsPerCast": 0.001,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|Strong Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 41.1,
+   "valueFinalPerCast": 41.1,
+   "valuePerFish": 41.1,
+   "castsPerHour": 400,
+   "xpPerHour": 6811,
+   "xpFinalPerHour": 6811,
+   "cashPerHour": 16437,
+   "cashFinalPerHour": 16437,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "rare": 4.1,
+    "common": 70.9,
+    "uncommon": 22.7,
+    "legendary": 0.8,
+    "giant": 0.3,
+    "ultra": 1.2
+   },
+   "valueByRarityPerFish": {
+    "rare": 30.9,
+    "common": 30.9,
+    "uncommon": 42.8,
+    "legendary": 409.5,
+    "giant": 1152.7,
+    "ultra": 124.7
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Common parts)|-|normal",
+   "fishPerCast": 4,
+   "xpPerCast": 68.2,
+   "xpFinalPerCast": 68.2,
+   "valuePerCast": 189.2,
+   "valueFinalPerCast": 189.2,
+   "valuePerFish": 47.3,
+   "castsPerHour": 400,
+   "xpPerHour": 27267,
+   "xpFinalPerHour": 27267,
+   "cashPerHour": 75689,
+   "cashFinalPerHour": 75689,
+   "durabilityPerCast": 4,
+   "rarity": {
+    "uncommon": 23.4,
+    "common": 70.2,
+    "rare": 4.55,
+    "giant": 0.8,
+    "ultra": 0.9,
+    "lucky": 0.05,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 51.6,
+    "common": 38.2,
+    "rare": 39.1,
+    "giant": 586.2,
+    "ultra": 186.8,
+    "legendary": 289
+   },
+   "itemsPerCast": 0.002,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Uncommon parts)|-|normal",
+   "fishPerCast": 6,
+   "xpPerCast": 102.7,
+   "xpFinalPerCast": 102.7,
+   "valuePerCast": 245.8,
+   "valueFinalPerCast": 245.8,
+   "valuePerFish": 41,
+   "castsPerHour": 400,
+   "xpPerHour": 41067,
+   "xpFinalPerHour": 41067,
+   "cashPerHour": 98328,
+   "cashFinalPerHour": 98328,
+   "durabilityPerCast": 6,
+   "rarity": {
+    "rare": 5.833,
+    "common": 69.167,
+    "uncommon": 23.267,
+    "ultra": 1.2,
+    "legendary": 0.233,
+    "giant": 0.3
+   },
+   "valueByRarityPerFish": {
+    "rare": 50.9,
+    "common": 30.3,
+    "uncommon": 45.7,
+    "ultra": 137.1,
+    "legendary": 598.1,
+    "giant": 1135
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Rare parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 255.4,
+   "xpFinalPerCast": 255.4,
+   "valuePerCast": 631.3,
+   "valueFinalPerCast": 631.3,
+   "valuePerFish": 42.1,
+   "castsPerHour": 424,
+   "xpPerHour": 108155,
+   "xpFinalPerHour": 108155,
+   "cashPerHour": 267369,
+   "cashFinalPerHour": 267369,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 66.82,
+    "uncommon": 24.44,
+    "rare": 6.5,
+    "ultra": 1.58,
+    "giant": 0.54,
+    "legendary": 0.12
+   },
+   "valueByRarityPerFish": {
+    "common": 29.1,
+    "uncommon": 43.7,
+    "rare": 54,
+    "ultra": 128.4,
+    "giant": 1054.1,
+    "legendary": 598
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Ultra parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.1,
+   "xpFinalPerCast": 254.1,
+   "valuePerCast": 672.2,
+   "valueFinalPerCast": 672.2,
+   "valuePerFish": 44.8,
+   "castsPerHour": 450,
+   "xpPerHour": 114331,
+   "xpFinalPerHour": 114331,
+   "cashPerHour": 302500,
+   "cashFinalPerHour": 302500,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 65.44,
+    "uncommon": 24.78,
+    "rare": 7.34,
+    "giant": 0.56,
+    "ultra": 1.66,
+    "legendary": 0.22
+   },
+   "valueByRarityPerFish": {
+    "common": 30.7,
+    "uncommon": 42.8,
+    "rare": 61.6,
+    "giant": 1104.1,
+    "ultra": 133.2,
+    "legendary": 561
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Legendary parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 255.6,
+   "xpFinalPerCast": 255.6,
+   "valuePerCast": 815.7,
+   "valueFinalPerCast": 815.7,
+   "valuePerFish": 54.4,
+   "castsPerHour": 450,
+   "xpPerHour": 115016,
+   "xpFinalPerHour": 115016,
+   "cashPerHour": 367064,
+   "cashFinalPerHour": 367064,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 63.6,
+    "uncommon": 24.02,
+    "rare": 9.36,
+    "ultra": 2.04,
+    "giant": 0.64,
+    "legendary": 0.32,
+    "lucky": 0.02
+   },
+   "valueByRarityPerFish": {
+    "common": 35.3,
+    "uncommon": 49.8,
+    "rare": 67.5,
+    "ultra": 161.7,
+    "giant": 1300.9,
+    "legendary": 632.8,
+    "lucky": 50
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "pond|Old Rod|-|founder",
+   "fishPerCast": 2.99,
+   "xpPerCast": 50.7,
+   "xpFinalPerCast": 253.6,
+   "valuePerCast": 297.7,
+   "valueFinalPerCast": 2976.8,
+   "valuePerFish": 99.6,
+   "castsPerHour": 600,
+   "xpPerHour": 30429,
+   "xpFinalPerHour": 152145,
+   "cashPerHour": 178607,
+   "cashFinalPerHour": 1786074,
+   "durabilityPerCast": 1.09,
+   "rarity": {
+    "rare": 19.344,
+    "common": 31.861,
+    "giant": 5.254,
+    "uncommon": 27.51,
+    "ultra": 10.509,
+    "legendary": 4.25,
+    "lucky": 1.272
+   },
+   "valueByRarityPerFish": {
+    "rare": 39.5,
+    "common": 40.3,
+    "giant": 563.2,
+    "uncommon": 49.2,
+    "ultra": 189.8,
+    "legendary": 280.6,
+    "lucky": 327.4
+   },
+   "itemsPerCast": 0.005,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Legendary parts)|-|founder",
+   "fishPerCast": 40,
+   "xpPerCast": 677.4,
+   "xpFinalPerCast": 3386.8,
+   "valuePerCast": 6792.9,
+   "valueFinalPerCast": 67937.2,
+   "valuePerFish": 169.8,
+   "castsPerHour": 655,
+   "xpPerHour": 443364,
+   "xpFinalPerHour": 2216821,
+   "cashPerHour": 4446291,
+   "cashFinalPerHour": 44467999,
+   "durabilityPerCast": 10,
+   "rarity": {
+    "uncommon": 20.45,
+    "lucky": 1.438,
+    "rare": 28.313,
+    "giant": 5.575,
+    "ultra": 15.25,
+    "common": 23.712,
+    "legendary": 5.263
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 52.9,
+    "lucky": 230.5,
+    "rare": 65,
+    "giant": 1265.1,
+    "ultra": 164.4,
+    "common": 35.4,
+    "legendary": 632.6
+   },
+   "itemsPerCast": 0.1,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|-|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.1,
+   "xpFinalPerCast": 17.1,
+   "valuePerCast": 16.3,
+   "valueFinalPerCast": 16.3,
+   "valuePerFish": 16.3,
+   "castsPerHour": 400,
+   "xpPerHour": 6834,
+   "xpFinalPerHour": 6834,
+   "cashPerHour": 6510,
+   "cashFinalPerHour": 6510,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 68.8,
+    "uncommon": 24.1,
+    "ultra": 1.8,
+    "rare": 4.4,
+    "giant": 0.7,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 5.7,
+    "uncommon": 3.9,
+    "ultra": 193.6,
+    "rare": 15.7,
+    "giant": 924,
+    "legendary": 393
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Worm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.1,
+   "xpFinalPerCast": 17.1,
+   "valuePerCast": 13.1,
+   "valueFinalPerCast": 13.1,
+   "valuePerFish": 13.1,
+   "castsPerHour": 400,
+   "xpPerHour": 6844,
+   "xpFinalPerHour": 6844,
+   "cashPerHour": 5234,
+   "cashFinalPerHour": 5234,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 24.4,
+    "common": 70.2,
+    "giant": 0.7,
+    "rare": 4.2,
+    "ultra": 0.5
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 3.9,
+    "common": 5.4,
+    "giant": 960.3,
+    "rare": 15.3,
+    "ultra": 197.6
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Minnow|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 10.5,
+   "valueFinalPerCast": 10.5,
+   "valuePerFish": 10.5,
+   "castsPerHour": 400,
+   "xpPerHour": 6803,
+   "xpFinalPerHour": 6803,
+   "cashPerHour": 4213,
+   "cashFinalPerHour": 4213,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 23.4,
+    "common": 69.4,
+    "rare": 5.4,
+    "ultra": 1.4,
+    "legendary": 0.1,
+    "giant": 0.2,
+    "lucky": 0.1
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 3.9,
+    "common": 5.4,
+    "rare": 15.5,
+    "ultra": 185.4,
+    "legendary": 370,
+    "giant": 1034.5,
+    "lucky": 1
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Shrimp|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.1,
+   "xpFinalPerCast": 17.1,
+   "valuePerCast": 27.3,
+   "valueFinalPerCast": 27.3,
+   "valuePerFish": 27.3,
+   "castsPerHour": 400,
+   "xpPerHour": 6834,
+   "xpFinalPerHour": 6834,
+   "cashPerHour": 10928,
+   "cashFinalPerHour": 10928,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.1,
+    "uncommon": 23.7,
+    "rare": 4.8,
+    "giant": 1,
+    "ultra": 1.3,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 7,
+    "uncommon": 26.9,
+    "rare": 94.2,
+    "giant": 709,
+    "ultra": 317.2,
+    "legendary": 354
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Spinner|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 42.4,
+   "xpFinalPerCast": 42.4,
+   "valuePerCast": 50.1,
+   "valueFinalPerCast": 50.1,
+   "valuePerFish": 25.1,
+   "castsPerHour": 400,
+   "xpPerHour": 16942,
+   "xpFinalPerHour": 16942,
+   "cashPerHour": 20053,
+   "cashFinalPerHour": 20053,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 70.7,
+    "uncommon": 21.5,
+    "giant": 0.6,
+    "rare": 5.9,
+    "ultra": 1.1,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 7.5,
+    "uncommon": 25.9,
+    "giant": 678.8,
+    "rare": 101,
+    "ultra": 310.9,
+    "legendary": 361.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Fly|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 21,
+   "xpFinalPerCast": 21,
+   "valuePerCast": 13.8,
+   "valueFinalPerCast": 13.8,
+   "valuePerFish": 13.8,
+   "castsPerHour": 400,
+   "xpPerHour": 8408,
+   "xpFinalPerHour": 8408,
+   "cashPerHour": 5527,
+   "cashFinalPerHour": 5527,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 68.8,
+    "ultra": 1,
+    "uncommon": 25.9,
+    "giant": 0.6,
+    "rare": 3.5,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 5.5,
+    "ultra": 188.4,
+    "uncommon": 3.9,
+    "giant": 965.7,
+    "rare": 15.7,
+    "legendary": 375.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Bloodworm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.9,
+   "xpFinalPerCast": 20.9,
+   "valuePerCast": 37.3,
+   "valueFinalPerCast": 37.3,
+   "valuePerFish": 37.3,
+   "castsPerHour": 400,
+   "xpPerHour": 8360,
+   "xpFinalPerHour": 8360,
+   "cashPerHour": 14912,
+   "cashFinalPerHour": 14912,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 22.3,
+    "common": 63.3,
+    "ultra": 2.4,
+    "rare": 11.1,
+    "legendary": 0.4,
+    "giant": 0.5
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 25,
+    "common": 7.1,
+    "ultra": 275.7,
+    "rare": 125.6,
+    "legendary": 1303.3,
+    "giant": 290.2
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 50.6,
+   "xpFinalPerCast": 50.6,
+   "valuePerCast": 71.8,
+   "valueFinalPerCast": 71.8,
+   "valuePerFish": 35.9,
+   "castsPerHour": 400,
+   "xpPerHour": 20240,
+   "xpFinalPerHour": 20240,
+   "cashPerHour": 28715,
+   "cashFinalPerHour": 28715,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "uncommon": 23.8,
+    "giant": 0.4,
+    "common": 63.2,
+    "rare": 11,
+    "ultra": 1.2,
+    "lucky": 0.1,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 28.9,
+    "giant": 303.3,
+    "common": 7.9,
+    "rare": 126.9,
+    "ultra": 271,
+    "lucky": 1,
+    "legendary": 1865.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Magic Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 84.6,
+   "xpFinalPerCast": 84.6,
+   "valuePerCast": 79.4,
+   "valueFinalPerCast": 79.4,
+   "valuePerFish": 39.7,
+   "castsPerHour": 400,
+   "xpPerHour": 33841,
+   "xpFinalPerHour": 33841,
+   "cashPerHour": 31755,
+   "cashFinalPerHour": 31755,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 62.6,
+    "rare": 11.2,
+    "ultra": 1.4,
+    "uncommon": 23.8,
+    "legendary": 0.5,
+    "giant": 0.5
+   },
+   "valueByRarityPerFish": {
+    "common": 7.7,
+    "rare": 92.2,
+    "ultra": 293.1,
+    "uncommon": 25.4,
+    "legendary": 1924,
+    "giant": 961
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 17.3,
+   "valueFinalPerCast": 17.3,
+   "valuePerFish": 17.3,
+   "castsPerHour": 400,
+   "xpPerHour": 6762,
+   "xpFinalPerHour": 6762,
+   "cashPerHour": 6922,
+   "cashFinalPerHour": 6922,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 26.3,
+    "common": 67.8,
+    "rare": 4.1,
+    "giant": 1,
+    "ultra": 0.5,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 4,
+    "common": 5.7,
+    "rare": 15.2,
+    "giant": 963,
+    "ultra": 189.6,
+    "legendary": 393
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|Strong Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.1,
+   "xpFinalPerCast": 17.1,
+   "valuePerCast": 24.8,
+   "valueFinalPerCast": 24.8,
+   "valuePerFish": 24.8,
+   "castsPerHour": 400,
+   "xpPerHour": 6838,
+   "xpFinalPerHour": 6838,
+   "cashPerHour": 9936,
+   "cashFinalPerHour": 9936,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.8,
+    "uncommon": 24.7,
+    "rare": 4,
+    "giant": 0.4,
+    "ultra": 0.5,
+    "legendary": 0.6
+   },
+   "valueByRarityPerFish": {
+    "common": 7.5,
+    "uncommon": 25,
+    "rare": 86.5,
+    "giant": 330.5,
+    "ultra": 301.4,
+    "legendary": 1191.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Common parts)|-|normal",
+   "fishPerCast": 4,
+   "xpPerCast": 68.2,
+   "xpFinalPerCast": 68.2,
+   "valuePerCast": 49.9,
+   "valueFinalPerCast": 49.9,
+   "valuePerFish": 12.5,
+   "castsPerHour": 400,
+   "xpPerHour": 27296,
+   "xpFinalPerHour": 27296,
+   "cashPerHour": 19952,
+   "cashFinalPerHour": 19952,
+   "durabilityPerCast": 4,
+   "rarity": {
+    "uncommon": 25.35,
+    "common": 68.8,
+    "rare": 4.5,
+    "giant": 0.55,
+    "ultra": 0.75,
+    "legendary": 0.05
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 3.9,
+    "common": 5.6,
+    "rare": 15.3,
+    "giant": 967.5,
+    "ultra": 188.3,
+    "legendary": 365
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Uncommon parts)|-|normal",
+   "fishPerCast": 6,
+   "xpPerCast": 102.2,
+   "xpFinalPerCast": 102.2,
+   "valuePerCast": 157.9,
+   "valueFinalPerCast": 157.9,
+   "valuePerFish": 26.3,
+   "castsPerHour": 400,
+   "xpPerHour": 40879,
+   "xpFinalPerHour": 40879,
+   "cashPerHour": 63180,
+   "cashFinalPerHour": 63180,
+   "durabilityPerCast": 6,
+   "rarity": {
+    "uncommon": 23.833,
+    "common": 68.467,
+    "ultra": 1.233,
+    "rare": 5.733,
+    "giant": 0.567,
+    "legendary": 0.167
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 24.6,
+    "common": 7.6,
+    "ultra": 302.3,
+    "rare": 112.9,
+    "giant": 672.8,
+    "legendary": 756.2
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Rare parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.4,
+   "xpFinalPerCast": 254.4,
+   "valuePerCast": 365.3,
+   "valueFinalPerCast": 365.3,
+   "valuePerFish": 24.4,
+   "castsPerHour": 424,
+   "xpPerHour": 107737,
+   "xpFinalPerHour": 107737,
+   "cashPerHour": 154722,
+   "cashFinalPerHour": 154722,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 67.62,
+    "uncommon": 24.42,
+    "rare": 6.1,
+    "ultra": 1.3,
+    "giant": 0.46,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 7.4,
+    "uncommon": 24.8,
+    "rare": 104.3,
+    "ultra": 277.6,
+    "giant": 484.8,
+    "legendary": 1086
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Ultra parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 255.2,
+   "xpFinalPerCast": 255.2,
+   "valuePerCast": 424.6,
+   "valueFinalPerCast": 424.6,
+   "valuePerFish": 28.3,
+   "castsPerHour": 450,
+   "xpPerHour": 114841,
+   "xpFinalPerHour": 114841,
+   "cashPerHour": 191070,
+   "cashFinalPerHour": 191070,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "rare": 7.98,
+    "common": 65.62,
+    "giant": 0.64,
+    "ultra": 1.46,
+    "uncommon": 24.06,
+    "legendary": 0.24
+   },
+   "valueByRarityPerFish": {
+    "rare": 94.4,
+    "common": 7.3,
+    "giant": 387.5,
+    "ultra": 294.5,
+    "uncommon": 25,
+    "legendary": 1322.4
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Legendary parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 255.8,
+   "xpFinalPerCast": 255.8,
+   "valuePerCast": 583.7,
+   "valueFinalPerCast": 583.7,
+   "valuePerFish": 38.9,
+   "castsPerHour": 450,
+   "xpPerHour": 115105,
+   "xpFinalPerHour": 115105,
+   "cashPerHour": 262665,
+   "cashFinalPerHour": 262665,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 65.08,
+    "rare": 9.36,
+    "uncommon": 23.02,
+    "ultra": 1.72,
+    "legendary": 0.18,
+    "giant": 0.64
+   },
+   "valueByRarityPerFish": {
+    "common": 8.9,
+    "rare": 121.7,
+    "uncommon": 31,
+    "ultra": 331.4,
+    "legendary": 2344.8,
+    "giant": 734.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "coast|Old Rod|-|founder",
+   "fishPerCast": 2.99,
+   "xpPerCast": 50.9,
+   "xpFinalPerCast": 254.7,
+   "valuePerCast": 268.8,
+   "valueFinalPerCast": 2687.8,
+   "valuePerFish": 89.9,
+   "castsPerHour": 600,
+   "xpPerHour": 30561,
+   "xpFinalPerHour": 152805,
+   "cashPerHour": 161269,
+   "cashFinalPerHour": 1612692,
+   "durabilityPerCast": 1.1,
+   "rarity": {
+    "common": 32.14,
+    "ultra": 10.435,
+    "uncommon": 27.893,
+    "rare": 18.93,
+    "legendary": 4.247,
+    "lucky": 1.405,
+    "giant": 4.95
+   },
+   "valueByRarityPerFish": {
+    "common": 5.4,
+    "ultra": 188,
+    "uncommon": 3.9,
+    "rare": 15.5,
+    "legendary": 375.9,
+    "lucky": 0.8,
+    "giant": 981
+   },
+   "itemsPerCast": 0.01,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Legendary parts)|-|founder",
+   "fishPerCast": 40,
+   "xpPerCast": 680.2,
+   "xpFinalPerCast": 3401,
+   "valuePerCast": 8822.3,
+   "valueFinalPerCast": 88228.7,
+   "valuePerFish": 220.6,
+   "castsPerHour": 655,
+   "xpPerHour": 445219,
+   "xpFinalPerHour": 2226093,
+   "cashPerHour": 5774609,
+   "cashFinalPerHour": 57749721,
+   "durabilityPerCast": 10,
+   "rarity": {
+    "common": 22.875,
+    "uncommon": 20.25,
+    "ultra": 15.575,
+    "giant": 5.5,
+    "legendary": 5.663,
+    "rare": 28.738,
+    "lucky": 1.4
+   },
+   "valueByRarityPerFish": {
+    "common": 7.9,
+    "uncommon": 31.1,
+    "ultra": 335.5,
+    "giant": 629.5,
+    "legendary": 1576.3,
+    "rare": 126.2,
+    "lucky": 1.8
+   },
+   "itemsPerCast": 0.145,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|-|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17,
+   "xpFinalPerCast": 17,
+   "valuePerCast": 39.6,
+   "valueFinalPerCast": 39.6,
+   "valuePerFish": 39.6,
+   "castsPerHour": 400,
+   "xpPerHour": 6783,
+   "xpFinalPerHour": 6783,
+   "cashPerHour": 15824,
+   "cashFinalPerHour": 15824,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 22.6,
+    "common": 71.5,
+    "rare": 4.9,
+    "ultra": 0.7,
+    "giant": 0.2,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 36.4,
+    "common": 28.9,
+    "rare": 64.6,
+    "ultra": 384.1,
+    "giant": 2209,
+    "legendary": 384
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Worm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.8,
+   "xpFinalPerCast": 16.8,
+   "valuePerCast": 51.4,
+   "valueFinalPerCast": 51.4,
+   "valuePerFish": 51.4,
+   "castsPerHour": 400,
+   "xpPerHour": 6720,
+   "xpFinalPerHour": 6720,
+   "cashPerHour": 20546,
+   "cashFinalPerHour": 20546,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 24.5,
+    "common": 69.2,
+    "legendary": 0.3,
+    "ultra": 1.2,
+    "rare": 4.3,
+    "giant": 0.5
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 39.7,
+    "common": 29.5,
+    "legendary": 364,
+    "ultra": 382.5,
+    "rare": 88.5,
+    "giant": 2346.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Minnow|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 17.1,
+   "xpFinalPerCast": 17.1,
+   "valuePerCast": 165.6,
+   "valueFinalPerCast": 165.6,
+   "valuePerFish": 165.6,
+   "castsPerHour": 400,
+   "xpPerHour": 6835,
+   "xpFinalPerHour": 6835,
+   "cashPerHour": 66246,
+   "cashFinalPerHour": 66246,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 70,
+    "rare": 4.8,
+    "uncommon": 23.4,
+    "giant": 0.6,
+    "ultra": 1.1,
+    "legendary": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 137.1,
+    "rare": 175.5,
+    "uncommon": 135.4,
+    "giant": 2252.7,
+    "ultra": 1418.4,
+    "legendary": 435
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Shrimp|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 53.2,
+   "valueFinalPerCast": 53.2,
+   "valuePerFish": 53.2,
+   "castsPerHour": 400,
+   "xpPerHour": 6744,
+   "xpFinalPerHour": 6744,
+   "cashPerHour": 21298,
+   "cashFinalPerHour": 21298,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 68.6,
+    "uncommon": 24.8,
+    "rare": 4.5,
+    "ultra": 1,
+    "giant": 0.7,
+    "legendary": 0.4
+   },
+   "valueByRarityPerFish": {
+    "common": 29.2,
+    "uncommon": 38.3,
+    "rare": 60.3,
+    "ultra": 374.1,
+    "giant": 2249.4,
+    "legendary": 383.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Spinner|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 42.4,
+   "xpFinalPerCast": 42.4,
+   "valuePerCast": 364.3,
+   "valueFinalPerCast": 364.3,
+   "valuePerFish": 182.1,
+   "castsPerHour": 400,
+   "xpPerHour": 16970,
+   "xpFinalPerHour": 16970,
+   "cashPerHour": 145710,
+   "cashFinalPerHour": 145710,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "uncommon": 23.1,
+    "common": 69.5,
+    "rare": 5,
+    "ultra": 1.5,
+    "giant": 0.6,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 137.3,
+    "common": 149.5,
+    "rare": 220,
+    "ultra": 1395.9,
+    "giant": 2155.5,
+    "legendary": 559.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Fly|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 21.1,
+   "xpFinalPerCast": 21.1,
+   "valuePerCast": 166.9,
+   "valueFinalPerCast": 166.9,
+   "valuePerFish": 166.9,
+   "castsPerHour": 400,
+   "xpPerHour": 8451,
+   "xpFinalPerHour": 8451,
+   "cashPerHour": 66761,
+   "cashFinalPerHour": 66761,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "uncommon": 23.8,
+    "common": 64.4,
+    "rare": 9.8,
+    "ultra": 1.1,
+    "giant": 0.6,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 133.3,
+    "common": 139.7,
+    "rare": 202.4,
+    "ultra": 995.1,
+    "giant": 2080,
+    "legendary": 652.3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Bloodworm|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 20.9,
+   "xpFinalPerCast": 20.9,
+   "valuePerCast": 40.2,
+   "valueFinalPerCast": 40.2,
+   "valuePerFish": 40.2,
+   "castsPerHour": 400,
+   "xpPerHour": 8346,
+   "xpFinalPerHour": 8346,
+   "cashPerHour": 16076,
+   "cashFinalPerHour": 16076,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 69.3,
+    "uncommon": 24.4,
+    "rare": 5,
+    "giant": 0.2,
+    "ultra": 0.9,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 28.5,
+    "uncommon": 33.6,
+    "rare": 69.5,
+    "giant": 2323.5,
+    "ultra": 374.4,
+    "legendary": 392
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 50.9,
+   "xpFinalPerCast": 50.9,
+   "valuePerCast": 365.6,
+   "valueFinalPerCast": 365.6,
+   "valuePerFish": 182.8,
+   "castsPerHour": 400,
+   "xpPerHour": 20366,
+   "xpFinalPerHour": 20366,
+   "cashPerHour": 146242,
+   "cashFinalPerHour": 146242,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "common": 64.2,
+    "uncommon": 23.9,
+    "rare": 8.9,
+    "ultra": 2.2,
+    "giant": 0.6,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 145.1,
+    "uncommon": 135.3,
+    "rare": 210,
+    "ultra": 1118.8,
+    "giant": 2129.5,
+    "legendary": 606.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Magic Lure|normal",
+   "fishPerCast": 2,
+   "xpPerCast": 85.1,
+   "xpFinalPerCast": 85.1,
+   "valuePerCast": 368.2,
+   "valueFinalPerCast": 368.2,
+   "valuePerFish": 184.1,
+   "castsPerHour": 400,
+   "xpPerHour": 34028,
+   "xpFinalPerHour": 34028,
+   "cashPerHour": 147275,
+   "cashFinalPerHour": 147275,
+   "durabilityPerCast": 2,
+   "rarity": {
+    "uncommon": 23.3,
+    "common": 61.5,
+    "ultra": 2.6,
+    "rare": 11.5,
+    "legendary": 0.4,
+    "giant": 0.7
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 134.7,
+    "common": 135.2,
+    "ultra": 1069.7,
+    "rare": 207.6,
+    "legendary": 697,
+    "giant": 2154
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 41.2,
+   "valueFinalPerCast": 41.2,
+   "valuePerFish": 41.2,
+   "castsPerHour": 400,
+   "xpPerHour": 6776,
+   "xpFinalPerHour": 6776,
+   "cashPerHour": 16490,
+   "cashFinalPerHour": 16490,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 68.3,
+    "uncommon": 25.4,
+    "rare": 5.2,
+    "legendary": 0.5,
+    "ultra": 0.4,
+    "giant": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 29.1,
+    "uncommon": 38.8,
+    "rare": 73.3,
+    "legendary": 410.2,
+    "ultra": 343,
+    "giant": 2109
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|Strong Magnet|normal",
+   "fishPerCast": 1,
+   "xpPerCast": 16.9,
+   "xpFinalPerCast": 16.9,
+   "valuePerCast": 160.5,
+   "valueFinalPerCast": 160.5,
+   "valuePerFish": 160.5,
+   "castsPerHour": 400,
+   "xpPerHour": 6750,
+   "xpFinalPerHour": 6750,
+   "cashPerHour": 64186,
+   "cashFinalPerHour": 64186,
+   "durabilityPerCast": 1,
+   "rarity": {
+    "common": 67.9,
+    "uncommon": 24.2,
+    "giant": 0.4,
+    "rare": 5.2,
+    "ultra": 0.9,
+    "legendary": 1.3,
+    "lucky": 0.1
+   },
+   "valueByRarityPerFish": {
+    "common": 140.1,
+    "uncommon": 125,
+    "giant": 2172.3,
+    "rare": 185.4,
+    "ultra": 1045.2,
+    "legendary": 563.7,
+    "lucky": 4
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Common parts)|-|normal",
+   "fishPerCast": 4,
+   "xpPerCast": 67.7,
+   "xpFinalPerCast": 67.7,
+   "valuePerCast": 193.7,
+   "valueFinalPerCast": 193.7,
+   "valuePerFish": 48.4,
+   "castsPerHour": 400,
+   "xpPerHour": 27063,
+   "xpFinalPerHour": 27063,
+   "cashPerHour": 77485,
+   "cashFinalPerHour": 77485,
+   "durabilityPerCast": 4,
+   "rarity": {
+    "common": 66.7,
+    "uncommon": 25.95,
+    "rare": 5.65,
+    "ultra": 1.15,
+    "giant": 0.5,
+    "legendary": 0.05
+   },
+   "valueByRarityPerFish": {
+    "common": 29,
+    "uncommon": 34.8,
+    "rare": 78.4,
+    "ultra": 364.6,
+    "giant": 2245.2,
+    "legendary": 393
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Uncommon parts)|-|normal",
+   "fishPerCast": 6,
+   "xpPerCast": 102.3,
+   "xpFinalPerCast": 102.3,
+   "valuePerCast": 1012.6,
+   "valueFinalPerCast": 1012.6,
+   "valuePerFish": 168.8,
+   "castsPerHour": 400,
+   "xpPerHour": 40914,
+   "xpFinalPerHour": 40914,
+   "cashPerHour": 405022,
+   "cashFinalPerHour": 405022,
+   "durabilityPerCast": 6,
+   "rarity": {
+    "common": 66.867,
+    "uncommon": 25,
+    "rare": 5.933,
+    "legendary": 0.267,
+    "ultra": 1.433,
+    "giant": 0.467,
+    "lucky": 0.033
+   },
+   "valueByRarityPerFish": {
+    "common": 146,
+    "uncommon": 136.3,
+    "rare": 202.9,
+    "legendary": 492.6,
+    "ultra": 955,
+    "giant": 2154.8,
+    "lucky": 3
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Rare parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 255,
+   "xpFinalPerCast": 255,
+   "valuePerCast": 2595.5,
+   "valueFinalPerCast": 2595.5,
+   "valuePerFish": 173,
+   "castsPerHour": 424,
+   "xpPerHour": 108009,
+   "xpFinalPerHour": 108009,
+   "cashPerHour": 1099263,
+   "cashFinalPerHour": 1099263,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 66.32,
+    "uncommon": 24.08,
+    "rare": 7.22,
+    "ultra": 1.52,
+    "giant": 0.66,
+    "legendary": 0.2
+   },
+   "valueByRarityPerFish": {
+    "common": 141.8,
+    "uncommon": 129.6,
+    "rare": 221.2,
+    "ultra": 1093.4,
+    "giant": 2132,
+    "legendary": 563.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Ultra parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.9,
+   "xpFinalPerCast": 254.9,
+   "valuePerCast": 2620.2,
+   "valueFinalPerCast": 2620.2,
+   "valuePerFish": 174.7,
+   "castsPerHour": 450,
+   "xpPerHour": 114690,
+   "xpFinalPerHour": 114690,
+   "cashPerHour": 1179104,
+   "cashFinalPerHour": 1179104,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 66.14,
+    "uncommon": 24.12,
+    "rare": 7.44,
+    "ultra": 1.44,
+    "legendary": 0.26,
+    "giant": 0.6
+   },
+   "valueByRarityPerFish": {
+    "common": 141.5,
+    "uncommon": 133.9,
+    "rare": 220.1,
+    "ultra": 1229.1,
+    "legendary": 541.2,
+    "giant": 2217.5
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Legendary parts)|-|normal",
+   "fishPerCast": 15,
+   "xpPerCast": 254.5,
+   "xpFinalPerCast": 254.5,
+   "valuePerCast": 3159.2,
+   "valueFinalPerCast": 3159.2,
+   "valuePerFish": 210.6,
+   "castsPerHour": 450,
+   "xpPerHour": 114516,
+   "xpFinalPerHour": 114516,
+   "cashPerHour": 1421638,
+   "cashFinalPerHour": 1421638,
+   "durabilityPerCast": 15,
+   "rarity": {
+    "common": 64.28,
+    "rare": 9.18,
+    "uncommon": 23.78,
+    "ultra": 1.82,
+    "giant": 0.64,
+    "legendary": 0.3
+   },
+   "valueByRarityPerFish": {
+    "common": 166.5,
+    "rare": 254.1,
+    "uncommon": 159.3,
+    "ultra": 1314.7,
+    "giant": 2588.7,
+    "legendary": 632.8
+   },
+   "itemsPerCast": 0,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Old Rod|-|founder",
+   "fishPerCast": 3.03,
+   "xpPerCast": 51.4,
+   "xpFinalPerCast": 257.1,
+   "valuePerCast": 552.2,
+   "valueFinalPerCast": 5521.8,
+   "valuePerFish": 182.4,
+   "castsPerHour": 600,
+   "xpPerHour": 30855,
+   "xpFinalPerHour": 154275,
+   "cashPerHour": 331310,
+   "cashFinalPerHour": 3313098,
+   "durabilityPerCast": 1.11,
+   "rarity": {
+    "ultra": 9.412,
+    "uncommon": 27.642,
+    "rare": 20.31,
+    "common": 32.266,
+    "giant": 4.491,
+    "legendary": 4.359,
+    "lucky": 1.519
+   },
+   "valueByRarityPerFish": {
+    "ultra": 376.4,
+    "uncommon": 35.3,
+    "rare": 69.6,
+    "common": 28.5,
+    "giant": 2168.3,
+    "legendary": 376.9,
+    "lucky": 0.9
+   },
+   "itemsPerCast": 0.007,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Legendary parts)|-|founder",
+   "fishPerCast": 40,
+   "xpPerCast": 680.1,
+   "xpFinalPerCast": 3400.6,
+   "valuePerCast": 21586.3,
+   "valueFinalPerCast": 215863.1,
+   "valuePerFish": 539.7,
+   "castsPerHour": 655,
+   "xpPerHour": 445175,
+   "xpFinalPerHour": 2225873,
+   "cashPerHour": 14129192,
+   "cashFinalPerHour": 141292198,
+   "durabilityPerCast": 10,
+   "rarity": {
+    "giant": 5.925,
+    "rare": 29.188,
+    "common": 24.063,
+    "uncommon": 19.875,
+    "ultra": 14.4,
+    "legendary": 5.188,
+    "lucky": 1.363
+   },
+   "valueByRarityPerFish": {
+    "giant": 2615.6,
+    "rare": 283.3,
+    "common": 170.6,
+    "uncommon": 157.1,
+    "ultra": 1350.5,
+    "legendary": 678.9,
+    "lucky": 1.9
+   },
+   "itemsPerCast": 0.1,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Uncommon parts)|-|founder",
+   "fishPerCast": 10,
+   "xpPerCast": 169.8,
+   "xpFinalPerCast": 849.3,
+   "valuePerCast": 4033.3,
+   "valueFinalPerCast": 40332.7,
+   "valuePerFish": 403.5,
+   "castsPerHour": 600,
+   "xpPerHour": 101910,
+   "xpFinalPerHour": 509550,
+   "cashPerHour": 2419962,
+   "cashFinalPerHour": 24199620,
+   "durabilityPerCast": 2.74,
+   "rarity": {
+    "legendary": 4.382,
+    "rare": 22.469,
+    "uncommon": 25.95,
+    "common": 30.572,
+    "giant": 4.782,
+    "ultra": 10.764,
+    "lucky": 1.08
+   },
+   "valueByRarityPerFish": {
+    "legendary": 3006.9,
+    "rare": 317.6,
+    "uncommon": 210.6,
+    "common": 19.6,
+    "giant": 1092.7,
+    "ultra": 644.6,
+    "lucky": 1673.9
+   },
+   "itemsPerCast": 0.02,
+   "failures": {}
+  },
+  {
+   "key": "ocean|Custom (Rare parts)|-|founder",
+   "fishPerCast": 37.6,
+   "xpPerCast": 637.4,
+   "xpFinalPerCast": 3187.2,
+   "valuePerCast": 14973,
+   "valueFinalPerCast": 149729.8,
+   "valuePerFish": 398.2,
+   "castsPerHour": 655,
+   "xpPerHour": 417231,
+   "xpFinalPerHour": 2086154,
+   "cashPerHour": 9800496,
+   "cashFinalPerHour": 98004960,
+   "durabilityPerCast": 9.52,
+   "rarity": {
+    "common": 28.68,
+    "legendary": 3.922,
+    "uncommon": 24.611,
+    "rare": 25.09,
+    "ultra": 11.714,
+    "giant": 4.733,
+    "lucky": 1.25
+   },
+   "valueByRarityPerFish": {
+    "common": 20.8,
+    "legendary": 3001.9,
+    "uncommon": 218.4,
+    "rare": 334.8,
+    "ultra": 623.7,
+    "giant": 1091.2,
+    "lucky": 959.4
+   },
+   "itemsPerCast": 0.15,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Uncommon parts)|-|founder",
+   "fishPerCast": 9.99,
+   "xpPerCast": 170.3,
+   "xpFinalPerCast": 851.6,
+   "valuePerCast": 2986.5,
+   "valueFinalPerCast": 29865,
+   "valuePerFish": 298.9,
+   "castsPerHour": 600,
+   "xpPerHour": 102196,
+   "xpFinalPerHour": 510981,
+   "cashPerHour": 1791900,
+   "cashFinalPerHour": 17919000,
+   "durabilityPerCast": 2.75,
+   "rarity": {
+    "uncommon": 26.081,
+    "giant": 4.544,
+    "common": 29.704,
+    "ultra": 10.608,
+    "rare": 23.759,
+    "legendary": 4.003,
+    "lucky": 1.301
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 130.5,
+    "giant": 1708,
+    "common": 65.6,
+    "ultra": 207.2,
+    "rare": 349.7,
+    "legendary": 1244.7,
+    "lucky": 989
+   },
+   "itemsPerCast": 0.024,
+   "failures": {}
+  },
+  {
+   "key": "river|Custom (Rare parts)|-|founder",
+   "fishPerCast": 37.84,
+   "xpPerCast": 643,
+   "xpFinalPerCast": 3215.1,
+   "valuePerCast": 10821.1,
+   "valueFinalPerCast": 108211,
+   "valuePerFish": 285.9,
+   "castsPerHour": 655,
+   "xpPerHour": 420887,
+   "xpFinalPerHour": 2104436,
+   "cashPerHour": 7082902,
+   "cashFinalPerHour": 70829018,
+   "durabilityPerCast": 9.57,
+   "rarity": {
+    "common": 28.736,
+    "uncommon": 24.68,
+    "rare": 25.538,
+    "lucky": 1.017,
+    "ultra": 11.745,
+    "giant": 4.096,
+    "legendary": 4.188
+   },
+   "valueByRarityPerFish": {
+    "common": 65,
+    "uncommon": 131.6,
+    "rare": 346.4,
+    "lucky": 951.1,
+    "ultra": 166.8,
+    "giant": 1681.5,
+    "legendary": 1150.4
+   },
+   "itemsPerCast": 0.08,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Uncommon parts)|-|founder",
+   "fishPerCast": 10.11,
+   "xpPerCast": 171.1,
+   "xpFinalPerCast": 855.5,
+   "valuePerCast": 4458.3,
+   "valueFinalPerCast": 44582.9,
+   "valuePerFish": 440.9,
+   "castsPerHour": 600,
+   "xpPerHour": 102663,
+   "xpFinalPerHour": 513315,
+   "cashPerHour": 2674974,
+   "cashFinalPerHour": 26749740,
+   "durabilityPerCast": 2.79,
+   "rarity": {
+    "uncommon": 26.483,
+    "giant": 4.49,
+    "rare": 22.468,
+    "common": 30.281,
+    "ultra": 11.116,
+    "legendary": 4.094,
+    "lucky": 1.068
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 94.1,
+    "giant": 5404.5,
+    "rare": 193.4,
+    "common": 37.1,
+    "ultra": 706.8,
+    "legendary": 963.5,
+    "lucky": 59.9
+   },
+   "itemsPerCast": 0.022,
+   "failures": {}
+  },
+  {
+   "key": "lake|Custom (Rare parts)|-|founder",
+   "fishPerCast": 37.67,
+   "xpPerCast": 640.5,
+   "xpFinalPerCast": 3202.3,
+   "valuePerCast": 16824.6,
+   "valueFinalPerCast": 168246,
+   "valuePerFish": 446.6,
+   "castsPerHour": 655,
+   "xpPerHour": 419213,
+   "xpFinalPerHour": 2096064,
+   "cashPerHour": 11012469,
+   "cashFinalPerHour": 110124687,
+   "durabilityPerCast": 9.53,
+   "rarity": {
+    "rare": 24.476,
+    "uncommon": 24.608,
+    "ultra": 12.53,
+    "common": 28.843,
+    "legendary": 4.115,
+    "giant": 4.393,
+    "lucky": 1.035
+   },
+   "valueByRarityPerFish": {
+    "rare": 179.6,
+    "uncommon": 94.1,
+    "ultra": 738.6,
+    "common": 35.2,
+    "legendary": 937.6,
+    "giant": 5407.3,
+    "lucky": 63.3
+   },
+   "itemsPerCast": 0.065,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Uncommon parts)|-|founder",
+   "fishPerCast": 9.98,
+   "xpPerCast": 169.5,
+   "xpFinalPerCast": 847.4,
+   "valuePerCast": 1161.8,
+   "valueFinalPerCast": 11617.8,
+   "valuePerFish": 116.5,
+   "castsPerHour": 600,
+   "xpPerHour": 101693,
+   "xpFinalPerHour": 508464,
+   "cashPerHour": 697069,
+   "cashFinalPerHour": 6970692,
+   "durabilityPerCast": 2.75,
+   "rarity": {
+    "rare": 22.895,
+    "ultra": 11.588,
+    "uncommon": 26.965,
+    "common": 28.929,
+    "giant": 4.531,
+    "legendary": 3.929,
+    "lucky": 1.163
+   },
+   "valueByRarityPerFish": {
+    "rare": 60.1,
+    "ultra": 135.6,
+    "uncommon": 42.5,
+    "common": 29.7,
+    "giant": 1008,
+    "legendary": 501.3,
+    "lucky": 133.6
+   },
+   "itemsPerCast": 0.028,
+   "failures": {}
+  },
+  {
+   "key": "pond|Custom (Rare parts)|-|founder",
+   "fishPerCast": 37.8,
+   "xpPerCast": 643.7,
+   "xpFinalPerCast": 3218.4,
+   "valuePerCast": 4770.3,
+   "valueFinalPerCast": 47702.8,
+   "valuePerFish": 126.2,
+   "castsPerHour": 655,
+   "xpPerHour": 421321,
+   "xpFinalPerHour": 2106605,
+   "cashPerHour": 3122368,
+   "cashFinalPerHour": 31223684,
+   "durabilityPerCast": 9.56,
+   "rarity": {
+    "giant": 5.013,
+    "common": 27.91,
+    "ultra": 13.558,
+    "rare": 24.656,
+    "uncommon": 23.664,
+    "lucky": 1.005,
+    "legendary": 4.193
+   },
+   "valueByRarityPerFish": {
+    "giant": 1022.5,
+    "common": 28.6,
+    "ultra": 136.9,
+    "rare": 55.7,
+    "uncommon": 43.9,
+    "lucky": 149.1,
+    "legendary": 542.9
+   },
+   "itemsPerCast": 0.075,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Uncommon parts)|-|founder",
+   "fishPerCast": 9.96,
+   "xpPerCast": 169.8,
+   "xpFinalPerCast": 849.2,
+   "valuePerCast": 1441.4,
+   "valueFinalPerCast": 14413.9,
+   "valuePerFish": 144.7,
+   "castsPerHour": 600,
+   "xpPerHour": 101906,
+   "xpFinalPerHour": 509532,
+   "cashPerHour": 864832,
+   "cashFinalPerHour": 8648316,
+   "durabilityPerCast": 2.74,
+   "rarity": {
+    "common": 30.094,
+    "uncommon": 26.4,
+    "ultra": 12.046,
+    "lucky": 1.325,
+    "rare": 21.401,
+    "giant": 4.658,
+    "legendary": 4.075
+   },
+   "valueByRarityPerFish": {
+    "common": 7.6,
+    "uncommon": 24.3,
+    "ultra": 284.6,
+    "lucky": 1.5,
+    "rare": 103.7,
+    "giant": 542.9,
+    "legendary": 1330
+   },
+   "itemsPerCast": 0.03,
+   "failures": {}
+  },
+  {
+   "key": "coast|Custom (Rare parts)|-|founder",
+   "fishPerCast": 37.85,
+   "xpPerCast": 641.7,
+   "xpFinalPerCast": 3208.5,
+   "valuePerCast": 5679.7,
+   "valueFinalPerCast": 56797.1,
+   "valuePerFish": 150.1,
+   "castsPerHour": 655,
+   "xpPerHour": 420028,
+   "xpFinalPerHour": 2100139,
+   "cashPerHour": 3717625,
+   "cashFinalPerHour": 37176251,
+   "durabilityPerCast": 9.57,
+   "rarity": {
+    "uncommon": 25.31,
+    "rare": 24.412,
+    "common": 27.939,
+    "ultra": 12.114,
+    "lucky": 1.162,
+    "legendary": 4.412,
+    "giant": 4.65
+   },
+   "valueByRarityPerFish": {
+    "uncommon": 25.2,
+    "rare": 101.9,
+    "common": 7.9,
+    "ultra": 278.4,
+    "lucky": 1.5,
+    "legendary": 1289.9,
+    "giant": 557.7
+   },
+   "itemsPerCast": 0.13,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Uncommon parts)|-|founder",
+   "fishPerCast": 10,
+   "xpPerCast": 169.9,
+   "xpFinalPerCast": 849.7,
+   "valuePerCast": 3789.2,
+   "valueFinalPerCast": 37891.6,
+   "valuePerFish": 378.8,
+   "castsPerHour": 600,
+   "xpPerHour": 101966,
+   "xpFinalPerHour": 509832,
+   "cashPerHour": 2273498,
+   "cashFinalPerHour": 22734984,
+   "durabilityPerCast": 2.74,
+   "rarity": {
+    "rare": 22.755,
+    "ultra": 12.378,
+    "legendary": 3.699,
+    "common": 29.354,
+    "uncommon": 26.235,
+    "giant": 4.359,
+    "lucky": 1.22
+   },
+   "valueByRarityPerFish": {
+    "rare": 224.2,
+    "ultra": 1108.4,
+    "legendary": 562.9,
+    "common": 136,
+    "uncommon": 133.2,
+    "giant": 2177.9,
+    "lucky": 1.6
+   },
+   "itemsPerCast": 0.014,
+   "failures": {}
+  },
+  {
+   "key": "swamp|Custom (Rare parts)|-|founder",
+   "fishPerCast": 37.82,
+   "xpPerCast": 641.9,
+   "xpFinalPerCast": 3209.3,
+   "valuePerCast": 14542.2,
+   "valueFinalPerCast": 145421.6,
+   "valuePerFish": 384.5,
+   "castsPerHour": 655,
+   "xpPerHour": 420122,
+   "xpFinalPerHour": 2100610,
+   "cashPerHour": 9518505,
+   "cashFinalPerHour": 95185047,
+   "durabilityPerCast": 9.56,
+   "rarity": {
+    "common": 27.79,
+    "rare": 25.185,
+    "ultra": 12.11,
+    "legendary": 4.574,
+    "uncommon": 24.828,
+    "lucky": 1.084,
+    "giant": 4.429
+   },
+   "valueByRarityPerFish": {
+    "common": 142.7,
+    "rare": 223,
+    "ultra": 1080.8,
+    "legendary": 579.8,
+    "uncommon": 137.2,
+    "lucky": 1.8,
+    "giant": 2195
+   },
+   "itemsPerCast": 0.075,
+   "failures": {}
+  }
+ ],
+ "bait": [
+  {
+   "biome": "ocean",
+   "bait": "Worm",
+   "price": 10,
+   "fishPerCast": 1,
+   "valuePerCast": 35.7,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": -1.7,
+   "costPerCast": 10,
+   "netPerCast": -11.7,
+   "roi": -0.171,
+   "extraXpPerCast": 0.2,
+   "costPerExtraXp": 53.5
+  },
+  {
+   "biome": "ocean",
+   "bait": "Minnow",
+   "price": 150,
+   "fishPerCast": 1,
+   "valuePerCast": 35.9,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": -1.5,
+   "costPerCast": 150,
+   "netPerCast": -151.5,
+   "roi": -0.01,
+   "extraXpPerCast": 0.1,
+   "costPerExtraXp": 1145
+  },
+  {
+   "biome": "ocean",
+   "bait": "Shrimp",
+   "price": 200,
+   "fishPerCast": 1,
+   "valuePerCast": 96.2,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": 58.8,
+   "costPerCast": 200,
+   "netPerCast": -141.2,
+   "roi": 0.294,
+   "extraXpPerCast": 0.1,
+   "costPerExtraXp": 3773.6
+  },
+  {
+   "biome": "ocean",
+   "bait": "Spinner",
+   "price": 500,
+   "fishPerCast": 2,
+   "valuePerCast": 203.1,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": 165.8,
+   "costPerCast": 1000,
+   "netPerCast": -834.2,
+   "roi": 0.166,
+   "extraXpPerCast": 25.6,
+   "costPerExtraXp": 39.1
+  },
+  {
+   "biome": "ocean",
+   "bait": "Fly",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 35.9,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": -1.4,
+   "costPerCast": 1000,
+   "netPerCast": -1001.4,
+   "roi": -0.001,
+   "extraXpPerCast": 4.1,
+   "costPerExtraXp": 246.3
+  },
+  {
+   "biome": "ocean",
+   "bait": "Bloodworm",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 126.7,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": 89.3,
+   "costPerCast": 1000,
+   "netPerCast": -910.7,
+   "roi": 0.089,
+   "extraXpPerCast": 3.9,
+   "costPerExtraXp": 254.5
+  },
+  {
+   "biome": "ocean",
+   "bait": "Lure",
+   "price": 2500,
+   "fishPerCast": 2,
+   "valuePerCast": 214,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": 176.6,
+   "costPerCast": 5000,
+   "netPerCast": -4823.4,
+   "roi": 0.035,
+   "extraXpPerCast": 33.5,
+   "costPerExtraXp": 149.2
+  },
+  {
+   "biome": "ocean",
+   "bait": "Magic Lure",
+   "price": 15000,
+   "fishPerCast": 2,
+   "valuePerCast": 257.5,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": 220.1,
+   "costPerCast": 30000,
+   "netPerCast": -29779.9,
+   "roi": 0.007,
+   "extraXpPerCast": 67.9,
+   "costPerExtraXp": 441.9
+  },
+  {
+   "biome": "ocean",
+   "bait": "Magnet",
+   "price": 5000,
+   "fishPerCast": 1,
+   "valuePerCast": 38.8,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": 1.4,
+   "costPerCast": 5000,
+   "netPerCast": -4998.6,
+   "roi": 0,
+   "extraXpPerCast": 0.4,
+   "costPerExtraXp": 12953.4
+  },
+  {
+   "biome": "ocean",
+   "bait": "Strong Magnet",
+   "price": 15000,
+   "fishPerCast": 1,
+   "valuePerCast": 101.2,
+   "baseValuePerCast": 37.4,
+   "extraValuePerCast": 63.9,
+   "costPerCast": 15000,
+   "netPerCast": -14936.1,
+   "roi": 0.004,
+   "extraXpPerCast": 0.3,
+   "costPerExtraXp": 44117.6
+  },
+  {
+   "biome": "river",
+   "bait": "Worm",
+   "price": 10,
+   "fishPerCast": 1,
+   "valuePerCast": 91.6,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": 0.6,
+   "costPerCast": 10,
+   "netPerCast": -9.4,
+   "roi": 0.056,
+   "extraXpPerCast": 0.3,
+   "costPerExtraXp": 39.2
+  },
+  {
+   "biome": "river",
+   "bait": "Minnow",
+   "price": 150,
+   "fishPerCast": 1,
+   "valuePerCast": 114.1,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": 23,
+   "costPerCast": 150,
+   "netPerCast": -127,
+   "roi": 0.153,
+   "extraXpPerCast": 0.1,
+   "costPerExtraXp": 2678.6
+  },
+  {
+   "biome": "river",
+   "bait": "Shrimp",
+   "price": 200,
+   "fishPerCast": 1,
+   "valuePerCast": 85.5,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": -5.6,
+   "costPerCast": 200,
+   "netPerCast": -205.6,
+   "roi": -0.028,
+   "extraXpPerCast": 0.2,
+   "costPerExtraXp": 836.8
+  },
+  {
+   "biome": "river",
+   "bait": "Spinner",
+   "price": 500,
+   "fishPerCast": 2,
+   "valuePerCast": 210.3,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": 119.2,
+   "costPerCast": 1000,
+   "netPerCast": -880.8,
+   "roi": 0.119,
+   "extraXpPerCast": 25.2,
+   "costPerExtraXp": 39.7
+  },
+  {
+   "biome": "river",
+   "bait": "Fly",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 123.7,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": 32.7,
+   "costPerCast": 1000,
+   "netPerCast": -967.3,
+   "roi": 0.033,
+   "extraXpPerCast": 4.1,
+   "costPerExtraXp": 241
+  },
+  {
+   "biome": "river",
+   "bait": "Bloodworm",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 90.6,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": -0.5,
+   "costPerCast": 1000,
+   "netPerCast": -1000.5,
+   "roi": -0.001,
+   "extraXpPerCast": 3.8,
+   "costPerExtraXp": 264.1
+  },
+  {
+   "biome": "river",
+   "bait": "Lure",
+   "price": 2500,
+   "fishPerCast": 2,
+   "valuePerCast": 245.2,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": 154.1,
+   "costPerCast": 5000,
+   "netPerCast": -4845.9,
+   "roi": 0.031,
+   "extraXpPerCast": 34.4,
+   "costPerExtraXp": 145.2
+  },
+  {
+   "biome": "river",
+   "bait": "Magic Lure",
+   "price": 15000,
+   "fishPerCast": 2,
+   "valuePerCast": 297.4,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": 206.3,
+   "costPerCast": 30000,
+   "netPerCast": -29793.7,
+   "roi": 0.007,
+   "extraXpPerCast": 67.9,
+   "costPerExtraXp": 441.7
+  },
+  {
+   "biome": "river",
+   "bait": "Magnet",
+   "price": 5000,
+   "fishPerCast": 1,
+   "valuePerCast": 86.8,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": -4.2,
+   "costPerCast": 5000,
+   "netPerCast": -5004.2,
+   "roi": -0.001,
+   "extraXpPerCast": 0.2,
+   "costPerExtraXp": 26455
+  },
+  {
+   "biome": "river",
+   "bait": "Strong Magnet",
+   "price": 15000,
+   "fishPerCast": 1,
+   "valuePerCast": 115.1,
+   "baseValuePerCast": 91.1,
+   "extraValuePerCast": 24,
+   "costPerCast": 15000,
+   "netPerCast": -14976,
+   "roi": 0.002,
+   "extraXpPerCast": 0.4,
+   "costPerExtraXp": 41551.2
+  },
+  {
+   "biome": "lake",
+   "bait": "Worm",
+   "price": 10,
+   "fishPerCast": 1,
+   "valuePerCast": 61.6,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 0.5,
+   "costPerCast": 10,
+   "netPerCast": -9.5,
+   "roi": 0.045,
+   "extraXpPerCast": -0.3,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "lake",
+   "bait": "Minnow",
+   "price": 150,
+   "fishPerCast": 1,
+   "valuePerCast": 144.5,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 83.3,
+   "costPerCast": 150,
+   "netPerCast": -66.7,
+   "roi": 0.556,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "lake",
+   "bait": "Shrimp",
+   "price": 200,
+   "fishPerCast": 1,
+   "valuePerCast": 60.3,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": -0.8,
+   "costPerCast": 200,
+   "netPerCast": -200.8,
+   "roi": -0.004,
+   "extraXpPerCast": -0.3,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "lake",
+   "bait": "Spinner",
+   "price": 500,
+   "fishPerCast": 2,
+   "valuePerCast": 152.2,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 91.1,
+   "costPerCast": 1000,
+   "netPerCast": -908.9,
+   "roi": 0.091,
+   "extraXpPerCast": 24.6,
+   "costPerExtraXp": 40.6
+  },
+  {
+   "biome": "lake",
+   "bait": "Fly",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 134.4,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 73.3,
+   "costPerCast": 1000,
+   "netPerCast": -926.7,
+   "roi": 0.073,
+   "extraXpPerCast": 3.5,
+   "costPerExtraXp": 282.2
+  },
+  {
+   "biome": "lake",
+   "bait": "Bloodworm",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 54.9,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": -6.2,
+   "costPerCast": 1000,
+   "netPerCast": -1006.2,
+   "roi": -0.006,
+   "extraXpPerCast": 3.5,
+   "costPerExtraXp": 282
+  },
+  {
+   "biome": "lake",
+   "bait": "Lure",
+   "price": 2500,
+   "fishPerCast": 2,
+   "valuePerCast": 195.8,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 134.7,
+   "costPerCast": 5000,
+   "netPerCast": -4865.3,
+   "roi": 0.027,
+   "extraXpPerCast": 33.6,
+   "costPerExtraXp": 149
+  },
+  {
+   "biome": "lake",
+   "bait": "Magic Lure",
+   "price": 15000,
+   "fishPerCast": 2,
+   "valuePerCast": 239.9,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 178.8,
+   "costPerCast": 30000,
+   "netPerCast": -29821.2,
+   "roi": 0.006,
+   "extraXpPerCast": 67.5,
+   "costPerExtraXp": 444.8
+  },
+  {
+   "biome": "lake",
+   "bait": "Magnet",
+   "price": 5000,
+   "fishPerCast": 1,
+   "valuePerCast": 61.2,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 0.1,
+   "costPerCast": 5000,
+   "netPerCast": -4999.9,
+   "roi": 0,
+   "extraXpPerCast": -0.1,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "lake",
+   "bait": "Strong Magnet",
+   "price": 15000,
+   "fishPerCast": 1,
+   "valuePerCast": 107.5,
+   "baseValuePerCast": 61.1,
+   "extraValuePerCast": 46.4,
+   "costPerCast": 15000,
+   "netPerCast": -14953.6,
+   "roi": 0.003,
+   "extraXpPerCast": -0.2,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "pond",
+   "bait": "Worm",
+   "price": 10,
+   "fishPerCast": 1,
+   "valuePerCast": 44.9,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": -2.1,
+   "costPerCast": 10,
+   "netPerCast": -12.1,
+   "roi": -0.206,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": 454.5
+  },
+  {
+   "biome": "pond",
+   "bait": "Minnow",
+   "price": 150,
+   "fishPerCast": 1,
+   "valuePerCast": 51,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": 4,
+   "costPerCast": 150,
+   "netPerCast": -146,
+   "roi": 0.027,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": 9375
+  },
+  {
+   "biome": "pond",
+   "bait": "Shrimp",
+   "price": 200,
+   "fishPerCast": 1,
+   "valuePerCast": 48,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": 1.1,
+   "costPerCast": 200,
+   "netPerCast": -198.9,
+   "roi": 0.005,
+   "extraXpPerCast": 0.2,
+   "costPerExtraXp": 1117.3
+  },
+  {
+   "biome": "pond",
+   "bait": "Spinner",
+   "price": 500,
+   "fishPerCast": 2,
+   "valuePerCast": 84.8,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": 37.8,
+   "costPerCast": 1000,
+   "netPerCast": -962.2,
+   "roi": 0.038,
+   "extraXpPerCast": 24.7,
+   "costPerExtraXp": 40.4
+  },
+  {
+   "biome": "pond",
+   "bait": "Fly",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 40.6,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": -6.4,
+   "costPerCast": 1000,
+   "netPerCast": -1006.4,
+   "roi": -0.006,
+   "extraXpPerCast": 3.8,
+   "costPerExtraXp": 261.7
+  },
+  {
+   "biome": "pond",
+   "bait": "Bloodworm",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 46.5,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": -0.4,
+   "costPerCast": 1000,
+   "netPerCast": -1000.4,
+   "roi": 0,
+   "extraXpPerCast": 3.9,
+   "costPerExtraXp": 257.1
+  },
+  {
+   "biome": "pond",
+   "bait": "Lure",
+   "price": 2500,
+   "fishPerCast": 2,
+   "valuePerCast": 84,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": 37,
+   "costPerCast": 5000,
+   "netPerCast": -4963,
+   "roi": 0.007,
+   "extraXpPerCast": 33.6,
+   "costPerExtraXp": 148.6
+  },
+  {
+   "biome": "pond",
+   "bait": "Magic Lure",
+   "price": 15000,
+   "fishPerCast": 2,
+   "valuePerCast": 99.8,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": 52.9,
+   "costPerCast": 30000,
+   "netPerCast": -29947.1,
+   "roi": 0.002,
+   "extraXpPerCast": 66.7,
+   "costPerExtraXp": 449.7
+  },
+  {
+   "biome": "pond",
+   "bait": "Magnet",
+   "price": 5000,
+   "fishPerCast": 1,
+   "valuePerCast": 49.7,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": 2.8,
+   "costPerCast": 5000,
+   "netPerCast": -4997.2,
+   "roi": 0.001,
+   "extraXpPerCast": -0.1,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "pond",
+   "bait": "Strong Magnet",
+   "price": 15000,
+   "fishPerCast": 1,
+   "valuePerCast": 41.1,
+   "baseValuePerCast": 47,
+   "extraValuePerCast": -5.9,
+   "costPerCast": 15000,
+   "netPerCast": -15005.9,
+   "roi": 0,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": 5000000
+  },
+  {
+   "biome": "coast",
+   "bait": "Worm",
+   "price": 10,
+   "fishPerCast": 1,
+   "valuePerCast": 13.1,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": -3.2,
+   "costPerCast": 10,
+   "netPerCast": -13.2,
+   "roi": -0.319,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": 434.8
+  },
+  {
+   "biome": "coast",
+   "bait": "Minnow",
+   "price": 150,
+   "fishPerCast": 1,
+   "valuePerCast": 10.5,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": -5.7,
+   "costPerCast": 150,
+   "netPerCast": -155.7,
+   "roi": -0.038,
+   "extraXpPerCast": -0.1,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "coast",
+   "bait": "Shrimp",
+   "price": 200,
+   "fishPerCast": 1,
+   "valuePerCast": 27.3,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": 11,
+   "costPerCast": 200,
+   "netPerCast": -189,
+   "roi": 0.055,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "coast",
+   "bait": "Spinner",
+   "price": 500,
+   "fishPerCast": 2,
+   "valuePerCast": 50.1,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": 33.9,
+   "costPerCast": 1000,
+   "netPerCast": -966.1,
+   "roi": 0.034,
+   "extraXpPerCast": 25.3,
+   "costPerExtraXp": 39.6
+  },
+  {
+   "biome": "coast",
+   "bait": "Fly",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 13.8,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": -2.5,
+   "costPerCast": 1000,
+   "netPerCast": -1002.5,
+   "roi": -0.002,
+   "extraXpPerCast": 3.9,
+   "costPerExtraXp": 254.1
+  },
+  {
+   "biome": "coast",
+   "bait": "Bloodworm",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 37.3,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": 21,
+   "costPerCast": 1000,
+   "netPerCast": -979,
+   "roi": 0.021,
+   "extraXpPerCast": 3.8,
+   "costPerExtraXp": 262.2
+  },
+  {
+   "biome": "coast",
+   "bait": "Lure",
+   "price": 2500,
+   "fishPerCast": 2,
+   "valuePerCast": 71.8,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": 55.5,
+   "costPerCast": 5000,
+   "netPerCast": -4944.5,
+   "roi": 0.011,
+   "extraXpPerCast": 33.5,
+   "costPerExtraXp": 149.2
+  },
+  {
+   "biome": "coast",
+   "bait": "Magic Lure",
+   "price": 15000,
+   "fishPerCast": 2,
+   "valuePerCast": 79.4,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": 63.1,
+   "costPerCast": 30000,
+   "netPerCast": -29936.9,
+   "roi": 0.002,
+   "extraXpPerCast": 67.5,
+   "costPerExtraXp": 444.3
+  },
+  {
+   "biome": "coast",
+   "bait": "Magnet",
+   "price": 5000,
+   "fishPerCast": 1,
+   "valuePerCast": 17.3,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": 1,
+   "costPerCast": 5000,
+   "netPerCast": -4999,
+   "roi": 0,
+   "extraXpPerCast": -0.2,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "coast",
+   "bait": "Strong Magnet",
+   "price": 15000,
+   "fishPerCast": 1,
+   "valuePerCast": 24.8,
+   "baseValuePerCast": 16.3,
+   "extraValuePerCast": 8.6,
+   "costPerCast": 15000,
+   "netPerCast": -14991.4,
+   "roi": 0.001,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": 1500000
+  },
+  {
+   "biome": "swamp",
+   "bait": "Worm",
+   "price": 10,
+   "fishPerCast": 1,
+   "valuePerCast": 51.4,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 11.8,
+   "costPerCast": 10,
+   "netPerCast": 1.8,
+   "roi": 1.18,
+   "extraXpPerCast": -0.2,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "swamp",
+   "bait": "Minnow",
+   "price": 150,
+   "fishPerCast": 1,
+   "valuePerCast": 165.6,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 126.1,
+   "costPerCast": 150,
+   "netPerCast": -23.9,
+   "roi": 0.84,
+   "extraXpPerCast": 0.1,
+   "costPerExtraXp": 1145
+  },
+  {
+   "biome": "swamp",
+   "bait": "Shrimp",
+   "price": 200,
+   "fishPerCast": 1,
+   "valuePerCast": 53.2,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 13.7,
+   "costPerCast": 200,
+   "netPerCast": -186.3,
+   "roi": 0.068,
+   "extraXpPerCast": -0.1,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "swamp",
+   "bait": "Spinner",
+   "price": 500,
+   "fishPerCast": 2,
+   "valuePerCast": 364.3,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 324.7,
+   "costPerCast": 1000,
+   "netPerCast": -675.3,
+   "roi": 0.325,
+   "extraXpPerCast": 25.5,
+   "costPerExtraXp": 39.3
+  },
+  {
+   "biome": "swamp",
+   "bait": "Fly",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 166.9,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 127.3,
+   "costPerCast": 1000,
+   "netPerCast": -872.7,
+   "roi": 0.127,
+   "extraXpPerCast": 4.2,
+   "costPerExtraXp": 239.8
+  },
+  {
+   "biome": "swamp",
+   "bait": "Bloodworm",
+   "price": 1000,
+   "fishPerCast": 1,
+   "valuePerCast": 40.2,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 0.6,
+   "costPerCast": 1000,
+   "netPerCast": -999.4,
+   "roi": 0.001,
+   "extraXpPerCast": 3.9,
+   "costPerExtraXp": 255.9
+  },
+  {
+   "biome": "swamp",
+   "bait": "Lure",
+   "price": 2500,
+   "fishPerCast": 2,
+   "valuePerCast": 365.6,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 326,
+   "costPerCast": 5000,
+   "netPerCast": -4674,
+   "roi": 0.065,
+   "extraXpPerCast": 34,
+   "costPerExtraXp": 147.2
+  },
+  {
+   "biome": "swamp",
+   "bait": "Magic Lure",
+   "price": 15000,
+   "fishPerCast": 2,
+   "valuePerCast": 368.2,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 328.6,
+   "costPerCast": 30000,
+   "netPerCast": -29671.4,
+   "roi": 0.011,
+   "extraXpPerCast": 68.1,
+   "costPerExtraXp": 440.4
+  },
+  {
+   "biome": "swamp",
+   "bait": "Magnet",
+   "price": 5000,
+   "fishPerCast": 1,
+   "valuePerCast": 41.2,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 1.7,
+   "costPerCast": 5000,
+   "netPerCast": -4998.3,
+   "roi": 0,
+   "extraXpPerCast": 0,
+   "costPerExtraXp": null
+  },
+  {
+   "biome": "swamp",
+   "bait": "Strong Magnet",
+   "price": 15000,
+   "fishPerCast": 1,
+   "valuePerCast": 160.5,
+   "baseValuePerCast": 39.6,
+   "extraValuePerCast": 120.9,
+   "costPerCast": 15000,
+   "netPerCast": -14879.1,
+   "roi": 0.008,
+   "extraXpPerCast": -0.1,
+   "costPerExtraXp": null
+  }
+ ],
+ "players": {
+  "casual": {
+   "core": {
+    "name": "casual",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 12.5,
+     "overheadS": 7,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 9,
+      "hours": 1.73
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 9,
+      "hours": 1.73
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.2,
+      "level": 3,
+      "xp": 1053,
+      "money": 2336,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 1.5,
+      "level": 9,
+      "xp": 8621,
+      "money": 18340,
+      "stage": "old"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 2.9,
+      "level": 12,
+      "xp": 16018,
+      "money": 53758,
+      "stage": "old"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 6.3,
+      "level": 18,
+      "xp": 35440,
+      "money": 147810,
+      "stage": "old"
+     }
+    ],
+    "sources": {
+     "fishSales": 142857,
+     "dailyQuests": 4875,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 1078
+    },
+    "sinks": {
+     "repairs": 1000,
+     "crates": 0
+    },
+    "xpSources": {
+     "fish": 31690,
+     "dailyQuests": 3750,
+     "farmQuests": 0
+    }
+   },
+   "withVotes": {
+    "name": "casual",
+    "profile": "normal",
+    "days": 30,
+    "votes": true,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 12.5,
+     "overheadS": 7,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 9,
+      "hours": 1.73
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 9,
+      "hours": 1.73
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.2,
+      "level": 3,
+      "xp": 1053,
+      "money": 12820,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 1.5,
+      "level": 9,
+      "xp": 8621,
+      "money": 91721,
+      "stage": "old"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 2.9,
+      "level": 12,
+      "xp": 16018,
+      "money": 200522,
+      "stage": "old"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 6.3,
+      "level": 18,
+      "xp": 35440,
+      "money": 462304,
+      "stage": "old"
+     }
+    ],
+    "sources": {
+     "fishSales": 142857,
+     "dailyQuests": 4875,
+     "farmQuests": 0,
+     "votes": 300000,
+     "voterCrateLiquid": 14494,
+     "dailyBoxLiquid": 1078
+    },
+    "sinks": {
+     "repairs": 1000,
+     "crates": 0
+    },
+    "xpSources": {
+     "fish": 31690,
+     "dailyQuests": 3750,
+     "farmQuests": 0
+    }
+   },
+   "questFarming": {
+    "name": "casual",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": true,
+    "arch": {
+     "minutesPerDay": 12.5,
+     "overheadS": 7,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 6,
+      "hours": 1.13
+     },
+     "level20": {
+      "day": 23,
+      "hours": 4.68
+     },
+     "rod:c20": {
+      "day": 23,
+      "hours": 4.68,
+      "level": 20
+     },
+     "level30": {
+      "day": 28,
+      "hours": 5.64
+     },
+     "rod:c30": {
+      "day": 28,
+      "hours": 5.64,
+      "level": 30
+     },
+     "level40": {
+      "day": 30,
+      "hours": 6.17
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 6,
+      "hours": 1.13
+     },
+     "lake": {
+      "day": 23,
+      "hours": 4.68
+     },
+     "pond": {
+      "day": 28,
+      "hours": 5.64
+     },
+     "coast": {
+      "day": 30,
+      "hours": 6.17
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.2,
+      "level": 4,
+      "xp": 1653,
+      "money": 8336,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 1.5,
+      "level": 11,
+      "xp": 12828,
+      "money": 65710,
+      "stage": "old"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 2.9,
+      "level": 15,
+      "xp": 24732,
+      "money": 150558,
+      "stage": "old"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 6.3,
+      "level": 41,
+      "xp": 169200,
+      "money": 897512,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 346969,
+     "dailyQuests": 11742,
+     "farmQuests": 591000,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 2876
+    },
+    "sinks": {
+     "repairs": 1000,
+     "crates": 54075
+    },
+    "xpSources": {
+     "fish": 100883,
+     "dailyQuests": 9217,
+     "farmQuests": 59100
+    }
+   },
+   "founder": {
+    "name": "casual",
+    "profile": "founder",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 12.5,
+     "overheadS": 7,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 0.07
+     },
+     "level20": {
+      "day": 2,
+      "hours": 0.28
+     },
+     "rod:c20": {
+      "day": 2,
+      "hours": 0.28,
+      "level": 20
+     },
+     "level30": {
+      "day": 3,
+      "hours": 0.43
+     },
+     "rod:c30": {
+      "day": 3,
+      "hours": 0.43,
+      "level": 30
+     },
+     "level40": {
+      "day": 3,
+      "hours": 0.52
+     },
+     "level50": {
+      "day": 4,
+      "hours": 0.64
+     },
+     "level60": {
+      "day": 4,
+      "hours": 0.79
+     },
+     "level70": {
+      "day": 5,
+      "hours": 0.95
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 0.07
+     },
+     "lake": {
+      "day": 2,
+      "hours": 0.28
+     },
+     "pond": {
+      "day": 3,
+      "hours": 0.43
+     },
+     "coast": {
+      "day": 3,
+      "hours": 0.52
+     },
+     "swamp": {
+      "day": 4,
+      "hours": 0.64
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.2,
+      "level": 16,
+      "xp": 27110,
+      "money": 393435,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 1.5,
+      "level": 94,
+      "xp": 891248,
+      "money": 33399844,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 2.9,
+      "level": 142,
+      "xp": 2030848,
+      "money": 82594317,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 6.3,
+      "level": 215,
+      "xp": 4635648,
+      "money": 195077398,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 194923201,
+     "dailyQuests": 257893,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 60000,
+     "crates": 54480
+    },
+    "xpSources": {
+     "fish": 4408452,
+     "dailyQuests": 227196,
+     "farmQuests": 0
+    }
+   }
+  },
+  "regular": {
+   "core": {
+    "name": "regular",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 45,
+     "overheadS": 4,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 2,
+      "hours": 1.3
+     },
+     "level20": {
+      "day": 8,
+      "hours": 5.37
+     },
+     "rod:c20": {
+      "day": 8,
+      "hours": 5.37,
+      "level": 20
+     },
+     "level30": {
+      "day": 9,
+      "hours": 6.55
+     },
+     "rod:c30": {
+      "day": 9,
+      "hours": 6.55,
+      "level": 30
+     },
+     "level40": {
+      "day": 10,
+      "hours": 7.2
+     },
+     "level50": {
+      "day": 11,
+      "hours": 8.05
+     },
+     "level60": {
+      "day": 13,
+      "hours": 9.08
+     },
+     "level70": {
+      "day": 14,
+      "hours": 10.28
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 2,
+      "hours": 1.3
+     },
+     "lake": {
+      "day": 8,
+      "hours": 5.37
+     },
+     "pond": {
+      "day": 9,
+      "hours": 6.55
+     },
+     "coast": {
+      "day": 10,
+      "hours": 7.2
+     },
+     "swamp": {
+      "day": 11,
+      "hours": 8.05
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.8,
+      "level": 7,
+      "xp": 5054,
+      "money": 11215,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 5.3,
+      "level": 19,
+      "xp": 39248,
+      "money": 167304,
+      "stage": "old"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 10.5,
+      "level": 71,
+      "xp": 513395,
+      "money": 3038733,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 22.5,
+      "level": 134,
+      "xp": 1800885,
+      "money": 15070794,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 15729611,
+     "dailyQuests": 43912,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 9346
+    },
+    "sinks": {
+     "repairs": 472000,
+     "crates": 240075
+    },
+    "xpSources": {
+     "fish": 1762800,
+     "dailyQuests": 38085,
+     "farmQuests": 0
+    }
+   },
+   "withVotes": {
+    "name": "regular",
+    "profile": "normal",
+    "days": 30,
+    "votes": true,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 45,
+     "overheadS": 4,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 2,
+      "hours": 1.3
+     },
+     "level20": {
+      "day": 8,
+      "hours": 5.37
+     },
+     "rod:c20": {
+      "day": 8,
+      "hours": 5.37,
+      "level": 20
+     },
+     "level30": {
+      "day": 9,
+      "hours": 6.55
+     },
+     "rod:c30": {
+      "day": 9,
+      "hours": 6.55,
+      "level": 30
+     },
+     "level40": {
+      "day": 10,
+      "hours": 7.2
+     },
+     "level50": {
+      "day": 11,
+      "hours": 8.05
+     },
+     "level60": {
+      "day": 13,
+      "hours": 9.08
+     },
+     "level70": {
+      "day": 14,
+      "hours": 10.28
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 2,
+      "hours": 1.3
+     },
+     "lake": {
+      "day": 8,
+      "hours": 5.37
+     },
+     "pond": {
+      "day": 9,
+      "hours": 6.55
+     },
+     "coast": {
+      "day": 10,
+      "hours": 7.2
+     },
+     "swamp": {
+      "day": 11,
+      "hours": 8.05
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.8,
+      "level": 7,
+      "xp": 5054,
+      "money": 21698,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 5.3,
+      "level": 19,
+      "xp": 39248,
+      "money": 240686,
+      "stage": "old"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 10.5,
+      "level": 71,
+      "xp": 513395,
+      "money": 3185497,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 22.5,
+      "level": 134,
+      "xp": 1800885,
+      "money": 15385288,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 15729611,
+     "dailyQuests": 43912,
+     "farmQuests": 0,
+     "votes": 300000,
+     "voterCrateLiquid": 14494,
+     "dailyBoxLiquid": 9346
+    },
+    "sinks": {
+     "repairs": 472000,
+     "crates": 240075
+    },
+    "xpSources": {
+     "fish": 1762800,
+     "dailyQuests": 38085,
+     "farmQuests": 0
+    }
+   },
+   "questFarming": {
+    "name": "regular",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": true,
+    "arch": {
+     "minutesPerDay": 45,
+     "overheadS": 4,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 2,
+      "hours": 0.85
+     },
+     "level20": {
+      "day": 5,
+      "hours": 3.52
+     },
+     "rod:c20": {
+      "day": 5,
+      "hours": 3.52,
+      "level": 20
+     },
+     "level30": {
+      "day": 6,
+      "hours": 4.25
+     },
+     "rod:c30": {
+      "day": 6,
+      "hours": 4.25,
+      "level": 30
+     },
+     "level40": {
+      "day": 7,
+      "hours": 4.67
+     },
+     "level50": {
+      "day": 7,
+      "hours": 5.22
+     },
+     "level60": {
+      "day": 8,
+      "hours": 5.87
+     },
+     "level70": {
+      "day": 9,
+      "hours": 6.63
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 2,
+      "hours": 0.85
+     },
+     "lake": {
+      "day": 5,
+      "hours": 3.52
+     },
+     "pond": {
+      "day": 6,
+      "hours": 4.25
+     },
+     "coast": {
+      "day": 7,
+      "hours": 4.67
+     },
+     "swamp": {
+      "day": 7,
+      "hours": 5.22
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.8,
+      "level": 8,
+      "xp": 8054,
+      "money": 41215,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 5.3,
+      "level": 50,
+      "xp": 258250,
+      "money": 1326700,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 10.5,
+      "level": 107,
+      "xp": 1145527,
+      "money": 9852758,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 22.5,
+      "level": 178,
+      "xp": 3173416,
+      "money": 29272319,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 18435106,
+     "dailyQuests": 47858,
+     "farmQuests": 11577000,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10065
+    },
+    "sinks": {
+     "repairs": 511000,
+     "crates": 286710
+    },
+    "xpSources": {
+     "fish": 1973845,
+     "dailyQuests": 41871,
+     "farmQuests": 1157700
+    }
+   },
+   "founder": {
+    "name": "regular",
+    "profile": "founder",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 45,
+     "overheadS": 4,
+     "votes": 1
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 0.05
+     },
+     "level20": {
+      "day": 1,
+      "hours": 0.23
+     },
+     "rod:c20": {
+      "day": 1,
+      "hours": 0.23,
+      "level": 20
+     },
+     "level30": {
+      "day": 1,
+      "hours": 0.33
+     },
+     "rod:c30": {
+      "day": 1,
+      "hours": 0.33,
+      "level": 30
+     },
+     "level40": {
+      "day": 1,
+      "hours": 0.4
+     },
+     "level50": {
+      "day": 1,
+      "hours": 0.48
+     },
+     "level60": {
+      "day": 1,
+      "hours": 0.57
+     },
+     "level70": {
+      "day": 1,
+      "hours": 0.68
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 0.05
+     },
+     "lake": {
+      "day": 1,
+      "hours": 0.23
+     },
+     "pond": {
+      "day": 1,
+      "hours": 0.33
+     },
+     "coast": {
+      "day": 1,
+      "hours": 0.4
+     },
+     "swamp": {
+      "day": 1,
+      "hours": 0.48
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 0.8,
+      "level": 75,
+      "xp": 571214,
+      "money": 19969835,
+      "stage": "c30"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 5.3,
+      "level": 240,
+      "xp": 5791854,
+      "money": 254373602,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 10.5,
+      "level": 344,
+      "xp": 11882601,
+      "money": 527843164,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 22.5,
+      "level": 507,
+      "xp": 25804309,
+      "money": 1152856876,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 1153138332,
+     "dailyQuests": 261875,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 360000,
+     "crates": 194115
+    },
+    "xpSources": {
+     "fish": 25571497,
+     "dailyQuests": 232813,
+     "farmQuests": 0
+    }
+   }
+  },
+  "active": {
+   "core": {
+    "name": "active",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 120,
+     "overheadS": 3,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 1.17
+     },
+     "level20": {
+      "day": 3,
+      "hours": 4.93
+     },
+     "rod:c20": {
+      "day": 3,
+      "hours": 4.93,
+      "level": 20
+     },
+     "level30": {
+      "day": 3,
+      "hours": 6
+     },
+     "rod:c30": {
+      "day": 4,
+      "hours": 6,
+      "level": 30
+     },
+     "level40": {
+      "day": 4,
+      "hours": 6.58
+     },
+     "level50": {
+      "day": 4,
+      "hours": 7.35
+     },
+     "level60": {
+      "day": 5,
+      "hours": 8.25
+     },
+     "level70": {
+      "day": 5,
+      "hours": 9.35
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 1.17
+     },
+     "lake": {
+      "day": 3,
+      "hours": 4.93
+     },
+     "pond": {
+      "day": 3,
+      "hours": 6
+     },
+     "coast": {
+      "day": 4,
+      "hours": 6.58
+     },
+     "swamp": {
+      "day": 4,
+      "hours": 7.35
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 2,
+      "level": 12,
+      "xp": 16441,
+      "money": 55767,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 14,
+      "level": 102,
+      "xp": 1046445,
+      "money": 8088403,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 28,
+      "level": 164,
+      "xp": 2720339,
+      "money": 23912838,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 60,
+      "level": 255,
+      "xp": 6546381,
+      "money": 60042903,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 62603755,
+     "dailyQuests": 51708,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 1732000,
+     "crates": 891345
+    },
+    "xpSources": {
+     "fish": 6500923,
+     "dailyQuests": 45458,
+     "farmQuests": 0
+    }
+   },
+   "withVotes": {
+    "name": "active",
+    "profile": "normal",
+    "days": 30,
+    "votes": true,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 120,
+     "overheadS": 3,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 1.17
+     },
+     "level20": {
+      "day": 3,
+      "hours": 4.93
+     },
+     "rod:c20": {
+      "day": 3,
+      "hours": 4.93,
+      "level": 20
+     },
+     "level30": {
+      "day": 3,
+      "hours": 6
+     },
+     "rod:c30": {
+      "day": 4,
+      "hours": 6,
+      "level": 30
+     },
+     "level40": {
+      "day": 4,
+      "hours": 6.58
+     },
+     "level50": {
+      "day": 4,
+      "hours": 7.35
+     },
+     "level60": {
+      "day": 5,
+      "hours": 8.25
+     },
+     "level70": {
+      "day": 5,
+      "hours": 9.35
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 1.17
+     },
+     "lake": {
+      "day": 3,
+      "hours": 4.93
+     },
+     "pond": {
+      "day": 3,
+      "hours": 6
+     },
+     "coast": {
+      "day": 4,
+      "hours": 6.58
+     },
+     "swamp": {
+      "day": 4,
+      "hours": 7.35
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 2,
+      "level": 12,
+      "xp": 16441,
+      "money": 76733,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 14,
+      "level": 102,
+      "xp": 1046445,
+      "money": 8235167,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 28,
+      "level": 164,
+      "xp": 2720339,
+      "money": 24206366,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 60,
+      "level": 255,
+      "xp": 6546381,
+      "money": 60671891,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 62603755,
+     "dailyQuests": 51708,
+     "farmQuests": 0,
+     "votes": 600000,
+     "voterCrateLiquid": 28988,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 1732000,
+     "crates": 891345
+    },
+    "xpSources": {
+     "fish": 6500923,
+     "dailyQuests": 45458,
+     "farmQuests": 0
+    }
+   },
+   "questFarming": {
+    "name": "active",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": true,
+    "arch": {
+     "minutesPerDay": 120,
+     "overheadS": 3,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 0.75
+     },
+     "level20": {
+      "day": 2,
+      "hours": 3.13
+     },
+     "rod:c20": {
+      "day": 2,
+      "hours": 3.13,
+      "level": 20
+     },
+     "level30": {
+      "day": 2,
+      "hours": 3.82
+     },
+     "rod:c30": {
+      "day": 2,
+      "hours": 3.82,
+      "level": 30
+     },
+     "level40": {
+      "day": 3,
+      "hours": 4.18
+     },
+     "level50": {
+      "day": 3,
+      "hours": 4.67
+     },
+     "level60": {
+      "day": 3,
+      "hours": 5.25
+     },
+     "level70": {
+      "day": 3,
+      "hours": 5.93
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 0.75
+     },
+     "lake": {
+      "day": 2,
+      "hours": 3.13
+     },
+     "pond": {
+      "day": 2,
+      "hours": 3.82
+     },
+     "coast": {
+      "day": 3,
+      "hours": 4.18
+     },
+     "swamp": {
+      "day": 3,
+      "hours": 4.67
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 2,
+      "level": 15,
+      "xp": 25455,
+      "money": 155835,
+      "stage": "old"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 14,
+      "level": 142,
+      "xp": 2016646,
+      "money": 18323035,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 28,
+      "level": 216,
+      "xp": 4666140,
+      "money": 43903470,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 60,
+      "level": 327,
+      "xp": 10721782,
+      "money": 102329534,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 65504897,
+     "dailyQuests": 51833,
+     "farmQuests": 39471000,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 1771000,
+     "crates": 937980
+    },
+    "xpSources": {
+     "fish": 6728911,
+     "dailyQuests": 45771,
+     "farmQuests": 3947100
+    }
+   },
+   "founder": {
+    "name": "active",
+    "profile": "founder",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 120,
+     "overheadS": 3,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 0.03
+     },
+     "level20": {
+      "day": 1,
+      "hours": 0.2
+     },
+     "rod:c20": {
+      "day": 1,
+      "hours": 0.2,
+      "level": 20
+     },
+     "level30": {
+      "day": 1,
+      "hours": 0.28
+     },
+     "rod:c30": {
+      "day": 1,
+      "hours": 0.28,
+      "level": 30
+     },
+     "level40": {
+      "day": 1,
+      "hours": 0.33
+     },
+     "level50": {
+      "day": 1,
+      "hours": 0.4
+     },
+     "level60": {
+      "day": 1,
+      "hours": 0.48
+     },
+     "level70": {
+      "day": 1,
+      "hours": 0.57
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 0.03
+     },
+     "lake": {
+      "day": 1,
+      "hours": 0.2
+     },
+     "pond": {
+      "day": 1,
+      "hours": 0.28
+     },
+     "coast": {
+      "day": 1,
+      "hours": 0.33
+     },
+     "swamp": {
+      "day": 1,
+      "hours": 0.4
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 2,
+      "level": 158,
+      "xp": 2505409,
+      "money": 107811221,
+      "stage": "c30"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 14,
+      "level": 440,
+      "xp": 19414927,
+      "money": 871630719,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 28,
+      "level": 625,
+      "xp": 39142697,
+      "money": 1762732466,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 60,
+      "level": 917,
+      "xp": 84234744,
+      "money": 3799546961,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 3801026917,
+     "dailyQuests": 261875,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 1140000,
+     "crates": 612615
+    },
+    "xpSources": {
+     "fish": 84001932,
+     "dailyQuests": 232813,
+     "farmQuests": 0
+    }
+   }
+  },
+  "grinder": {
+   "core": {
+    "name": "grinder",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 300,
+     "overheadS": 2,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 1.02
+     },
+     "level20": {
+      "day": 1,
+      "hours": 4.47
+     },
+     "rod:c20": {
+      "day": 1,
+      "hours": 4.47,
+      "level": 20
+     },
+     "level30": {
+      "day": 2,
+      "hours": 5.4
+     },
+     "rod:c30": {
+      "day": 2,
+      "hours": 5.4,
+      "level": 30
+     },
+     "level40": {
+      "day": 2,
+      "hours": 5.92
+     },
+     "level50": {
+      "day": 2,
+      "hours": 6.58
+     },
+     "level60": {
+      "day": 2,
+      "hours": 7.38
+     },
+     "level70": {
+      "day": 2,
+      "hours": 8.33
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 1.02
+     },
+     "lake": {
+      "day": 1,
+      "hours": 4.47
+     },
+     "pond": {
+      "day": 2,
+      "hours": 5.4
+     },
+     "coast": {
+      "day": 2,
+      "hours": 5.92
+     },
+     "swamp": {
+      "day": 2,
+      "hours": 6.58
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 5,
+      "level": 26,
+      "xp": 68057,
+      "money": 294784,
+      "stage": "c20"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 35,
+      "level": 203,
+      "xp": 4134984,
+      "money": 37414836,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 70,
+      "level": 298,
+      "xp": 8919222,
+      "money": 82771122,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 150,
+      "level": 445,
+      "xp": 19854622,
+      "money": 186442633,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 194326804,
+     "dailyQuests": 52025,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 5242000,
+     "crates": 2704980
+    },
+    "xpSources": {
+     "fish": 19808522,
+     "dailyQuests": 46100,
+     "farmQuests": 0
+    }
+   },
+   "withVotes": {
+    "name": "grinder",
+    "profile": "normal",
+    "days": 30,
+    "votes": true,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 300,
+     "overheadS": 2,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 1.02
+     },
+     "level20": {
+      "day": 1,
+      "hours": 4.47
+     },
+     "rod:c20": {
+      "day": 1,
+      "hours": 4.47,
+      "level": 20
+     },
+     "level30": {
+      "day": 2,
+      "hours": 5.4
+     },
+     "rod:c30": {
+      "day": 2,
+      "hours": 5.4,
+      "level": 30
+     },
+     "level40": {
+      "day": 2,
+      "hours": 5.92
+     },
+     "level50": {
+      "day": 2,
+      "hours": 6.58
+     },
+     "level60": {
+      "day": 2,
+      "hours": 7.38
+     },
+     "level70": {
+      "day": 2,
+      "hours": 8.33
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 1.02
+     },
+     "lake": {
+      "day": 1,
+      "hours": 4.47
+     },
+     "pond": {
+      "day": 2,
+      "hours": 5.4
+     },
+     "coast": {
+      "day": 2,
+      "hours": 5.92
+     },
+     "swamp": {
+      "day": 2,
+      "hours": 6.58
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 5,
+      "level": 26,
+      "xp": 68057,
+      "money": 315750,
+      "stage": "c20"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 35,
+      "level": 203,
+      "xp": 4134984,
+      "money": 37561600,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 70,
+      "level": 298,
+      "xp": 8919222,
+      "money": 83064650,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 150,
+      "level": 445,
+      "xp": 19854622,
+      "money": 187071622,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 194326804,
+     "dailyQuests": 52025,
+     "farmQuests": 0,
+     "votes": 600000,
+     "voterCrateLiquid": 28988,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 5242000,
+     "crates": 2704980
+    },
+    "xpSources": {
+     "fish": 19808522,
+     "dailyQuests": 46100,
+     "farmQuests": 0
+    }
+   },
+   "questFarming": {
+    "name": "grinder",
+    "profile": "normal",
+    "days": 30,
+    "votes": false,
+    "questFarming": true,
+    "arch": {
+     "minutesPerDay": 300,
+     "overheadS": 2,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 0.67
+     },
+     "level20": {
+      "day": 1,
+      "hours": 2.82
+     },
+     "rod:c20": {
+      "day": 1,
+      "hours": 2.82,
+      "level": 20
+     },
+     "level30": {
+      "day": 1,
+      "hours": 3.42
+     },
+     "rod:c30": {
+      "day": 1,
+      "hours": 3.42,
+      "level": 30
+     },
+     "level40": {
+      "day": 1,
+      "hours": 3.75
+     },
+     "level50": {
+      "day": 1,
+      "hours": 4.17
+     },
+     "level60": {
+      "day": 1,
+      "hours": 4.67
+     },
+     "level70": {
+      "day": 2,
+      "hours": 5.27
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 0.67
+     },
+     "lake": {
+      "day": 1,
+      "hours": 2.82
+     },
+     "pond": {
+      "day": 1,
+      "hours": 3.42
+     },
+     "coast": {
+      "day": 1,
+      "hours": 3.75
+     },
+     "swamp": {
+      "day": 1,
+      "hours": 4.17
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 5,
+      "level": 65,
+      "xp": 432864,
+      "money": 3054943,
+      "stage": "c30"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 35,
+      "level": 263,
+      "xp": 6933639,
+      "money": 65931760,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 70,
+      "level": 381,
+      "xp": 14517777,
+      "money": 139287046,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 150,
+      "level": 564,
+      "xp": 31853077,
+      "money": 306957558,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 197333014,
+     "dailyQuests": 52375,
+     "farmQuests": 117594000,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 5281000,
+     "crates": 2751615
+    },
+    "xpSources": {
+     "fish": 20047114,
+     "dailyQuests": 46563,
+     "farmQuests": 11759400
+    }
+   },
+   "founder": {
+    "name": "grinder",
+    "profile": "founder",
+    "days": 30,
+    "votes": false,
+    "questFarming": false,
+    "arch": {
+     "minutesPerDay": 300,
+     "overheadS": 2,
+     "votes": 2
+    },
+    "milestones": {
+     "level10": {
+      "day": 1,
+      "hours": 0.03
+     },
+     "level20": {
+      "day": 1,
+      "hours": 0.17
+     },
+     "rod:c20": {
+      "day": 1,
+      "hours": 0.17,
+      "level": 20
+     },
+     "level30": {
+      "day": 1,
+      "hours": 0.23
+     },
+     "rod:c30": {
+      "day": 1,
+      "hours": 0.23,
+      "level": 30
+     },
+     "level40": {
+      "day": 1,
+      "hours": 0.28
+     },
+     "level50": {
+      "day": 1,
+      "hours": 0.33
+     },
+     "level60": {
+      "day": 1,
+      "hours": 0.38
+     },
+     "level70": {
+      "day": 1,
+      "hours": 0.47
+     }
+    },
+    "unlocks": {
+     "ocean": {
+      "day": 1,
+      "hours": 0.02
+     },
+     "river": {
+      "day": 1,
+      "hours": 0.03
+     },
+     "lake": {
+      "day": 1,
+      "hours": 0.17
+     },
+     "pond": {
+      "day": 1,
+      "hours": 0.23
+     },
+     "coast": {
+      "day": 1,
+      "hours": 0.28
+     },
+     "swamp": {
+      "day": 1,
+      "hours": 0.33
+     }
+    },
+    "timeline": [
+     {
+      "day": 1,
+      "hoursPlayed": 5,
+      "level": 295,
+      "xp": 8706697,
+      "money": 388111853,
+      "stage": "c30"
+     },
+     {
+      "day": 7,
+      "hoursPlayed": 35,
+      "level": 793,
+      "xp": 62954923,
+      "money": 2843103285,
+      "stage": "c30"
+     },
+     {
+      "day": 14,
+      "hoursPlayed": 70,
+      "level": 1123,
+      "xp": 126244520,
+      "money": 5707245456,
+      "stage": "c30"
+     },
+     {
+      "day": 30,
+      "hoursPlayed": 150,
+      "level": 1645,
+      "xp": 270906456,
+      "money": 12253858274,
+      "stage": "c30"
+     }
+    ],
+    "sources": {
+     "fishSales": 12259130230,
+     "dailyQuests": 261875,
+     "farmQuests": 0,
+     "votes": 0,
+     "voterCrateLiquid": 0,
+     "dailyBoxLiquid": 10784
+    },
+    "sinks": {
+     "repairs": 3630000,
+     "crates": 1914615
+    },
+    "xpSources": {
+     "fish": 270673643,
+     "dailyQuests": 232813,
+     "farmQuests": 0
+    }
+   }
+  }
+ }
+}

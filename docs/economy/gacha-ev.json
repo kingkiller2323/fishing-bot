@@ -1,0 +1,2917 @@
+{
+ "Fishing Crate": {
+  "slots": 3,
+  "rarityTable": {
+   "common": 0.6916312617330304,
+   "uncommon": 0.2470111649046537,
+   "rare": 0.04940223298093074,
+   "ultra": 0.009880446596186148,
+   "giant": 0,
+   "legendary": 0.0019760893192372294,
+   "lucky": 0.00009880446596186147
+  },
+  "typeShare": {
+   "part_rod": 0.1401266892819111,
+   "part_reel": 0.26984597481583944,
+   "part_hook": 0.1351974442578138,
+   "part_handle": 0.13453874781806804,
+   "bait": 0.3202911438263676
+  },
+  "expectedLiquidValuePerOpen": 377.4330599743108,
+  "rewards": {
+   "Wooden Rod Piece": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Plastic Reel": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Spinning Reel": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Barbed Hook": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Wooden Handle": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Worm": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "bait",
+    "price": 10
+   },
+   "Minnow": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "bait",
+    "price": 150
+   },
+   "Shrimp": {
+    "p": 0.0864539077166288,
+    "rarity": "common",
+    "type": "bait",
+    "price": 200
+   },
+   "Bamboo Rod Piece": {
+    "p": 0.041168527484108944,
+    "rarity": "uncommon",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Aluminum Reel": {
+    "p": 0.041168527484108944,
+    "rarity": "uncommon",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Baitcasting Reel": {
+    "p": 0.041168527484108944,
+    "rarity": "uncommon",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Circle Hook": {
+    "p": 0.041168527484108944,
+    "rarity": "uncommon",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Cork Handle": {
+    "p": 0.041168527484108944,
+    "rarity": "uncommon",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Spinner": {
+    "p": 0.041168527484108944,
+    "rarity": "uncommon",
+    "type": "bait",
+    "price": 500
+   },
+   "Fiberglass Rod Piece": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Graphite Rod Piece": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Centerpin Reel": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Jigging Reel": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Treble Hook": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "part_hook",
+    "price": 0
+   },
+   "EVA Handle": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Fly": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 1000
+   },
+   "Bloodworm": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 1000
+   },
+   "Magnet": {
+    "p": 0.005489136997881193,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 5000
+   },
+   "Carbon Fiber Rod Piece": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Titanium Reel": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Trolling Reel": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Fly Fishing Reel": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Jig Hook": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Carbon Fiber Handle": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Lure": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 2500
+   },
+   "Magic Lure": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 15000
+   },
+   "Strong Magnet": {
+    "p": 0.0010978273995762386,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 15000
+   },
+   "Composite Rod Piece": {
+    "p": 0.00032934821987287157,
+    "rarity": "legendary",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Sage Green Reel": {
+    "p": 0.00032934821987287157,
+    "rarity": "legendary",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Swimbait Hook": {
+    "p": 0.00032934821987287157,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Octopus Hook": {
+    "p": 0.00032934821987287157,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Worm Hook": {
+    "p": 0.00032934821987287157,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Composite Handle": {
+    "p": 0.00032934821987287157,
+    "rarity": "legendary",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Gold Rod Piece": {
+    "p": 0.00009880446596186147,
+    "rarity": "lucky",
+    "type": "part_rod",
+    "price": 0
+   }
+  }
+ },
+ "Booster Pack": {
+  "slots": 1,
+  "rarityTable": {
+   "common": 0,
+   "uncommon": 0,
+   "rare": 1,
+   "ultra": 0,
+   "giant": 0,
+   "legendary": 0,
+   "lucky": 0
+  },
+  "typeShare": {
+   "buff": 1
+  },
+  "expectedLiquidValuePerOpen": 0,
+  "rewards": {
+   "Double XP": {
+    "p": 0.3333333333333333,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Double Cash": {
+    "p": 0.3333333333333333,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Lucky Draw": {
+    "p": 0.3333333333333333,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   }
+  }
+ },
+ "Voter's Crate": {
+  "slots": 3,
+  "rarityTable": {
+   "common": 0.48614487117160915,
+   "uncommon": 0.40512072597634097,
+   "rare": 0.0810241451952682,
+   "ultra": 0.01620482903905364,
+   "giant": 0.00810241451952682,
+   "legendary": 0.0032409658078107278,
+   "lucky": 0.00016204829039053638
+  },
+  "typeShare": {
+   "rod": 0.011574877885038313,
+   "part_rod": 0.024589952437008997,
+   "part_reel": 0.04665409923688518,
+   "part_hook": 0.023425260703527764,
+   "part_handle": 0.023130627448272243,
+   "bait": 0.050107107997917594,
+   "fish": 0.8161774950844581,
+   "buff": 0.004340579206889367
+  },
+  "expectedLiquidValuePerOpen": 483.1394251192993,
+  "rewards": {
+   "Old Rod": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "rod",
+    "price": 0
+   },
+   "Wooden Rod Piece": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Plastic Reel": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Spinning Reel": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Barbed Hook": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Wooden Handle": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Worm": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "bait",
+    "price": 10
+   },
+   "Minnow": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "bait",
+    "price": 150
+   },
+   "Shrimp": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "bait",
+    "price": 200
+   },
+   "Seabass": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Sardine": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Salmon": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Carp": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Bass": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Bluegill": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Guppy": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frog": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Swamp Eel": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Mud Fish": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Crab": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Clam": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Dewfin Perch": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Emerald Minnow": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Sandshell Flounder": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Sunshine Perch": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Harvest Carp": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Acorn Perch": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Cider Minnow": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frostscale Cod": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Snowflake Shad": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frozen Herring": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Icefin Perch": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frostfin Trout": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Sunfish": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Citrus Carp": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Rainwater Bass": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Cloudfin Carp": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Cloudspike Trout": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Fogtail Trout": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Mistfin Trout": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Breezefin Trout": {
+    "p": 0.011574877885038313,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Crystal Perch": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Bamboo Rod Piece": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Aluminum Reel": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Baitcasting Reel": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Circle Hook": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Cork Handle": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Spinner": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "bait",
+    "price": 500
+   },
+   "Tuna": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Anchovy": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Catfish": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Rainbow Trout": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Walleye": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Perch": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Betta": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Koi": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Water Snake": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Bullfrog": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Lobster": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Oyster": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Cherry Trout": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Lily Pike": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Blossom Carp": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Willow Snapper": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Tropic Snapper": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Sunspot Catfish": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Scorch Pike": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Pumpkinseed Sunfish": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Fogtail Eel": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Fall Blue Trout": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Thistle Pike": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Icicle Pike": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Frostling Trout": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Arctic Cod": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Sunspot Bass": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Amberfin Salmon": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Stormfin Carp": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Drenched Sturgeon": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Splashfin Salmon": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Grayfin Carp": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Silvercloud Carp": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Whirlwind Pike": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Skyfin Trout": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Tempest Carp": {
+    "p": 0.009421412232007929,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Fiberglass Rod Piece": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Graphite Rod Piece": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Centerpin Reel": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Jigging Reel": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Treble Hook": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "part_hook",
+    "price": 0
+   },
+   "EVA Handle": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Fly": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 1000
+   },
+   "Bloodworm": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 1000
+   },
+   "Magnet": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 5000
+   },
+   "Double XP": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Double Cash": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Lucky Draw": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Swordfish": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Pufferfish": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Sturgeon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Shad": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Pike": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Loach": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Chub": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Giant Frog": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Viperfish": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Bogfish": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Octopus": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Starfish": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Rainbloom Bass": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Petal Flounder": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Fogscale Eel": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Clover Trout": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Heatwave Tuna": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Coral Grouper": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Glowfin Barracuda": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Crimson Salmon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Mapleleaf Bass": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Bonfire Snapper": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Icefin Salmon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Glacier Minnow": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Snowy Snapper": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Snowflake Carp": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Blizzard Bass": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Frostscale Salmon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Glacier Carp": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Solar Pike": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Sunbeam Carp": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Sunflare Bass": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Goldenfin Trout": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Thunder Trout": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Raincloud Pike": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Tempest Pike": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Misty Pike": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Overcast Sturgeon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Mistscale Pike": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Cloudwater Sturgeon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Gale Sturgeon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Windcatcher Carp": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Stormtail Pike": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Windwhisper Sturgeon": {
+    "p": 0.001446859735629789,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Albacore": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Super Cucumber": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Queen Salmon": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "King Salmon": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Loch Ness Monster": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Ogopogo": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Jumbo Koi": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Zombie Fish": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Crocodile": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Alligator": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Jellyfish": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Sea Serpent": {
+    "p": 0.0006752012099605683,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Carbon Fiber Rod Piece": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Titanium Reel": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Trolling Reel": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Fly Fishing Reel": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Jig Hook": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Carbon Fiber Handle": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Lure": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 2500
+   },
+   "Magic Lure": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 15000
+   },
+   "Strong Magnet": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 15000
+   },
+   "Azure Marlin": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Giant Shrimp": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Dorado": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Scorpion Carp": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Steelhead": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Bass": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Guppy": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Frog": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Eel": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Mudfish": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Crab": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Clam": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Polar Pike": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Snowdrift Eel": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Frostback Pike": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Solaris Trout": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Luminis Pike": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Radiant Sturgeon": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Monsoon Trout": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Grayfin Salmon": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Cyclone Salmon": {
+    "p": 0.0005401609679684547,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Composite Rod Piece": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Sage Green Reel": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Swimbait Hook": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Octopus Hook": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Worm Hook": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Composite Handle": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Kraken": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Anglerfish": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Void Salmon": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Woodskip": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Pike": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Loach": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Chub": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Platinum Frog": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Viperfish": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Bogfish": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Octopus": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Starfish": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Suncrest Marlin": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Firefly Minnow": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Glacier Grouper": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Winterlight Bass": {
+    "p": 0.00014731662762776035,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Gold Rod Piece": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Pearl": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Magikarp": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Noxclate Fish": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lunafin Fish": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Ring": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Necklace": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Wallet": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Phone": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Boot": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Hat": {
+    "p": 0.000012465253106964338,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   }
+  }
+ },
+ "Daily Box": {
+  "slots": 3,
+  "rarityTable": {
+   "common": 0.6882312456985548,
+   "uncommon": 0.24579687346376955,
+   "rare": 0.04915937469275391,
+   "ultra": 0.009831874938550781,
+   "giant": 0.004915937469275391,
+   "legendary": 0.001966374987710156,
+   "lucky": 0.00009831874938550782
+  },
+  "typeShare": {
+   "part_rod": 0.024682699083402253,
+   "part_reel": 0.04783292873540675,
+   "part_hook": 0.023976051488543076,
+   "part_handle": 0.02379729012602397,
+   "bait": 0.05969131561504816,
+   "fish": 0.8173861770216041,
+   "buff": 0.0026335379299689595
+  },
+  "expectedLiquidValuePerOpen": 359.46097825939944,
+  "rewards": {
+   "Wooden Rod Piece": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Plastic Reel": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Spinning Reel": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Barbed Hook": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Wooden Handle": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Worm": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "bait",
+    "price": 10
+   },
+   "Minnow": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "bait",
+    "price": 150
+   },
+   "Shrimp": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "bait",
+    "price": 200
+   },
+   "Seabass": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Sardine": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Salmon": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Carp": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Bass": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Bluegill": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Guppy": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frog": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Swamp Eel": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Mud Fish": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Crab": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Clam": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Dewfin Perch": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Emerald Minnow": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Sandshell Flounder": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Sunshine Perch": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Harvest Carp": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Acorn Perch": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Cider Minnow": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frostscale Cod": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Snowflake Shad": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frozen Herring": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Icefin Perch": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Frostfin Trout": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Sunfish": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Citrus Carp": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Rainwater Bass": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Cloudfin Carp": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Cloudspike Trout": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Fogtail Trout": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Mistfin Trout": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Breezefin Trout": {
+    "p": 0.01678612794386719,
+    "rarity": "common",
+    "type": "fish",
+    "price": null
+   },
+   "Crystal Perch": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Bamboo Rod Piece": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Aluminum Reel": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Baitcasting Reel": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Circle Hook": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Cork Handle": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Spinner": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "bait",
+    "price": 500
+   },
+   "Tuna": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Anchovy": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Catfish": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Rainbow Trout": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Walleye": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Perch": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Betta": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Koi": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Water Snake": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Bullfrog": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Lobster": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Oyster": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Cherry Trout": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Lily Pike": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Blossom Carp": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Willow Snapper": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Tropic Snapper": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Sunspot Catfish": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Scorch Pike": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Pumpkinseed Sunfish": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Fogtail Eel": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Fall Blue Trout": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Thistle Pike": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Icicle Pike": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Frostling Trout": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Arctic Cod": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Sunspot Bass": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Amberfin Salmon": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Stormfin Carp": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Drenched Sturgeon": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Splashfin Salmon": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Grayfin Carp": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Silvercloud Carp": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Whirlwind Pike": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Skyfin Trout": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Tempest Carp": {
+    "p": 0.005716206359622548,
+    "rarity": "uncommon",
+    "type": "fish",
+    "price": null
+   },
+   "Fiberglass Rod Piece": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Graphite Rod Piece": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Centerpin Reel": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Jigging Reel": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Treble Hook": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "part_hook",
+    "price": 0
+   },
+   "EVA Handle": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Fly": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 1000
+   },
+   "Bloodworm": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 1000
+   },
+   "Magnet": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "bait",
+    "price": 5000
+   },
+   "Double XP": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Double Cash": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Lucky Draw": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "buff",
+    "price": 0
+   },
+   "Swordfish": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Pufferfish": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Sturgeon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Shad": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Pike": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Loach": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Chub": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Giant Frog": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Viperfish": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Bogfish": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Octopus": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Starfish": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Rainbloom Bass": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Petal Flounder": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Fogscale Eel": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Clover Trout": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Heatwave Tuna": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Coral Grouper": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Glowfin Barracuda": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Crimson Salmon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Mapleleaf Bass": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Bonfire Snapper": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Icefin Salmon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Glacier Minnow": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Snowy Snapper": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Snowflake Carp": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Blizzard Bass": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Frostscale Salmon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Glacier Carp": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Solar Pike": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Sunbeam Carp": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Sunflare Bass": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Goldenfin Trout": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Thunder Trout": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Raincloud Pike": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Tempest Pike": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Misty Pike": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Overcast Sturgeon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Mistscale Pike": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Cloudwater Sturgeon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Gale Sturgeon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Windcatcher Carp": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Stormtail Pike": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Windwhisper Sturgeon": {
+    "p": 0.0008778459766563198,
+    "rarity": "rare",
+    "type": "fish",
+    "price": null
+   },
+   "Albacore": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Super Cucumber": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Queen Salmon": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "King Salmon": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Loch Ness Monster": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Ogopogo": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Jumbo Koi": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Zombie Fish": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Crocodile": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Alligator": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Jellyfish": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Sea Serpent": {
+    "p": 0.0004096614557729492,
+    "rarity": "giant",
+    "type": "fish",
+    "price": null
+   },
+   "Carbon Fiber Rod Piece": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Titanium Reel": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Trolling Reel": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Fly Fishing Reel": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Jig Hook": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Carbon Fiber Handle": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Lure": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 2500
+   },
+   "Magic Lure": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 15000
+   },
+   "Strong Magnet": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "bait",
+    "price": 15000
+   },
+   "Azure Marlin": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Giant Shrimp": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Dorado": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Scorpion Carp": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Steelhead": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Bass": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Guppy": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Frog": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Eel": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Mudfish": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Crab": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Clam": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Polar Pike": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Snowdrift Eel": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Frostback Pike": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Solaris Trout": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Luminis Pike": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Radiant Sturgeon": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Monsoon Trout": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Grayfin Salmon": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Cyclone Salmon": {
+    "p": 0.0003277291646183594,
+    "rarity": "ultra",
+    "type": "fish",
+    "price": null
+   },
+   "Composite Rod Piece": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Sage Green Reel": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "part_reel",
+    "price": 0
+   },
+   "Swimbait Hook": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Octopus Hook": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Worm Hook": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "part_hook",
+    "price": 0
+   },
+   "Composite Handle": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "part_handle",
+    "price": 0
+   },
+   "Kraken": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Anglerfish": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Void Salmon": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Woodskip": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Pike": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Loach": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Chub": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Platinum Frog": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Viperfish": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Bogfish": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Octopus": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Golden Starfish": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Suncrest Marlin": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Firefly Minnow": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Glacier Grouper": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Winterlight Bass": {
+    "p": 0.00008938068125955256,
+    "rarity": "legendary",
+    "type": "fish",
+    "price": null
+   },
+   "Gold Rod Piece": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "part_rod",
+    "price": 0
+   },
+   "Pearl": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Magikarp": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Noxclate Fish": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lunafin Fish": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Ring": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Necklace": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Wallet": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Phone": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Boot": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   },
+   "Lost Hat": {
+    "p": 0.000007562980721962141,
+    "rarity": "lucky",
+    "type": "fish",
+    "price": null
+   }
+  }
+ }
+}
