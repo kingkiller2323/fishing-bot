@@ -567,3 +567,47 @@ node -e "console.log(require('./scripts/economy/5b/world.js').permitTable())"
 node -e "console.log(require('./scripts/economy/5b/world.js').checks())"
 node scripts/economy/5b/check-shared.js                              # shared-assumption guard (passes)
 ```
+
+---
+
+## Integration (framework 5b.3)
+
+`world.system(opts)` puts the world on the shared lifecycle core (`lifecycle.js`); `integrate.js` runs it as `'world'` in the reference loop. The contract and validation are in `report().integration`.
+
+**Hooks.** All per-run state lives in `state.sys.world`, and each call returns a fresh object.
+- `init`: permits held from the start. Ocean is free. Grandfathered players get every live biome at or below `opts.grandfatheredLevel`, or the biomes in `opts.grandfathered` (names or `grandfatheredPermits()` records).
+- `canFish(biome)`: a **live** biome whose permit is held. With `opts.permits: false`, every live biome is open at its level (the reference-stage model behind `permitPrice()`). **Mountain Stream stays out of the live biomes:** the core never fishes it, even with its permit held (`opts.expansion` only offers the permit).
+- `goals`: one goal per unowned permit whose level the **gate level** has reached. Category `'progression'`, item `'permit:<biome>'`, cost `permitPrice()`. A permit the player can't afford yet blocks the goals after it.
+- `on('levelUp')` of the gate kind (public under the Founder's public gate) records when each biome level is reached. `onDayStart`/`onDayEnd` flag purchases made in the core's end-of-day purchase pass.
+
+**Purchase order (differs from `LC.PRIORITY`).** The design funds goals in order of the level they're due at, and a tie goes to the rod (`PARAMS.schedule.tieBreak = 'rod-first'`). A fixed `LC.PRIORITY.permit` (always before rods) is therefore not the design order. `permitPriority()` works as follows:
+- It compares the permit with the pending rod tier (`path[equippedTier + 1]`, which rods buys at `LC.PRIORITY.rod`).
+- If the permit is due first, it takes `LC.PRIORITY.permit` (10). Otherwise it goes right after the rod (21).
+- `'permit-first'` (sensitivity) moves ties to 10. `opts.priority` sets a fixed priority.
+
+`permitSavings()` returns the money a player keeps aside for the next permit before its level. The core has no saving primitive, so a system that should honour it passes it as `reserve`. Under `'rod-first'` it is 0 for rods, so nothing is required of `rods.system()`.
+
+**Ledger.**
+- No XP or cash sources: the world grants nothing.
+- Spend: `progression` → `permit:River`, `permit:Lake`, `permit:Pond`, `permit:Coast`, `permit:Swamp`, plus `permit:Mountain Stream` with `opts.expansion`.
+- `permitSummary(result)` gives time to afford per permit from any `simulate()` result.
+
+**Validation (`validateSystem()`).** The system on the core, with baselines that reproduce `lifecycle()`'s other assumptions:
+- `scheduledRodsBaseline()`: rod instalments from the crate unlock level, equip at level, repairs per fish.
+- `LC.provisionalDaily()`: daily XP.
+- the other-spend share.
+
+It is compared with `world.lifecycle()` for **all four archetypes** in the report's configurations: design (time to afford), permit-first, 15% other spend, grandfathered Lv 34, and no permits. Result:
+- **Max relative difference 0.029%.**
+  - Every level time, permit purchase and rod equip matches to the step, and the ledgers (gross $, repairs, rods, permits, other spend, fishing/daily XP, money) match at every milestone day end.
+  - The one gap is casual: the Pond permit is bought in the core's end-of-day pass, one step before `lifecycle()` bought it. The core rule is the right one: the player has the money and the level at the end of the session.
+- **Time to afford through the core:** 0 sessions for every archetype and permit, identical to §3.4.
+- **Prices recomputed from the core's reference stage hours are identical:** $1,200 / $6,500 / $23,000 / $59,000 / $150,000 / $340,000.
+- **`curve.json` is reproduced on the core:** provisional path, `LC.provisionalRods` + `LC.provisionalDaily`, 0 h at two decimals.
+- **Compare hours, not days:** the core counts a level reached on a day's last step in that day.
+- **With the in-flight `rods.system()`** (informational, live permits, Lv 60): every permit is owned at its level for every archetype.
+
+**Other changes in this stage (world.js only):**
+- The `rods.gearPath()` comparison with its `// shared-ok` escape is removed, along with `report().valueModel.rodsPath` and `report().permits.rodsPath` (R3: `F.gearPath()` is the rods path). §2.4 and §3.6 describe the shared path from now on; the docs regeneration will fold them in.
+- `replicationCheck()` now pins `F.PROVISIONAL_GEAR_PATH` (the path `curve.json` was fit on). Before this fix it failed at 0.53 h after the cutover.
+- The ladder mirror follows the framework's pinned Lucky-item rule (`F.RULES.luckyItems`), as `castOutcome` does. Parity is back to 0 (it was 5.7e-4). Mountain Stream's step over Swamp moves from ×1.393 to ×1.394, still inside the band.

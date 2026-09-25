@@ -476,3 +476,60 @@ node scripts/economy/5b/rods.js > /tmp/rods.json                    # same, as J
 node -e "require('./scripts/economy/5b/rods.js').verifyLegacyParity().then(console.log)"
 node -e "require('./scripts/economy/5b/rods.js').validateCratesWithEngine(8000).then(console.log)"  # in-memory MongoDB, ~10 min
 ```
+
+---
+
+## Integration (framework 5b.3)
+
+`system(opts)` expresses this subsystem as a system on the shared lifecycle core (`lifecycle.js`); it is the `rods` entry of `integrate.js`. Each call returns a fresh object, and all per-run state lives in `state.sys.rods` (`owned`, `plan`, `bought`, `equips`, `spent`). It is deterministic and draws no random numbers. `gearPath()` is unchanged (5b.3 digest `e73d1be6aec26cdd`).
+
+| Hook | Behaviour |
+| --- | --- |
+| `goals` | The next tier's assembly (the one after the owned tier). Category `progression` (blocking), priority `LC.PRIORITY.rod`. Cost = `assembly(t)` expected cost (the gear path's `assembly.expectedCost`). `available` from the tier crate's unlock level (Lv 10 / 20 / 30 / 40 / 50) on the gate level. The ledger item is the crate name. `buy()` records ownership, pays the salvage refund, emits `assembly`, and equips at once if the gate level already reaches the tier. |
+| `on('levelUp')` | Equips the owned tier (`state.equippedTier`) once the gate level reaches its level. The new tier fishes from the next step. |
+| `onCasts` | Repairs: `spend('upkeep', 'repairs', durability used this step × repairCost / maxDurability)` of the equipped tier. The Old Rod is unbreakable, so it costs 0. Durability comes from the step's rates, so Founder efficiency and any bait stat carry through. |
+
+- **Ledger.**
+  - Cash source: `salvage` only. Base fishing income is the core's `fishing`.
+  - Spend items: `upkeep.repairs`, plus `progression.Fishing Crate`, `Pro Tackle Crate`, `Expert Tackle Crate`, `Master Tackle Crate` and `Gilded Tackle Crate`.
+- **Events.**
+  - `assembly { tier, crate, crates, cost, level }` on each purchase.
+  - No `box` event: tier crates carry no buffs, so the counting rule has nothing for the buffs system to value. The buffs system can listen to `assembly` if it spends Lucky Draw charges on tier crates.
+- **Profile and gate.**
+  - With `state.profile === 'founder'`, an assembly costs the Founder's expected crates (`founder.founderCrates(t)`) at the same price.
+    - Its salvage refund is estimated from the Normal per-crate salvage value over those crates.
+  - Every level check uses `ctx.gateLevel()`, so `gate: 'public'` works.
+- **Options.**
+  - `salvage` (default `true`): every leftover part is salvaged when the assembly is bought.
+    - Over T1–T5 that returns $167,038 on $1,965,492 of assemblies.
+    - `false` is the conservative case, the one `lifecycle()` modelled. Parts are still never salvaged automatically in the game (§8); this is the player's choice, modelled.
+  - `founderCrates` (default `true`).
+  - `equipTiming` (`'levelUp'` by default). `'afterCasts'` replays `lifecycle()`'s timing, for validation only.
+
+**Validation** (`validateSystem()`, in `report().systemValidation`).
+- Setup: `LC.simulate` with `system({ salvage: false })` and `LC.provisionalDaily()`, which is `lifecycle()`'s XP model, compared against `lifecycle()`.
+- Hours are compared step-exact. The table shows hours to each level as old / core, and the step shift of each tier's first step on the core.
+
+| Case | L20 | L30 | L40 | L50 | L60 | Tier start shift T1–T5 (steps) | Max diff |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Casual | 5.22 / 5.22 | 11.05 / 11.05 | 19.78 / 19.78 | 31.88 / 31.88 | 48.45 / 48.45 | −1, −1, −1, −1, −1 | 0.32% |
+| Regular | 5.62 / 5.62 | 12.82 / 12.80 | 24.77 / 24.77 | 41.72 / 41.72 | 65.27 / 65.27 | −1, −2, −1, −1, −1 | 0.30% |
+| Active | 5.47 / 5.47 | 12.73 / 12.73 | 25.07 / 25.05 | 42.68 / 42.67 | 67.45 / 67.43 | −1, −1, −2, −2, −2 | 0.30% |
+| Grinder | 4.97 / 4.97 | 11.57 / 11.57 | 22.95 / 22.93 | 39.25 / 39.23 | 61.87 / 61.85 | −1, −1, −2, −2, −2 | 0.33% |
+| Regular, 30% spent elsewhere | 5.62 / 5.62 | 12.82 / 12.80 | 24.77 / 24.77 | 41.72 / 41.72 | 65.27 / 65.27 | −1, −2, −1, −1, −1 | 0.30% |
+| Casual, 50% spent elsewhere (cash-gated) | 5.22 / 5.22 | 11.05 / 11.05 | 19.80 / 19.80 | 32.10 / 32.10 | 48.95 / 48.95 | −1, 0, 0, 0, 0 | 0.32% |
+
+- **Maximum relative difference 0.33%.** It is the grinder's T1 starting one minute earlier at 4.97 h. Milestones differ by at most one step (0.13%). Gross income, repairs and assembly totals agree within 0.04%.
+- **One rule accounts for all of it: equip timing.**
+  - `lifecycle()` equips in the purchase block of the step after the level is reached, so that step still fishes the old rod.
+  - The core equips on `levelUp`.
+  - A level-gated tier therefore starts one step earlier on the core. The extra XP can pull a later level, and its tier, one more step forward.
+  - A cash-gated tier starts on the same step on both.
+  - The core's rule is the right one: the rod is owned and the level is reached.
+  - With `lifecycle()`'s timing on the core (`equipTiming: 'afterCasts'`), the replay is **exact**: 36/36 milestones, every tier start and every total.
+- **Purchases.**
+  - `lifecycle()` pays crates progressively from the unlock level. The core buys the whole expected assembly once cash covers it.
+  - With no competing purchases, both finish on the same step.
+  - In the integrated economy, the core's priorities decide: rods sit at `progression`, priority 20, blocking.
+- **XP decomposition.** A level reached on a day's final step is recorded by the core before that day's daily XP, and by `lifecycle()` after it. The comparison applies `lifecycle()`'s convention. It is the same state, recorded either side of the daily.
+- **Days.** Hours are compared, not days. The core counts a level reached on a day's final step in that day, while `ceil(h / dayH)` counted the next day.

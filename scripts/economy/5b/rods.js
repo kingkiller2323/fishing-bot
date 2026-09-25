@@ -59,8 +59,13 @@
 //                               repairCostPerFish, assembly: {price, expectedCrates, expectedCost, ...}}
 //   lifecycle(archetype, opts)  curve.js-style lifecycle on this gear path, with crates bought from net
 //                               income (checks the chosen XP curve still meets the approved targets)
+//   system(opts)                framework 5b.3: this subsystem as a lifecycle.js SYSTEM (fresh object per
+//                               call): tier assemblies as 'progression' goals, equip at the tier level,
+//                               repair upkeep, salvage refunds (see the system() comment)
+//   validateSystem()            system() on the shared core vs lifecycle() for every archetype
 //   report()                    every key number of docs/economy/5b/rods.md, computed (cached)
 const F = require('./framework');
+const LC = require('./lifecycle');
 const CATALOG = require('../../../src/bootstrap/data/rodParts');
 const { baseTable } = require('../../../src/engine/gacha');
 const { applyPity, normalize } = require('../../../src/engine/rarity');
@@ -870,6 +875,290 @@ function lifecycle(arch, { otherSpendShare = 0, maxLevel = F.LIFECYCLE.maxLevel,
 const inTarget = (reached) => Object.fromEntries(Object.entries(TARGETS).map(([L, [lo, hi]]) => [L, { hours: reached[L]?.hours ?? null, target: `${lo}-${hi}h`, ok: reached[L] ? reached[L].hours >= lo && reached[L].hours <= hi : false }]));
 
 // ---------------------------------------------------------------------------------------------
+// Framework 5b.3: rods as a SYSTEM on the shared lifecycle core (lifecycle.js; contract in its header
+// and integrate.js). Gear purchases (tier assemblies), equipping, repair upkeep and salvage refunds.
+const SYSTEM_NAME = 'rods';
+
+/** Repair cost per durability point of a gear-path step (0 for the unbreakable Old Rod). */
+const repairPerPoint = (step) => (step && step.maxDurability && step.repairCost ? step.repairCost / step.maxDurability : 0);
+
+/**
+ * Per-tier purchase plan on a gear path: the tier crate, expected crates and cost of assembling the
+ * tier's reference set (assembly(t); the Founder profile uses founder.founderCrates(t), i.e. the same
+ * price with the Founder's crate luck), the crate unlock level, the tier level and, with `salvage`, the
+ * refund for salvaging every leftover part (assembly(t).salvageRefund; for the Founder, the Normal
+ * per-crate salvage value over its own expected crates).
+ */
+function assemblyPlan(path, { profile = 'normal', salvage = true } = {}) {
+	const plan = [null];
+	for (let t = 1; t < path.length; t++) {
+		const step = path[t];
+		if (!TIERS.includes(t)) break;
+		const a = assembly(t);
+		let crates = step.assembly?.expectedCrates ?? a.expectedCrates;
+		let cost = step.assembly?.expectedCost ?? a.expectedCost;
+		let refund = a.salvageRefund;
+		if (profile === 'founder') {
+			const fc = require('./founder').founderCrates(t).founder;
+			refund = Math.max(0, a.salvageRefund + a.salvageReturnPerCrate * a.price * (fc.expected - a.expectedCrates));
+			crates = fc.expected;
+			cost = fc.expectedCost;
+		}
+		plan.push({
+			tier: t, crate: step.assembly?.crate ?? a.crate, price: step.assembly?.price ?? a.price, crates, cost,
+			unlockLevel: step.crateUnlockLevel ?? PARAMS.crates.tiers[t].unlockLevel, level: step.level,
+			salvage: salvage ? refund : 0,
+		});
+	}
+	return plan;
+}
+
+/**
+ * The rods SYSTEM (lifecycle.js hooks). Per-run state lives in state.sys.rods only.
+ *   goals     the next tier's assembly: category 'progression', priority LC.PRIORITY.rod, cost = the
+ *             expected assembly cost, available from the tier crate's unlock level (gate level); ledger
+ *             item = the crate name. buy() records ownership, pays any salvage refund (cash source
+ *             'salvage') and equips at once if the gate level already reaches the tier.
+ *   on        'levelUp': equips the owned tier once the gate level reaches its level. Emits 'assembly'
+ *             { tier, crate, crates, cost, level } on each purchase (tier crates carry no buffs, so no
+ *             'box' event: the counting rule has nothing for buffs to value).
+ *   onCasts   repairs: spend('upkeep', 'repairs', durability used this step x the equipped tier's repair
+ *             cost per durability point); the Old Rod is unbreakable (0).
+ * @param {object} opts { salvage: salvage every leftover part on assembly (default true),
+ *   founderCrates: price the Founder's assemblies with its crate luck (default true),
+ *   equipTiming: 'levelUp' (default: the tier fishes from the step after its level is reached) |
+ *   'afterCasts' (validation replay of lifecycle(): checked after each step's casts, one step later) }
+ */
+function system(opts = {}) {
+	const { salvage = true, founderCrates = true, equipTiming = 'levelUp' } = opts;
+	if (!['levelUp', 'afterCasts'].includes(equipTiming)) throw new Error(`Unknown equipTiming ${equipTiming}`);
+	const own = (state) => state.sys[SYSTEM_NAME];
+	function plan(state, ctx) {
+		const s = own(state);
+		const profile = founderCrates && state.profile === 'founder' ? 'founder' : 'normal';
+		if (!s.plan || s.planProfile !== profile) {
+			s.plan = assemblyPlan(ctx.path, { profile, salvage });
+			s.planProfile = profile;
+		}
+		return s.plan;
+	}
+	// startH: the play clock when the new tier starts fishing (the next step's start).
+	function equip(state, ctx, startH = state.h) {
+		const s = own(state);
+		while (state.equippedTier < s.owned && ctx.gateLevel() >= ctx.path[state.equippedTier + 1].level) {
+			state.equippedTier++;
+			const L = state.ledger;
+			s.equips[state.equippedTier] = {
+				hours: +startH.toFixed(4), day: state.day + 1, level: ctx.gateLevel(),
+				fishingCash: L.cash.fishing || 0, repairs: L.spend.upkeep.repairs || 0, assemblies: s.spent, salvage: L.cash.salvage || 0,
+			};
+		}
+	}
+	return {
+		name: SYSTEM_NAME,
+		init(state) {
+			state.sys[SYSTEM_NAME] = { owned: state.equippedTier, plan: null, planProfile: null, bought: {}, equips: {}, spent: 0 };
+		},
+		goals(state, ctx) {
+			const s = own(state);
+			const next = plan(state, ctx)[s.owned + 1];
+			if (!next) return [];
+			return [{
+				id: `rods:T${next.tier}`, item: next.crate, category: 'progression', priority: LC.PRIORITY.rod, cost: next.cost,
+				available: ctx.gateLevel() >= next.unlockLevel,
+				buy(st, c) {
+					s.owned = next.tier;
+					s.spent += next.cost;
+					s.bought[next.tier] = { hours: +st.h.toFixed(4), day: st.day + 1, level: c.gateLevel(), crates: next.crates, cost: next.cost, salvage: next.salvage };
+					if (next.salvage > 0) c.addCash('salvage', next.salvage);
+					c.emit('assembly', { tier: next.tier, crate: next.crate, crates: next.crates, cost: next.cost, level: c.gateLevel() });
+					equip(st, c);
+				},
+			}];
+		},
+		onCasts(state, ctx, { rates }) {
+			const perPoint = repairPerPoint(ctx.path[rates.tier]);
+			if (perPoint > 0 && rates.durability > 0) ctx.spend('upkeep', 'repairs', rates.durability * perPoint);
+			// onCasts runs before the core advances the clock: the new tier starts at the next step.
+			if (equipTiming === 'afterCasts') equip(state, ctx, state.h + ctx.stepH);
+		},
+		on(event, payload, state, ctx) {
+			if (event === 'levelUp' && equipTiming === 'levelUp') equip(state, ctx);
+		},
+	};
+}
+
+/** Validation helper: spends `share` of each step's fishing income outside rods (lifecycle()'s otherSpendShare). */
+function otherSpendSystem(share) {
+	return {
+		name: 'otherSpend',
+		onCasts(state, ctx, { rates }) {
+			if (share > 0) ctx.spend('optional', 'other', share * rates.cash);
+		},
+	};
+}
+
+/**
+ * Validation helper (runs after the daily system): lifecycle() adds the day's daily XP inside the day's
+ * final step, before it records a level reached on that step, while the core records the milestone
+ * after the step and adds the daily at onDayEnd. For such milestones this records the XP ledger
+ * including that daily, so the fishing share of XP is compared on lifecycle()'s basis.
+ */
+function dayEndMilestoneProbe() {
+	return {
+		name: 'dayEndMilestoneProbe',
+		init(state) {
+			state.sys.dayEndMilestoneProbe = {};
+		},
+		onDayEnd(state, ctx) {
+			// Only a day whose session ran to the clock (not one cut short by the stop level).
+			if (Math.floor(state.h / (ctx.arch.minutesPerDay / 60)) === state.playDay) return;
+			const probe = state.sys.dayEndMilestoneProbe;
+			for (const [T, m] of Object.entries(state.milestones)) {
+				if (!(T in probe) && m.hours === +state.h.toFixed(4)) probe[T] = { ...state.ledger.xp };
+			}
+		},
+	};
+}
+
+/**
+ * lifecycle()'s model on the shared core: this system (salvage off, as lifecycle() has none), the
+ * provisional daily XP (curve.js placeholder) and, optionally, the other-spend share.
+ */
+function coreLifecycle(arch, { otherSpendShare = 0, salvage = false, equipTiming = 'levelUp', ...simOpts } = {}) {
+	return LC.simulate({
+		archetype: arch,
+		systems: [system({ salvage, equipTiming }), LC.provisionalDaily(), otherSpendShare > 0 ? otherSpendSystem(otherSpendShare) : null, dayEndMilestoneProbe()],
+		...simOpts,
+	});
+}
+
+/**
+ * One comparison of system() on the shared core with lifecycle() (same archetype and other-spend share):
+ * milestone hours, the fishing share of XP, the hour each tier starts fishing, and the whole-run totals
+ * (gross fish income, repairs, assemblies; lifecycle() stops once T5 is equipped at Lv 60, so the core's
+ * totals are taken at its T5 equip). Hours are compared step-exact: lifecycle() reports hours rounded to
+ * 0.01 h (under a third of a step), from which its step index is recovered.
+ */
+function compareWithLifecycle(archetype, { otherSpendShare = 0, equipTiming = 'levelUp' } = {}) {
+	const stepH = F.LIFECYCLE.stepH;
+	const stepOf = (hours) => Math.round(hours / stepH);
+	const h4 = (k) => +(k * stepH).toFixed(4);
+	const out = { maxRel: 0, worst: null, exactMilestones: 0, milestonesCompared: 0, maxEquipSteps: 0 };
+	const note = (key, a, b) => {
+		// Float noise (different summation order) counts as equal.
+		const d = Math.abs(a - b) / Math.max(Math.abs(b), 1e-12) < 1e-9 ? 0 : Math.abs(a - b) / Math.abs(b);
+		if (d > out.maxRel) {
+			out.maxRel = d;
+			out.worst = key;
+		}
+		return round4(d);
+	};
+	const old = lifecycle(archetype, { otherSpendShare });
+	// Run the core past the stop level to the day lifecycle() ended on (it stops once T5 is equipped).
+	const days = Math.ceil(old.hours / (ARCHETYPES[archetype].minutesPerDay / 60)) + 1;
+	const core = coreLifecycle(archetype, { otherSpendShare, equipTiming, stopAtLevel: null, days });
+	const sys = core.sys[SYSTEM_NAME];
+	const milestones = {};
+	for (const T of F.LIFECYCLE.milestones) {
+		const o = old.reached[T];
+		const c = core.milestones[T];
+		if (!o || !c) {
+			milestones[T] = { old: o ? h4(stepOf(o.hours)) : null, core: c ? c.hours : null };
+			continue;
+		}
+		const x = core.sys.dayEndMilestoneProbe[T] || c.ledger.xp;
+		const share = round4((x.fishing || 0) / ((x.fishing || 0) + (x.daily || 0)));
+		const [kOld, kCore] = [stepOf(o.hours), stepOf(c.hours)];
+		out.milestonesCompared++;
+		if (kOld === kCore) out.exactMilestones++;
+		milestones[T] = {
+			old: h4(kOld), core: h4(kCore), steps: kCore - kOld, rel: note(`L${T} hours`, kCore, kOld),
+			fishingXpShare: { old: o.fishingXpShare, core: share, rel: note(`L${T} fishing XP share`, share, o.fishingXpShare) },
+		};
+	}
+	// Hour each tier starts fishing: lifecycle() equips in a step's purchase block and reports that step's
+	// start, so its first step on the tier starts one step later.
+	const equips = {};
+	for (const t of TIERS) {
+		const o = old.upgrades[t];
+		const c = sys.equips[t];
+		if (!o || !c) {
+			equips[t] = { old: o ? h4(stepOf(o.hours) + 1) : null, core: c ? c.hours : null };
+			continue;
+		}
+		const [kOld, kCore] = [stepOf(o.hours) + 1, stepOf(c.hours)];
+		out.maxEquipSteps = Math.max(out.maxEquipSteps, Math.abs(kCore - kOld));
+		equips[t] = { old: h4(kOld), core: h4(kCore), steps: kCore - kOld, rel: note(`T${t} equip hours`, kCore, kOld) };
+	}
+	const last = sys.equips[TIERS[TIERS.length - 1]];
+	const totals = last
+		? Object.fromEntries([['gross', last.fishingCash, old.totals.gross], ['repairs', last.repairs, old.totals.repairs], ['crates', last.assemblies, old.totals.crates]].map(([k, c, o]) => [k, { old: r0(o), core: r0(c), rel: note(k, c, o) }]))
+		: null;
+	return { ...out, row: { milestones, equips, totals, repairShare: round4((core.ledger.spend.upkeep.repairs || 0) / core.ledger.cash.fishing) } };
+}
+
+/**
+ * Framework 5b.3 validation: system() on the shared core (with LC.provisionalDaily(), lifecycle()'s XP
+ * model) vs this module's lifecycle() for every archetype, for the regular player with 30% of fish
+ * income spent elsewhere and for the casual player with 50% (cash-gated tiers: T2-T5 bought late). `system` = the default system (what the integrator runs); `replay` = the same
+ * system with lifecycle()'s equip timing (equipTiming 'afterCasts'), which isolates that one rule.
+ */
+function validateSystem({ archetypes = Object.keys(ARCHETYPES), otherSpend = [{ archetype: 'regular', share: 0.3 }, { archetype: 'casual', share: 0.5 }], tolerance = 0.005 } = {}) {
+	const cases = [...archetypes.map((a) => ({ archetype: a, share: 0 })), ...otherSpend.map((o) => ({ archetype: o.archetype, share: o.share }))];
+	const run = (equipTiming) => {
+		const agg = { maxRel: 0, worst: null, exact: 0, compared: 0, maxEquipSteps: 0, cases: {} };
+		for (const { archetype, share } of cases) {
+			const key = share ? `${archetype}@otherSpend${share}` : archetype;
+			const c = compareWithLifecycle(archetype, { otherSpendShare: share, equipTiming });
+			if (c.maxRel > agg.maxRel) {
+				agg.maxRel = c.maxRel;
+				agg.worst = `${key} ${c.worst}`;
+			}
+			agg.exact += c.exactMilestones;
+			agg.compared += c.milestonesCompared;
+			agg.maxEquipSteps = Math.max(agg.maxEquipSteps, c.maxEquipSteps);
+			agg.cases[key] = c.row;
+		}
+		return {
+			equipTiming,
+			maxRelativeDifference: round4(agg.maxRel),
+			worst: agg.worst,
+			exactMilestones: `${agg.exact}/${agg.compared}`,
+			maxEquipShiftSteps: agg.maxEquipSteps,
+			cases: agg.cases,
+		};
+	};
+	const main = run('levelUp');
+	const replay = run('afterCasts');
+	const regularDefault = LC.simulate({ archetype: F.REFERENCE_ARCHETYPE, systems: [system(), LC.provisionalDaily()] });
+	return {
+		method: 'LC.simulate with rods.system({ salvage: false }) + LC.provisionalDaily() (+ a validation-only system spending otherSpendShare of each step\'s fish income) vs rods.lifecycle(), every archetype; hours compared step-exact',
+		matches: main.maxRelativeDifference < tolerance,
+		tolerance,
+		maxRelativeDifference: main.maxRelativeDifference,
+		worst: main.worst,
+		system: main,
+		replay: { ...replay, cases: undefined, exact: replay.maxEquipShiftSteps === 0 && replay.exactMilestones.split('/')[0] === replay.exactMilestones.split('/')[1] && replay.maxRelativeDifference < 1e-4 },
+		// The integrated default (salvage on) for the regular player, same XP model: salvage only lowers
+		// net assembly costs; every tier is level-gated, not cash-gated, so milestones are unchanged.
+		defaultRegular: {
+			milestones: LC.milestoneHours(regularDefault),
+			salvageCash: r0(regularDefault.ledger.cash.salvage || 0),
+			assemblies: r0(Object.values(regularDefault.ledger.spend.progression).reduce((a, v) => a + v, 0)),
+			repairs: r0(regularDefault.ledger.spend.upkeep.repairs || 0),
+		},
+		differences: [
+			'Equip timing (the only rule difference): lifecycle() equips a tier in the purchase block of the step AFTER its level is reached, so that step still fishes the old rod; system() equips on the levelUp event and the tier fishes from the next step. Level-gated tiers therefore start 1 step (1 min) earlier, and the extra XP can bring a later level (and so its tier) 1 more step forward; cash-gated tiers start on the same step. The core is right: the rod is owned and the level is reached. The replay (lifecycle()\'s timing on the core) isolates this rule.',
+			'Purchases: lifecycle() pours net income into crates progressively from the crate unlock level; the core buys the whole expected assembly once cash covers it. With no competing purchases both complete on the same step (cash on hand = what lifecycle() has paid in); with other systems the core\'s priorities decide (rods: progression, priority LC.PRIORITY.rod, blocking).',
+			'Totals: lifecycle() stops at the end of the step that equips T5 (at Lv 60); the core snapshot is taken when T5 starts fishing, one step earlier where T5 is level-gated.',
+			'XP decomposition: a level reached on a day\'s final step is snapshotted by the core before that day\'s daily XP (onDayEnd) and by lifecycle() after it; the comparison applies lifecycle()\'s convention (dayEndMilestoneProbe). Without it the casual L30 fishing share reads 0.5375 vs 0.5303: the same state, snapshotted either side of the daily.',
+			'Days: the core counts a level reached on a day\'s final step in that day (ceil(h/dayH) counted the next day), so hours are compared, not days.',
+		],
+	};
+}
+
+// ---------------------------------------------------------------------------------------------
 const r0 = (x) => Math.round(x);
 const quant = (arr, q) => {
 	const s = [...arr].sort((a, b) => a - b);
@@ -1108,6 +1397,8 @@ function buildReport() {
 			delayByOtherSpend,
 			stageHoursRegular: stageHours,
 		},
+		// Framework 5b.3: system() on the shared lifecycle core reproduces lifecycle() above.
+		systemValidation: validateSystem(),
 	};
 }
 
@@ -1124,7 +1415,7 @@ module.exports = {
 	rodOutcome, rodHourly, upkeepShare, baseDurability, repairCostFor,
 	legacyCombine, legacyCraft, verifyLegacyParity, legacySignature, convertLegacyRod, evaluateAllCombos,
 	crateDefinition, crateDefinitions, crateSlotOdds, openOutcomes, cratesDistribution, validateCratesWithEngine, cratePrice, stageIncome, assembly, salvageValue, slotBalanceFeatured,
-	gearPath, lifecycle, report,
+	gearPath, lifecycle, system, validateSystem, report,
 };
 
 if (require.main === module) {
