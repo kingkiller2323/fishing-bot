@@ -64,7 +64,9 @@ function run(o = {}) {
 	if (variant.founder) names.push('founder');
 	const opts = o.systemOpts || {};
 	const systems = names.map((n) => systemOf(n, { ...(opts[n] || {}), ...(n === 'bait' ? { policy: variant.bait } : {}), ...(n === 'founder' ? { gate: variant.gate } : {}) }));
-	const result = LC.simulate({ ...o, systems, gate: variant.founder ? variant.gate : 'real' });
+	// Founder runs continue until the PUBLIC level reaches the stop level (the real level races ahead).
+	const stopOn = o.stopOn || (variant.founder ? 'public' : 'gate');
+	const result = LC.simulate({ ...o, stopOn, systems, gate: variant.founder ? variant.gate : 'real' });
 	return { ...result, variant, systems: names, ...F.stamp() };
 }
 

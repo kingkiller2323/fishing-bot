@@ -20,15 +20,18 @@ const A = require('./assumptions');
 // shared DAY, RULES (pinned Lucky items, stochastic durability), BUFFS, EVENTS, attendance and the
 // R2 minimum-daily archetype; castOutcome: STAT_CAPS clamp, additive multiChance stat, fish-count
 // distribution override, durability rule, Lucky-item split, species override; Mountain Stream value 149.
-const FRAMEWORK_VERSION = '5b.3';
+// 5b.4: R1 on the integrated lifecycle (curve.js integrated): at 0.0475 every window passed but L40 was
+// 0.02 h from its edge; the integrated best fit is 0.0525 (L20 5.27 h, L30 12.58, L40 25.13, L50 43.65).
+const FRAMEWORK_VERSION = '5b.4';
 
 // ---------------------------------------------------------------------------------------------
 // XP curve: xp(L) = 100·L² + QUARTIC·L⁴. Smooth everywhere (no kink at Lv 20); close to today at low
 // levels and steeper as levels rise. Levels never drop: level = max(stored level, curve level).
-// QUARTIC is chosen by scripts/economy/5b/curve.js (best fit of the regular player's hours of play to
-// the approved windows L20 5-6h, L30 12-15h, L40 24-30h, L50 40-45h on the provisional rod path):
-// 0.0475 -> L20 47,600 XP (5.6h), L30 128,475 (13.5h), L40 281,600 (25.5h), L50 546,875 (42.7h).
-const CURVE = { base: 100, quartic: 0.0475 };
+// QUARTIC is chosen by scripts/economy/5b/curve.js: the best fit of the regular player's hours of play to
+// the approved windows L20 5-6h, L30 12-15h, L40 24-30h, L50 40-45h. 5b.1-5b.3: 0.0475 (provisional
+// rod path). 5b.4 (R1, integrated lifecycle on the rods path with every system): 0.0525 ->
+// L20 48,400 XP (5.27 h), L30 132,525 (12.58 h), L40 294,400 (25.13 h), L50 578,125 (43.65 h).
+const CURVE = { base: 100, quartic: 0.0525 };
 const xpForLevel = (L, c = CURVE) => c.base * L * L + c.quartic * L ** 4;
 /** Closed form: quadratic in x = L². */
 function levelForXp(xp, c = CURVE) {
@@ -213,7 +216,7 @@ function hourly(o, overheadS = A.DESIGN_OVERHEAD_S) {
 // Shared digest: a hash of every shared value (the assumptions above + this file's constants, and the
 // designed gear path once GEAR_PATH_SOURCE is 'rods'). Each FRAMEWORK_VERSION pins its digest, so a
 // shared value cannot change without a version bump; every subsystem report carries both.
-const VERSION_DIGESTS = { '5b.1': '7a3ceb5551f3e41f', '5b.2': '26bbca823c8b2b8b', '5b.3': 'e73d1be6aec26cdd' };
+const VERSION_DIGESTS = { '5b.1': '7a3ceb5551f3e41f', '5b.2': '26bbca823c8b2b8b', '5b.3': 'e73d1be6aec26cdd', '5b.4': 'd9e4938f85074918' };
 const canonical = (v) => {
 	if (Array.isArray(v)) return v.map(canonical);
 	if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical(v[k])]));

@@ -533,3 +533,58 @@ Unchanged:
 3. **One shared R2 minimum-daily archetype.** Streak and this module use 20 casts a day (3.0 min). Quests uses "fish until the daily is done". Both pass, but R2 should use one definition.
 4. **`rods.cratesDistribution(t, { def })` override.** `buffs.luckyAssembly()` mirrors its chain to evaluate lucky opens. The mirror is validated exact (K = 0), but one implementation is better.
 5. **Integrator:** count buff value once. Use `buffs.buffIncomeShare().bySource.streak` or `streak.streakValue().breakdown.doubleCash` / `.xp`, never both.
+
+---
+
+## Integration (framework 5b.3)
+
+`buffs.system(opts)` is this subsystem as a `lifecycle.js` system. Each call returns a fresh object, and all per-run state lives in `state.sys.buffs`. The shared core steps time and accrues base fishing (`'fishing'`). This system credits only the **bonus** a buff adds. The numbers regenerate with `report().system`.
+
+**Hooks**
+
+| Hook | What it does |
+| --- | --- |
+| `on('box')` | Adds a granted box's expected buffs to the stock: `{ name, count, level, source }`, priced by `boxBuffOdds` at the payload level and the run's profile. The Booster Pack is never valued (decision 12). An unknown box throws, because a box with buffs must be priced here, once. |
+| events | The `F.EVENTS` budget accrues per calendar day. It is delivered with the first cast of the next played day, so days not played still count toward the 30-day budget. |
+| `onDayStart` | Activates the Double XP / Double Cash in stock at session start. It uses one unit per started hour of the planned session (queued, at most 3); the minimum-daily session uses one. A box granted at a session's end waits for the next session. |
+| `onCasts` | While a window is open, counted in play minutes (`state.minutesToday`), credits the bonus on that step's catch:<br>• XP `'buff'`: final (multiplier − 1) × `rates.xp`, public base (multiplier − 1) × `rates.xpBase`<br>• cash `'buff'`: (multiplier − 1) × `rates.cash` (catch-time)<br>The rest of the window expires with the session (wall clock). |
+| `on('assembly')` | On the rods system's assembly event, puts one held Lucky Draw into the tier assembly. It is credited as cash `'luckyDraw'` = `luckyDrawValue(tier).dollars`: a rebate at the assembly, not a lower goal cost, because the goal is the rods system's own. |
+| `onDayEnd` | Lucky Draws above the reserve (1 while a tier is still ahead) go on Streak Crates, valued at 2 × `bonusSlotValue('Streak Crate', level)` as cash `'luckyDraw'`. |
+| `sessionDone` | Always true: buffs set no daily minimum. |
+
+**Ledger and money**
+- Sources written: XP and public XP `'buff'`; cash `'buff'` and `'luckyDraw'`.
+- No spend items and no purchases.
+- Counting rule: each box's non-buff contents stay with the system that grants it (quests: Daily Box; streak: Streak Crate / Chest). Its buffs are valued here only.
+
+**Founder** (`state.profile === 'founder'`)
+- Box odds use the Founder's gacha luck.
+- Buff XP is public (base) XP for everyone. The final XP and the cash follow the profile's rates.
+- The Streak Crate bonus slot sells at the Founder's sell multiplier.
+- The assembly rebate uses the Normal crate chain, so it is a slight overstatement for the Founder.
+
+**Validation** (`validateSystem()`; all 22 `checks()` pass; `check-shared.js` passes at 5b.3 / `e73d1be6aec26cdd`):
+- **Exact replay.** The system is run with `lifecycle()`'s conventions (`valuation: 'dayEnd'`), together with `lifecycle()`'s own assumptions expressed as systems:
+  - its gear rule, plus an `'assembly'` event;
+  - `LC.provisionalDaily()`;
+  - its streak and Daily Box arrivals as `'box'` events.
+
+  It reproduces `lifecycle()` exactly: **30/30 milestones step-exact, maximum relative difference 0**, for every archetype and the minimum-daily player. This covers the buff XP at each milestone, and the XP, cash, Lucky Draw, arrivals and levels at days 7/30/90 (minimum-daily: up to day 364).
+- **Design defaults** (activation at the next session start):
+  - Every milestone lands within **1 step** (1 min) of `lifecycle()`. The worst is regular L10 at 81 vs 80 steps (1.2%).
+  - The 30-day shares barely move:
+
+    | Player | Cash share: before → system | XP share: before → system |
+    | --- | --- | --- |
+    | Casual | 6.12% → 5.97% | 1.35% → 1.31% |
+    | Regular | 7.06% → 6.99% | 1.91% → 1.85% |
+    | Active | 4.18% → 4.06% | 1.09% → 1.05% |
+    | Grinder | 1.43% → 1.39% | 0.46% → 0.45% |
+
+  - The gap in buff value to date is a **one-day lag**. A box granted at a session's end pays in the next session, so the last day's units are still in stock at a checkpoint. The gap therefore falls like 1/days: 16–22% of buff value at day 7, 1.5–4.3% at day 30, about 1% at day 90.
+  - Per unit actually used, the two models agree within 0.75% (Double Cash) and 0.12% (Double XP).
+  - **The design rule is right:** `lifecycle()` paid each day's arrivals at that day's end, at its last step's rates.
+- **Minimum-daily player.** The core runs the shared `F.MINIMUM_DAILY`, which stops at the streak gate's 20 casts every day. `lifecycle()`'s fixed 3-minute day drifted a step on some days through floating point. The milestones still agree within 1 step.
+- **Streak (count buff value once).** Two checks, at 30 days, for every archetype:
+  - The streak's boxes replayed as events: this system's Double Cash and Double XP XP equal `streak.lifecycle()` to the cent.
+  - `streak.system()` + `buffs.system()`: every buff unit the streak grants is received here. The streak's own `'streak'` source (non-buff contents) plus this system's `'buff'` equals `streak.lifecycle()`'s cash equivalent exactly (regular: $17,909 + $15,816 = $33,725). No other ledger source carries buff value.

@@ -525,3 +525,34 @@ node -e "console.log(require('./scripts/economy/5b/streak.js').checks())"
 node -e "console.log(require('./scripts/economy/5b/streak.js').streakValue(7, 30))"   # integrator entry point
 node scripts/economy/5b/check-shared.js                                  # shared-framework guard
 ```
+
+---
+
+## Integration (framework 5b.3)
+
+The streak is now a SYSTEM on the shared lifecycle core (`lifecycle.js`). `integrate.js` runs it in the reference loop, and `streak.system()` replaces the stepping loop in `lifecycle()`. `lifecycle()` stays until the old loops are retired. `F.DAY` / `F.dayIndex` now supply the day boundary (request 2 in §15), so this module keeps no local copy of it.
+
+**`system(opts)`** returns a fresh system each call. All per-run state lives in `state.sys.streak`.
+
+| Hook | What it does |
+|---|---|
+| `onDayEnd` | Default `credit: 'dayEnd'`. If today's casts (`state.castsToday`) reached the play gate (20), it credits the streak day with `advanceStreak` and grants the box. The box is valued at the level the day's last step started at, the same level the daily XP uses. An attended day that ends below the gate counts as a miss. |
+| `onCasts` | Only with `credit: 'gate'`, the engine's timing. The day is credited, and its box granted, on the step whose casts reach the gate. |
+| `onMissedDay` | A day not attended (`daysPerWeek` < 7) counts as a miss. Misses are settled by the engine rule when the next day is credited (`applyGap`): grace tokens first, then 7 days of decay per uncovered miss, then a reset after 7 misses in a row. A reset keeps the tokens. |
+| `sessionDone` | True once today's casts reach the gate. The R2 minimum-daily player (`F.MINIMUM_DAILY`) stops there. |
+
+- **Ledger:** cash source `'streak'` only. It holds the box's non-buff contents from `boxContents()`: fish at sale value, parts at salvage, and bait packs usable at the level at their pack price. `baitValue: 'items'` leaves the packs out of the cash. The streak writes no XP and has no purchases and no spend items.
+- **Counting rule:** every grant calls `emit('box', { name: 'Streak Crate' | 'Streak Chest', count: 1, level, source: 'streak', streakDay, profile })`. The buffs system values the Double XP, Double Cash and Lucky Draw buffs from these events. The streak never values them.
+- **Founder:** when `state.profile === 'founder'`, boxes are valued with the Founder gacha stats and with the proposed Founder sell multiplier from `founder.founderProfile()`. The gate is the same for every profile.
+
+**`validateSystem()`** is included in `report().systemValidation` and in `checks()` as `system-reproduces-lifecycle`. It runs the system with `LC.provisionalRods()` and `LC.provisionalDaily()`, plus a validation-only `legacyBuffValue()` that reproduces `lifecycle()`'s buff valuation. It compares the result with `lifecycle()` and `r2()`:
+
+- **Default system, all four archetypes:** exact. All 24 milestones land on the same step. Every XP, cash, breakdown and item total matches at every milestone and at days 7, 30 and 90. `r2()`'s archetype decompositions and the no-miss-grinder verdict are identical. Max relative difference: 0.
+- **One old rule was wrong:** `lifecycle()` credited every played day without checking the gate. Its fixed 3-minute minimum-daily session drifts on floating-point day boundaries. On 2 of 364 days it plays only 2 steps (13.3 casts), and `lifecycle()` still credited those days; the core does not. With the gate enforced, only `r2()`'s minimum-daily streak-cash rows move, by up to 7.3%, and the verdict stays PASS. The replay (`requireGate: false`) restores the old rule and reproduces `r2()` exactly.
+- **Shared minimum-daily session:** `F.MINIMUM_DAILY` plays exactly 20 casts a day, so all 364 days are credited. It never leads the casual player in level (PASS).
+- **Days:** only hours are compared. The core counts a level reached on a day's final step in that day, while `ceil(h/dayH)` counted it in the next day.
+- **Sensitivity of `credit: 'gate'`:**
+  - Milestones move by 1–2 steps (at most 1.5%, at Lv 10).
+  - Boxes are valued at the level the session started at, so early totals for fast levellers are up to 19% lower (active player, day 7).
+  - The legacy buff valuation books the whole Double XP buff at minute 3, which moves the grinder's Lv 10 by 1.8%.
+  - Day-end credit is therefore the default. It matches the player opening the box after the session, and it matches the daily quest's day-end grants.

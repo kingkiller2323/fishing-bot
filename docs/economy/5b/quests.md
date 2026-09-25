@@ -639,3 +639,85 @@ node scripts/economy/5b/check-shared.js                            # shared-assu
 # rods-path sensitivity (one-off; the module itself only uses F.gearPath(), R3):
 node -e "const F=require('./scripts/economy/5b/framework');const q=require('./scripts/economy/5b/quests.js');const m=q.withGear(require('./scripts/economy/5b/rods.js').gearPath());console.log(m.lifecycle(F.ARCHETYPES.regular).reached[50].hours, m.guardrails())"
 ```
+
+---
+
+## Integration (framework 5b.3)
+
+Framework 5b.3 delivers change requests 1–3 of §16: `F.DAY` (the shared DCC day), the shared lifecycle core (`lifecycle.js`) and the integrator (`integrate.js`). Quests now plug into that core as a **system**. `lifecycle()` above is kept until the next stage retires the per-module loops. Every rule below is a **proposal** from this design (§2.1). None of it is approved.
+
+### The system (`quests.system(opts)`)
+
+`system()` returns a fresh object on every call. All per-run state lives in `state.sys.quests`. It is deterministic and has no randomness. The core steps time and books base fishing as `'fishing'`. The quest system only credits quest income, grants Daily Boxes and ends the minimum-daily player's session.
+
+| Hook | What it does |
+| --- | --- |
+| `init` | Sets up the story chapters (`storyEvents()`) and the box counters. |
+| `onDayStart` | Issues the day's daily at the band of the gate level. **Terms are fixed at issue.** Issues the weekly with the week's first daily at or after the weekly unlock (Lv 10). There is one weekly per ISO week (7 calendar days), and it expires with its week. A day the player skips (`daysPerWeek < 7`) adds no progress. |
+| `onCasts` | Story progress: fish caught while a chapter is available (gate level, every prerequisite done, its biome scope). A chapter pays once, when its expected fish are caught. |
+| `sessionDone` | True once today's fish reach the daily's expected fish at issue (`dailyFishNeeded`). `F.MINIMUM_DAILY` stops there. Fixed sessions ignore it. |
+| `onDayEnd` | Credits the daily and repeatables from `questIncome(issue level, state.fishToday, state.minutesToday / 60)`. The minimum-daily player completes its daily by construction. Credits the weekly's expected reward so far, on the week's fish (exact for any-fish templates, binomial for rarity templates). |
+| boxes | Each Daily Box grant (1 per daily, 2 per weekly, story chapters) is valued as cash (`'questBoxes'`), then `emit('box', { name: 'Daily Box', count, level, source: 'quests', kind })` fires. |
+
+- **Ledger sources:**
+  - **XP:** `daily`, `weekly`, `repeatable`, `story`. The account (final) XP goes to `ledger.xp` and the base XP to `ledger.publicXp`.
+  - **Cash:** the same four sources, plus `questBoxes`.
+- **Spend items:** none. Quests have no sinks.
+- **Counting rule:**
+  - The quest system values a Daily Box's **non-buff** contents once: fish sale value $197.7 + rod-part salvage $135.2 = **$332.9 per box** (`dailyBoxValue()`, `streak.boxEV` on today's unchanged Daily Box pool).
+  - Usable bait (about $2 of packs) isn't counted as cash. The `'cashEquivalent'` option adds it.
+  - Buffs (0.26% per box for each of Double XP, Double Cash and Lucky Draw) are valued by the buffs system from the `'box'` events.
+- **Founder:**
+  - When `state.profile === 'founder'`, the system reads `questXp` / `questCash` (×5) from `founder.founderProfile()`.
+  - It writes `addXp(kind, base × questXp, base)` and cash as base × questCash.
+  - Daily Box fish sell at that profile's sell multiplier.
+- **Options:**
+  - `terms`: `'issue'` (default) or `'lastStep'`.
+  - `weekly`: `'period'` (default) or `'smoothed'`.
+  - `session`: `'fish'` (default) or `'time'`.
+  - `boxValue`: `'liquid'` (default), `'cashEquivalent'` or `'none'`.
+  - `parts`: toggles for daily, weekly, repeatable and story.
+  - `weekdayOfDay0`: the weekday of calendar day 0 (default Monday).
+  - The non-default values reproduce `lifecycle()` and are used only for validation.
+
+### Validation (`quests.validateSystem()`, also `report().integration.validation`)
+
+**Setup:**
+- The system runs on the core with `lifecycle()`'s gear rule, expressed as a validation-only system (`lifecycleRods`). The rule: buy the next tier after saving `F.PURCHASE.saveHours` of stage income, with quest cash counting toward it.
+- A milestone probe records the ledgers on `lifecycle()`'s basis. `lifecycle()` credits the day's quests inside the day's last step, so it books them before a level reached on that step. Hours are unaffected.
+- The run is compared with `lifecycle(questModel 'proposed')` for casual, regular, active, grinder and the minimum-daily player (365 days).
+- Hours are compared step-exact. `lifecycle()` rounds to 0.01 h, which is less than one step.
+- Calendar days aren't compared, because the conventions differ. The core counts a level reached on a day's final step in that day. `lifecycle()` used `ceil(h / dayH)`, which gives the next day.
+
+**1. Replay (`lifecycle()`'s conventions): exact. Max relative difference 0.**
+- 30 of 30 milestones are step-exact.
+- At every milestone, every XP, cash and box source matches within float noise (< 1e-9).
+- Every story chapter completes on the same step.
+- Every calendar checkpoint matches.
+- **R2 `decomposition()`:** the shares are identical (0.0 pp).
+- **R2 `adversarial()`:**
+  - The minimum-daily player's levels at days 7/28/91/182/365 are identical, and so are every archetype's.
+  - XP per active hour vs the regular player is 1.91 in both.
+  - The no-miss grinder's maximum hours saved is 5.8% in both.
+
+**2. Proposed rules (the defaults) vs `lifecycle()`: max 2.6%** (active L20: 5.15 → 5.02 h, 8 steps).
+- **Largest absolute shift:** 12 steps (0.2 h), regular L30: 12.75 → 12.55 h.
+- **Regular player:** L20 5.27 h, L30 12.55 h, L40 24.75 h, L50 42.77 h. All four windows still hold.
+- **Attribution, each rule alone:**
+  - Terms at issue: 1.3%.
+  - Weekly by period: 3.2%.
+  - Minimum-daily session by fish: 0.26%.
+- **The design rule is right in each case:**
+  - **Terms at issue.** Per §2.1, levelling mid-day doesn't change the terms. `lifecycle()` priced the whole day at the band of its **last** step, so on a band-crossing day it paid the next band's larger daily early. The difference only appears on band-crossing days.
+  - **Weekly by period.**
+    - `lifecycle()` smoothed the weekly to 1/7 of its expectation per day, priced on 7 × that day's fish at that day's band.
+    - The period rule pays the same per week, but pays it when the weekly completes. An engaged player finishes the Haul in a day or two, so the income is front-loaded inside each week.
+    - It is `daysPerWeek`-aware by construction.
+  - **Session by fish.** `lifecycle()` ended the minimum-daily session at a clock time fixed at the day's start (need ÷ rate). This only differs when a rod is bought mid-session. The requirement is fish, so the fish rule is right.
+  - **Boxes.** Box contents are now cash. This doesn't change XP or hours here.
+
+**Reproduce:**
+```
+node -e "console.log(JSON.stringify(require('./scripts/economy/5b/quests.js').validateSystem(), null, 1))"
+node -e "const I=require('./scripts/economy/5b/integrate');console.log(I.run({archetype:'regular'}).milestones)"   # once every reference system exports system()
+```

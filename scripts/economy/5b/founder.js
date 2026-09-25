@@ -29,10 +29,26 @@
 //                                P(n visible fish) for a cast: normal chain roll + Founder bonus, capped
 //   pityLegendaryPlus(perDraw, table, visible, rule)
 //                                exact renewal model of the per-cast Legendary+ pity (FOUNDER_PITY)
+//   visibleFromChain(chain, bonusFish, maxFish)
+//                                the same from any normal chain P(n fish) (e.g. a cast input's fishDist)
 //   lifecycle(archetype, {profile, gating, path, stopAtRealMax})
 //                                hours of play to each REAL and PUBLIC level (curve.js core: same step,
-//                                daily XP, purchase delay; profile null = Normal and reproduces curve.json),
-//                                plus the XP-source decomposition and the public-tell window
+//                                daily XP, purchase delay; profile null = Normal and reproduces curve.json
+//                                on the provisional path), plus the XP-source decomposition and the
+//                                public-tell window. 5b.3: superseded by system() on the shared core
+//                                (validateSystem() proves they agree); kept until the old loops are retired
+//   founderCastOutcome(input, profile)
+//                                the Founder outcome for a lifecycle.js cast input (honours stats,
+//                                multiChance, fishDist, sellMult, xpMult, fish, rules)
+//   system({gate, profile})      framework 5b.3 lifecycle.js SYSTEM (integrate.js 'founder' variant):
+//                                init sets state.profile = 'founder'; outcome = founderCastOutcome (final and
+//                                base XP/value); public-tell and base-value bookkeeping in state.sys.founder
+//   systemDescription()          the system contract (hooks, ledger, what reads it)
+//   coreLifecycle(archetype, {founder, gate})
+//                                lifecycle()'s model on the shared core (system() + validation-only
+//                                purchase and daily systems)
+//   validateSystem()             system() on the core vs lifecycle(): every archetype, both gates, real and
+//                                public milestones, XP sources, upgrades, tell, stop totals; and Normal
 //   today()                      TODAY's Founder power per stage and as ratios to TODAY's Normal
 //   solve()                      the private luck, sell and xp multipliers from the targets (cached)
 //   gacha()                      Founder vs Normal box luck: today's boxes and the rods tier crates
@@ -40,8 +56,10 @@
 //   journalProfileBonus(result)  profile XP bonus recorded by one Cast journal (all three journal shapes)
 //   migratePublicXp(user, journals, {levelForXp})
 //                                reference implementation of the additive publicXp/publicLevel migration
-//   report()                     every key number of docs/economy/5b/founder.md (cached)
+//   report()                     every key number of docs/economy/5b/founder.md (cached); report().integration
+//                                holds the system contract and validateSystem()
 const F = require('./framework');
+const LC = require('./lifecycle');
 const rods = require('./rods');
 const { PROFILES, RARITIES, STAT_CAPS, levelForXp: levelForXpToday } = require('../../../src/engine/balance');
 const { buildTable, applyPity } = require('../../../src/engine/rarity');
@@ -189,19 +207,23 @@ function combinedStats(tier, profile) {
 // ---------------------------------------------------------------------------------------------
 // Visible catch distribution
 /**
- * P(n fish on the public card): the rod's normal chain roll (F.fishDistribution) plus the Founder's
- * bonus fish, capped at maxFish. Returns { dist[0..maxFish], mean, pOne, p3plus, p5 }.
+ * P(n fish on the public card) from the NORMAL multi-catch roll `chain` (P(n fish), any length) plus the
+ * Founder's bonus fish, capped at maxFish. Returns { dist[0..maxFish], mean, pOne, p3plus, p5 }.
  */
-function visibleDistribution(multiChance, bonusFish = PARAMS.visible.bonusFish, maxFish = F.MULTI.maxFish) {
-	const chain = F.fishDistribution(multiChance).dist;
+function visibleFromChain(chain, bonusFish = PARAMS.visible.bonusFish, maxFish = F.MULTI.maxFish) {
 	const total = sum(Object.values(bonusFish));
 	const dist = new Array(maxFish + 1).fill(0);
 	chain.forEach((pn, n) => {
 		if (!pn) return;
 		for (const [b, pb] of Object.entries(bonusFish)) dist[Math.min(maxFish, n + Number(b))] += (pn * pb) / total;
 	});
-	const mean = dist.reduce((s, p, n) => s + p * n, 0);
-	return { dist, mean, pOne: dist[1], p3plus: sum(dist.slice(3)), p5: dist[maxFish] };
+	const visibleMean = dist.reduce((s, p, n) => s + p * n, 0);
+	return { dist, mean: visibleMean, pOne: dist[1], p3plus: sum(dist.slice(3)), p5: dist[maxFish] };
+}
+
+/** visibleFromChain on the framework chain for a rod multi-catch chance (F.fishDistribution). */
+function visibleDistribution(multiChance, bonusFish = PARAMS.visible.bonusFish, maxFish = F.MULTI.maxFish) {
+	return visibleFromChain(F.fishDistribution(multiChance).dist, bonusFish, maxFish);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -236,12 +258,26 @@ function pityLegendaryPlus(perDrawLplus, table, visible, rule) {
 
 // ---------------------------------------------------------------------------------------------
 // Outcomes
+const tierSignatures = new WeakMap();
+/**
+ * Cache key of a gear-path step: its index plus everything an outcome reads from it, so steps of different
+ * paths (F.gearPath() and the provisional path curve.json was fitted on) never share a cache entry.
+ */
+function tierKey(tier) {
+	let k = tierSignatures.get(tier);
+	if (!k) {
+		k = `${tier.tier}|${JSON.stringify([tier.meanFish, tier.qualities, tier.stats])}`;
+		tierSignatures.set(tier, k);
+	}
+	return k;
+}
+
 const normalCache = new Map();
 /** Normal outcome at a stage (framework chain on the tier's mean fish). */
 function normalOutcome(stage, { overheadS = stage?.overheadS ?? F.DESIGN_OVERHEAD_S } = {}) {
 	const tier = gear(stage?.tier ?? stage);
 	const biome = stage?.biome || F.biomeAt(tier.level);
-	const key = `${tier.tier}|${biome}|${overheadS}`;
+	const key = `${tierKey(tier)}|${biome}|${overheadS}`;
 	if (!normalCache.has(key)) {
 		const o = F.castOutcome({ biome, qualities: tier.qualities, stats: tier.stats, multiChance: normalChance(tier) });
 		const h = F.hourly(o, overheadS);
@@ -256,32 +292,52 @@ function normalOutcome(stage, { overheadS = stage?.overheadS ?? F.DESIGN_OVERHEA
 	return normalCache.get(key);
 }
 
+// One fish exactly: the per-DRAW outcome (the visible count is applied separately).
+const ONE_FISH = Object.freeze([0, 1]);
+/**
+ * The Founder's cast from explicit inputs; founderOutcome() and the lifecycle system (system()) share it.
+ * g: { biome, qualities, stats (gear and any other stat source; the profile's stats are added, then
+ * clamped to STAT_CAPS), chain (P(n fish) of the NORMAL multi-catch roll), sellMult, xpMult (public
+ * multipliers such as buffs: in base AND final), fish, fishKey, rules (F.castOutcome overrides) }.
+ * Per-draw XP/value come from F.castOutcome with the Founder rarity table and the combined stats; the
+ * visible count (chain + bonus fish, capped) multiplies them (every visible fish is a draw from the same
+ * table). Base = without the profile's private multipliers (the public card, publicXp); final = x them.
+ */
+function founderCast(g, p) {
+	const stats = combinedStats({ stats: g.stats }, p);
+	const per = F.castOutcome({ biome: g.biome, qualities: g.qualities, stats, fishDist: ONE_FISH, table: p.rarityTable, sellMult: g.sellMult, xpMult: g.xpMult, fish: g.fish, fishKey: g.fishKey, rules: g.rules });
+	const visible = visibleFromChain(g.chain, p.bonusDraws, p.limits.maxDraws);
+	const table = buildTable(p.rarityTable, stats);
+	const pity = pityLegendaryPlus(lplus(per.rarity), table, visible, p.pity?.legendaryPlus || null);
+	const eff = stats.durabilityEfficiency || 0;
+	const durabilityByRule = {
+		ceil: visible.dist.reduce((s, q, n) => s + (n > 0 ? q * Math.max(1, Math.ceil(n * (1 - eff) - 1e-9)) : 0), 0),
+		stochastic: visible.mean * (1 - eff),
+	};
+	const xpBase = visible.mean * per.xpPerCast;
+	const valueBase = visible.mean * per.valuePerCast;
+	return { stats, per, visible, pity, durabilityByRule, xpBase, valueBase, xp: xpBase * p.multipliers.xp, value: valueBase * p.multipliers.sell };
+}
+
 const founderCache = new Map();
 /**
- * Founder outcome at a stage under `profile` (default: the proposed founderProfile()).
+ * Founder outcome at a stage under `profile` (default: the proposed founderProfile()), from founderCast()
+ * on the tier's stats and the framework chain for the tier's mean fish.
  * Base = without the profile multipliers (what the public card shows and publicXp receives);
- * final = what the account receives. Value and XP per fish come from F.castOutcome with the Founder
- * rarity table and the combined stats; the visible count multiplies them (every visible fish is a
- * draw from the same table). Pity is applied to the Legendary+ frequency only (its XP/value uplift is
- * left out, so XP/$ are slight under-estimates: conservative for the targets).
+ * final = what the account receives. Pity is applied to the Legendary+ frequency only (its XP/value
+ * uplift is left out, so XP/$ are slight under-estimates: conservative for the targets).
  */
 function founderOutcome(stage, { profile = null, overheadS = stage?.overheadS ?? F.DESIGN_OVERHEAD_S } = {}) {
 	const p = profile || founderProfile();
 	const tier = gear(stage?.tier ?? stage);
 	const biome = stage?.biome || F.biomeAt(tier.level);
-	const key = `${JSON.stringify([p.stats, p.multipliers, p.bonusDraws, p.limits])}|${tier.tier}|${biome}|${overheadS}`;
+	const key = `${JSON.stringify([p.stats, p.multipliers, p.bonusDraws, p.limits])}|${tierKey(tier)}|${biome}|${overheadS}`;
 	if (founderCache.has(key)) return founderCache.get(key);
-	const stats = combinedStats(tier, p);
-	const per = F.castOutcome({ biome, qualities: tier.qualities, stats, multiChance: 0, table: p.rarityTable });
-	const visible = visibleDistribution(normalChance(tier), p.bonusDraws, p.limits.maxDraws);
-	const table = buildTable(p.rarityTable, stats);
-	const pity = pityLegendaryPlus(lplus(per.rarity), table, visible, p.pity?.legendaryPlus || null);
-	const eff = stats.durabilityEfficiency || 0;
-	const durabilityCeil = visible.dist.reduce((s, q, n) => s + (n > 0 ? q * Math.max(1, Math.ceil(n * (1 - eff) - 1e-9)) : 0), 0);
-	const durabilityStochastic = visible.mean * (1 - eff);
-	const durabilityPerCast = PARAMS.durability.rule === 'stochastic' ? durabilityStochastic : durabilityCeil;
-	const xpBasePerCast = visible.mean * per.xpPerCast;
-	const valueBasePerCast = visible.mean * per.valuePerCast;
+	const c = founderCast({ biome, qualities: tier.qualities, stats: tier.stats, chain: F.fishDistribution(normalChance(tier)).dist }, p);
+	const { stats, per, visible, pity } = c;
+	const durabilityPerCast = PARAMS.durability.rule === 'stochastic' ? c.durabilityByRule.stochastic : c.durabilityByRule.ceil;
+	const xpBasePerCast = c.xpBase;
+	const valueBasePerCast = c.valueBase;
 	const perCast = {
 		fish: visible.mean,
 		xpBase: xpBasePerCast,
@@ -300,7 +356,7 @@ function founderOutcome(stage, { profile = null, overheadS = stage?.overheadS ??
 		tier: tier.tier, biome, overheadS, cooldownMs: per.cooldownMs, stats,
 		visible, perDraw: { xp: per.xpPerCast, value: per.valuePerCast, legendaryPlus: lplus(per.rarity), rarity: per.rarity },
 		perCast, hourly, pity,
-		durabilityByRule: { ceil: durabilityCeil, stochastic: durabilityStochastic },
+		durabilityByRule: c.durabilityByRule,
 		legendaryCardShare: pity.cardShare,
 		normal: { fishPerCast: n.outcome.fishPerCast, xpPerHour: n.hourly.xp, cashPerHour: n.hourly.cash, casts: n.hourly.casts, cooldownMs: n.outcome.cooldownMs, legendaryPlusPerHour: n.legendaryPlusPerHour, legendaryCardShare: n.legendaryCardShare, durabilityPerCast: n.outcome.durabilityPerCast, p3plus: n.outcome.jackpot3plus },
 		ratio: {
@@ -796,6 +852,376 @@ function migratePublicXp(user, journals = [], { levelForXp = levelForXpToday } =
 }
 
 // ---------------------------------------------------------------------------------------------
+// Framework 5b.3: the Founder profile as a SYSTEM on the shared lifecycle core (lifecycle.js).
+// integrate.js runs it as the 'founder' variant; validateSystem() proves it reproduces lifecycle()
+// above, which stays until the old loops are retired.
+const SYSTEM_NAME = 'founder';
+const TOP_LIVE_BIOME = F.LIVE_BIOMES[F.LIVE_BIOMES.length - 1];
+
+/** The NORMAL multi-catch roll of a lifecycle.js cast input: fishDist when set, else the framework chain. */
+function inputChain(input) {
+	if (input.fishDist) {
+		const total = input.fishDist.reduce((a, b) => a + (b || 0), 0);
+		return input.fishDist.map((q) => (q || 0) / total);
+	}
+	// As F.castOutcome: the rod's chance plus the additive multiChance stat (clamped), at most 1.
+	const extra = F.clampStats({ multiChance: input.stats?.multiChance || 0 }).multiChance;
+	return F.fishDistribution(Math.min(1, (input.multiChance || 0) + extra), input.multiOpts).dist;
+}
+
+/**
+ * The Founder outcome for a lifecycle.js cast input (the system's outcome hook; founderCast() underneath,
+ * as founderOutcome()). Honours every input field other systems set: biome, qualities, stats (gear, bait,
+ * ...; the profile's stats are added, then clamped to STAT_CAPS), multiChance + stats.multiChance (the
+ * normal chain) or fishDist (a full P(n fish) chain override), multiOpts, sellMult / xpMult (public
+ * multipliers: in base AND final), fish / fishKey, rules (durability and Lucky-item rules, default
+ * F.RULES). The profile brings its own base rarity table, so an input.table is refused.
+ * Returns the core's fields (fishPerCast, xpPerCast = final, xpBasePerCast, valuePerCast = final,
+ * valueBasePerCast, cooldownMs, durabilityPerCast) plus the visible fishDist, Lucky-item split,
+ * Legendary+ per cast with pity and the card share.
+ */
+function founderCastOutcome(input, profile = null) {
+	const p = profile || founderProfile();
+	if (input.table) throw new Error(`${SYSTEM_NAME}: input.table is set, but the Founder profile brings its own base rarity table (two base tables cannot both apply)`);
+	const c = founderCast({
+		biome: input.biome, qualities: input.qualities || ['weak'], stats: input.stats || {}, chain: inputChain(input),
+		sellMult: input.sellMult, xpMult: input.xpMult, fish: input.fish, fishKey: input.fishKey, rules: input.rules,
+	}, p);
+	const rule = { ...F.RULES, ...(input.rules || {}) }.durability;
+	const eff = c.stats.durabilityEfficiency || 0;
+	return {
+		profile: SYSTEM_NAME, biome: input.biome, tier: input.tier,
+		fishPerCast: c.visible.mean, fishDist: c.visible.dist, jackpot3plus: c.visible.p3plus, jackpot5: c.visible.p5,
+		xpPerCast: c.xp, xpBasePerCast: c.xpBase,
+		valuePerCast: c.value, valueBasePerCast: c.valueBase,
+		valuePerFish: c.per.valuePerFish * p.multipliers.sell, valueBasePerFish: c.per.valuePerFish,
+		cooldownMs: c.per.cooldownMs,
+		durabilityPerCast: c.visible.dist.reduce((s, q, n) => s + (n > 0 ? q * F.durabilityCost(n, eff, rule) : 0), 0),
+		fishSharePerDraw: c.per.fishSharePerDraw, itemPerDraw: c.per.itemPerDraw, boosterPerDraw: c.per.boosterPerDraw,
+		itemsPerCast: c.visible.mean * c.per.itemPerDraw, luckyItemShare: c.per.luckyItemShare,
+		legendaryPlusPerCast: c.pity.perCast, legendaryCardShare: c.pity.cardShare,
+		multipliers: { xp: p.multipliers.xp, sell: p.multipliers.sell },
+		stats: c.stats, rarity: c.per.rarity, table: c.per.table,
+	};
+}
+
+/** Everything of a profile the cast outcome depends on (the core's outcome cache key). */
+const profileKey = (p) => JSON.stringify([p.rarityTable, p.stats, p.multipliers, p.bonusDraws, p.limits, p.pity]);
+
+/**
+ * The Founder SYSTEM (lifecycle.js hooks). Per-run state lives in state.sys.founder only.
+ *   init            sets state.profile = 'founder': rods (Founder crate luck), quests (questXp/questCash,
+ *                   Daily Box sell), streak and buffs (Founder box odds and sell) read it and take the
+ *                   Founder's values from founderProfile(). Refuses a run whose gate (simulate({ gate }))
+ *                   is not opts.gate: the level gate is a profile rule (PARAMS.publicLevel.gate).
+ *   outcome         founderCastOutcome(input): replaces F.castOutcome on every cast. The core credits
+ *                   its final XP and value to ledger.xp.fishing / ledger.cash.fishing and its base XP to
+ *                   ledger.publicXp.fishing (fishing profile bonus = xp.fishing - publicXp.fishing).
+ *   outcomeCacheKey the profile (the outcome is a pure function of the input and the profile).
+ *   beforeStep      the public tell: steps fished on a biome or rod tier above the PUBLIC level (possible
+ *                   only under gate 'real'): hours, first step, first step on the top live biome, last.
+ *   onCasts         base (public) fish value (the core ledgers the final cash only), Legendary+ caught
+ *                   (with pity) and the fishing totals, in state.sys.founder.fishing.
+ * No goals, no spend, no ledger source of its own, no daily minimum (no sessionDone).
+ * @param {object} opts { gate: 'public' (default, PARAMS.publicLevel.gate) | 'real', profile: a
+ *   profileWith() trial profile for the cast outcome (default founderProfile(); the other systems always
+ *   read founderProfile()) }
+ */
+function system(opts = {}) {
+	const gate = opts.gate || PARAMS.publicLevel.gate;
+	if (!PARAMS.targets.gatingModes.includes(gate)) throw new Error(`${SYSTEM_NAME}: unknown gate ${gate} (${PARAMS.targets.gatingModes.join(' | ')})`);
+	const own = (state) => state.sys[SYSTEM_NAME];
+	return {
+		name: SYSTEM_NAME,
+		init(state, ctx) {
+			if (ctx.gate !== gate) throw new Error(`${SYSTEM_NAME} system built for gate '${gate}' but the run gates on '${ctx.gate}': pass the same gate to simulate()`);
+			const profile = opts.profile || founderProfile();
+			state.profile = SYSTEM_NAME;
+			state.sys[SYSTEM_NAME] = {
+				gate, profile, key: `${SYSTEM_NAME}|${profileKey(profile)}`,
+				fishing: { casts: 0, fish: 0, xp: 0, xpBase: 0, value: 0, valueBase: 0, legendaryPlus: 0 },
+				tell: { hours: 0, firstAt: null, topBiomeFirstAt: null, lastAt: null },
+			};
+		},
+		outcome(input, state) {
+			return founderCastOutcome(input, own(state).profile);
+		},
+		outcomeCacheKey(input, state) {
+			return own(state).key;
+		},
+		beforeStep(state, ctx, rates) {
+			if (rates.blocked) return;
+			const Lp = state.publicLevel;
+			if (!(F.BIOME_LEVEL[rates.biome] > Lp || ctx.path[rates.tier].level > Lp)) return;
+			const t = own(state).tell;
+			const at = { hours: +state.h.toFixed(4), day: state.day + 1, publicLevel: Lp, realLevel: state.level, biome: rates.biome, tier: rates.tier };
+			t.hours += ctx.stepH;
+			if (!t.firstAt) t.firstAt = at;
+			if (!t.topBiomeFirstAt && rates.biome === TOP_LIVE_BIOME) t.topBiomeFirstAt = at;
+			t.lastAt = { ...at, hours: +(state.h + ctx.stepH).toFixed(4) };
+		},
+		onCasts(state, ctx, { casts, fish, rates }) {
+			const f = own(state).fishing;
+			f.casts += casts;
+			f.fish += fish;
+			f.xp += rates.xp;
+			f.xpBase += rates.xpBase;
+			f.value += rates.cash;
+			f.valueBase += rates.cashBase;
+			f.legendaryPlus += casts * (rates.outcome?.legendaryPlusPerCast || 0);
+		},
+	};
+}
+
+/** The system contract, for report().integration and the integrator's documentation. */
+function systemDescription() {
+	return {
+		name: SYSTEM_NAME,
+		options: { gate: '\'public\' (default, recommended: PARAMS.publicLevel.gate, decisions.js P-FOUNDER-GATE) | \'real\'; must equal simulate({ gate })', profile: 'trial profile for the cast outcome (default founderProfile())' },
+		hooks: {
+			init: 'state.profile = \'founder\'; state.sys.founder = { gate, profile, key, fishing, tell }; throws if the run\'s gate differs',
+			outcome: 'founderCastOutcome(input): visible fish = normal chain (input.multiChance + stats.multiChance, or input.fishDist) + Founder bonus fish, capped at F.MULTI.maxFish; per draw = F.castOutcome with the Founder rarity table and gear + profile stats (clamped), input sellMult/xpMult; base = visible mean x per draw; final = base x profile xp / sell; durability per F.RULES.durability (or input.rules)',
+			outcomeCacheKey: 'the profile',
+			beforeStep: 'public tell (gate \'real\' only): steps on a biome or tier above the public level',
+			onCasts: 'base fish value, Legendary+ caught, fishing totals (state.sys.founder.fishing)',
+		},
+		ledger: {
+			sources: 'none of its own: the core books its outcome under \'fishing\' (xp.fishing = final, publicXp.fishing = base, cash.fishing = final); base cash is state.sys.founder.fishing.valueBase',
+			spend: 'none',
+		},
+		reads: 'state.publicLevel / state.level (tell); ctx.path (tier levels)',
+		readBy: 'rods (state.profile: Founder crate luck via founderCrates), quests (founderProfile().multipliers questXp/questCash/sell), streak and buffs (Founder box odds and sell)',
+	};
+}
+
+// Validation-only systems: lifecycle()'s placeholder assumptions on the core. Not part of the economy
+// (the integrator uses rods/quests/streak/buffs); they exist so validateSystem() compares like with like.
+/**
+ * lifecycle()'s daily: F.DAILY.xpPerLevel x the level of the day's last step; base at the PUBLIC level,
+ * final at the gate level x questXp for the Founder (both the public level for Normal).
+ */
+function lifecycleDaily() {
+	const name = 'founderLifecycleDaily';
+	return {
+		name,
+		init(state) {
+			state.sys[name] = { publicLevel: 1 };
+		},
+		beforeStep(state) {
+			state.sys[name].publicLevel = state.publicLevel;
+		},
+		onDayEnd(state, ctx) {
+			const questXp = state.profile === SYSTEM_NAME ? state.sys[SYSTEM_NAME].profile.multipliers.questXp : 1;
+			ctx.addXp('daily', F.DAILY.xpPerLevel * state.stepStartLevel * questXp, F.DAILY.xpPerLevel * state.sys[name].publicLevel);
+		},
+	};
+}
+
+/**
+ * lifecycle()'s purchases: the next tier once the gate level reaches it and the player's own income since
+ * then covers F.PURCHASE.saveHours of NORMAL income at the current stage (x the Founder's crate factor).
+ * Spend 'progression' / 'T<tier>'.
+ */
+function lifecycleRods() {
+	const name = 'founderLifecycleRods';
+	return {
+		name,
+		init(state) {
+			state.sys[name] = { saving: 0, upgrades: {} };
+		},
+		beforeStep(state, ctx, rates) {
+			const next = ctx.path[state.equippedTier + 1];
+			if (rates.blocked || !next || state.stepStartLevel < next.level) return;
+			const s = state.sys[name];
+			s.saving += rates.cash;
+			const n = normalOutcome({ tier: ctx.path[state.equippedTier], biome: rates.biome }, { overheadS: ctx.arch.overheadS });
+			const cost = n.hourly.cash * F.PURCHASE.saveHours * crateFactor(next.tier, state.profile === SYSTEM_NAME ? state.sys[SYSTEM_NAME].profile : null);
+			if (s.saving < cost) return;
+			state.equippedTier++;
+			s.saving = 0;
+			ctx.spend('progression', `T${next.tier}`, cost);
+			// The new tier fishes from the next step (this step's rates are fixed).
+			s.upgrades[next.tier] = +(state.h + ctx.stepH).toFixed(4);
+		},
+	};
+}
+
+/**
+ * Validation-only (runs after the daily): lifecycle() adds a day's daily XP inside the day's final step,
+ * before it records a level reached on that step; the core records the milestone after the step and adds
+ * the daily at onDayEnd. For such milestones this keeps the ledger including that daily, so XP sources
+ * are compared on lifecycle()'s basis. A session cut short by the stop level crossed no day: skipped.
+ */
+function dayEndProbe() {
+	const name = 'founderDayEndProbe';
+	return {
+		name,
+		init(state) {
+			state.sys[name] = { milestones: {}, publicMilestones: {} };
+		},
+		onDayEnd(state, ctx) {
+			if (Math.floor(state.h / (ctx.arch.minutesPerDay / 60)) === state.playDay) return;
+			const probe = state.sys[name];
+			const h = +state.h.toFixed(4);
+			for (const which of ['milestones', 'publicMilestones']) {
+				for (const [T, m] of Object.entries(state[which])) {
+					if (!(T in probe[which]) && m.hours === h) probe[which][T] = { xp: { ...state.ledger.xp }, publicXp: { ...state.ledger.publicXp } };
+				}
+			}
+		},
+	};
+}
+
+/** lifecycle()'s model on the core: the Founder system (or none: Normal) + the validation-only systems. */
+function coreLifecycle(archetype, { founder = true, gate = PARAMS.publicLevel.gate, ...simOpts } = {}) {
+	return LC.simulate({
+		archetype,
+		gate: founder ? gate : 'real',
+		systems: [founder ? system({ gate }) : null, lifecycleRods(), lifecycleDaily(), dayEndProbe()],
+		stopAtLevel: F.LIFECYCLE.maxLevel,
+		// lifecycle() runs until both levels reach the cap; real >= public, so the public level decides.
+		stopOn: 'public',
+		...simOpts,
+	});
+}
+
+/** XP sources in lifecycle()'s shape from a core ledger snapshot. */
+function coreSources(snap) {
+	const x = snap.xp;
+	const b = snap.publicXp;
+	return { fishingBase: b.fishing || 0, fishingBonus: (x.fishing || 0) - (b.fishing || 0), dailyBase: b.daily || 0, dailyBonus: (x.daily || 0) - (b.daily || 0) };
+}
+
+/**
+ * One comparison of the core with lifecycle() (one archetype; the Founder under `gate`, or Normal):
+ * real and public milestone hours (step-exact: lifecycle() rounds hours to 0.01, under a step, so its step
+ * index is recovered), XP sources at every milestone, the real level at each public milestone, the hour
+ * each tier starts fishing, the public tell, and XP and money at the stop.
+ */
+function compareWithLifecycle(archetype, { founder = true, gate = PARAMS.publicLevel.gate } = {}) {
+	const stepH = F.LIFECYCLE.stepH;
+	const stepOf = (hours) => Math.round(hours / stepH);
+	const out = { maxRel: 0, worst: null, exact: 0, compared: 0 };
+	const note = (key, a, b) => {
+		// Float noise (a different order of the same sums) counts as equal.
+		const d = Math.abs(a - b) <= 1e-9 * Math.max(Math.abs(a), Math.abs(b), 1) ? 0 : Math.abs(a - b) / Math.max(Math.abs(b), 1e-12);
+		if (d > out.maxRel) {
+			out.maxRel = d;
+			out.worst = key;
+		}
+		return round(d, 6);
+	};
+	const old = lifecycle(archetype, founder ? { profile: founderProfile(), gating: gate } : {});
+	const core = coreLifecycle(archetype, { founder, gate });
+	const probe = core.sys.founderDayEndProbe;
+	const row = { milestones: {}, publicMilestones: {}, upgrades: {} };
+	for (const [which, oldKey, oldSources] of [['milestones', 'real', 'sourcesAtRealMilestone'], ['publicMilestones', 'public', 'sourcesAtPublicMilestone']]) {
+		for (const T of F.LIFECYCLE.milestones) {
+			const o = old[oldKey][T];
+			const c = core[which][T];
+			if (!o || !c) {
+				row[which][T] = { old: o ? o.hours : null, core: c ? c.hours : null };
+				if (o || c) note(`${which} L${T} reached by one only`, 1, 0);
+				continue;
+			}
+			const [kOld, kCore] = [stepOf(o.hours), stepOf(c.hours)];
+			out.compared++;
+			if (kOld === kCore) out.exact++;
+			const src = coreSources(probe[which][T] || c.ledger);
+			const os = old[oldSources][T];
+			const r = { old: o.hours, core: c.hours, steps: kCore - kOld, rel: note(`${which} L${T} hours`, kCore, kOld), day: { old: o.day, core: c.day } };
+			r.sources = Object.fromEntries(Object.keys(src).map((k) => [k, { old: Math.round(os[k]), core: Math.round(src[k]), rel: note(`${which} L${T} ${k}`, src[k], os[k]) }]));
+			if (which === 'publicMilestones') {
+				const realLevel = F.levelForXp(sum(Object.values((probe[which][T] || c.ledger).xp)));
+				r.realLevel = { old: os.realLevel, core: realLevel };
+				note(`public L${T} real level`, realLevel, os.realLevel);
+			}
+			row[which][T] = r;
+		}
+	}
+	const ups = core.sys.founderLifecycleRods.upgrades;
+	for (const t of Object.keys({ ...old.upgrades, ...ups })) {
+		const [o, c] = [old.upgrades[t], ups[t]];
+		if (o == null || c == null) {
+			row.upgrades[t] = { old: o ?? null, core: c ?? null };
+			note(`T${t} bought by one only`, 1, 0);
+			continue;
+		}
+		row.upgrades[t] = { old: o, core: c, steps: stepOf(c) - stepOf(o), rel: note(`T${t} hours`, stepOf(c), stepOf(o)) };
+	}
+	if (founder) {
+		const [o, c] = [old.tell, core.sys[SYSTEM_NAME].tell];
+		const at = (x) => (x ? { step: stepOf(x.hours), publicLevel: x.publicLevel, realLevel: x.realLevel, biome: x.biome } : null);
+		const same = ['firstAt', 'topBiomeFirstAt', 'lastAt'].every((k) => JSON.stringify(at(o[k])) === JSON.stringify(at(c[k])));
+		if (!same) note('tell points', 1, 0);
+		row.tell = { hours: { old: o.hours, core: round(c.hours, 2), rel: note('tell hours', stepOf(c.hours), stepOf(o.hours)) }, pointsMatch: same, firstAt: c.firstAt, topBiomeFirstAt: c.topBiomeFirstAt, lastAt: c.lastAt };
+	}
+	// At the stop (both levels at the cap): the public-cap milestone snapshot, with lifecycle()'s daily basis.
+	const stop = core.publicMilestones[F.LIFECYCLE.maxLevel];
+	if (stop) {
+		const snap = probe.publicMilestones[F.LIFECYCLE.maxLevel] || stop.ledger;
+		const [xp, pub] = [sum(Object.values(snap.xp)), sum(Object.values(snap.publicXp))];
+		// lifecycle() reports whole XP and dollars at its end: compare the core's figures rounded the same way.
+		row.stop = {
+			hours: { old: old.end.hours, core: stop.hours },
+			realXp: { old: old.end.realXp, core: Math.round(xp), rel: note('stop real XP', Math.round(xp), old.end.realXp) },
+			publicXp: { old: old.end.publicXp, core: Math.round(pub), rel: note('stop public XP', Math.round(pub), old.end.publicXp) },
+			money: { old: old.end.money, core: Math.round(stop.money), rel: note('stop money', Math.round(stop.money), old.end.money) },
+			tier: { old: old.end.tier, core: core.final.tier },
+		};
+		if (old.end.tier !== core.final.tier) note('stop tier', core.final.tier, old.end.tier);
+	}
+	if (founder) {
+		const f = core.sys[SYSTEM_NAME].fishing;
+		row.fishing = { valueBase: Math.round(f.valueBase), value: Math.round(f.value), privateSellShare: round(1 - f.valueBase / f.value, 4), legendaryPlus: round(f.legendaryPlus, 1), fishPerCast: round(f.fish / f.casts, 3) };
+	}
+	return { ...out, row };
+}
+
+let validationMemo = null;
+/**
+ * Framework 5b.3 validation: system() on the shared core vs this module's lifecycle(), for every archetype
+ * under both gates (the Founder, real and public milestones), plus the Normal run of the same baseline
+ * (no founder system) for every archetype. The baseline systems reproduce lifecycle()'s placeholder
+ * assumptions: its level-scaled daily (lifecycleDaily) and its purchase rule (lifecycleRods).
+ */
+function validateSystem({ tolerance = 0.005 } = {}) {
+	if (validationMemo && validationMemo.tolerance === tolerance) return validationMemo;
+	const cases = {};
+	const agg = { maxRel: 0, worst: null, exact: 0, compared: 0 };
+	const add = (key, c) => {
+		cases[key] = c.row;
+		agg.exact += c.exact;
+		agg.compared += c.compared;
+		if (c.maxRel > agg.maxRel) {
+			agg.maxRel = c.maxRel;
+			agg.worst = `${key}: ${c.worst}`;
+		}
+	};
+	for (const gate of PARAMS.targets.gatingModes) {
+		for (const a of Object.keys(F.ARCHETYPES)) add(`founder/${gate}/${a}`, compareWithLifecycle(a, { gate }));
+	}
+	for (const a of Object.keys(F.ARCHETYPES)) add(`normal/${a}`, compareWithLifecycle(a, { founder: false }));
+	validationMemo = {
+		method: 'LC.simulate with founder.system({ gate }) + validation-only lifecycleRods() (lifecycle()\'s purchase rule: F.PURCHASE.saveHours of NORMAL stage income x the Founder crate factor) + lifecycleDaily() (F.DAILY.xpPerLevel x level; base at the public level, final at the gate level x questXp) vs founder.lifecycle(), every archetype, gates public and real (real and public milestones); Normal: the same baseline without the founder system vs lifecycle() with no profile. Hours compared step-exact; XP sources at every milestone, tier upgrade hours, the public tell, and XP and money at the stop.',
+		matches: agg.maxRel < tolerance,
+		tolerance,
+		maxRelativeDifference: round(agg.maxRel, 6),
+		worst: agg.worst,
+		exactMilestones: `${agg.exact}/${agg.compared}`,
+		cases,
+		differences: [
+			'None in the model: the core steps, gates, buys and credits exactly as lifecycle() did, so every milestone (real and public), tier upgrade and tell point lands on the same step and every XP source, XP total and money figure agrees (float noise only).',
+			'Days: the core counts a level reached on a day\'s final step in that day, where lifecycle() reported ceil(h/dayH) (the next day), so hours are compared, not days (row.day shows both).',
+			'XP sources: a level reached on a day\'s final step is snapshotted by the core before that day\'s daily (onDayEnd) and by lifecycle() after it; the comparison applies lifecycle()\'s basis (validation-only dayEndProbe()). The integrated ledgers keep the core\'s convention.',
+			'Stop: lifecycle() ran until both levels reached the cap; the core stops on the public level (real >= public). When the stop falls mid-day the core still ends that day (its onDayEnd daily comes after the last milestone), so the run\'s final totals include one more daily than lifecycle()\'s end; the comparison reads the public-cap milestone snapshot.',
+			'Level-scaled daily under gate \'real\': lifecycle() credited the base at the PUBLIC level and the final at the real (gate) level x questXp. The integrated quests system credits both at the gate level (base = its reward, final = base x questXp), so under the non-recommended \'real\' gate its publicXp from quests is a little higher than lifecycle()\'s placeholder; under the recommended \'public\' gate the two agree.',
+		],
+	};
+	return validationMemo;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Report
 let reportMemo = null;
 function report() {
@@ -805,6 +1231,7 @@ function report() {
 	const s = solve();
 	const prof = founderProfile();
 	const G = gacha();
+	const validation = validateSystem();
 
 	// Visible distribution and plausibility per tier (home biome).
 	const visible = path.map((t) => {
@@ -887,7 +1314,11 @@ function report() {
 	// Lifecycles: Normal (validates against curve.json) and Founder under both gate options.
 	const normalLc = Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => [a, lifecycle(a)]));
 	const curveRegular = CURVE_JSON.best?.regular || {};
-	const normalMatchesCurveJson = Object.entries(curveRegular).every(([L, hrs]) => normalLc[F.REFERENCE_ARCHETYPE].real[L]?.hours === hrs);
+	// curve.json is fitted on the gear path it names (the 5b.1 provisional path through 5b.3): the Normal
+	// lifecycle reproduces it on that path (the timeTable's newNormal column is on F.gearPath()).
+	const curvePath = CURVE_JSON.gearPathSource === 'provisional' ? F.PROVISIONAL_GEAR_PATH : F.gearPath();
+	const curveLc = curvePath === F.PROVISIONAL_GEAR_PATH ? lifecycle(F.REFERENCE_ARCHETYPE, { path: curvePath }) : normalLc[F.REFERENCE_ARCHETYPE];
+	const normalMatchesCurveJson = Object.keys(curveRegular).length > 0 && Object.entries(curveRegular).every(([L, hrs]) => curveLc.real[L]?.hours === hrs);
 	const founderLc = {};
 	for (const gating of PARAMS.targets.gatingModes) {
 		founderLc[gating] = Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => [a, lifecycle(a, { profile: prof, gating })]));
@@ -975,6 +1406,7 @@ function report() {
 		rodLifePreserved: upkeep.every((u) => u.lifeRatio.proposed >= u.lifeRatio.todayTarget),
 		day30XpAndMoneyRatioPreserved: Object.values(day30).every((d) => !d.today || (d.xpVsToday.ratio >= 1 && d.moneyRatioToNormal.new >= d.moneyRatioToNormal.today)),
 		competitiveEligibleFalse: prof.competitiveEligible === false,
+		systemReproducesLifecycle: validation.matches,
 	};
 	checks.pass = Object.values(checks).every((v) => v === true || v === 'capped by plausibility');
 
@@ -1026,6 +1458,7 @@ function report() {
 		afford: affordTable,
 		lifecycle: {
 			normalMatchesCurveJson,
+			normalCurveJsonPath: CURVE_JSON.gearPathSource || F.GEAR_PATH_SOURCE,
 			time: timeTable,
 			publicPace,
 			tellWindowRealGating: Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => [a, founderLc.real[a].tell])),
@@ -1034,6 +1467,7 @@ function report() {
 			decompositionRegular: decomposition,
 			day30,
 		},
+		integration: { system: systemDescription(), validation },
 		pityModelCheck: { todayFounderOldRodMeasuredPerFish: round(oldToday, 4), modelWithPity: round(oldModel, 4), modelNoPity: round(oldModelNoPity, 4) },
 		luckyItems: (() => {
 			const pinned = LUCKY_ITEM_SHARE * buildTable(F.NORMAL_RARITY_TABLE).lucky;
@@ -1059,9 +1493,10 @@ function mean(a) {
 }
 
 module.exports = {
-	PARAMS,
-	founderProfile, profileWith, founderOutcome, normalOutcome, visibleDistribution, pityLegendaryPlus,
-	lifecycle, today, solve, gacha, founderCrates, journalProfileBonus, migratePublicXp, report,
+	PARAMS, SYSTEM_NAME,
+	founderProfile, profileWith, founderOutcome, normalOutcome, visibleDistribution, visibleFromChain, pityLegendaryPlus,
+	lifecycle, today, solve, gacha, founderCrates, journalProfileBonus, migratePublicXp,
+	founderCastOutcome, system, systemDescription, coreLifecycle, validateSystem, report,
 };
 
 if (require.main === module) process.stdout.write(`${JSON.stringify(report(), null, 1)}\n`);

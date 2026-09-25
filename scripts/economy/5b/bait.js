@@ -34,15 +34,27 @@
 //   gachaBaitValue()             bait liquid value per box open: current, proposed (1 unit/slot) and
 //                                proposed if a bait slot grants one pack
 //   currentBaits()               today's catalog + measured Old Rod economics (measurements.json)
-//   lifecycle(policy, archetype) curve.js-style lifecycle with bait bought every cast ('none'|'cash'|'xp')
-//                                incl. the XP-source split (fishing / bait / daily) for requirement R2
+//   lifecycle(policy, archetype, { detail })
+//                                curve.js-style lifecycle with bait bought every cast ('none'|'cash'|'xp')
+//                                incl. the XP-source split (fishing / bait / daily) for requirement R2;
+//                                detail adds the unrounded figures validateSystem() compares
 //   lifecycleSensitivity()       regular/grinder/casual lifecycles, approved windows, speed-up check
-//   report(opts)                 all of the above, plus frameworkVersion; opts.gearPath = withGear input
+//   system(opts)                 framework 5b.3: a FRESH lifecycle.js system (per-run state in
+//                                state.sys.bait only). opts.policy 'cash' | 'xp' | a bait name | 'none'.
+//                                modifyCast applies baitOption() at the equipped stage and pushes the
+//                                per-cast cost (spend item optional.bait); the core's 'fishing' ledger
+//                                carries the bait effect, the bait's marginal value/XP is in state.sys.bait
+//   validateSystem()             system() on the shared core (LC.simulate) vs lifecycle() for every
+//                                archetype x 'none'/'cash'/'xp' (memoised)
+//   SYSTEM_NAME, SPEND_ITEM      'bait' and its one ledger item { category: 'optional', item: 'bait' }
+//   report(opts)                 all of the above, plus frameworkVersion and system (contract +
+//                                validateSystem()); opts.gearPath = withGear input
 //   withGear(gearPath)           the same API rebuilt on another rod path (e.g. rods.gearPath(): an
 //                                array old..t4 or { old, t1..t4 } of { level, qualities, stats,
 //                                multiChance | meanFish | mean }). Every price and check regenerates;
 //                                the functions above are withGear(PROVISIONAL.tiers).
 const F = require('./framework');
+const LC = require('./lifecycle');
 const { drawDistribution } = require('../lib/catalog-model');
 const { PROFILES, BAIT_STATS } = require('../../../src/engine/balance');
 const CURRENT_CATALOG = require('../../../src/bootstrap/data/bait');
@@ -304,7 +316,8 @@ const biomeAt = (L) => [...ALL].reverse().find((b) => L >= F.BIOME_LEVEL[b]);
  */
 function createBaitModel(gearPath = null) {
 	const TIERS = normaliseGear(gearPath);
-	const gearSource = gearPath ? 'custom' : 'provisional';
+	// The default path is the shared one (F.gearPath(): the rods design since the 5b.3 R3 cutover).
+	const gearSource = gearPath ? 'custom' : F.GEAR_PATH_SOURCE;
 
 	/** Normalises a stage to castOutcome input. */
 	function stageGear(stage) {
@@ -654,12 +667,19 @@ function createBaitModel(gearPath = null) {
 		return lcCache.get(key);
 	}
 
-	function lifecycle(policy = 'none', archName = 'regular') {
+	/**
+	 * @param policy 'none' | 'cash' | 'xp' (baitOption goal, bait bought every cast)
+	 * @param archName an F.ARCHETYPES name
+	 * @param opts { detail: also return the unrounded figures (step index and XP by source at each
+	 *   milestone, run totals) that validateSystem() compares with the shared core; off by default }
+	 */
+	function lifecycle(policy = 'none', archName = 'regular', { detail = false } = {}) {
 		const arch = PROVISIONAL.archetypes[archName];
 		const { dailyXpPerLevel, purchaseHours, stepH, maxLevel } = PROVISIONAL.lifecycle;
 		const order = PROVISIONAL.tierOrder;
 		let xp = 0;
 		let h = 0;
+		let steps = 0;
 		let tierIdx = 0;
 		let saving = 0;
 		let spend = 0;
@@ -667,6 +687,7 @@ function createBaitModel(gearPath = null) {
 		let gross = 0;
 		const xpBy = { fishing: 0, bait: 0, daily: 0 };
 		const xpAt = {};
+		const rawAt = {};
 		const dayH = arch.minutesPerDay / 60;
 		const reached = {};
 		const baitsUsed = new Set();
@@ -691,6 +712,7 @@ function createBaitModel(gearPath = null) {
 			gross += r.grossNoBait * stepH;
 			const before = h;
 			h += stepH;
+			steps++;
 			if (Math.floor(h / dayH) !== Math.floor(before / dayH)) {
 				xp += dailyXpPerLevel * L;
 				xpBy.daily += dailyXpPerLevel * L;
@@ -701,15 +723,18 @@ function createBaitModel(gearPath = null) {
 					reached[T] = r2(h);
 					const tot = xpBy.fishing + xpBy.bait + xpBy.daily;
 					xpAt[T] = { day: Math.ceil(h / dayH), fishingShare: r4(xpBy.fishing / tot), baitShare: r4(xpBy.bait / tot), dailyShare: r4(xpBy.daily / tot) };
+					rawAt[T] = { step: steps, day: xpAt[T].day, xpBy: { ...xpBy } };
 				}
 			}
 			if (L2 >= maxLevel) break;
 		}
-		return {
+		const out = {
 			policy, archetype: archName, gear: gearSource, hoursToLevel: reached, xpSources: xpAt,
 			baitSpendShareOfIncome: r4(spend / gross), baitExtraValueShareOfIncome: r4(extra / gross), netEffectShareOfIncome: r4((extra - spend) / gross),
 			baitsUsed: [...baitsUsed],
 		};
+		if (detail) out.detail = { milestones: rawAt, totals: { steps, spend, extra, gross, xpBy: { ...xpBy } } };
+		return out;
 	}
 
 	function lifecycleSensitivity() {
@@ -802,12 +827,372 @@ function createBaitModel(gearPath = null) {
 
 const DEFAULT = createBaitModel();
 
+// ---------------------------------------------------------------------------------------------
+// SYSTEM (framework 5b.3): bait on the shared lifecycle core (lifecycle.js). The core steps time and
+// accrues every cast into ledger source 'fishing', the bait's effect included. This system only picks
+// the bait, applies it to the cast and pays for it. It writes no ledger source and one spend item.
+const SYSTEM_NAME = 'bait';
+/** The one ledger item the system writes: bait bought per cast, an optional sink (user decision 10). */
+const SPEND_ITEM = Object.freeze({ category: 'optional', item: 'bait' });
+const POLICIES = Object.freeze(['none', 'cash', 'xp']);
+const NO_BAIT = Object.freeze({ bait: null, costPerCast: 0, extraValuePerCast: 0, extraXpPerCast: 0 });
+const numericKeys = (o) => Object.keys(o).filter((k) => /^\d+$/.test(k));
+const newTally = () => ({ units: 0, spend: 0, extraValue: 0, extraXp: 0, extraPublicXp: 0 });
+const addTally = (t, d) => {
+	for (const k of Object.keys(d)) t[k] += d[k];
+};
+const pickTally = (t) => ({ units: t.units, spend: t.spend, extraValue: t.extraValue, extraXp: t.extraXp, extraPublicXp: t.extraPublicXp });
+
+/**
+ * The cast input without what the bait added. Other systems' changes are kept: a stat nothing else
+ * touched after the bait gets its exact pre-bait value back, any other stat has the bait's bonus removed.
+ */
+function withoutBait(input, applied) {
+	const stats = { ...input.stats };
+	for (const [k, v] of Object.entries(applied.stats)) {
+		const restored = stats[k] === applied.after[k] ? applied.before[k] : stats[k] - v;
+		if (restored === undefined) delete stats[k];
+		else stats[k] = restored;
+	}
+	const qualities = applied.strong ? input.qualities.filter((q) => q !== 'strong') : [...input.qualities];
+	return { ...input, qualities, stats, costs: undefined };
+}
+
+/**
+ * The bait SYSTEM (lifecycle.js hooks). A fresh object per call. Per-run state lives in state.sys.bait only.
+ *   init        state.sys.bait: { policy, units, spend, extraValue, extraXp, extraPublicXp, byBait,
+ *               stages, milestones, publicMilestones }
+ *   modifyCast  baitOption({ biome: input.biome, tier: the equipped tier on the run's gear path
+ *               (ctx.path[input.tier], F.gearPath() by default) }, { goal: policy }), memoised per stage in
+ *               state.sys.bait.stages. When a bait fits, it adds the bait's stats to input.stats (Rare Find,
+ *               Trophy Chance, Luck, xpBonus, and Spinner's extra-fish chance as stats.multiChance) and
+ *               strong access for the starter baits (input.qualities). It then pushes the per-cast cost
+ *               { category: 'optional', item: 'bait', perCast: shop price per cast }: one unit per cast,
+ *               only where the bait works (PARAMS.consumption). Nothing happens where no bait fits.
+ *   onCasts     the bait's marginal effect this step, measured on the core's own cast: value and XP
+ *               (account and public) of the cast minus the same cast without the bait (other systems'
+ *               changes kept), from the same outcome function the core used. It is added to the totals,
+ *               byBait[name] and stages[biome/tier].
+ *   on          'levelUp': snapshots the totals at each recorded milestone (milestones /
+ *               publicMilestones), next to the core's ledger snapshots
+ * Ledgers: the core's 'fishing' XP and cash already include the bait's effect. The system writes no
+ * XP or cash source. Its only ledger item is ledger.spend.optional.bait. A report that splits XP by
+ * source takes the bait's share from state.sys.bait (extraXp / extraPublicXp) and never edits 'fishing'.
+ * Profile: the choice is baitOption's (normal-profile stage economics, fixed shop prices). A Founder
+ * also uses one unit per cast (PARAMS.consumption.profileIndependent). The marginal is measured on the
+ * profile's actual cast (the outcome override honours the input), so a Founder's is its own.
+ * Box contents: bait units inside boxes are valued by the system that grants the box (counting rule),
+ * never here, and they do not offset the bait bought per cast.
+ * @param {object} opts { policy: 'cash' (default: best positive net cash) | 'xp' (best XP-class bait, else
+ *   'cash') | a bait name (that bait wherever it works) | 'none' (no-op, validation baseline) }
+ */
+function system(opts = {}) {
+	const policy = opts.policy ?? 'cash';
+	if (!POLICIES.includes(policy) && !PARAMS.baits[policy]) throw new Error(`Unknown bait policy ${policy} (${POLICIES.join(' | ')} | a bait name)`);
+	const own = (state) => state.sys[SYSTEM_NAME];
+
+	/** What the policy equips at a biome with a path tier (memoised per run; shop prices are fixed). */
+	function stageChoice(s, biome, tierIdx, ctx) {
+		const gear = ctx.path[tierIdx];
+		const key = gear.key || F.TIER_KEYS[tierIdx] || `tier${tierIdx}`;
+		const id = `${biome}/${key}`;
+		if (!s.stages[id]) {
+			const opt = policy === 'none' ? NO_BAIT : DEFAULT.baitOption({ biome, tier: key, gear }, { goal: policy });
+			s.stages[id] = { bait: opt.bait, costPerCast: opt.costPerCast, designExtraValuePerCast: opt.extraValuePerCast, designExtraXpPerCast: opt.extraXpPerCast, ...newTally() };
+		}
+		return s.stages[id];
+	}
+
+	/** The no-bait outcome from the function the core used (castOutcome, or the run's outcome override). */
+	function baseOutcome(s, input, state, ctx) {
+		const provider = ctx.systems.find((x) => typeof x.outcome === 'function');
+		let key = JSON.stringify(input);
+		if (provider) key = typeof provider.outcomeCacheKey === 'function' ? `${key}|${provider.outcomeCacheKey(input, state, ctx)}` : null;
+		let o = key === null ? null : s.memo.get(key);
+		if (!o) {
+			o = provider ? provider.outcome(input, state, ctx) : F.castOutcome(input);
+			if (key !== null) s.memo.set(key, o);
+		}
+		return o;
+	}
+
+	return {
+		name: SYSTEM_NAME,
+		init(state) {
+			state.sys[SYSTEM_NAME] = { policy, ...newTally(), byBait: {}, stages: {}, milestones: {}, publicMilestones: {} };
+			// Per-run scratch kept out of the result's JSON: the step's bait and a memo of no-bait outcomes.
+			Object.defineProperty(own(state), 'current', { value: null, writable: true, enumerable: false });
+			Object.defineProperty(own(state), 'memo', { value: new Map(), enumerable: false });
+		},
+		modifyCast(input, state, ctx) {
+			const s = own(state);
+			const stage = stageChoice(s, input.biome, input.tier, ctx);
+			s.current = null;
+			if (!stage.bait) return;
+			const b = PARAMS.baits[stage.bait];
+			const add = { ...b.stats, ...(b.multiChance ? { multiChance: b.multiChance } : {}) };
+			const before = {};
+			const after = {};
+			for (const [k, v] of Object.entries(add)) {
+				before[k] = input.stats[k];
+				input.stats[k] = (input.stats[k] || 0) + v;
+				after[k] = input.stats[k];
+			}
+			const strong = b.grantsStrong && !input.qualities.includes('strong');
+			if (strong) input.qualities.push('strong');
+			input.costs.push({ ...SPEND_ITEM, perCast: stage.costPerCast });
+			s.current = { stage, input, applied: { stats: add, before, after, strong } };
+		},
+		onCasts(state, ctx, { casts, rates }) {
+			const s = own(state);
+			const cur = s.current;
+			s.current = null;
+			if (!cur || rates.blocked || !(casts > 0)) return;
+			const base = baseOutcome(s, withoutBait(cur.input, cur.applied), state, ctx);
+			const baseCasts = (ctx.stepH * 3600) / (base.cooldownMs / 1000 + ctx.arch.overheadS);
+			const d = {
+				units: casts * PARAMS.consumption.perCast,
+				spend: casts * cur.stage.costPerCast,
+				extraValue: rates.cash - baseCasts * base.valuePerCast,
+				extraXp: rates.xp - baseCasts * base.xpPerCast,
+				extraPublicXp: rates.xpBase - baseCasts * (base.xpBasePerCast ?? base.xpPerCast),
+			};
+			addTally(s, d);
+			addTally(s.byBait[cur.stage.bait] || (s.byBait[cur.stage.bait] = newTally()), d);
+			addTally(cur.stage, d);
+		},
+		on(event, payload, state) {
+			if (event !== 'levelUp') return;
+			const s = own(state);
+			const [recorded, mine] = payload.kind === 'public' ? [state.publicMilestones, s.publicMilestones] : [state.milestones, s.milestones];
+			for (const T of numericKeys(recorded)) if (!mine[T]) mine[T] = pickTally(s);
+		},
+	};
+}
+
+// ---------------------------------------------------------------------------------------------
+// Validation (5b.3): system() on the shared core against lifecycle().
+/**
+ * lifecycle()'s gear rule as a system (validation only; the assumption lifecycle() made): once the next
+ * tier's level is reached, save each step's NET cash (with-bait income minus the bait bought) until it
+ * covers F.PURCHASE.saveHours of the stage's NO-BAIT income, then equip the tier. The price of a tier does
+ * not depend on bait use; bait spend delays it. The arithmetic is lifecycle()'s, so the replay is step-exact.
+ * It reads the bait the system chose at the stage (state.sys.bait.stages).
+ */
+function lifecycleRods({ saveHours = F.PURCHASE.saveHours } = {}) {
+	const name = 'baitLifecycleRods';
+	return {
+		name,
+		init(state) {
+			state.sys[name] = { saving: 0 };
+		},
+		beforeStep(state, ctx, rates) {
+			const next = ctx.path[state.equippedTier + 1];
+			if (!next || rates.blocked || state.stepStartLevel < next.level) return;
+			const s = state.sys[name];
+			const key = ctx.path[state.equippedTier].key;
+			const h = F.hourly(outcome(DEFAULT.stageGear({ biome: rates.biome, tier: key }), null), ctx.arch.overheadS);
+			const stage = state.sys[SYSTEM_NAME]?.stages[`${rates.biome}/${key}`];
+			const opt = stage ? { extraValuePerCast: stage.designExtraValuePerCast, costPerCast: stage.costPerCast } : NO_BAIT;
+			s.saving += (h.cash + h.casts * (opt.extraValuePerCast - opt.costPerCast)) * ctx.stepH;
+			if (s.saving >= h.cash * saveHours) {
+				state.equippedTier++;
+				s.saving = 0;
+			}
+		},
+	};
+}
+
+/**
+ * Milestone XP on lifecycle()'s basis (validation only; runs after LC.provisionalDaily). lifecycle() adds
+ * the day's daily XP inside the day's final step, before it checks levels. The core records a level
+ * reached by that step's fishing before onDayEnd. For such milestones this re-records the XP after the
+ * daily. Hours are identical either way.
+ */
+function validationProbe() {
+	const name = 'baitValidationProbe';
+	const snap = (state) => ({ xp: { ...state.ledger.xp }, baitXp: state.sys[SYSTEM_NAME]?.extraXp ?? 0 });
+	return {
+		name,
+		init(state) {
+			state.sys[name] = {};
+		},
+		on(event, payload, state) {
+			if (event !== 'levelUp' || payload.kind !== 'real') return;
+			for (const T of numericKeys(state.milestones)) if (!(T in state.sys[name])) state.sys[name][T] = snap(state);
+		},
+		onDayEnd(state, ctx) {
+			// A session cut short by the stop level has no day end in lifecycle().
+			if (Math.floor(state.h / (ctx.arch.minutesPerDay / 60)) === state.playDay) return;
+			const h = +state.h.toFixed(4);
+			for (const [T, m] of Object.entries(state.milestones)) if (m.hours === h) state.sys[name][T] = snap(state);
+		},
+	};
+}
+
+const VALIDATION_POLICIES = ['none', 'cash', 'xp'];
+/**
+ * Symmetric relative difference of a part of `scale` (e.g. one XP source of the milestone's total XP).
+ * Float noise (a gap under 1e-9 of the scale, from a different summation order) counts as equal. Without
+ * that floor the starter baits' XP delta, which is 0 up to rounding (strong access changes species, not
+ * rarity), would compare two rounding residues of about 1e-12.
+ */
+const relDiff = (a, b, scale = Math.max(Math.abs(a), Math.abs(b))) => {
+	const gap = Math.abs(a - b);
+	return gap <= 1e-9 * scale ? 0 : gap / Math.max(Math.abs(a), Math.abs(b));
+};
+
+/**
+ * One core run on the shared gear path: system({ policy }), a gear rule ('lifecycle': lifecycle()'s,
+ * 'provisional': LC.provisionalRods), LC.provisionalDaily (lifecycle()'s daily XP) and the probe.
+ */
+function coreRun(archName, policy, rods = 'lifecycle') {
+	return LC.simulate({
+		archetype: archName,
+		systems: [system({ policy }), rods === 'lifecycle' ? lifecycleRods() : LC.provisionalRods(), LC.provisionalDaily(), validationProbe()],
+	});
+}
+
+/** lifecycle()'s income figures from a core run: bait spend and extra value against no-bait income. */
+function coreIncome(core) {
+	const b = core.sys[SYSTEM_NAME];
+	const spend = core.ledger.spend.optional.bait || 0;
+	const gross = (core.ledger.cash.fishing || 0) - b.extraValue;
+	return {
+		spend, extra: b.extraValue, gross,
+		shares: { baitSpendShareOfIncome: r4(spend / gross), baitExtraValueShareOfIncome: r4(b.extraValue / gross), netEffectShareOfIncome: r4((b.extraValue - spend) / gross) },
+	};
+}
+
+/**
+ * system() on the core vs lifecycle(policy, archetype): milestone hours (step-exact: lifecycle() rounds
+ * hours to 0.01 h, under one step, so both are compared as step indices), XP by source at each milestone
+ * (fishing without bait, bait, daily), and run totals (bait spend, bait extra value, no-bait income, steps).
+ */
+function compareRun(archName, policy) {
+	const stepH = F.LIFECYCLE.stepH;
+	const old = DEFAULT.lifecycle(policy, archName, { detail: true });
+	const core = coreRun(archName, policy);
+	const probe = core.sys.baitValidationProbe;
+	const out = { maxRel: 0, worst: null, maxFloatGap: 0, milestonesCompared: 0, exactMilestones: 0, missing: [] };
+	const note = (key, d) => {
+		if (d > out.maxRel) {
+			out.maxRel = d;
+			out.worst = key;
+		}
+	};
+	/** Compares a part of `scale`; also tracks the largest gap (relative to its scale) the floor absorbed. */
+	const compare = (key, a, b, scale = Math.max(Math.abs(a), Math.abs(b))) => {
+		note(key, relDiff(a, b, scale));
+		if (scale > 0) out.maxFloatGap = Math.max(out.maxFloatGap, Math.abs(a - b) / scale);
+	};
+	const milestones = {};
+	for (const T of F.LIFECYCLE.milestones) {
+		const o = old.detail.milestones[T];
+		const c = core.milestones[T];
+		if (!o || !c) {
+			if (Boolean(o) !== Boolean(c)) out.missing.push(T);
+			continue;
+		}
+		out.milestonesCompared++;
+		const steps = Math.round(c.hours / stepH) - o.step;
+		if (steps === 0) out.exactMilestones++;
+		note(`L${T} hours`, Math.abs(steps) / o.step);
+		const p = probe[T];
+		const xp = { fishing: (p.xp.fishing || 0) - p.baitXp, bait: p.baitXp, daily: p.xp.daily || 0 };
+		const total = o.xpBy.fishing + o.xpBy.bait + o.xpBy.daily;
+		for (const k of Object.keys(xp)) compare(`L${T} xp.${k}`, xp[k], o.xpBy[k], total);
+		milestones[T] = { hours: { old: old.hoursToLevel[T], core: c.hours }, steps, day: { old: o.day, core: c.day }, baitXp: { old: Math.round(o.xpBy.bait), core: Math.round(xp.bait) } };
+	}
+	const t = old.detail.totals;
+	const inc = coreIncome(core);
+	note('run steps', Math.abs(Math.round(core.hours / stepH) - t.steps) / t.steps);
+	compare('bait spend', inc.spend, t.spend, t.gross);
+	compare('bait extra value', inc.extra, t.extra, t.gross);
+	compare('no-bait income', inc.gross, t.gross);
+	const baitsUsed = { old: [...old.baitsUsed].sort(), core: Object.keys(core.sys[SYSTEM_NAME].byBait).sort() };
+	const oldShares = { baitSpendShareOfIncome: old.baitSpendShareOfIncome, baitExtraValueShareOfIncome: old.baitExtraValueShareOfIncome, netEffectShareOfIncome: old.netEffectShareOfIncome };
+	return {
+		maxRel: out.maxRel, worst: out.worst, maxFloatGap: out.maxFloatGap, milestonesCompared: out.milestonesCompared, exactMilestones: out.exactMilestones, missing: out.missing,
+		baitsMatch: JSON.stringify(baitsUsed.old) === JSON.stringify(baitsUsed.core), baitsUsed,
+		incomeShares: { old: oldShares, core: inc.shares },
+		milestones,
+	};
+}
+
+let validation = null;
+/**
+ * validateSystem(): system() on the shared core (LC.simulate) vs this module's lifecycle(), for every
+ * archetype (F.ARCHETYPES) and the policies 'none', 'cash' and 'xp'. The baseline systems are the
+ * assumptions lifecycle() made: its gear rule (lifecycleRods) and its daily XP (LC.provisionalDaily).
+ * Also reports how much the gear rule matters (LC.provisionalRods instead, regular player).
+ */
+function validateSystem() {
+	if (validation) return validation;
+	const archetypes = Object.keys(F.ARCHETYPES);
+	const byArchetype = Object.fromEntries(archetypes.map((a) => [a, Object.fromEntries(VALIDATION_POLICIES.map((p) => [p, compareRun(a, p)]))]));
+	const runs = archetypes.flatMap((a) => VALIDATION_POLICIES.map((p) => ({ archetype: a, policy: p, r: byArchetype[a][p] })));
+	const worst = runs.reduce((w, x) => (x.r.maxRel > w.maxRelativeDifference ? { maxRelativeDifference: x.r.maxRel, archetype: x.archetype, policy: x.policy, at: x.r.worst } : w), { maxRelativeDifference: 0, archetype: null, policy: null, at: null });
+	const complete = runs.every((x) => !x.r.missing.length && x.r.baitsMatch);
+	const tolerance = 0.005;
+
+	// The gear rule: LC.provisionalRods saves the with-bait gross (bait spend ignored) against saveHours of the
+	// with-bait gross, so the price of a tier moves with bait use. lifecycle()'s rule is the one the integrated
+	// core follows (the rods system buys at a fixed assembly cost out of money that has already paid for bait).
+	const ref = F.REFERENCE_ARCHETYPE;
+	const purchaseRule = Object.fromEntries(VALIDATION_POLICIES.map((p) => {
+		const a = coreRun(ref, p);
+		const b = coreRun(ref, p, 'provisional');
+		const rows = Object.fromEntries(F.LIFECYCLE.milestones.filter((T) => a.milestones[T] && b.milestones[T]).map((T) => [T, { lifecycleRule: a.milestones[T].hours, provisionalRods: b.milestones[T].hours, rel: r4((b.milestones[T].hours - a.milestones[T].hours) / a.milestones[T].hours) }]));
+		return [p, { maxAbsRel: Math.max(...Object.values(rows).map((x) => Math.abs(x.rel))), hours: rows }];
+	}));
+
+	validation = {
+		method: 'LC.simulate(system({ policy }) + lifecycle()\'s gear rule (lifecycleRods: F.PURCHASE.saveHours of no-bait stage income, saved from net cash after bait) + LC.provisionalDaily + a milestone probe) on the shared gear path vs lifecycle(policy, archetype), every archetype x policy. Compared: milestone hours as step indices, XP by source at each milestone (fishing without bait = ledger fishing - state.sys.bait.extraXp; bait; daily), run totals (bait spend = ledger.spend.optional.bait, bait extra value, no-bait income, steps) and the baits used.',
+		archetypes, policies: VALIDATION_POLICIES,
+		matches: complete && worst.maxRelativeDifference < tolerance,
+		exact: complete && worst.maxRelativeDifference === 0,
+		tolerance,
+		maxRelativeDifference: worst.maxRelativeDifference,
+		worst,
+		maxFloatGap: Math.max(...runs.map((x) => x.r.maxFloatGap)),
+		milestonesCompared: runs.reduce((a, x) => a + x.r.milestonesCompared, 0),
+		exactMilestones: runs.reduce((a, x) => a + x.r.exactMilestones, 0),
+		notes: [
+			'Hours are compared, not days: the core counts a level reached on a day\'s final step in that day; lifecycle() used ceil(h / dayH), the next day. Both are reported.',
+			'Gaps below 1e-9 of the compared total (milestone XP, run income) count as equal: float summation order differs (the core accrues casts x the per-cast outcome with the bait in the cast; lifecycle() adds hourly no-bait rates and the bait\'s per-cast delta). The starter baits\' XP delta is 0 up to such rounding (strong access changes species, not rarity).',
+			'The core runs onDayEnd once more after the stop level is reached mid-day (one extra daily XP after L60); lifecycle() stops at once. Milestone XP is taken before it, and cash is unaffected.',
+			'state.sys.bait.extraValue / extraXp are measured on the core\'s actual cast (cast minus the same cast without the bait). Here that equals lifecycle()\'s baitOption delta. With buffs or the Founder profile it includes their interaction with the bait.',
+		],
+		purchaseRuleSensitivity: { archetype: ref, byPolicy: purchaseRule, note: 'LC.provisionalRods in place of lifecycle()\'s gear rule. lifecycle()\'s rule is kept: a tier\'s price must not depend on bait use, and bait bought is money not saved. The integrated rods system follows the same rule (a fixed assembly cost paid from money after the bait spend).' },
+		byArchetype,
+	};
+	return validation;
+}
+
+/** The system's contract and its validation, for report(). */
+function systemReport() {
+	return {
+		name: SYSTEM_NAME,
+		policies: [...POLICIES, ...BAIT_NAMES],
+		hooks: ['init', 'modifyCast', 'onCasts', 'on'],
+		events: { listens: ['levelUp'], emits: [] },
+		ledger: {
+			xpSources: [], cashSources: [], spend: [{ ...SPEND_ITEM }],
+			note: 'The core\'s \'fishing\' XP/cash includes the bait effect. The bait\'s own share is state.sys.bait.extraXp / extraPublicXp / extraValue (totals, byBait, stages, and snapshots at milestones / publicMilestones).',
+		},
+		integration: 'integrate.run({ variant: { bait: \'cash\' | \'xp\' } }) adds system({ policy })',
+		validation: validateSystem(),
+	};
+}
+
 module.exports = {
 	PARAMS, STAGES, PROVISIONAL,
 	withGear: createBaitModel,
 	currentBaits,
 	...DEFAULT,
-	report: (opts = {}) => (opts.gearPath ? createBaitModel(opts.gearPath).report() : DEFAULT.report()),
+	SYSTEM_NAME, SPEND_ITEM, system, validateSystem,
+	report: (opts = {}) => ({ ...(opts.gearPath ? createBaitModel(opts.gearPath).report() : DEFAULT.report()), system: systemReport() }),
 };
 
 if (require.main === module) process.stdout.write(`${JSON.stringify(module.exports.report(), null, 1)}\n`);

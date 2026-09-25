@@ -499,3 +499,70 @@ node scripts/economy/5b/aquarium.js > /tmp/aquarium.json                  # same
 node -e "console.log(require('./scripts/economy/5b/aquarium.js').checks())"
 node scripts/economy/5b/check-shared.js                                   # shared-assumption guard (passes)
 ```
+
+---
+
+## Integration (framework 5b.3)
+
+The aquarium now runs as a **system on the shared lifecycle core** (`lifecycle.js`). `aquarium.system(opts)` returns a fresh hook object each call, and all per-run state lives in `state.sys.aquarium`. `integrate.run({ variant: { aquarium: true } })` adds it to the reference loop. `lifecycle()` and `report()` still work, and `report().system` carries the system's contract and `validateSystem()`. The tables above are still the 5b.2 figures; the next stage regenerates them.
+
+**Options** (defaults in brackets): `buy` [true; false gives an inert system, the no-aquarium baseline], `displayTanks` [false], `waters` [Freshwater; a second water type adds tanks, not slots], `tiers` [all], `mix` [Legendary], `care` [1], `reserve` [0; a number or `(state, ctx) => number`], `conventions` ['core'; 'lifecycle' is the validation replay].
+
+| Hook | What it does |
+| --- | --- |
+| `init` | Creates `state.sys.aquarium`: holdings (`owned`), one record per purchase (price, slots added, bond start, stamps, companion cash, payback), gates, spend, `companionCash`, the measured XP effect, and milestone snapshots. |
+| `goals` | Offers what `aquariumOptions(gate level, { owned })` offers, as a chain per water type: the next license tiers, then (with `displayTanks`) the display tanks of an Expert water type. Prices rise along a chain, so a later offer is affordable in a pass only after its prerequisite is bought. Licenses are `'optional'` at `LC.PRIORITY.license`; display tanks are `'aspirational'` at `LC.PRIORITY.aspirational`. All are **non-blocking** (user decision 10), so blocking progression goals of higher priority (permits, rod assemblies) are served first. That is the integrated "rods first" rule. |
+| `modifyCast` | Adds the companion bonus to `input.stats.sellBonus`. Per purchase: slots added × per-pet bonus of the mix × `bondFactorAfterDays(care days owned)` × care. This is `holdingsBonus()` per purchase with each purchase's own bond; at full bond the sum equals `holdingsBonus(owned)`. Care days follow play hours ÷ session hours, so bond grows only on days the player attends. The minimum-daily player counts completed play days. |
+| `beforeStep` | Notes the step's start (used by the replay's stamps). |
+| `onCasts` | Measures the bonus's marginal cash on the core's own cast: cash minus the same cast without the bonus, with other systems' changes kept and the run's outcome function. It splits that over purchases by their share of the bonus, stamps payback, and measures the XP effect the same way (always 0). |
+| `onDayStart` / `onDayEnd` | Mark the day-end purchase pass, which the replay skips. |
+| `on('levelUp')` | Snapshots companion cash and spend at each milestone (real and public). |
+
+- **Ledgers:** the system writes **no XP or cash source**. The companion bonus is a cast stat, so the core's `'fishing'` cash already includes it; the aquarium's share is `state.sys.aquarium.companionCash` (per purchase in `purchases[i].cash`). It is a marginal, so with bait or Double Cash it includes the bonus on their extra income. Spend items: `ledger.spend.optional['license:<name>']` and `ledger.spend.aspirational['display:<name>']`.
+- **No upkeep, no boxes:** there is no money upkeep (care is the upkeep, §5). The aquarium grants no boxes, so it emits no `'box'` events.
+- **Profile:** the rules are profile-independent (§10). An outcome override (Founder) honours `input.stats.sellBonus`, so the Founder sell multiplier multiplies the bonus as it multiplies gear.
+- **Figures:** `systemSummary(result)` turns any run into this module's figures: purchases, gate and purchase stamps, payback hours (extrapolated past the end as `lifecycle()` did), totals and shares of income.
+
+**Validation** (`validateSystem()`). This runs `LC.simulate` with `system()` on the shared (rods) gear path. The baseline systems reproduce what `lifecycle()` assumed:
+- **Gear rule** (`lifecycleMoney`): `LC.provisionalRods`' rule, applied to stage income without the bonus.
+- **Money:** `rods.assembly(t)` at each equip, repairs at rods' upkeep share, and other spend.
+- **Daily XP:** `LC.provisionalDaily`.
+- **Rods first:** `lifecycleReserve` as the goals' reserve.
+
+It covers 17 cases: all four archetypes; each with 15% and 30% of income spent elsewhere; and the regular player with Common, Rare and Lucky pets, care on half the days, and Saltwater.
+
+| Run | Milestones step-exact | License purchase passes | Max relative difference |
+| --- | --- | --- | --- |
+| Replay (`conventions: 'lifecycle'`) | 102 / 102 | all identical | **0** (exact: payback, recovered, totals, shares, final money) |
+| **Default system** | 102 / 102 | all identical | **0.09%** (tolerance 0.5%) |
+
+The default system's largest difference is on a small net: companion cash minus licenses for the casual player spending 30% elsewhere, −$2,205 vs −$2,203. Elsewhere, companion cash is about 1e-4 lower (regular: $208,128 vs $208,149), and payback hours move by at most 0.02 h.
+
+**No XP effect:** with and without licenses, every level (1–60) is reached on the same step with the same XP ledger, for every archetype. The measured per-cast XP effect is 0.
+
+**What differs, and which rule is right.**
+- **Days:** the core counts a level reached on a day's final step in that day; `ceil(h/dayH)` counted the next day. Hours are compared.
+- **Stamps:** `lifecycle()` stamps a purchase at the start of the step whose income paid for it. The core buys in the pass after that step, so purchase passes are compared, and payback counts the same earning steps.
+- **Bond clock** (the one rule difference): `lifecycle()` starts the ramp one step (1 min of play) before the pets are adopted. The core starts it at the purchase, which is right. The replay isolates this rule and is exact.
+- **Day-end pass:** the core also buys after a day's last step. A gate reached on that step is acted on before the next session, where `lifecycle()` waited for the next step. No validated case is affected.
+- **Extrapolated payback** (after Lv 60): `lifecycle()` counted one step more than the purchase earned over. The core counts the earning steps.
+- **Gear rule:** `LC.provisionalRods` as-is saves the core's cast income, bonus included. While a bond ramps, the saved sum trails the current income, so the active player's L50 and the grinder's L40–60 come 1 step later. That is an artifact of a placeholder rule that reads income, not an XP effect. `lifecycle()`'s rule (stage income without the bonus) is the right baseline.
+
+**On the integrated reference loop** (`integrate.run`, default system, all archetypes to Lv 60). Income is every cash source, including quests and streak.
+
+| Player | Basic / Advanced / Expert bought | Basic payback | Bonus / fish income | Licenses / income | Net | Other purchases moved |
+| --- | --- | --- | --- | --- | --- | --- |
+| Casual | 2.58 h Lv 15 / 11.35 h Lv 30 / 28.08 h Lv 45 | 49.4 h | 3.65% | 4.57% | −3.09% | T2 assembly 4.85 → 5.37 h |
+| **Regular** | 2.55 h Lv 15 / 12.38 h Lv 30 / 31.70 h Lv 45 | **44.5 h** | **3.64%** | **4.62%** | **−2.22%** | T2 assembly 5.27 → 6.02 h |
+| Active | 2.87 h Lv 15 / 13.13 h Lv 30 / 31.75 h Lv 45 | 42.4 h | 3.54% | 4.91% | −2.03% | T2 assembly 5.30 → 6.02 h |
+| Grinder | 2.65 h Lv 15 / 12.08 h Lv 31 / 29.20 h Lv 45 | 40.1 h | 3.11% | 5.10% | −2.33% | T2 assembly 5.03 → 5.68 h |
+
+- **XP milestones are identical** with and without the aquarium for every archetype.
+- The licenses compete for cash only with the T2 crate assembly, which is bought 0.5–0.75 h later but still long before its Lv 30 equip.
+- Advanced and Expert paybacks fall after Lv 60 (extrapolated), as before.
+
+**Fixes in this module** (no design value changed):
+- `lifecycle()` takes a `gearPath` option, and `baselineMatchesCurveJson()` checks curve.json on `F.PROVISIONAL_GEAR_PATH`, the path it was fitted on (hours only). The check had failed since the R3 cutover.
+- `gearRates()` is now cached by tier content, since the provisional and rods paths share the keys `t1`–`t5`.
+- The shared path is read once per module (`F.gearPath()` rebuilds rods' path on every call).
+- Every other `report()` number is unchanged.

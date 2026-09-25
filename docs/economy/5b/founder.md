@@ -521,3 +521,52 @@ node -e "console.log(require('./scripts/economy/5b/founder.js').founderProfile()
 node -e "const f=require('./scripts/economy/5b/founder.js'); console.log(f.founderOutcome({ tier: 4, biome: 'Swamp' }))"
 node scripts/economy/5b/check-shared.js                            # must pass
 ```
+
+---
+
+## Integration (framework 5b.3)
+
+The Founder profile is now a SYSTEM on the shared lifecycle core (`lifecycle.js`). `integrate.js` runs it as the `founder` variant: `run({ variant: { founder: true, gate } })`. The gate is `'public'` (recommended, decisions.js `P-FOUNDER-GATE`) or `'real'`. `lifecycle()` stays until the old loops are retired.
+
+**`system({ gate, profile })`** returns a fresh system each call. All per-run state lives in `state.sys.founder`.
+
+| Hook | What it does |
+|---|---|
+| `init` | Sets `state.profile = 'founder'`. Rods, quests, streak and buffs read this and take the Founder's values from `founderProfile()`. Throws if the run's `simulate({ gate })` differs from the system's `gate`, because the level gate is a profile rule (`PARAMS.publicLevel.gate`). |
+| `outcome` | `founderCastOutcome(input)` replaces `F.castOutcome` on every cast (the core allows one such system per run). It honours every input field. **Visible fish:** the normal chain (`input.multiChance` + `stats.multiChance`, or a full `input.fishDist`) plus the Founder bonus fish, capped at `F.MULTI.maxFish`. **Per draw:** `F.castOutcome` with the Founder rarity table, gear + other systems' stats + profile stats (clamped to `STAT_CAPS`), `input.sellMult` / `xpMult`, `fish` / `fishKey` and `rules`. **Base** = visible mean × per draw (public card, `publicXp`). **Final** = base × profile XP / sell. Durability follows `F.RULES.durability` or `input.rules`. An `input.table` is refused: the profile brings its own base table. |
+| `outcomeCacheKey` | The profile. The outcome is a pure function of the input and the profile, so the core caches it. |
+| `beforeStep` | Records the **public tell**: steps fished on a biome or rod tier above the public level. This is possible only under gate `'real'`. It records hours, the first step, the first step on Swamp and the last step. |
+| `onCasts` | Records base (public) fish value, Legendary+ caught (with pity) and fishing totals in `state.sys.founder.fishing`. |
+
+- **Ledger:**
+  - The system has no source of its own. The core books its outcome under `'fishing'`:
+    - `ledger.xp.fishing` = final (account) XP
+    - `ledger.publicXp.fishing` = base XP
+    - `ledger.cash.fishing` = final cash
+  - The fishing profile bonus is `xp.fishing − publicXp.fishing`.
+  - Base cash is in `state.sys.founder.fishing.valueBase`, because the core keeps no public cash ledger.
+  - No goals, no spend items, no `sessionDone`.
+- **Counting rule:** the Founder grants no boxes, so it emits no `'box'` events.
+- **Profile multipliers elsewhere:**
+  - quests read `founderProfile().multipliers` (questXp / questCash; Daily Box fish at the Founder sell)
+  - rods price assemblies with `founderCrates(t)`
+  - streak and buffs use the Founder box odds and sell
+
+**`validateSystem()`** is included in `report().integration.validation` and in `report().checks.systemReproducesLifecycle`. It runs the system on `LC.simulate` with validation-only systems that reproduce `lifecycle()`'s placeholder assumptions:
+- `lifecycleRods()`: the next tier once the gate level reaches it and the player's own income covers `F.PURCHASE.saveHours` of NORMAL stage income × the Founder crate factor.
+- `lifecycleDaily()`: `F.DAILY.xpPerLevel` × level. Base is at the public level; final is at the gate level × questXp.
+- `dayEndProbe()`: `lifecycle()`'s XP-source basis for levels reached on a day's final step.
+
+It compares the result with `lifecycle()` for all four archetypes under both gates, and for the Normal run of the same baseline:
+
+- **Exact.** All 144 milestones (real and public) land on the same step. Every XP source at every milestone, the real level at each public milestone, every tier upgrade, every public-tell point and hour, and XP and money at the stop agree. Max relative difference: **0**.
+- **Days:** only hours are compared. The core counts a level reached on a day's final step in that day, while `ceil(h/dayH)` counted it in the next day.
+- **Stop:** `lifecycle()` ran until both levels reached Lv 60. The core stops on the public level (real ≥ public). When the stop falls mid-day, the core still ends that day with one more daily, after the last milestone.
+- **For quests (gate `'real'` only):** `lifecycle()` credited the level-scaled daily's base at the public level and its final at the real level. The quests system credits both at the gate level. Under the recommended `'public'` gate the two agree.
+- **For the integrator (gate `'real'` only):** `integrate.run` stops on the gate level by default. Under `'real'` it therefore ends at real Lv 60 after about 0.4 h, with public Lv ~14. Pass `stopOn: 'public'` to record the public milestones.
+- **Composition smoke test:** runs with the reference loop (rods, world, quests, streak, buffs), with bait (`'cash'` and `'xp'`), for fixed and minimum-daily archetypes, under both gates.
+- **Fixed in this stage:** `report().checks.normalLifecycleMatchesCurveJson` had been false since the R3 cutover, for two reasons:
+  - `curve.json` is fitted on the provisional path.
+  - The outcome caches keyed gear-path steps by index only, so a provisional-path run read rods-path outcomes.
+
+  The check now runs on the path `curve.json` names, and the cache keys include the step's content. All 14 checks pass again (the 13 design checks plus `systemReproducesLifecycle`). Every other report number is unchanged (checked at full precision).

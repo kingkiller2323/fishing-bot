@@ -6,7 +6,8 @@
 //      a line may opt out only with an explicit `// shared-ok: <reason>` comment;
 //   2. runtime: framework.verifyShared() passes (shared values match the digest pinned for
 //      FRAMEWORK_VERSION), and every module's report() carries that exact version and digest;
-//   3. the committed curve choice (docs/economy/5b/curve.json) equals framework CURVE.quartic;
+//   3. R1: the integrated sweep's best fit (docs/economy/5b/curve-integrated.json) equals framework
+//      CURVE.quartic, was generated at the current digest, and keeps the regular player in every window;
 //   4. the decision registry (decisions.js) only uses allowed statuses (nothing claims user approval
 //      of a candidate rule) and every entry's modelled value is what the framework actually runs.
 //
@@ -93,12 +94,19 @@ async function main() {
 			problems.push(`${file}: report stamped ${stamp.frameworkVersion}/${stamp.sharedDigest}, framework is ${expected.frameworkVersion}/${expected.sharedDigest}`);
 		}
 	}
-	const curveFile = path.join(DIR, '../../../docs/economy/5b/curve.json');
-	if (fs.existsSync(curveFile)) {
-		const curve = JSON.parse(fs.readFileSync(curveFile, 'utf8'));
-		if (curve.chosen !== F.CURVE.quartic) problems.push(`curve.json chose quartic ${curve.chosen} but framework CURVE.quartic is ${F.CURVE.quartic}`);
-		if (curve.sharedDigest && curve.sharedDigest !== expected.sharedDigest) problems.push(`curve.json was generated at digest ${curve.sharedDigest}; regenerate it (framework is ${expected.sharedDigest})`);
+	// R1: the authoritative coefficient is the integrated sweep's best fit (curve-integrated.json, from
+	// `curve.js integrated`). curve.json (`curve.js provisional`) is the provenance of the 5b.1 choice.
+	const integratedFile = path.join(DIR, '../../../docs/economy/5b/curve-integrated.json');
+	if (!fs.existsSync(integratedFile)) {problems.push('docs/economy/5b/curve-integrated.json is missing: run `node scripts/economy/5b/curve.js integrated`');}
+	else {
+		const curve = JSON.parse(fs.readFileSync(integratedFile, 'utf8'));
+		if (curve.model !== 'integrated') problems.push(`curve-integrated.json has model ${curve.model}`);
+		if (curve.chosen !== F.CURVE.quartic) problems.push(`the integrated sweep's best fit is quartic ${curve.chosen} but framework CURVE.quartic is ${F.CURVE.quartic} (R1)`);
+		if (curve.sharedDigest !== expected.sharedDigest) problems.push(`curve-integrated.json was generated at digest ${curve.sharedDigest}; regenerate it (framework is ${expected.sharedDigest})`);
+		if (!curve.framework?.allInWindow) problems.push(`R1: the regular player misses an approved window at quartic ${F.CURVE.quartic}`);
 	}
+	const provenanceFile = path.join(DIR, '../../../docs/economy/5b/curve.json');
+	if (fs.existsSync(provenanceFile) && JSON.parse(fs.readFileSync(provenanceFile, 'utf8')).model !== 'provisional') problems.push('curve.json must be the provisional-model provenance record');
 	// Decision registry: candidate rules stay 'proposed' and match what the model runs.
 	const decisions = require('./decisions').verify();
 	for (const p of decisions.problems) problems.push(`decisions.js: ${p}`);

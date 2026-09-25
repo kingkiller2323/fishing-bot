@@ -41,13 +41,29 @@
 //   lifecycle(archetype, opts)   curve.js-style lifecycle (identical XP timeline) with money: rods first
 //                                (rods.assembly costs + repair upkeep), licenses bought when affordable,
 //                                companion bonus with bond ramp; purchases, payback, shares of income
-//   baselineMatchesCurveJson()   the lifecycle reproduces docs/economy/5b/curve.json milestones exactly
+//                                (5b.3: superseded by system(); kept until the old loops are retired)
+//   baselineMatchesCurveJson()   the lifecycle reproduces docs/economy/5b/curve.json milestone hours exactly
+//                                (on F.PROVISIONAL_GEAR_PATH, the path curve.json was fitted on)
+//   system(opts)                 framework 5b.3: this subsystem as a lifecycle.js SYSTEM (fresh object per
+//                                call): licenses ('optional') and display tanks ('aspirational') as
+//                                non-blocking goals from aquariumOptions(), the companion sell bonus with its
+//                                bond ramp in modifyCast, no XP effect (see the system() comment)
+//   systemSummary(result)        the aquarium's figures from a lifecycle.js result (purchases, payback,
+//                                companion cash, shares of income)
+//   validateSystem()             system() on the shared core vs lifecycle() (every archetype; other-spend,
+//                                mix, care and water variants), the no-XP check, the gear-rule sensitivity
+//                                and the aquarium on the integrated reference loop (integrate.run)
+//   lifecycleMoney, lifecycleReserve, coreLifecycle
+//                                validation baselines: lifecycle()'s gear rule, money and rods-first reserve
+//                                as systems on the shared core
 //   currentExploit()             today's /pet play -> /pet sell money rate, breeding odds, temperature factors
 //   currentLicenses()            today's license catalog priced in hours of proposed stage income
 //   upkeepAlternatives()         why no money upkeep: a flat daily fee as a share of the bonus per archetype
 //   checks()                     design-target checks (pass/fail)
-//   report()                     every number in docs/economy/5b/aquarium.md (cached), with ...F.stamp()
+//   report()                     every number in docs/economy/5b/aquarium.md (cached), with ...F.stamp();
+//                                report().system: the system's contract and validateSystem()
 const F = require('./framework');
+const LC = require('./lifecycle');
 // rods: crate assembly costs, crate unlock levels and the repair upkeep share (never its gear path).
 const rods = require('./rods');
 const { FISH, drawDistribution } = require('../lib/catalog-model');
@@ -196,15 +212,20 @@ const REFERENCE = archOf(F.REFERENCE_ARCHETYPE);
 // Stage income (framework): the biome unlocked at a level with the shared gear tier held at that level.
 const rateCache = new Map();
 function gearRates(biome, tier, overheadS) {
-	const key = `${biome}|${tier.key}|${overheadS}`;
+	// Keyed by the tier's content, not its key: the shared (rods) and provisional paths reuse 't1'..'t5'.
+	const key = `${biome}|${tier.key}|${tier.meanFish}|${tier.qualities.join(',')}|${JSON.stringify(tier.stats)}|${overheadS}`;
 	if (!rateCache.has(key)) {
 		const outcome = F.castOutcome({ biome, qualities: tier.qualities, stats: tier.stats, multiChance: F.chanceForMean(tier.meanFish) });
 		rateCache.set(key, { ...F.hourly(outcome, overheadS), outcome, gearSell: tier.stats.sellBonus || 0 });
 	}
 	return rateCache.get(key);
 }
+// The shared gear path, read once: F.gearPath() rebuilds rods' path (crate odds) on every call, and it is
+// deterministic, so stage lookups (stageAt, aquariumOptions every purchase pass) reuse it.
+let sharedPathCache = null;
+const sharedPath = () => sharedPathCache || (sharedPathCache = F.gearPath());
 function stageAt(level, { overheadS = F.DESIGN_OVERHEAD_S } = {}) {
-	const tier = F.tierAt(level);
+	const tier = F.tierAt(level, sharedPath());
 	const biome = F.biomeAt(level);
 	const r = gearRates(biome, tier, overheadS);
 	return { level, biome, water: waterOf(biome), tier: tier.key, cashPerHour: r.cash, xpPerHour: r.xp, fishPerHour: r.fish, castsPerHour: r.casts, gearSell: r.gearSell, outcome: r.outcome };
@@ -380,7 +401,7 @@ function petIncomeBound({ capacity, tanks, value }) {
 /** Fish of each rarity caught per hour at a level's stage (framework draw model; Lucky items excluded). */
 function availability(level, { overheadS = F.DESIGN_OVERHEAD_S } = {}) {
 	const s = stageAt(level, { overheadS });
-	const tier = F.tierAt(level);
+	const tier = F.tierAt(level, sharedPath());
 	const fishByRarity = Object.fromEntries(RARITIES.map((r) => [r, 0]));
 	for (const d of drawDistribution(s.biome, tier.qualities, s.outcome.table)) if (d.kind === 'fish') fishByRarity[d.rarity] += d.p;
 	const fishShare = Object.values(fishByRarity).reduce((a, b) => a + b, 0);
@@ -458,15 +479,18 @@ const rodCost = (t) => {
 const crateUnlock = (t) => rods.PARAMS.crates.tiers[t].unlockLevel;
 
 /**
+ * 5b.3: superseded by system() on the shared core (validateSystem() proves they agree); kept until the
+ * old loops are retired.
  * @param {string|object} archetype
  * @param {object} opts { tiers (license tiers to buy, in order), water, mix, care, otherSpendShare (share of
  *   income spent elsewhere, e.g. permits), rodSpend (charge rods.assembly + repairs), reserveRods (keep the
- *   next rod tier's cost when its crates are unlocked), maxLevel }
+ *   next rod tier's cost when its crates are unlocked), maxLevel, gearPath (default F.gearPath(), the shared
+ *   path; baselineMatchesCurveJson() passes F.PROVISIONAL_GEAR_PATH, the path curve.json was fitted on) }
  */
 function lifecycle(archetype, opts = {}) {
 	const a = archOf(archetype);
-	const { tiers = TIERS, water = PARAMS.model.primaryWater, mix = PARAMS.model.typicalMix, care = PARAMS.model.care, otherSpendShare = 0, rodSpend = true, reserveRods = true, maxLevel = F.LIFECYCLE.maxLevel } = opts;
-	const path = F.gearPath();
+	const { tiers = TIERS, water = PARAMS.model.primaryWater, mix = PARAMS.model.typicalMix, care = PARAMS.model.care, otherSpendShare = 0, rodSpend = true, reserveRods = true, maxLevel = F.LIFECYCLE.maxLevel, gearPath = sharedPath() } = opts;
+	const path = gearPath;
 	const stepH = F.LIFECYCLE.stepH;
 	const dayH = a.minutesPerDay / 60;
 	const perPet = PARAMS.companion.perPet[mix];
@@ -574,16 +598,25 @@ function lifecycle(archetype, opts = {}) {
 	};
 }
 
-/** The lifecycle's XP timeline equals docs/economy/5b/curve.json for every archetype (aquarium adds no XP). */
+/**
+ * The lifecycle's XP timeline equals docs/economy/5b/curve.json for every archetype, and the aquarium adds no
+ * XP (identical milestones with and without it, on the shared path). curve.json is curve.js's 'provisional'
+ * model, fitted on F.PROVISIONAL_GEAR_PATH, so the stepping is checked on that path. Hours only: curve.json
+ * is generated on the shared core, which counts a level reached on a day's final step in that day
+ * (ceil(h/dayH) here counts the next day), so the day column may differ by 1.
+ */
+let baselineCache = null;
 function baselineMatchesCurveJson() {
+	if (baselineCache) return baselineCache;
 	const rows = Object.keys(F.ARCHETYPES).map((name) => {
-		const mine = lifecycle(name, { tiers: [] }).reached;
+		const mine = lifecycle(name, { tiers: [], gearPath: F.PROVISIONAL_GEAR_PATH }).reached;
 		const theirs = CURVE_JSON.archetypes[name];
-		const same = Object.keys(theirs).every((L) => mine[L] && mine[L].hours === theirs[L].hours && mine[L].day === theirs[L].day);
+		const same = Object.keys(theirs).every((L) => mine[L] && mine[L].hours === theirs[L].hours);
 		return { archetype: name, same };
 	});
 	const withAquarium = Object.keys(F.ARCHETYPES).every((name) => JSON.stringify(lifecycle(name).reached) === JSON.stringify(lifecycle(name, { tiers: [] }).reached));
-	return { pass: rows.every((r) => r.same) && withAquarium && CURVE_JSON.chosen === F.CURVE.quartic, rows, aquariumChangesXp: !withAquarium };
+	baselineCache = { pass: rows.every((r) => r.same) && withAquarium && CURVE_JSON.chosen === F.CURVE.quartic && CURVE_JSON.model === 'provisional', rows, aquariumChangesXp: !withAquarium };
+	return baselineCache;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -593,7 +626,7 @@ function currentExploit() {
 	const actionsPerHour = 3600 / CURRENT.commandCooldownS;
 	const perPet = (m, att) => actionsPerHour * CURRENT.careXp * m * att;
 	const measuredBest = MEASURED.results.filter((x) => x.profile === 'normal').map((x) => ({ key: x.key, cashPerHour: (x.valueBase / x.casts) * (3600 / (x.cooldownMs / 1000 + F.DESIGN_OVERHEAD_S)) })).sort((a, b) => b.cashPerHour - a.cashPerHour)[0];
-	const bestProposed = Math.max(...F.LIVE_BIOMES.flatMap((b) => F.gearPath().map((t) => gearRates(b, t, F.DESIGN_OVERHEAD_S).cash)));
+	const bestProposed = Math.max(...F.LIVE_BIOMES.flatMap((b) => sharedPath().map((t) => gearRates(b, t, F.DESIGN_OVERHEAD_S).cash)));
 	const low = perPet(1, 5);
 	const high = perPet(traits.multiplier.max, traits.attraction.max);
 	// One Expert tank (3 pets) with both commands: /pet (1 pet) + /aquarium feed (3 pets) each every 3 s.
@@ -706,7 +739,559 @@ function incomeBoundTable() {
 			rows.push({ parents, biome, speciesValueMax: Math.round(v.max), capacity: label, slots: capacity, ...b, shareOfWeeklyFishing });
 		}
 	}
-	return { stage: `${biome} ${F.tierAt(top).key}`, rows };
+	return { stage: `${biome} ${F.tierAt(top, sharedPath()).key}`, rows };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Framework 5b.3: the aquarium as a SYSTEM on the shared lifecycle core (lifecycle.js; contract in its
+// header and integrate.js). License and display-tank purchases, and the companion sell bonus with its bond
+// ramp. No XP effect, no boxes, no money upkeep.
+const SYSTEM_NAME = 'aquarium';
+const CONVENTIONS = ['core', 'lifecycle'];
+/** Ledger spend items and purchase rules per option kind (aquariumOptions()). */
+const SPEND = Object.freeze({
+	license: Object.freeze({ category: 'optional', priority: LC.PRIORITY.license, prefix: 'license:' }),
+	display: Object.freeze({ category: 'aspirational', priority: LC.PRIORITY.aspirational, prefix: 'display:' }),
+});
+
+/**
+ * The bond clock (days of care since a purchase, at one feed + one play per pet per play day): fixed sessions
+ * count play hours / the session's hours (continuous; lifecycle()'s clock), so bond grows only on days the
+ * player attends and cares. Sessions without a fixed length (F.MINIMUM_DAILY) count completed play days.
+ */
+const careDays = (h, state, ctx) => (ctx.arch.minutesPerDay ? h / (ctx.arch.minutesPerDay / 60) : state.playDay);
+
+/**
+ * What the player can buy next, as purchase chains per water type (aquariumOptions() applied repeatedly to
+ * the holding each offer would leave): the next license tiers in `tiers`, then (with `display`) the display
+ * tanks of an Expert water type. Every offer is level-reached. Prices rise along a chain, so in one purchase
+ * pass a later offer is affordable only after its prerequisite was bought (the chain stops if they did not).
+ */
+function offerChains(level, owned, { waters, tiers, display, mix, arch }) {
+	const hypo = { ...owned, display: { ...owned.display } };
+	const chains = [];
+	for (const water of waters) {
+		const chain = [];
+		for (;;) {
+			const o = aquariumOptions(level, { owned: hypo, mix, archetype: arch }).find((x) => x.waterType === water && (x.kind === 'license' ? tiers.includes(x.tier) : display));
+			if (!o || (chain.length && o.price < chain[chain.length - 1].price)) break;
+			chain.push(o);
+			if (o.kind === 'license') hypo[water] = o.tier;
+			else hypo.display[water] = (hypo.display[water] || 0) + 1;
+		}
+		if (chain.length) chains.push(chain);
+	}
+	return chains;
+}
+
+/**
+ * The aquarium SYSTEM (lifecycle.js hooks). A fresh object per call; per-run state lives in
+ * state.sys.aquarium only.
+ *   init        state.sys.aquarium: { owned: { Freshwater, Saltwater, display }, purchases (one per
+ *               purchase: price, slots added, bond clock start, stamps, companion cash earned, payback),
+ *               gates, spent, companionCash, xpEffect, milestones, publicMilestones }
+ *   goals       aquariumOptions(gate level, { owned }) as chains per water type in `waters` (see offerChains):
+ *               licenses ('optional', LC.PRIORITY.license, item 'license:<name>') and, with displayTanks,
+ *               display tanks of an Expert water type ('aspirational', LC.PRIORITY.aspirational, item
+ *               'display:<name>'). All non-blocking (user decision 10: big sinks are choices), so a blocking
+ *               progression goal of higher priority (rods, permits) is always served first. `reserve` keeps
+ *               cash back. buy() records the holding and the companion slots it adds (companionSlots(), level
+ *               capped at the gate level).
+ *   modifyCast  adds the companion bonus to input.stats.sellBonus: per purchase, slots added x
+ *               PARAMS.companion.perPet[mix] x bondFactorAfterDays(care days owned) x care (holdingsBonus()
+ *               per purchase, with each purchase's own bond; at full bond the sum is holdingsBonus(owned)).
+ *   beforeStep  notes the step's start (lifecycle() conventions' stamps).
+ *   onCasts     the bonus's marginal cash this step, measured on the core's own cast: cash minus the same
+ *               cast without the bonus (other systems' changes kept, the run's outcome function), split over
+ *               purchases by their share of the bonus; the XP effect is measured the same way (0: cash only).
+ *               Payback is stamped when a purchase's companion cash covers its price.
+ *   onDayStart / onDayEnd   mark the day-end purchase pass (skipped under lifecycle() conventions).
+ *   on          'levelUp': snapshots companion cash and spend at each recorded milestone.
+ * Ledgers: the core's 'fishing' cash already includes the companion bonus (it is a cast stat). The system
+ * writes NO XP or cash source; its share of 'fishing' is state.sys.aquarium.companionCash (never edit
+ * 'fishing'). Spend: ledger.spend.optional['license:<name>'] and ledger.spend.aspirational['display:<name>'].
+ * No money upkeep (PARAMS.upkeep.moneyPerDay 0: care is the upkeep). Grants no boxes, so no 'box' events.
+ * Profile: the rules are profile-independent (§10); an outcome override (Founder) honours
+ * input.stats.sellBonus, so its sell multiplier multiplies the bonus as it multiplies gear.
+ * @param {object} opts {
+ *   buy          buy licenses (default true; false: an inert system, the no-aquarium baseline)
+ *   displayTanks also buy display tanks once a water type is Expert (default false)
+ *   waters       water types whose licenses are bought, in order (default [PARAMS.model.primaryWater]; a second
+ *                water type adds tanks, not companion slots)
+ *   tiers        license tiers to buy (a prefix of the ladder; default all)
+ *   mix          pet rarity filling the companion slots (default PARAMS.model.typicalMix)
+ *   care         share of fishing time the pets are thriving (default PARAMS.model.care)
+ *   reserve      cash to keep after a purchase: a number or (state, ctx) => number (default 0; in the
+ *                integrated run the rods system's blocking progression goal already puts rods first)
+ *   conventions  'core' (default) | 'lifecycle' (validation replay of lifecycle()'s timing: stamps and the
+ *                bond clock at the start of the step whose income paid; no day-end purchase pass) }
+ */
+function system(opts = {}) {
+	const {
+		buy = true, displayTanks: withDisplay = false, waters = [PARAMS.model.primaryWater], tiers = TIERS,
+		mix = PARAMS.model.typicalMix, care = PARAMS.model.care, reserve = 0, conventions = 'core',
+	} = opts;
+	if (!CONVENTIONS.includes(conventions)) throw new Error(`Unknown conventions ${conventions} (${CONVENTIONS.join(' | ')})`);
+	if (!(mix in PARAMS.companion.perPet)) throw new Error(`Unknown pet mix ${mix}`);
+	for (const w of waters) if (!WATER_TYPES.includes(w)) throw new Error(`Unknown water type ${w}`);
+	for (const t of tiers) if (!TIERS.includes(t)) throw new Error(`Unknown license tier ${t}`);
+	const perPet = PARAMS.companion.perPet[mix];
+	const replay = conventions === 'lifecycle';
+	const own = (state) => state.sys[SYSTEM_NAME];
+	/** A purchase pass's stamp: the pass time (core) or the start of the step whose income paid (lifecycle()). */
+	const stampH = (state) => (replay ? own(state).stepStartH : state.h);
+
+	function chains(s, level, ctx) {
+		const key = `${level}|${JSON.stringify(s.owned)}`;
+		if (!s.offers.has(key)) s.offers.set(key, offerChains(level, s.owned, { waters, tiers, display: withDisplay, mix, arch: ctx.arch }));
+		return s.offers.get(key);
+	}
+	function markGate(state, ctx, o) {
+		const s = own(state);
+		if (!s.gates[o.name]) s.gates[o.name] = { h: stampH(state), passH: state.h, day: state.day + 1, level: ctx.gateLevel() };
+	}
+	function acquire(state, ctx, o) {
+		const s = own(state);
+		const L = ctx.gateLevel();
+		const before = companionSlots(s.owned, L);
+		if (o.kind === 'license') s.owned[o.waterType] = o.tier;
+		else s.owned.display[o.waterType] = (s.owned.display[o.waterType] || 0) + 1;
+		const h = stampH(state);
+		s.spent[o.kind] += o.price;
+		s.purchases.push({
+			name: o.name, kind: o.kind, water: o.waterType, tier: o.tier, price: o.price, slots: companionSlots(s.owned, L) - before,
+			from: careDays(h, state, ctx), h, passH: state.h, day: state.day + 1, level: L, cash: 0, paybackH: null,
+		});
+	}
+	/** The same cast without the companion bonus (the outcome function the core used; memoised per run). */
+	function baseOutcome(s, cur, state, ctx) {
+		const input = { ...cur.input, stats: { ...cur.input.stats } };
+		if (input.stats.sellBonus === cur.after) {
+			if (cur.before === undefined) delete input.stats.sellBonus;
+			else input.stats.sellBonus = cur.before;
+		}
+		else {
+			// A later system also changed sellBonus: remove only the companion part.
+			input.stats.sellBonus -= cur.bonus;
+		}
+		const provider = ctx.systems.find((x) => typeof x.outcome === 'function');
+		let key = JSON.stringify(input);
+		if (provider) key = typeof provider.outcomeCacheKey === 'function' ? `${key}|${provider.outcomeCacheKey(input, state, ctx)}` : null;
+		let o = key === null ? null : s.outcomes.get(key);
+		if (!o) {
+			o = provider ? provider.outcome(input, state, ctx) : F.castOutcome(input);
+			if (key !== null) s.outcomes.set(key, o);
+		}
+		return o;
+	}
+	const snapshot = (s) => ({ companionCash: s.companionCash, licenses: s.spent.license, displayTanks: s.spent.display });
+
+	return {
+		name: SYSTEM_NAME,
+		init(state) {
+			state.sys[SYSTEM_NAME] = {
+				options: { buy, displayTanks: withDisplay, waters: [...waters], tiers: [...tiers], mix, perPet, care, conventions },
+				owned: { ...Object.fromEntries(WATER_TYPES.map((w) => [w, null])), display: Object.fromEntries(WATER_TYPES.map((w) => [w, 0])) },
+				purchases: [], gates: {}, spent: { license: 0, display: 0 },
+				companionCash: 0, xpEffect: { maxAbs: 0, total: 0 }, lastUnit: null, endH: 0,
+				milestones: {}, publicMilestones: {},
+			};
+			// Per-run scratch kept out of the result's JSON: offer chains by (level, holding), no-bonus outcomes,
+			// the step's bonus, the step's start and the day-end pass flag.
+			const s = own(state);
+			for (const [k, v] of [['offers', new Map()], ['outcomes', new Map()], ['current', null], ['stepStartH', 0], ['dayEnd', false]]) Object.defineProperty(s, k, { value: v, writable: true, enumerable: false });
+		},
+		goals(state, ctx) {
+			const s = own(state);
+			if (!buy || (replay && s.dayEnd)) return [];
+			const list = chains(s, ctx.gateLevel(), ctx);
+			if (!list.length) return [];
+			const keep = typeof reserve === 'function' ? reserve(state, ctx) : reserve;
+			const goals = [];
+			for (const chain of list) {
+				markGate(state, ctx, chain[0]);
+				chain.forEach((o, i) => goals.push({
+					id: `${SYSTEM_NAME}:${o.name}`, item: `${SPEND[o.kind].prefix}${o.name}`, category: SPEND[o.kind].category,
+					priority: SPEND[o.kind].priority, cost: o.price, available: true, blocking: false, reserve: keep,
+					buy(st, c) {
+						acquire(st, c, o);
+						if (chain[i + 1]) markGate(st, c, chain[i + 1]);
+					},
+				}));
+			}
+			return goals;
+		},
+		modifyCast(input, state, ctx) {
+			const s = own(state);
+			s.current = null;
+			const now = careDays(state.h, state, ctx);
+			let bonus = 0;
+			const parts = s.purchases.map((p) => {
+				const b = p.slots * perPet * bondFactorAfterDays(now - p.from) * care;
+				bonus += b;
+				return b;
+			});
+			if (!(bonus > 0)) return;
+			const before = input.stats.sellBonus;
+			input.stats.sellBonus = (before || 0) + bonus;
+			s.current = { input, before, after: input.stats.sellBonus, bonus, parts };
+		},
+		beforeStep(state) {
+			own(state).stepStartH = state.h;
+		},
+		onCasts(state, ctx, { casts, rates }) {
+			const s = own(state);
+			const cur = s.current;
+			s.current = null;
+			s.endH = state.h + ctx.stepH;
+			if (!cur || rates.blocked || !(casts > 0)) return;
+			const base = baseOutcome(s, cur, state, ctx);
+			const baseCasts = (ctx.stepH * 3600) / (base.cooldownMs / 1000 + ctx.arch.overheadS);
+			const extra = rates.cash - baseCasts * base.valuePerCast;
+			const xp = rates.xp - baseCasts * base.xpPerCast;
+			s.companionCash += extra;
+			s.xpEffect.total += xp;
+			s.xpEffect.maxAbs = Math.max(s.xpEffect.maxAbs, Math.abs(xp));
+			s.lastUnit = extra / cur.bonus / ctx.stepH;
+			const paidH = replay ? s.stepStartH : state.h + ctx.stepH;
+			cur.parts.forEach((b, i) => {
+				const p = s.purchases[i];
+				p.cash += (extra * b) / cur.bonus;
+				if (p.paybackH === null && p.slots > 0 && p.cash >= p.price) p.paybackH = paidH;
+			});
+		},
+		onDayStart(state) {
+			own(state).dayEnd = false;
+		},
+		onDayEnd(state) {
+			own(state).dayEnd = true;
+		},
+		on(event, payload, state) {
+			if (event !== 'levelUp') return;
+			const s = own(state);
+			const [recorded, mine] = payload.kind === 'public' ? [state.publicMilestones, s.publicMilestones] : [state.milestones, s.milestones];
+			for (const T of Object.keys(recorded)) if (/^\d+$/.test(T) && !mine[T]) mine[T] = snapshot(s);
+		},
+	};
+}
+
+/**
+ * The aquarium's figures from a lifecycle.js result that ran system(): per purchase, gate and purchase stamps,
+ * slots added, companion cash earned and payback in hours of play after purchase (extrapolated past the end
+ * at the last step's income per unit of bonus, at full bond, as lifecycle() did); totals and shares of income
+ * (income = every ledger cash source; fish income = 'fishing' minus the companion cash).
+ */
+function systemSummary(result) {
+	const s = result.sys[SYSTEM_NAME];
+	if (!s) return null;
+	const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+	const income = sum(result.ledger.cash);
+	const fishCash = (result.ledger.cash.fishing || 0) - s.companionCash;
+	const dayH = result.archetype.minutesPerDay ? result.archetype.minutesPerDay / 60 : null;
+	const purchases = Object.fromEntries(s.purchases.map((p) => {
+		const gate = s.gates[p.name];
+		const rate = s.lastUnit === null ? 0 : p.slots * s.options.perPet * s.options.care * s.lastUnit;
+		const paybackH = p.paybackH !== null ? p.paybackH : rate > 0 ? s.endH + (p.price - p.cash) / rate : null;
+		const after = paybackH === null ? null : paybackH - p.h;
+		return [p.name, {
+			kind: p.kind, water: p.water, tier: p.tier, price: p.price,
+			gate: gate ? { hours: r4(gate.h), passHours: r4(gate.passH), day: gate.day, level: gate.level } : null,
+			bought: { hours: r4(p.h), passHours: r4(p.passH), day: p.day, level: p.level, hoursAfterGate: gate ? r4(p.h - gate.h) : null },
+			slotsAdded: p.slots, companionCash: Math.round(p.cash), recoveredByEnd: p.slots ? r4(p.cash / p.price) : 0,
+			paybackHoursAfterPurchase: after === null || !p.slots ? null : r2(after), paybackDaysAfterPurchase: after === null || !p.slots || !dayH ? null : Math.round(after / dayH),
+			paybackExtrapolated: p.slots > 0 && p.paybackH === null,
+			// Unrounded, for validateSystem().
+			raw: { gateH: gate ? gate.h : null, gatePassH: gate ? gate.passH : null, h: p.h, passH: p.passH, cash: p.cash, paybackAfterH: after },
+		}];
+	}));
+	return {
+		options: s.options, owned: s.owned, purchases,
+		totals: { income: Math.round(income), fishCash: Math.round(fishCash), companionCash: Math.round(s.companionCash), licenses: Math.round(s.spent.license), displayTanks: Math.round(s.spent.display) },
+		shares: {
+			companionOfFish: r4(s.companionCash / fishCash),
+			licensesOfIncome: r4(s.spent.license / income),
+			displayTanksOfIncome: r4(s.spent.display / income),
+			netOfIncome: r4((s.companionCash - s.spent.license - s.spent.display) / income),
+			upkeepOfIncome: 0,
+		},
+		xpEffect: s.xpEffect,
+		milestones: s.milestones,
+		raw: { income, fishCash, companionCash: s.companionCash },
+	};
+}
+
+// Validation (5b.3): system() on the shared core against lifecycle().
+/** lifecycle()'s "rods first" rule: keep the next rod tier's assembly cost once its crates unlock. */
+function lifecycleReserve(state, ctx) {
+	const nt = ctx.path[state.equippedTier + 1];
+	return nt && ctx.gateLevel() >= crateUnlock(nt.tier) ? rodCost(nt.tier) : 0;
+}
+
+/**
+ * lifecycle()'s gear and money assumptions as a validation-only system.
+ *   gear   LC.provisionalRods' rule (curve.js): once the next tier's level is reached, save each step's stage
+ *          income until it covers F.PURCHASE.saveHours of it, then equip. income 'stage' (lifecycle()'s rule):
+ *          the stage's fish income WITHOUT the companion bonus (gearRates), so the XP timeline does not depend
+ *          on the aquarium; 'cast': the core's cast income, bonus included (exactly LC.provisionalRods).
+ *   money  each equip is charged the tier's rods.assembly(t).expectedCost ('progression', item 'rods'); each
+ *          step on a crafted rod pays repairs at rods' upkeep share of that step's fish income without the
+ *          bonus ('upkeep', 'repairs'); optionally `otherSpendShare` of each step's income, bonus included
+ *          ('optional', 'other').
+ */
+function lifecycleMoney({ otherSpendShare = 0, income = 'stage' } = {}) {
+	const name = 'aquariumLifecycleMoney';
+	return {
+		name,
+		init(state) {
+			state.sys[name] = { saving: 0 };
+		},
+		beforeStep(state, ctx, rates) {
+			const next = ctx.path[state.equippedTier + 1];
+			if (!next || rates.blocked || state.stepStartLevel < next.level) return;
+			const m = state.sys[name];
+			const perHour = income === 'cast' ? rates.perHour.cash : gearRates(rates.biome, ctx.path[state.equippedTier], ctx.arch.overheadS).cash;
+			m.saving += income === 'cast' ? rates.cash : perHour * ctx.stepH;
+			if (m.saving >= perHour * F.PURCHASE.saveHours) {
+				state.equippedTier++;
+				m.saving = 0;
+				ctx.spend('progression', 'rods', rodCost(ctx.path[state.equippedTier].tier));
+			}
+		},
+		onCasts(state, ctx, { rates }) {
+			if (rates.blocked) return;
+			const gear = ctx.path[rates.tier];
+			if (gear.tier > 0) ctx.spend('upkeep', 'repairs', rods.PARAMS.repair.upkeepShare * gearRates(rates.biome, gear, ctx.arch.overheadS).cash * ctx.stepH);
+			if (otherSpendShare > 0) ctx.spend('optional', 'other', otherSpendShare * rates.cash);
+		},
+	};
+}
+
+/** lifecycle()'s model on the shared core: system() + lifecycleMoney (its gear rule and money) + LC.provisionalDaily. */
+function coreLifecycle(archetype, { conventions = 'core', otherSpendShare = 0, income = 'stage', water = PARAMS.model.primaryWater, mix, care, tiers, buy = true, ...simOpts } = {}) {
+	return LC.simulate({
+		archetype,
+		gearPath: sharedPath(),
+		systems: [
+			system({ buy, conventions, reserve: lifecycleReserve, waters: [water], mix, care, tiers }),
+			lifecycleMoney({ otherSpendShare, income }), LC.provisionalDaily(),
+		],
+		...simOpts,
+	});
+}
+
+/**
+ * One comparison of the core with lifecycle() (same archetype and options). Hours are compared step-exact:
+ * lifecycle() rounds hours to 0.01 h (under a third of a step), from which its step index is recovered.
+ * Purchases compare the purchase PASS (lifecycle() stamps the start of the step whose pass bought, i.e. one
+ * step before its pass). Values are rounded as lifecycle() rounds them: totals to $1, payback to 0.01 h,
+ * recoveredByEnd to 1e-4 (compared on its own scale, the price: a purchase made just before the end has
+ * recovered a tiny share, and a relative difference of two 4-decimal roundings of it would be noise). Shares
+ * of income are recomputed on both sides from the $1-rounded totals (lifecycle() prints them to 4 decimals,
+ * where a 1e-4 difference straddling a rounding boundary would read as up to 0.4%).
+ */
+function compareWithLifecycle(archetype, variant = {}, conventions = 'core') {
+	const stepH = F.LIFECYCLE.stepH;
+	const stepOf = (hours) => Math.round(hours / stepH);
+	const old = lifecycle(archetype, variant);
+	const core = coreLifecycle(archetype, { ...variant, conventions });
+	const sum = systemSummary(core);
+	const water = variant.water || PARAMS.model.primaryWater;
+	const out = { maxRel: 0, worst: null, milestonesCompared: 0, exactMilestones: 0, maxPassShiftSteps: 0 };
+	const note = (key, a, b, scale = Math.abs(b)) => {
+		const d = a === b ? 0 : Math.abs(a - b) / Math.max(scale, 1e-12);
+		if (d > out.maxRel) {
+			out.maxRel = d;
+			out.worst = key;
+		}
+		return r4(d);
+	};
+	const milestones = {};
+	for (const T of F.LIFECYCLE.milestones) {
+		const o = old.reached[T];
+		const c = core.milestones[T];
+		if (!o || !c) {
+			note(`L${T} reached`, o ? 1 : 0, c ? 1 : 0);
+			continue;
+		}
+		const [kOld, kCore] = [stepOf(o.hours), stepOf(c.hours)];
+		out.milestonesCompared++;
+		if (kOld === kCore) out.exactMilestones++;
+		milestones[T] = { old: o.hours, core: r2(c.hours), steps: kCore - kOld, rel: note(`L${T} hours`, kCore, kOld) };
+	}
+	const purchases = {};
+	for (const k of TIERS) {
+		const o = old.purchases[k];
+		const c = sum.purchases[licenseName(k, water)];
+		if (!o.bought || !c) {
+			note(`${k} bought`, c ? 1 : 0, o.bought ? 1 : 0);
+			purchases[k] = { old: o.bought, core: c ? c.bought : null };
+			continue;
+		}
+		const pass = { gate: stepOf(c.raw.gatePassH) - (stepOf(o.gate.hours) + 1), bought: stepOf(c.raw.passH) - (stepOf(o.bought.hours) + 1) };
+		out.maxPassShiftSteps = Math.max(out.maxPassShiftSteps, Math.abs(pass.gate), Math.abs(pass.bought));
+		note(`${k} bought pass`, stepOf(c.raw.passH), stepOf(o.bought.hours) + 1);
+		const payback = r2(c.raw.paybackAfterH);
+		purchases[k] = {
+			bought: { old: o.bought.hours, core: r2(c.raw.h), level: { old: o.bought.level, core: c.bought.level }, passShiftSteps: pass.bought, gatePassShiftSteps: pass.gate },
+			paybackHoursAfterPurchase: { old: o.paybackHoursAfterPurchase, core: payback, extrapolated: o.paybackExtrapolated, rel: note(`${k} payback hours`, payback, o.paybackHoursAfterPurchase) },
+			recoveredByEnd: { old: o.recoveredByEnd, core: c.recoveredByEnd, diffOfPrice: note(`${k} recovered by end (of price)`, c.recoveredByEnd, o.recoveredByEnd, 1) },
+		};
+	}
+	const L = core.ledger;
+	const coreTotals = Object.fromEntries(Object.entries({ fishCash: sum.raw.fishCash, companionCash: sum.raw.companionCash, repairs: L.spend.upkeep.repairs || 0, rods: L.spend.progression.rods || 0, licenses: sum.totals.licenses, otherSpend: L.spend.optional.other || 0 }).map(([k, v]) => [k, Math.round(v)]));
+	const totals = Object.fromEntries(Object.entries(coreTotals).map(([k, v]) => [k, { old: old.totals[k], core: v, rel: note(`total ${k}`, v, old.totals[k]) }]));
+	// lifecycle()'s share formulas (income = fish income + companion cash; no other cash source here).
+	const sharesOf = (t) => {
+		const income = t.fishCash + t.companionCash;
+		return { companionOfFish: t.companionCash / t.fishCash, licensesOfIncome: t.licenses / income, netOfIncome: (t.companionCash - t.licenses) / income, rodsOfIncome: (t.rods + t.repairs) / income };
+	};
+	const [shOld, shCore] = [sharesOf(old.totals), sharesOf(coreTotals)];
+	const shares = Object.fromEntries(Object.keys(shOld).map((k) => [k, { old: old.shares[k], core: r4(shCore[k]), rel: note(`share ${k}`, shCore[k], shOld[k]) }]));
+	note('final money', Math.round(core.final.money), old.finalMoney);
+	return {
+		maxRel: out.maxRel, worst: out.worst, milestonesCompared: out.milestonesCompared, exactMilestones: out.exactMilestones, maxPassShiftSteps: out.maxPassShiftSteps,
+		xpEffectMaxAbs: sum.xpEffect.maxAbs,
+		row: { milestones, purchases, totals, shares, finalMoney: { old: old.finalMoney, core: Math.round(core.final.money) } },
+	};
+}
+
+/**
+ * The aquarium adds no XP: the core with system() (licenses bought, bonus on) and with system({ buy: false })
+ * reach every level on the same step with the same XP ledger (milestone snapshots compared exactly).
+ */
+function noXpEffect(archetype) {
+	const all = Array.from({ length: F.LIFECYCLE.maxLevel }, (_, i) => i + 1);
+	const on = coreLifecycle(archetype, { milestones: all });
+	const off = coreLifecycle(archetype, { milestones: all, buy: false });
+	const same = all.every((T) => on.milestones[T] && off.milestones[T] && on.milestones[T].hours === off.milestones[T].hours && JSON.stringify(on.milestones[T].ledger.xp) === JSON.stringify(off.milestones[T].ledger.xp));
+	return { same, levels: all.length, companionCash: Math.round(on.sys[SYSTEM_NAME].companionCash), xpEffectMaxAbs: on.sys[SYSTEM_NAME].xpEffect.maxAbs };
+}
+
+/**
+ * The aquarium variant on the integrated reference loop (integrate.run, default system()): what it buys and
+ * earns there, whether the license spend moves any XP milestone, and which other purchases (permits, rod
+ * assemblies) it delays by competing for cash. Informational: other modules' systems are migrating in parallel,
+ * so a failure is reported, not thrown.
+ */
+function integratedEffect(archetypes = Object.keys(F.ARCHETYPES)) {
+	try {
+		const I = require('./integrate');
+		const rows = Object.fromEntries(archetypes.map((archetype) => {
+			const withA = I.run({ archetype, variant: { aquarium: true } });
+			const without = I.run({ archetype });
+			const sum = systemSummary(withA);
+			const hoursWith = LC.milestoneHours(withA);
+			const hoursWithout = LC.milestoneHours(without);
+			const shift = Object.fromEntries(Object.keys(hoursWithout).map((L) => [L, hoursWith[L] === undefined ? null : r4(hoursWith[L] - hoursWithout[L])]));
+			const others = Object.fromEntries(without.purchases.map((p) => [p.id, p.hours]));
+			const delayed = withA.purchases.filter((p) => !p.id.startsWith(`${SYSTEM_NAME}:`) && others[p.id] !== undefined && p.hours !== others[p.id]).map((p) => ({ id: p.id, hoursWithout: r2(others[p.id]), hoursWith: r2(p.hours) }));
+			return [archetype, {
+				xpMilestonesIdentical: Object.values(shift).every((d) => d === 0), milestoneShiftHours: shift,
+				otherPurchasesMoved: delayed,
+				licenses: Object.fromEntries(Object.values(sum.purchases).map((p) => [p.tier, { hours: r2(p.bought.hours), level: p.bought.level, paybackHoursAfterPurchase: p.paybackHoursAfterPurchase, paybackExtrapolated: p.paybackExtrapolated, recoveredByEnd: p.recoveredByEnd }])),
+				totals: sum.totals, shares: sum.shares,
+			}];
+		}));
+		return { systems: [...I.REFERENCE, SYSTEM_NAME], xpMilestonesIdentical: Object.values(rows).every((r) => r.xpMilestonesIdentical), byArchetype: rows };
+	}
+	catch (e) {
+		return { error: e.message };
+	}
+}
+
+let validation = null;
+/**
+ * validateSystem(): system() on the shared core (LC.simulate) vs this module's lifecycle(), for every archetype
+ * (default options, 15% and 30% of income spent elsewhere) and, for the reference player, every pet mix, care on
+ * half the days and Saltwater. The baseline systems are the assumptions lifecycle() made: LC.provisionalRods
+ * (its gear rule), lifecycleMoney (rods' assembly costs at each equip, repairs, other spend), LC.provisionalDaily
+ * (its daily XP) and lifecycleReserve (its rods-first rule, as the goals' reserve). `system` = the default
+ * system (core conventions); `replay` = the same system with lifecycle()'s conventions, which isolates them.
+ */
+function validateSystem({ tolerance = 0.005 } = {}) {
+	if (validation) return validation;
+	const archetypes = Object.keys(F.ARCHETYPES);
+	const ref = F.REFERENCE_ARCHETYPE;
+	const cases = [
+		...archetypes.map((a) => ({ key: a, archetype: a, variant: {} })),
+		...PARAMS.model.otherSpendShares.filter((x) => x > 0).flatMap((x) => archetypes.map((a) => ({ key: `${a}@otherSpend${x}`, archetype: a, variant: { otherSpendShare: x } }))),
+		...PARAMS.model.mixes.filter((m) => m !== PARAMS.model.typicalMix).map((m) => ({ key: `${ref}@mix:${m}`, archetype: ref, variant: { mix: m } })),
+		{ key: `${ref}@care0.5`, archetype: ref, variant: { care: 0.5 } },
+		{ key: `${ref}@Saltwater`, archetype: ref, variant: { water: 'Saltwater' } },
+	];
+	const run = (conventions) => {
+		const agg = { maxRel: 0, worst: null, exact: 0, compared: 0, maxPassShiftSteps: 0, xpEffectMaxAbs: 0, cases: {} };
+		for (const c of cases) {
+			const r = compareWithLifecycle(c.archetype, c.variant, conventions);
+			if (r.maxRel > agg.maxRel) {
+				agg.maxRel = r.maxRel;
+				agg.worst = `${c.key} ${r.worst}`;
+			}
+			agg.exact += r.exactMilestones;
+			agg.compared += r.milestonesCompared;
+			agg.maxPassShiftSteps = Math.max(agg.maxPassShiftSteps, r.maxPassShiftSteps);
+			agg.xpEffectMaxAbs = Math.max(agg.xpEffectMaxAbs, r.xpEffectMaxAbs);
+			agg.cases[c.key] = r.row;
+		}
+		return {
+			conventions,
+			maxRelativeDifference: agg.maxRel, worst: agg.worst,
+			exactMilestones: `${agg.exact}/${agg.compared}`, maxPurchasePassShiftSteps: agg.maxPassShiftSteps, xpEffectMaxAbs: agg.xpEffectMaxAbs,
+			cases: agg.cases,
+		};
+	};
+	const main = run('core');
+	const replay = run('lifecycle');
+	const noXp = Object.fromEntries(archetypes.map((a) => [a, noXpEffect(a)]));
+	// The gear rule: LC.provisionalRods itself saves the core's cast income, companion bonus included.
+	const gearRule = Object.fromEntries(archetypes.map((a) => {
+		const on = LC.milestoneHours(coreLifecycle(a, { income: 'cast' }));
+		const off = LC.milestoneHours(coreLifecycle(a, { income: 'cast', buy: false }));
+		const steps = Object.fromEntries(Object.keys(off).map((T) => [T, Math.round((on[T] - off[T]) / F.LIFECYCLE.stepH)]));
+		return [a, { maxShiftSteps: Math.max(...Object.values(steps).map(Math.abs)), steps }];
+	}));
+	validation = {
+		method: 'LC.simulate(system() + lifecycleMoney (LC.provisionalRods\' rule on stage income without the bonus; rods.assembly cost at each equip, repairs at rods\' upkeep share, other spend) + LC.provisionalDaily; goals reserve = lifecycleReserve, lifecycle()\'s rods-first rule) on the shared gear path vs lifecycle(archetype, variant). Compared: milestone hours (step indices), each license\'s purchase pass (step indices), payback hours after purchase, share of the price recovered by the end, run totals (fish income without the bonus, companion cash, repairs, rods, licenses, other spend), shares of income and final money.',
+		archetypes, cases: cases.map((c) => c.key),
+		matches: main.maxRelativeDifference < tolerance && replay.maxRelativeDifference < 1e-4 && Object.values(noXp).every((x) => x.same),
+		tolerance,
+		maxRelativeDifference: r4(main.maxRelativeDifference),
+		worst: main.worst,
+		system: { ...main, maxRelativeDifference: r4(main.maxRelativeDifference) },
+		replay: { ...replay, maxRelativeDifference: replay.maxRelativeDifference, cases: undefined, exact: replay.maxRelativeDifference === 0 && replay.maxPurchasePassShiftSteps === 0 },
+		noXpEffect: noXp,
+		gearRuleSensitivity: {
+			note: 'Milestone shift (steps) from buying the aquarium when the gear rule is LC.provisionalRods as is (it saves the core\'s cast income, bonus included) instead of lifecycle()\'s rule (stage income without the bonus). While a bond ramps, the bonus rises step by step, so the saved sum trails "saveHours of the current step\'s income" and a tier can be equipped a step later. That is an artifact of the placeholder rule reading income, not an XP effect of the aquarium (its casts\' XP is measured identical: xpEffectMaxAbs 0). lifecycle()\'s rule is the right baseline here; the integrated rods system buys at a fixed assembly cost (see integrated).',
+			byArchetype: gearRule,
+		},
+		integrated: integratedEffect(),
+		differences: [
+			'Days: the core counts a level reached on a day\'s final step in that day (ceil(h/dayH) counted the next day), so hours are compared, not days.',
+			'Stamps: lifecycle() stamps a purchase (and a gate) at the START of the step whose purchase block bought it; the core buys in the purchase pass after that step (its income is already in), so the comparison uses the pass. lifecycle() stamps payback at the start of the step whose income completed it, the core at its end: payback hours after purchase count the same steps.',
+			'Bond clock (the one rule difference, conventions \'core\'): lifecycle() starts a purchase\'s bond ramp at the start of the step that paid for it, one step (1 min of play) before the pets are adopted; the core starts it at the purchase. The ramp (7 care days) is therefore one step behind lifecycle()\'s, which lowers companion cash by about 1e-4 of it and payback hours by at most 0.02 h; the largest relative difference is on a small net (companion cash minus licenses) for the casual player spending 30% elsewhere. The core is right: bond starts at adoption. The replay (conventions \'lifecycle\') isolates this rule and is exact.',
+			'Day-end purchase pass (conventions \'core\'): the core also runs goals after a day\'s last step. A gate level reached on that step is acted on before the next session (lifecycle() waited for the next step\'s purchase block, with that step\'s income). The replay skips the day-end pass.',
+			'Extrapolated payback (after Lv 60): lifecycle() counts from the start of the paying step to the end of the run, one step more than the steps the purchase actually earned over (its own non-extrapolated paybacks count the earning steps); the core counts the earning steps. The replay reproduces lifecycle()\'s count.',
+			'Floats: companion cash is measured on the core\'s cast (cash with minus without the bonus), lifecycle() computes cash x bonus / (1 + gear sellBonus); equal up to rounding.',
+		],
+	};
+	return validation;
+}
+
+/** The system's contract and its validation, for report(). */
+function systemReport() {
+	return {
+		name: SYSTEM_NAME,
+		defaults: { buy: true, displayTanks: false, waters: [PARAMS.model.primaryWater], tiers: [...TIERS], mix: PARAMS.model.typicalMix, care: PARAMS.model.care, reserve: 0, conventions: 'core' },
+		hooks: ['init', 'goals', 'modifyCast', 'beforeStep', 'onCasts', 'onDayStart', 'onDayEnd', 'on'],
+		events: { listens: ['levelUp'], emits: [] },
+		ledger: {
+			xpSources: [], cashSources: [],
+			spend: Object.entries(SPEND).map(([kind, x]) => ({ kind, category: x.category, item: `${x.prefix}<name>`, priority: x.priority, blocking: false })),
+			note: 'The core\'s \'fishing\' cash includes the companion bonus (a cast stat). Its share is state.sys.aquarium.companionCash (per purchase: purchases[i].cash; at milestones: milestones / publicMilestones). No money upkeep, no boxes.',
+		},
+		integration: 'integrate.run({ variant: { aquarium: true } }) adds system()',
+		validation: validateSystem(),
+	};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -808,6 +1393,7 @@ function buildReport() {
 		options: { level15: aquariumOptions(15), level45Advanced: aquariumOptions(45, { owned: { Freshwater: 'advanced' } }), level50Expert: aquariumOptions(50, { owned: { Freshwater: 'expert', Saltwater: 'basic' } }) },
 		baseline: baselineMatchesCurveJson(),
 		checks: checks(),
+		system: systemReport(),
 	};
 }
 function report() {
@@ -822,6 +1408,7 @@ module.exports = {
 	thriving, effectiveTemperature, petSaleValue, speciesValue, breedingRate, petIncomeBound, availability,
 	aquariumOptions, displayTanks, lifecycle, baselineMatchesCurveJson,
 	currentExploit, currentLicenses, upkeepAlternatives, checks, report,
+	SYSTEM_NAME, SPEND, system, systemSummary, validateSystem, lifecycleReserve, lifecycleMoney, coreLifecycle,
 };
 
 if (require.main === module) process.stdout.write(`${JSON.stringify(report(), null, 1)}\n`);

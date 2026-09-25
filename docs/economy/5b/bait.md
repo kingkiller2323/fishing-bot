@@ -348,3 +348,44 @@ The integrator should build bait on the final path: `require('./bait').withGear(
 3. **Decide the Lucky-item rule once, for every luck source** (rods, bait, Founder). The recommendation is to pin it to the base table (§9) and mirror it in `catalog-model.js`.
 4. **Name one additive multi-catch stat** (e.g. `stats.multiChance`, summed across rod and bait, clamped ≤ 1) in the `castOutcome` contract. Rods and bait would then share it.
 5. **Add a Mountain Stream stage** (Tier 5, Lv 60) once its species ladder exists, so its bait band can be priced by the same functions.
+
+---
+
+## Integration (framework 5b.3)
+
+Bait now runs as a **system on the shared lifecycle core** (`lifecycle.js`). `bait.system({ policy })` returns a fresh hook object each call, and all per-run state lives in `state.sys.bait`. `integrate.run({ variant: { bait: 'cash' | 'xp' } })` adds it to the reference loop. `lifecycle()` and `report()` still work. `report().system` carries the system's contract and `validateSystem()`.
+
+**Policies.** `'cash'` (default) picks the best positive-net-cash bait. `'xp'` picks the best XP-class bait and falls back to `'cash'`. A bait name uses that bait wherever it works. `'none'` is a no-op, used as the validation baseline. The choice is always `baitOption(stage, { goal: policy })`, so the design and prices above are unchanged.
+
+| Hook | What it does |
+| --- | --- |
+| `init` | Creates `state.sys.bait`: `{ policy, units, spend, extraValue, extraXp, extraPublicXp, byBait, stages, milestones, publicMilestones }`. |
+| `modifyCast` | Looks up `baitOption({ biome: input.biome, tier: ctx.path[input.tier] }, { goal })`, memoised per stage in `stages['Lake/t1']`. The run's gear path defaults to `F.gearPath()`; shop prices stay fixed. If a bait fits, it adds the bait's stats to `input.stats` (Rare Find, Trophy Chance, Luck, `xpBonus`, and Spinner's +10% as `stats.multiChance`). Starter baits add strong access to `input.qualities`. It then pushes `{ category: 'optional', item: 'bait', perCast }`: one unit per cast, only where the bait works (B1, B2). |
+| `onCasts` | Records the bait's marginal effect for the step: cash, XP and public XP of the core's actual cast, minus the same cast without the bait. Other systems' changes stay in, and the outcome function is the one the core used (`castOutcome`, or the run's outcome override). So Double XP/Cash windows and the Founder profile are measured, not assumed. Results go to the totals, `byBait` and `stages`. |
+| `on('levelUp')` | Snapshots those totals at each milestone (real and public) next to the core's ledger snapshots. |
+
+**Ledgers.** The core's `'fishing'` XP and cash already include the bait effect. The bait system writes **no XP or cash source**. Its only ledger item is the spend `ledger.spend.optional.bait`, an optional sink (B10, user decision 10). To split XP by source, take the bait's share from `state.sys.bait.extraXp` (or `.milestones[L].extraXp`); never edit `'fishing'`. The bait system does not grant boxes, so it emits no `'box'` events. Bait units inside boxes are valued once, by the system that grants the box, and they do not offset bait bought per cast.
+
+**Profile.** Choice and cost are profile-independent: a Founder also uses one unit per cast. The marginal is measured on the profile's own cast.
+
+**Validation** (`validateSystem()`). This runs `LC.simulate` with `system({ policy })` against `lifecycle(policy, archetype)` for all four archetypes × `'none'`, `'cash'`, `'xp'`, on the shared (rods) gear path. The baseline systems reproduce what `lifecycle()` assumed:
+- **Gear rule** (`lifecycleRods`): the next tier after saving `F.PURCHASE.saveHours` of *no-bait* stage income, from net cash after bait.
+- **Daily XP**: `LC.provisionalDaily`.
+
+The result is **exact**:
+- All 72 milestones are step-exact.
+- XP by source at every milestone (fishing without bait, bait, daily) matches, as do bait spend, bait extra value, no-bait income and the baits used.
+- Max relative difference is **0**. The largest float gap is 1.4e-13 of the compared total.
+
+Two conventions differ, and neither moves any hours:
+- **Day counting.** The core counts a level reached on a day's final step in that day; `lifecycle()` used `ceil(h / dayH)`, the next day. Hours are compared.
+- **Last daily.** The core adds one more daily XP after a mid-day stop at L60. It comes after the L60 snapshot.
+
+| Regular player (core) | L30 h | L40 h | L50 h | L60 h | Bait XP at L50 | Bait spend / no-bait income | Net effect |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| cash | 13.05 | 24.77 | 41.67 | 64.93 | 8,234 | 6.3% | +2.4% |
+| xp | 12.43 | 23.27 | 38.68 | 60.02 | 51,956 | 21.8% | −13.4% |
+
+**Which gear rule is right.** Using `LC.provisionalRods` instead would change the XP-bait player's hours by up to −1.1% (L30), and leave the cash policy and no bait unchanged. That rule saves gross income, ignoring bait spend, toward a price that grows with the bait's extra income. `lifecycle()`'s rule is the right one: a tier's price does not depend on bait use, and money spent on bait is not saved. It is also how the integrated economy works: the rods system pays a fixed assembly cost from money that has already paid for bait.
+
+Since 5b.3 the default gear path is `F.gearPath()`, the rods design (R3). The report's `gear.source` now says `'rods'`; before, it was mislabelled `'provisional'`. No bait number changed with the label.

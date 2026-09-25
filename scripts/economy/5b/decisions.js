@@ -15,7 +15,7 @@ const F = () => require('./framework');
 
 const DECISIONS = [
 	// ----- Approved directions (user messages during Phase 5 / 5B); numbers pending final approval -----
-	{ id: 'A-CURVE', status: 'approved-direction', title: 'Steeper, smooth post-20 XP curve', modelled: 'xp(L) = 100L^2 + qL^4, q chosen by sweep (curve.js); windows L20 5-6h, L30 12-15h, L40 24-30h, L50 40-45h (regular)', get: () => ({ base: F().CURVE.base, quartic: F().CURVE.quartic }), expected: { base: 100, quartic: 0.0475 } },
+	{ id: 'A-CURVE', status: 'approved-direction', title: 'Steeper, smooth post-20 XP curve', modelled: 'xp(L) = 100L^2 + qL^4, q chosen by sweep (curve.js); windows L20 5-6h, L30 12-15h, L40 24-30h, L50 40-45h (regular)', get: () => ({ base: F().CURVE.base, quartic: F().CURVE.quartic }), expected: { base: 100, quartic: 0.0525 } },
 	{ id: 'A-MULTICATCH', status: 'approved-direction', title: 'Normal multi-catch: progression-based and probabilistic (~1.0 to 1.5-1.8 average, 3-5 fish jackpots)', modelled: 'rods.js tiers + framework chain (jackpotChain 0.35, max 5)', get: () => F().MULTI, expected: { jackpotChain: 0.35, maxFish: 5 } },
 	{ id: 'A-PERMITS', status: 'approved-direction', title: 'One-time biome permits priced from previous-stage earnings, grandfathered', modelled: 'world.js' },
 	{ id: 'A-TOPGG', status: 'approved-direction', title: 'Retire Top.gg; DCC-native streak (Streak Crate); Voter\'s Crates openable forever', modelled: 'streak.js' },
