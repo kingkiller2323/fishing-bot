@@ -54,3 +54,16 @@ During integration, in this order:
 **One authoritative path:** no subsystem may import `rods.js` directly as its own gear source. Every module uses the framework's shared `F.gearPath()`. Only `assumptions.js` reads `rods.gearPath()`, through the `GEAR_PATH_SOURCE` switch. `check-shared.js` enforces this. Other rods exports that are not a gear source (e.g. crate or legacy-converter helpers) remain importable.
 
 **Traceability:** the final Phase 5B report states the final framework version and shared digest at the top, and every table in it is generated at that version/digest.
+
+## Branch and deploy policy (Phase 5B)
+Railway deploys production from `main`, so every push to `main` rebuilds and restarts the live bot, even when the commit is analysis-only.
+- **Until Phase 5B integration is complete:** commit and push designer WIP and intermediate analysis **only to the session branch** `claude/vigilant-davinci-hf0q0d`. Never push intermediate snapshots to `main`. Production stays on its current healthy revision.
+- **One clean checkpoint to `main`**, only when all of these hold:
+  - all eight subsystem designs are complete;
+  - the R3 cutover is done and the framework version/digest is final;
+  - `check-shared.js` passes;
+  - R1, R2 and the adversarial review pass.
+
+  That checkpoint merges the completed Phase 5B analysis package.
+- The WIP commits already on `main` (up to d84b898) stay as they are. No history rewriting.
+- Implementing live balance values still requires the user's separate approval after that.
