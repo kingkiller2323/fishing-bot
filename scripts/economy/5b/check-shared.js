@@ -6,7 +6,9 @@
 //      a line may opt out only with an explicit `// shared-ok: <reason>` comment;
 //   2. runtime: framework.verifyShared() passes (shared values match the digest pinned for
 //      FRAMEWORK_VERSION), and every module's report() carries that exact version and digest;
-//   3. the committed curve choice (docs/economy/5b/curve.json) equals framework CURVE.quartic.
+//   3. the committed curve choice (docs/economy/5b/curve.json) equals framework CURVE.quartic;
+//   4. the decision registry (decisions.js) only uses allowed statuses (nothing claims user approval
+//      of a candidate rule) and every entry's modelled value is what the framework actually runs.
 //
 //   node scripts/economy/5b/check-shared.js
 const fs = require('node:fs');
@@ -14,7 +16,7 @@ const path = require('node:path');
 const F = require('./framework');
 
 const DIR = __dirname;
-const SHARED_FILES = new Set(['framework.js', 'assumptions.js', 'check-shared.js', 'curve.js', 'lifecycle.js', 'integrate.js']);
+const SHARED_FILES = new Set(['framework.js', 'assumptions.js', 'check-shared.js', 'curve.js', 'lifecycle.js', 'integrate.js', 'decisions.js']);
 const num = (n) => String(n).replace('.', '\\.').replace(/^0\\\./, '0?\\.');
 
 const RULES = [
@@ -97,7 +99,10 @@ async function main() {
 		if (curve.chosen !== F.CURVE.quartic) problems.push(`curve.json chose quartic ${curve.chosen} but framework CURVE.quartic is ${F.CURVE.quartic}`);
 		if (curve.sharedDigest && curve.sharedDigest !== expected.sharedDigest) problems.push(`curve.json was generated at digest ${curve.sharedDigest}; regenerate it (framework is ${expected.sharedDigest})`);
 	}
-	const summary = { framework: expected, gearPathSource: F.GEAR_PATH_SOURCE, modules: results, problems };
+	// Decision registry: candidate rules stay 'proposed' and match what the model runs.
+	const decisions = require('./decisions').verify();
+	for (const p of decisions.problems) problems.push(`decisions.js: ${p}`);
+	const summary = { framework: expected, gearPathSource: F.GEAR_PATH_SOURCE, decisions: { ok: decisions.ok, count: decisions.count }, modules: results, problems };
 	process.stdout.write(`${JSON.stringify(summary, null, 1)}\n`);
 	if (problems.length) process.exit(1);
 }

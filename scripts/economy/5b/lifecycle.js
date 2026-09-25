@@ -21,7 +21,14 @@
 //                                         { category, item, perCast } (category: see CATEGORIES)
 //   outcome(input, state, ctx) -> o       replace castOutcome entirely (e.g. the Founder profile); o must
 //                                         have fishPerCast, xpPerCast, valuePerCast, cooldownMs,
-//                                         durabilityPerCast and may add xpBasePerCast / valueBasePerCast
+//                                         durabilityPerCast and may add xpBasePerCast / valueBasePerCast.
+//                                         AT MOST ONE system per run may provide it (simulate() throws
+//                                         otherwise; everything else composes through modifyCast). Its
+//                                         result is NOT cached unless the system also provides
+//   outcomeCacheKey(input, state, ctx) -> string
+//                                         a key covering every piece of state the outcome depends on
+//                                         (the core caches on input + this key). Plain F.castOutcome is a
+//                                         pure function of the input and is always cached.
 //   beforeStep(state, ctx, rates)         runs after this step's rates are fixed, before they accrue
 //   onCasts(state, ctx, { casts, fish, rates })
 //                                         after accrual (repairs, counters)
@@ -69,6 +76,10 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
  *   curve       XP curve override (coefficient sweeps; default F.CURVE)
  *   gearPath    gear path override (default F.gearPath())
  *   biomes      fishable biome list (default F.LIVE_BIOMES)
+ *   onNoAccess  what happens when no biome is legally fishable (every canFish rejects every unlocked
+ *               biome): 'throw' (default: a broken access rule fails loudly) | 'idle' (the player cannot
+ *               fish: the step passes with no casts and is counted in blockedHours). The core never
+ *               falls back to a biome the access rules deny.
  *   milestones  levels to record (default F.LIFECYCLE.milestones)
  *   checkpoints calendar days to snapshot (default [1, 7, 14, 28, 30, 60, 90, 182, 365])
  *   stepH       step length in hours (default F.LIFECYCLE.stepH) }
@@ -86,12 +97,18 @@ function simulate(opts = {}) {
 	const gate = opts.gate || 'real';
 	const milestoneLevels = opts.milestones || F.LIFECYCLE.milestones;
 	const checkpoints = new Set(opts.checkpoints || [1, 7, 14, 28, 30, 60, 90, 182, 365]);
+	const onNoAccess = opts.onNoAccess || 'throw';
+	if (!['throw', 'idle'].includes(onNoAccess)) throw new Error(`Unknown onNoAccess ${onNoAccess}`);
 	const dayH = arch.minutesPerDay / 60;
+	// At most one full cast-outcome override per run; everything else composes through modifyCast.
+	const providers = systems.filter((s) => typeof s.outcome === 'function');
+	if (providers.length > 1) throw new Error(`Only one system may override the cast outcome; got ${providers.map((s) => s.name || '(unnamed)').join(', ')}`);
+	const provider = providers[0] || null;
 
 	const state = {
 		day: 0, playDay: 0, h: 0, minutesToday: 0, castsToday: 0, fishToday: 0, castsTotal: 0, fishTotal: 0,
 		xp: 0, publicXp: 0, money: 0, minMoney: 0, level: 1, publicLevel: 1, equippedTier: 0, biome: null,
-		stepStartLevel: 1, sys: {},
+		stepStartLevel: 1, blocked: false, blockedHours: 0, sys: {},
 		ledger: { xp: {}, publicXp: {}, cash: {}, spend: Object.fromEntries(CATEGORIES.map((c) => [c, {}])) },
 		milestones: {}, publicMilestones: {}, purchases: [], timeline: [],
 	};
@@ -124,10 +141,23 @@ function simulate(opts = {}) {
 	for (const s of systems) if (s.init) s.init(state, ctx);
 
 	const rateCache = new Map();
+	const BLOCKED = Object.freeze({ blocked: true, biome: null, castsPerStep: 0, fish: 0, xp: 0, xpBase: 0, cash: 0, cashBase: 0, durability: 0, costs: [], perHour: { casts: 0, xp: 0, cash: 0 } });
 	function castRates() {
 		const L = gateLevel();
-		const open = biomes.filter((b) => L >= F.BIOME_LEVEL[b] && systems.every((s) => !s.canFish || s.canFish(b, state, ctx) !== false));
-		const biome = open[open.length - 1] || biomes[0];
+		const unlocked = biomes.filter((b) => L >= F.BIOME_LEVEL[b]);
+		const open = unlocked.filter((b) => systems.every((s) => !s.canFish || s.canFish(b, state, ctx) !== false));
+		if (!open.length) {
+			// Never bypass an access gate: a denied player is blocked, not silently sent to a default biome.
+			if (onNoAccess === 'throw') {
+				const denials = unlocked.map((b) => `${b}: ${systems.filter((s) => s.canFish && s.canFish(b, state, ctx) === false).map((s) => s.name || '(unnamed)').join('/')}`);
+				throw new Error(`No legally fishable biome at gate level ${L} on day ${state.day + 1} (${denials.join('; ') || 'no biome unlocked'})`);
+			}
+			state.blocked = true;
+			state.biome = null;
+			return BLOCKED;
+		}
+		state.blocked = false;
+		const biome = open[open.length - 1];
 		state.biome = biome;
 		const gear = path[state.equippedTier];
 		const input = {
@@ -135,11 +165,13 @@ function simulate(opts = {}) {
 			multiChance: gear.multiChance ?? F.chanceForMean(gear.meanFish), tier: state.equippedTier, costs: [],
 		};
 		for (const s of systems) if (s.modifyCast) s.modifyCast(input, state, ctx);
-		const key = JSON.stringify(input);
-		let r = rateCache.get(key);
+		// Cache only what is provably a function of the key: plain castOutcome is pure in its input; a
+		// custom outcome() may read state, so it is cached only with its own state-aware key.
+		let key = JSON.stringify(input);
+		if (provider) key = typeof provider.outcomeCacheKey === 'function' ? `${key}|${provider.outcomeCacheKey(input, state, ctx)}` : null;
+		let r = key === null ? null : rateCache.get(key);
 		if (!r) {
-			const overrider = systems.find((s) => s.outcome);
-			const o = overrider ? overrider.outcome(input, state, ctx) : F.castOutcome(input);
+			const o = provider ? provider.outcome(input, state, ctx) : F.castOutcome(input);
 			const casts = (stepH * 3600) / (o.cooldownMs / 1000 + arch.overheadS);
 			r = {
 				biome, tier: state.equippedTier, outcome: o, castsPerStep: casts,
@@ -151,7 +183,7 @@ function simulate(opts = {}) {
 				// Per-hour figures for systems that price in hours of income.
 				perHour: { casts: casts / stepH, xp: (casts * o.xpPerCast) / stepH, cash: (casts * o.valuePerCast) / stepH },
 			};
-			rateCache.set(key, r);
+			if (key !== null) rateCache.set(key, r);
 		}
 		return r;
 	}
@@ -205,6 +237,7 @@ function simulate(opts = {}) {
 		for (const s of systems) if (s.onCasts) s.onCasts(state, ctx, { casts: r.castsPerStep, fish: r.fish, rates: r });
 		state.h += stepH;
 		state.minutesToday += stepH * 60;
+		if (r.blocked) state.blockedHours += stepH;
 		purchase();
 		updateLevels();
 	}
@@ -255,7 +288,7 @@ function simulate(opts = {}) {
 		timeline: state.timeline,
 		purchases: state.purchases,
 		ledger: state.ledger,
-		final: { level: state.level, publicLevel: state.publicLevel, xp: state.xp, publicXp: state.publicXp, money: state.money, minMoney: state.minMoney, tier: state.equippedTier, biome: state.biome, castsTotal: state.castsTotal, fishTotal: state.fishTotal },
+		final: { level: state.level, publicLevel: state.publicLevel, xp: state.xp, publicXp: state.publicXp, money: state.money, minMoney: state.minMoney, tier: state.equippedTier, biome: state.biome, castsTotal: state.castsTotal, fishTotal: state.fishTotal, blockedHours: state.blockedHours },
 		sys: state.sys,
 	};
 }

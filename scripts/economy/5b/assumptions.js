@@ -47,26 +47,32 @@ const LIFECYCLE = { stepH: 1 / 60, maxLevel: 60, milestones: [10, 20, 30, 40, 50
 
 // ---------------------------------------------------------------------------------------------
 // Time: the DCC day starts at this UTC hour; daily quests and the streak share it (5b.3).
+// PROPOSED (decisions.js P-DAY).
 const DAY = { startUtcHour: 0 };
 /** The DCC day index of a timestamp (ms). */
 const dayIndex = (ms, startUtcHour = DAY.startUtcHour) => Math.floor((ms - startUtcHour * 3600000) / 86400000);
 
 // ---------------------------------------------------------------------------------------------
-// Proposed engine rules every model shares (5b.3). Each is a user decision listed in the report; the
-// proposal models the recommended option.
+// CANDIDATE engine rules every model shares (5b.3). None of these is approved: each is a PROPOSED
+// decision awaiting the user's approval (listed with its alternatives in decisions.js and surfaced in
+// the Phase 5B report). The model runs the recommended option so the numbers are comparable; nothing
+// here becomes a production rule without that approval.
 const RULES = {
 	// Lucky rolls: today an item 20% of the time. Proposed: pinned so the item rate per draw stays at the
-	// NORMAL base table's rate whatever raises Lucky (gear, bait, Founder table, pity): Booster Packs stay
-	// an Easter egg (decision 12). 'engine' = today's rule.
+	// NORMAL base table's rate whatever raises Lucky (gear, bait, Founder table, pity), so Booster Packs stay
+	// an Easter egg (user decision 12 is the goal; this rule is a proposed way to keep it: decisions.js P-LUCKY).
+	// 'engine' = today's rule.
 	luckyItems: 'pinned',
-	// Durability per cast: today max(1, ceil(fish x (1 - efficiency))). Proposed (Founder D5): fish x
-	// (1 - efficiency) with stochastic rounding and no minimum. Identical at efficiency 0 (all normal rods).
+	// Durability per cast: today max(1, ceil(fish x (1 - efficiency))). Proposed (decisions.js P-DURABILITY,
+	// from the Founder design's D5): fish x (1 - efficiency) with stochastic rounding and no minimum.
+	// Identical at efficiency 0 (all normal rods).
 	durability: 'stochastic',
 };
 
 // ---------------------------------------------------------------------------------------------
-// Buffs (from the buffs design; 5b.3): Double Cash is stamped at CATCH time (decision 8: a buff
-// multiplies play, never a stockpile); temporary boosts in one category add their bonuses.
+// Buffs (from the buffs design; 5b.3). PROPOSED, not approved: Double Cash stamped at CATCH time (the
+// buffs design's answer to the user's decision-8 question; decisions.js P-DOUBLE-CASH, alternative:
+// sale-time with a cap); temporary boosts in one category add their bonuses.
 const BUFFS = {
 	doubleCashTiming: 'catch',
 	durationSeconds: 3600,
@@ -75,6 +81,7 @@ const BUFFS = {
 	stacking: { sameKind: 'queue', maxQueued: 3, withEvent: 'additive', withGearAndProfile: 'multiply' },
 };
 // Event budget: buffs an event calendar may grant per 30 days (and no XP/sell event multipliers).
+// PROPOSED (decisions.js P-EVENTS).
 const EVENTS = { buffsPerThirtyDays: { 'Double XP': 0, 'Double Cash': 1, 'Lucky Draw': 1 }, multipliers: null };
 
 // ---------------------------------------------------------------------------------------------

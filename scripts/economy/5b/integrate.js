@@ -36,6 +36,8 @@ const REGISTRY = {
 /** The approved core loop every player runs: gear, permits, quests, streak and buffs. */
 const REFERENCE = ['rods', 'world', 'quests', 'streak', 'buffs'];
 const REFERENCE_NOTE = 'integrated core loop: rods (gear purchases, repairs) + world (permits) + quests + streak + buffs, no bait, no aquarium';
+/** Which level gates content for the Founder variant: PROPOSED 'public' (decisions.js P-FOUNDER-GATE). */
+const DEFAULT_FOUNDER_GATE = 'public';
 
 function systemOf(name, opts = {}) {
 	const mod = REGISTRY[name]();
@@ -54,7 +56,8 @@ function referenceSystems(opts = {}) {
  *   gate: 'public'|'real' }, exclude: [system names], systemOpts: { [name]: opts }, ...simulate opts }
  */
 function run(o = {}) {
-	const variant = { bait: 'none', aquarium: false, founder: false, gate: 'real', ...(o.variant || {}) };
+	const variant = { bait: 'none', aquarium: false, founder: false, ...(o.variant || {}) };
+	variant.gate = variant.gate || (variant.founder ? DEFAULT_FOUNDER_GATE : 'real');
 	const names = REFERENCE.filter((n) => !(o.exclude || []).includes(n));
 	if (variant.bait !== 'none') names.push('bait');
 	if (variant.aquarium) names.push('aquarium');
@@ -91,4 +94,4 @@ function sinkSummary(result) {
 	return { income: Math.round(income), sources: Object.fromEntries(Object.entries(result.ledger.cash).map(([k, v]) => [k, Math.round(v)])), byCategory, saved: Math.round(result.final.money), savedShare: +(result.final.money / income).toFixed(4) };
 }
 
-module.exports = { REGISTRY, REFERENCE, REFERENCE_NOTE, systemOf, referenceSystems, run, xpDecomposition, sinkSummary };
+module.exports = { REGISTRY, REFERENCE, REFERENCE_NOTE, DEFAULT_FOUNDER_GATE, systemOf, referenceSystems, run, xpDecomposition, sinkSummary };

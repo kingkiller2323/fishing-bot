@@ -43,7 +43,8 @@ function levelForXp(xp, c = CURVE) {
 // fish of the same biome and rarity), clamped so rarity and biome order always hold.
 // Size/weight rolls still scale an individual catch around this expectation (trophies stay special).
 // Base value of a Common weak fish in each biome (Old Rod average $/fish = 1.40 × this).
-// 5b.3: Mountain Stream 143 -> 149 (world design: keeps its step over Swamp inside the live ladder's band).
+// 5b.3: Mountain Stream 143 -> 149, PROPOSED by the world design (keeps its step over Swamp inside the
+// live ladder's band; decisions.js P-MS-VALUE). Not approved; Mountain Stream is not live either way.
 const BIOME_VALUE = { 'Ocean': 18, 'River': 29, 'Lake': 43, 'Pond': 61, 'Coast': 82, 'Swamp': 107, 'Mountain Stream': 149 };
 const RARITY_VALUE = { common: 1, uncommon: 1.6, rare: 3, ultra: 6, giant: 12, legendary: 25, lucky: 50 };
 const QUALITY_VALUE = { weak: 1, strong: 1.3 };
