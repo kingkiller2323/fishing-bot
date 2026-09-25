@@ -3,6 +3,7 @@ const { Utils } = require('../class/Utils');
 const { User } = require('../class/User');
 const { Quest: QuestSchema, QuestData } = require('../schemas/QuestSchema');
 const { Gacha } = require('../schemas/GachaSchema');
+const { rng } = require('../engine/rng');
 
 class Quest {
 	constructor(data) {
@@ -100,7 +101,7 @@ class Quest {
 		const stats = await user.getStats();
 	
 		const dailies = await QuestSchema.find({ daily: true });
-		const randomIndex = Math.floor(Math.random() * dailies.length);
+		const randomIndex = Math.floor(rng.random() * dailies.length);
 		const originalQuest = dailies[randomIndex];
 	
 		if (!user) {

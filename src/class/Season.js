@@ -1,5 +1,6 @@
 const { WeatherType } = require("../schemas/WeatherTypeSchema");
 const { Season: SeasonSchema } = require("../schemas/SeasonSchema");
+const { rng } = require('../engine/rng');
 
 class Season {
 	static async getCurrentSeason() {
@@ -34,7 +35,7 @@ class Season {
 		}
 	
 		// Randomly select a weather type from the weighted list
-		const randomWeather = weightedWeather[Math.floor(Math.random() * weightedWeather.length)];
+		const randomWeather = weightedWeather[Math.floor(rng.random() * weightedWeather.length)];
 	
 		return randomWeather;
 	}

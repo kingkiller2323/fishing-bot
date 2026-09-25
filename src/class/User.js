@@ -6,6 +6,7 @@ const { BuffData } = require('../schemas/BuffSchema');
 const config = require('../config');
 const fetch = require('node-fetch');
 const { QuestData } = require('../schemas/QuestSchema');
+const { rng } = require('../engine/rng');
 
 class User {
 	constructor(data) {
@@ -377,7 +378,7 @@ class User {
 			const numItems = box.items || 1;
 			const generatedItems = [];
 			for (let i = 0; i < numItems; i++) {
-				const random = Math.floor(Math.random() * filteredItems.length);
+				const random = Math.floor(rng.random() * filteredItems.length);
 				const item = filteredItems[random];
 				generatedItems.push(await this.sendToInventory(item));
 			}

@@ -11,6 +11,7 @@ const { Icons } = require('./Icons');
 const { LicenseData } = require('../schemas/LicenseSchema');
 const { WeatherType } = require('../schemas/WeatherTypeSchema');
 const { Season } = require('../schemas/SeasonSchema');
+const { rng } = require('../engine/rng');
 
 class Utils {
 	/**
@@ -42,15 +43,15 @@ class Utils {
 	};
 
 	static generateXP(min = 10, max = 25) {
-		return Math.floor(Math.random() * (max - min) + min);
+		return Math.floor(rng.random() * (max - min) + min);
 	};
 
 	static generateCash(min = 10, max = 100) {
-		return Math.floor(Math.random() * (max - min) + min);
+		return Math.floor(rng.random() * (max - min) + min);
 	};
 
 	static getRandomInteger(max) {
-		return Math.floor(Math.random() * max);
+		return Math.floor(rng.random() * max);
 	};
 
 	static async sumArrays(arr1, arr2) {
@@ -366,7 +367,7 @@ class Utils {
 	
 		let successes = 0;
 		for (let i = 0; i < n; i++) {
-			if (Math.random() < p) {
+			if (rng.random() < p) {
 				successes++;
 			}
 		}
@@ -376,7 +377,7 @@ class Utils {
 		
 		// Scale the result to fit within the min and max range
 		const scaled = (successes / n) * range;
-		const jitter = (Math.random() - 0.5) * (range * 0.1); // Add some jitter for variety
+		const jitter = (rng.random() - 0.5) * (range * 0.1); // Add some jitter for variety
 		return min + scaled + jitter;
 	}
 }

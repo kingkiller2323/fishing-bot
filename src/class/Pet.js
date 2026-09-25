@@ -3,6 +3,7 @@ const { Habitat } = require('../schemas/HabitatSchema');
 const { PetFish } = require('../schemas/PetSchema');
 const { User } = require('../schemas/UserSchema');
 const { Utils } = require('../class/Utils');
+const { rng } = require('../engine/rng');
 
 class Pet {
 	constructor(data) {
@@ -534,7 +535,7 @@ class Pet {
 	async regenerateTrait() {
 		const traits = await this.getTraits();
 		const traitKeys = Object.keys(traits);
-		const trait = traitKeys[Math.floor(Math.random() * traitKeys.length)];
+		const trait = traitKeys[Math.floor(rng.random() * traitKeys.length)];
 		await this.generateTraits(trait);
 		return;
 	}
@@ -650,13 +651,13 @@ class Pet {
 	
 		// Add a random factor to the success rate
 		const successRate = Math.max(Math.min(0.65, (50 - stress) / 50), Math.max(Math.min(0.6, health / 100 - 0.5), 0.1));
-		const randomFactor = Math.random() * 100;
+		const randomFactor = rng.random() * 100;
 		if (randomFactor < successRate) success = true;
 		if (!success) return { success, reason: 'Unlucky. You can try improving the health of your pets and reducing their stress.' };
 	
 		// Generate a new pet with the same species as the parents
 		const speciesOptions = [await firstPet.getFishData(), await secondPet.getFishData()];
-		const species = speciesOptions[Math.floor(Math.random() * speciesOptions.length)];
+		const species = speciesOptions[Math.floor(rng.random() * speciesOptions.length)];
 	
 		// Randomize traits
 		const firstPetTraits = await firstPet.getTraits();

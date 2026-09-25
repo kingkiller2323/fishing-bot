@@ -4,7 +4,7 @@
   "description": "A fishing RPG bot for Discord!",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Wow is this a test?\" && exit 1",
+    "test": "node --test \"test/**/*.test.js\"",
     "start": "node .",
     "seed": "node src/scripts/seed.js"
   },
@@ -17,5 +17,8 @@
     "dotenv": "^16.3.1",
     "mongoose": "^7.3.1",
     "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server-core": "^9.5.0"
   }
 }

@@ -5,6 +5,7 @@ const { Utils } = require('./Utils');
 const { User } = require('../class/User');
 const { WeatherPattern } = require('./WeatherPattern');
 const { Season } = require('./Season');
+const { rng } = require('../engine/rng');
 
 class Fish {
 	// constructor(data) {
@@ -129,7 +130,7 @@ class Fish {
 				const itemFind = await Utils.getWeightedChoice(['fish', 'item'], [80, 20]);
 				if (itemFind === 'item') {
 					const options = await Item.find({ rarity: draw });
-					const random = Math.floor(Math.random() * options.length);
+					const random = Math.floor(rng.random() * options.length);
 					f = [options[random]];
 				}
 			}
@@ -153,7 +154,7 @@ class Fish {
 				return await this.generateFish(number, count, capabilities, choices, weights, user, weather, season);
 			}
 		
-			choice.push(validChoices[Math.floor(Math.random() * validChoices.length)]);
+			choice.push(validChoices[Math.floor(rng.random() * validChoices.length)]);
 		}
 
 		// merge any duplicate fish
