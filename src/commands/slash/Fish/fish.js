@@ -54,9 +54,8 @@ const followUpMessage = async (interaction, user, result) => {
 	let fishAgainDisabled = false;
 	const rodState = success ? result.rod.after.state : result.rodState;
 
-	// Subtle profile indicator: only Founder casts mention it.
-	const footer = success && result.profile === 'founder' ? `${branding.name} · 👑 Founder` : branding.name;
-	const embed = new EmbedBuilder().setFooter({ text: footer });
+	// Public card: identical for every profile. Profile details live in the private /fishing-stats.
+	const embed = new EmbedBuilder().setFooter({ text: branding.name });
 
 	if (success) {
 		embed

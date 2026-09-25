@@ -29,7 +29,7 @@ const { Season } = require('../class/Season');
 const { Utils } = require('../class/Utils');
 const { rng } = require('./rng');
 const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, levelForXp, activeEvent } = require('./balance');
-const { resolveModifiers } = require('./modifiers');
+const { resolveModifiers, rollDraws } = require('./modifiers');
 const { applyPity, roll, toPercent } = require('./rarity');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
@@ -122,6 +122,27 @@ function questMatches(quest, entry, rodName) {
 	return { found: true, progresses };
 }
 
+const part = (base, final) => ({ base, profileBonus: final - base, final });
+
+/** Reconciled reward totals for a cast: base + profileBonus = final for every line. */
+function rewardBreakdown({ catches, catchXp, catchXpWithoutProfile, quests }) {
+	const fish = catches.filter((c) => c.kind === 'fish');
+	const valueBase = fish.reduce((s, c) => s + c.reward.base * c.count, 0);
+	const valueFinal = fish.reduce((s, c) => s + c.reward.final * c.count, 0);
+	const questXpBase = quests.reduce((s, q) => s + q.reward.xp.base, 0);
+	const questXpFinal = quests.reduce((s, q) => s + q.reward.xp.final, 0);
+	const questCashBase = quests.reduce((s, q) => s + q.reward.cash.base, 0);
+	const questCashFinal = quests.reduce((s, q) => s + q.reward.cash.final, 0);
+	return {
+		catchXp: part(catchXpWithoutProfile, catchXp),
+		questXp: part(questXpBase, questXpFinal),
+		xp: part(catchXpWithoutProfile + questXpBase, catchXp + questXpFinal),
+		questCash: part(questCashBase, questCashFinal),
+		// Sale value of the catch (stored on each fish; paid when sold).
+		catchValue: part(valueBase, valueFinal),
+	};
+}
+
 function failure(base, code, message, extra = {}) {
 	return { ...base, status: 'failed', failure: { code, message }, ...extra };
 }
@@ -179,7 +200,9 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 		gachaSinceHighTier: user.pity?.gachaSinceHighTier || 0,
 	};
 	const pity = applyPity(modifiers.rarity.table, pityBefore, profile.pity);
-	const { draws, perDraw, qualities } = modifiers;
+	const { perDraw, qualities } = modifiers;
+	// Profile bonus draws are rolled per cast (Founder: 1-5 fish with the starter rod, average 3).
+	const { draws, bonus: bonusDraws } = rollDraws(modifiers, rng);
 
 	let templates;
 	try {
@@ -212,12 +235,15 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 		if (t.type === 'fish') {
 			const size = parseFloat((await Utils.binomialRandomInRange(10, 0.5, t.minSize, t.maxSize)).toFixed(3));
 			const weight = parseFloat((await Utils.binomialRandomInRange(10, 0.5, t.minWeight, t.maxWeight)).toFixed(3));
-			const baseValue = parseInt(await require('../class/Fish').Fish.calculateSellValue(t.baseValue, size, weight, t.rarity), 10);
-			// Sell bonuses (gear, profile) are baked into the catch's value; cash buffs still apply at sale.
-			const value = Math.round(baseValue * modifiers.sell.multiplier);
+			const rawValue = parseInt(await require('../class/Fish').Fish.calculateSellValue(t.baseValue, size, weight, t.rarity), 10);
+			// Sell bonuses (gear, event, profile) are baked into the stored value; cash buffs apply at sale.
+			// reward.base = what the same catch is worth without the profile; final = stored value.
+			const value = Math.round(rawValue * modifiers.sell.multiplier);
+			const valueBase = Math.round(rawValue * modifiers.sell.withoutProfile);
+			const reward = { base: valueBase, profileBonus: value - valueBase, final: value };
 			const fishId = new ObjectId().toString();
 			const locked = autoLockSpecies.includes(t.name.toLowerCase());
-			catches.push({ kind: 'fish', id: fishId, templateId: String(t._id), name: t.name, rarity: t.rarity, type: t.type, count, size, weight, baseValue, value, qualities: t.qualities || [], biome: t.biome, icon: t.icon, locked, autoLocked: locked });
+			catches.push({ kind: 'fish', id: fishId, templateId: String(t._id), name: t.name, rarity: t.rarity, type: t.type, count, size, weight, rawValue, value, reward, qualities: t.qualities || [], biome: t.biome, icon: t.icon, locked, autoLocked: locked });
 
 			const fields = copyFields(t);
 			fishDocs.push({
@@ -257,6 +283,7 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 
 	const xpMultiplier = modifiers.xp.multiplier;
 	const catchXp = Math.floor(baseXp * xpMultiplier);
+	const catchXpWithoutProfile = Math.floor(baseXp * modifiers.xp.withoutProfile);
 
 	// Rod and bait consumption. Durability Efficiency lowers the per-fish cost (at least 1 per cast).
 	const durabilityCost = units > 0 ? Math.max(1, Math.ceil(units * modifiers.durabilityCostPerFish)) : 0;
@@ -288,6 +315,8 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 		const q = state.doc;
 		const xp = state.completed ? Math.floor((q.xp || 0) * modifiers.quest.xp) : 0;
 		const cash = state.completed ? Math.floor((q.cash || 0) * modifiers.quest.cash) : 0;
+		const xpBase = state.completed ? Math.floor((q.xp || 0) * modifiers.quest.xpWithoutProfile) : 0;
+		const cashBase = state.completed ? Math.floor((q.cash || 0) * modifiers.quest.cashWithoutProfile) : 0;
 		const rewards = [];
 		if (state.completed) {
 			for (const rewardId of (q.reward || []).filter(Boolean)) {
@@ -300,7 +329,10 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 		}
 		questXp += xp;
 		questCash += cash;
-		quests.push({ questId: String(q._id), title: q.title, before: q.progress || 0, after: state.progress, max: q.progressMax, completed: state.completed, xp, cash, rewards });
+		quests.push({
+			questId: String(q._id), title: q.title, before: q.progress || 0, after: state.progress, max: q.progressMax, completed: state.completed, xp, cash, rewards,
+			reward: { xp: { base: xpBase, profileBonus: xp - xpBase, final: xp }, cash: { base: cashBase, profileBonus: cash - cashBase, final: cash } },
+		});
 	}
 
 	const xpTotal = catchXp + questXp;
@@ -332,11 +364,14 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 		// Resolved modifier snapshot: every source, the summed stats and the resulting multipliers.
 		modifiers: { ...modifiers, rarity: { base: toPercent(modifiers.rarity.base, 4), table: toPercent(modifiers.rarity.table, 4) } },
 		rarity: { table: toPercent(pity.table, 4), guarantee: pity.guarantee },
-		draws: { draws, perDraw, qualities },
+		draws: { draws, bonusDraws, perDraw, qualities },
 		cooldownMs: modifiers.cooldownMs,
 		catches,
 		units,
 		xp: { perFish, base: baseXp, multiplier: xpMultiplier, catch: catchXp, bonus: catchXp - baseXp, quest: questXp, total: xpTotal },
+		// base = without the player's profile (what a normal player would get for the same cast),
+		// profileBonus = what the profile added, final = what was actually awarded/stored.
+		rewards: rewardBreakdown({ catches, catchXp, catchXpWithoutProfile, quests }),
 		cash: { quest: questCash, total: cashTotal },
 		quests,
 		level: { before: levelBefore, after: levelAfter, levelUp: levelAfter > levelBefore },

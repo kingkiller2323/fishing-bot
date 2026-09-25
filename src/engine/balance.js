@@ -5,7 +5,7 @@
 // Engine code reads from here; it never hard-codes multipliers.
 const config = require('../config');
 
-const BALANCE_VERSION = '3.0.0';
+const BALANCE_VERSION = '3.1.0';
 
 /** Rarity tiers, lowest to highest. Keys match rod/bait `weights` objects. */
 const RARITIES = ['common', 'uncommon', 'rare', 'ultra', 'giant', 'legendary', 'lucky'];
@@ -83,7 +83,10 @@ const PROFILES = {
 	founder: {
 		competitiveEligible: false,
 		rarityTable: FOUNDER_RARITY_TABLE,
-		stats: { multiCatch: 2, durabilityEfficiency: 0.75, fishingSpeed: 0.6 },
+		stats: { durabilityEfficiency: 0.75, fishingSpeed: 0.6 },
+		// Extra draws rolled per cast instead of a fixed +2: same average (+2.0), natural-looking
+		// catches (starter rod: 1-5 fish, mostly 2-4).
+		bonusDraws: { 0: 0.10, 1: 0.25, 2: 0.30, 3: 0.25, 4: 0.10 },
 		multipliers: { xp: 5, sell: 10, questXp: 5, questCash: 5, gachaLuck: 3 },
 		limits: { maxDraws: 8, maxPerDraw: 5 },
 		pity: FOUNDER_PITY,

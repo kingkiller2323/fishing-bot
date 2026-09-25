@@ -136,10 +136,11 @@ test('multi-catch: rod draws + profile draws, fish per draw, capped per profile'
 	assert.equal(normal.draws, 3);
 	assert.equal(normal.perDraw, 2);
 	const founder = resolveModifiers({ profile: profile('founder'), rod: rod3, bait: bait('Lure'), baitApplies: true });
-	assert.equal(founder.draws, 5, '3 from the rod + 2 Founder');
+	assert.equal(founder.draws, 3, 'gear draws; Founder bonus draws are rolled per cast');
+	assert.ok(Math.abs(founder.expectedDraws - 5) < 1e-9, '3 from the rod + 2.0 Founder on average');
 	assert.equal(founder.perDraw, 3, '2 count rod + 1 Lure');
 	const starterFounder = resolveModifiers({ profile: profile('founder'), rod: oldRod });
-	assert.equal(starterFounder.draws, 3);
+	assert.ok(Math.abs(starterFounder.expectedDraws - 3) < 1e-9);
 });
 
 test('XP, sell and quest modifiers stack exactly as documented', () => {

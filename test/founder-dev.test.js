@@ -35,17 +35,18 @@ test.after(async () => {
 	restore();
 });
 
-test('Founder casts: 5x XP, 10x sale value, 3 draws, cheaper durability, non-competitive', async () => {
+test('Founder casts: 5x XP, 10x sale value, 1-5 draws, cheaper durability, non-competitive', async () => {
 	await makeUser('founder');
 	await useTestRod('founder', { capabilities: ['weak', '1'], durability: 100 });
 	rng.seed(5);
 	const r = await castLine({ userId: 'founder' });
 	assert.equal(r.profile, 'founder');
 	assert.equal(r.competitiveEligible, false);
-	assert.equal(r.units, 3);
+	assert.ok(r.units >= 1 && r.units <= 5);
+	assert.equal(r.units, 1 + r.draws.bonusDraws);
 	assert.equal(r.xp.catch, Math.floor(r.xp.base * 5));
-	for (const c of r.catches) assert.equal(c.value, Math.round(c.baseValue * 10));
-	assert.equal(r.rod.durabilityCost, 1, '3 fish x 0.25 rounds up to 1');
+	for (const c of r.catches) assert.equal(c.value, Math.round(c.rawValue * 10));
+	assert.equal(r.rod.durabilityCost, Math.max(1, Math.ceil(r.units * 0.25)));
 	assert.equal(r.cooldownMs, 2000);
 	assert.equal(r.modifiers.sources.find((s) => s.source === 'profile').name, 'founder');
 	await applyCastResult(r);

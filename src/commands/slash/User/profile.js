@@ -26,9 +26,10 @@ module.exports = {
 			const embeds = [];
 			const target = interaction.options.getUser('user') || interaction.user;
 			const user = new User(await User.get(target.id));
-			const rods = await RodData.find({ user: interaction.user.id });
+			const rods = await RodData.find({ user: target.id });
 			const stats = await user.getStats();
-			const isFounder = resolveProfile(target.id, user.user).name === 'founder';
+			// Founder status is private: only shown when players view their own profile.
+			const isFounder = target.id === interaction.user.id && resolveProfile(target.id, user.user).name === 'founder';
 
 			let fields = [{
 				name: `Level ${await user.getLevel() || 0}`,
@@ -55,7 +56,7 @@ module.exports = {
 
 				embeds.push(new EmbedBuilder()
 					.setFooter({ text: `Page ${Math.floor(i / chunkSize) + 1} / ${Math.ceil(fields.length / chunkSize)} ` })
-					.setTitle(`${interaction.user.globalName}'s Profile${isFounder ? ' · 👑 Founder' : ''}`)
+					.setTitle(`${target.globalName || target.username}'s Profile${isFounder ? ' · 👑 Founder' : ''}`)
 					.setColor('Green')
 					.addFields(chunk),
 				);

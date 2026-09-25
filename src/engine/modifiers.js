@@ -125,6 +125,21 @@ function buffEffects(buffs = []) {
 	return effects;
 }
 
+/** Expected draws per cast given gear draws, an optional bonus-draw distribution and the cap. */
+function expectedDrawCount(draws, bonusDraws, maxDraws) {
+	if (!bonusDraws) return draws;
+	const total = Object.values(bonusDraws).reduce((s, p) => s + p, 0);
+	return Object.entries(bonusDraws).reduce((s, [extra, p]) => s + Math.min(maxDraws, draws + Number(extra)) * (p / total), 0);
+}
+
+/** Draws for one cast: gear draws plus a rolled profile bonus, capped. */
+function rollDraws(modifiers, rng) {
+	if (!modifiers.bonusDraws) return { draws: modifiers.draws, bonus: 0 };
+	const extras = Object.keys(modifiers.bonusDraws);
+	const bonus = Number(rng.weighted(extras, extras.map((k) => modifiers.bonusDraws[k])) || 0);
+	return { draws: Math.min(modifiers.maxDraws, modifiers.draws + bonus), bonus };
+}
+
 /**
  * Resolves the modifier snapshot for one cast.
  * @param {object} input { profile, rod, rodParts, bait, baitApplies, buffs, event, user, now }
@@ -164,11 +179,17 @@ function resolveModifiers({ profile, rod, rodParts = null, bait = null, baitAppl
 	const stats = clampStats(total);
 	const eventMult = event?.multipliers || {};
 	const gearXp = stats.xpBonus;
-	const xpMultiplier = (1 + gearXp) * (1 + buffsResult.xp) * profile.multipliers.xp * (eventMult.xp || 1);
-	const sellMultiplier = (1 + stats.sellBonus) * profile.multipliers.sell * (eventMult.sell || 1);
+	// Everything except the profile, so rewards can be split into base / profile bonus / final.
+	const xpWithoutProfile = (1 + gearXp) * (1 + buffsResult.xp) * (eventMult.xp || 1);
+	const sellWithoutProfile = (1 + stats.sellBonus) * (eventMult.sell || 1);
+	const xpMultiplier = xpWithoutProfile * profile.multipliers.xp;
+	const sellMultiplier = sellWithoutProfile * profile.multipliers.sell;
 
 	const qualities = [...new Set([...rodResult.qualities, ...(baitApplies ? baitResult.qualities : [])])];
+	// Gear draws; a profile may add a random number of bonus draws per cast (rollDraws).
 	const draws = Math.min(profile.limits.maxDraws, 1 + Math.floor(stats.multiCatch));
+	const bonusDraws = profile.bonusDraws || null;
+	const expectedDraws = expectedDrawCount(draws, bonusDraws, profile.limits.maxDraws);
 	const perDraw = Math.min(profile.limits.maxPerDraw, 1 + Math.floor(stats.perDraw));
 	const table = buildTable(profile.rarityTable, stats);
 
@@ -180,10 +201,18 @@ function resolveModifiers({ profile, rod, rodParts = null, bait = null, baitAppl
 		stats,
 		qualities,
 		draws,
+		bonusDraws,
+		maxDraws: profile.limits.maxDraws,
+		expectedDraws,
 		perDraw,
-		xp: { perFish: { ...XP_PER_FISH }, gear: gearXp, buff: buffsResult.xp, profile: profile.multipliers.xp, event: eventMult.xp || 1, multiplier: xpMultiplier },
-		sell: { gear: stats.sellBonus, profile: profile.multipliers.sell, event: eventMult.sell || 1, multiplier: sellMultiplier, cashBuffAtSale: buffsResult.cash },
-		quest: { xp: profile.multipliers.questXp * (eventMult.questXp || 1), cash: profile.multipliers.questCash * (eventMult.questCash || 1) },
+		xp: { perFish: { ...XP_PER_FISH }, gear: gearXp, buff: buffsResult.xp, profile: profile.multipliers.xp, event: eventMult.xp || 1, withoutProfile: xpWithoutProfile, multiplier: xpMultiplier },
+		sell: { gear: stats.sellBonus, profile: profile.multipliers.sell, event: eventMult.sell || 1, withoutProfile: sellWithoutProfile, multiplier: sellMultiplier, cashBuffAtSale: buffsResult.cash },
+		quest: {
+			xp: profile.multipliers.questXp * (eventMult.questXp || 1),
+			cash: profile.multipliers.questCash * (eventMult.questCash || 1),
+			xpWithoutProfile: eventMult.questXp || 1,
+			cashWithoutProfile: eventMult.questCash || 1,
+		},
 		gachaLuck: profile.multipliers.gachaLuck * (1 + buffsResult.gacha),
 		durabilityCostPerFish: DURABILITY.costPerFish * (1 - stats.durabilityEfficiency),
 		cooldownMs: Math.max(COOLDOWN.minMs, Math.round(COOLDOWN.fishMs * (1 - stats.fishingSpeed))),
@@ -191,4 +220,4 @@ function resolveModifiers({ profile, rod, rodParts = null, bait = null, baitAppl
 	};
 }
 
-module.exports = { resolveModifiers, rodStats, baitStats, buffEffects, statsFromWeights, qualitiesOf, RARITIES };
+module.exports = { resolveModifiers, rollDraws, expectedDrawCount, rodStats, baitStats, buffEffects, statsFromWeights, qualitiesOf, RARITIES };
