@@ -1,7 +1,8 @@
 // Phase 5B reproducibility guard. Fails (exit 1) when a subsystem module could drift from the shared
 // framework:
 //   1. static scan: no module redefines a shared assumption (archetypes, target windows, daily XP,
-//      purchase delay, lifecycle step, biome levels, curve, value/XP tables, provisional tier stats);
+//      purchase delay, lifecycle step, biome levels, curve, value/XP tables, provisional tier stats)
+//      or reads an alternate gear source (rods.gearPath() outside assumptions.js; R3);
 //      a line may opt out only with an explicit `// shared-ok: <reason>` comment;
 //   2. runtime: framework.verifyShared() passes (shared values match the digest pinned for
 //      FRAMEWORK_VERSION), and every module's report() carries that exact version and digest;
@@ -28,6 +29,9 @@ const RULES = [
 	{ name: 'milestone list literal', re: /\[\s*10\s*,\s*20\s*,\s*30\s*,\s*40\s*,\s*50\s*,\s*60\s*\]/ },
 	{ name: 'biome level literal', re: /'(Ocean|River|Lake|Pond|Coast|Swamp|Mountain Stream)'\s*:\s*(0|10|20|30|40|50|60)\s*[,}]/ },
 	{ name: 'shared table redefinition', re: /\b(BIOME_LEVEL|BIOME_ORDER|BIOME_VALUE|RARITY_VALUE|QUALITY_VALUE|XP_RARITY|ARCHETYPES|TARGET_WINDOWS|TARGETS)\s*=\s*[{[]/ },
+	// R3: one authoritative gear path. Only assumptions.js may read rods.gearPath() (the GEAR_PATH_SOURCE
+	// switch); every other module uses F.gearPath(), which becomes the rods path at the 5b.3 cutover.
+	{ name: 'alternate gear source (use F.gearPath(); rods.gearPath() becomes the shared path at the R3 cutover)', re: /\brods\.gearPath\s*\(|require\(\s*['"]\.\/rods(\.js)?['"]\s*\)\s*\.\s*gearPath\s*\(/ },
 	...F.PROVISIONAL_GEAR_PATH.filter((t) => Object.keys(t.stats).length >= 2).map((t) => ({
 		name: `provisional tier ${t.key} stats literal`,
 		re: new RegExp(Object.entries(t.stats).map(([k, v]) => `${k}\\s*:\\s*${num(v)}`).join('\\s*,\\s*')),

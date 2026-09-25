@@ -37,3 +37,20 @@ Adversarial scenarios, simulated with the integrated model:
 - **No-miss grinder:** grinds and never misses a day, taking every daily, streak and repeatable reward. Report whether stacking daily systems on top of grinding breaks the curve targets.
 
 Each scenario ends with a verdict and, if needed, a proposed guardrail. Examples: a daily-reward XP cap that scales with actual fishing, or daily rewards that require a minimum of fish caught that day.
+
+## R3: Final gear-path cutover
+Framework 5b.2 intentionally uses `GEAR_PATH_SOURCE = 'provisional'`, so **5b.2 cannot be the final integrated framework version**. Once all eight subsystem designs are complete, the integrated economy must not remain priced against the provisional path.
+
+During integration, in this order:
+1. Switch the shared gear-path source (`assumptions.js` `GEAR_PATH_SOURCE`) from `'provisional'` to the finalized `rods.gearPath()`.
+2. Treat that as a shared-value change.
+3. Bump `FRAMEWORK_VERSION` (expected **5b.3**).
+4. Recompute and pin the new shared digest.
+5. Regenerate every subsystem report from the final rod path.
+6. Run `check-shared.js`. It must pass.
+7. Run **R1**, coefficient revalidation, on the fully integrated lifecycle at that version.
+8. Run **R2**, XP-source decomposition and the adversarial scenarios, on that same final version.
+
+**One authoritative path:** no subsystem may import `rods.js` directly as its own gear source. Every module uses the framework's shared `F.gearPath()`. Only `assumptions.js` reads `rods.gearPath()`, through the `GEAR_PATH_SOURCE` switch. `check-shared.js` enforces this. Other rods exports that are not a gear source (e.g. crate or legacy-converter helpers) remain importable.
+
+**Traceability:** the final Phase 5B report states the final framework version and shared digest at the top, and every table in it is generated at that version/digest.
