@@ -6,43 +6,60 @@
 //   node -e "require('./scripts/economy/5b/rods.js').report()"     (returns the report object)
 //   node scripts/economy/5b/rods.js                                  (prints it as JSON)
 //
-// Exports (all pure; no database, no randomness):
+// Exports (all pure and synchronous unless noted; no database, no randomness):
 //   PARAMS                      frozen design parameters (part levels, slot stat families, variants,
 //                               durability lives, upkeep share, crate tables, assembly hours, salvage)
-//   RARITY_ORDER, SLOTS         part rarities (low -> high) and slot -> catalog type
-//   CATALOG                     the seeded rod parts (src/bootstrap/data/rodParts.js)
+//   RARITY_ORDER, SLOTS, CATALOG, ARCHETYPES, TARGETS
+//                               part rarities (low -> high), slot -> catalog type, the seeded rod parts
+//                               (src/bootstrap/data/rodParts.js), player cadences, approved level windows
 //   tierLevel(t), homeBiome(t), stageBiome(t)
 //                               level of a tier, biome a tier is built for, biome of the stage before it
-//   capRarity(rarity, level)    highest part rarity a player of `level` gets the full effect of
+//   capRarity(rarity, level)    highest part rarity whose full effect a player of `level` has unlocked
 //   partProfile(part, {playerLevel})
 //                               one part's contribution under the proposed slot families
-//   matchedSet(rarity)          catalog-free "balanced" part set of one rarity (per slot: the highest
+//   matchedSet(rarity)          catalog-free balanced part set of one rarity (per slot: the highest
 //                               rarity <= `rarity` that exists in the catalog for that slot)
 //   referenceSet(tier)          the tier-appropriate set every tier figure is quoted for
+//   performance(parts, {playerLevel})
+//                               stats, meanFish, multiChance, jackpot odds, cooldown (no durability)
 //   craftRod(parts, {playerLevel})
-//                               the proposed crafted rod: tier, level requirement, qualities, stats,
-//                               meanFish, multiChance, jackpot odds, cooldown, maxDurability, repairCost
+//                               the proposed crafted rod: performance + tier, level requirement,
+//                               maxDurability, repairCost (unlimited repairs)
+//   baseDurability(rarity), repairCostFor(rarity)
+//                               durability base and repair cost by rod-piece rarity (formulas)
 //   oldRod()                    the proposed starter rod (unbreakable, weak only, 1 fish)
-//   rodOutcome(rod, biome)      F.castOutcome for a rod (normal profile)
-//   rodHourly(rod, biome, overheadS)
-//                               F.hourly of rodOutcome
+//   rodOutcome(rod, biome), rodHourly(rod, biome, overheadS)
+//                               F.castOutcome / F.hourly for a rod (normal profile)
 //   upkeepShare(rod, biome)     repair cost as a share of the fish income the same durability earns
-//   legacyCraft(parts)          TODAY's crafted rod for a part set (real FishingRod.combineQualities +
-//                               resolveModifiers rules): level, fish/cast, durability, repair
+//   legacyCombine(parts), legacyCraft(parts)
+//                               TODAY's crafting (mirror of FishingRod.combineQualities + generateStats,
+//                               then resolveModifiers): capabilities, level, fish/cast, durability, repair
+//   verifyLegacyParity()        ASYNC: the mirror equals the real FishingRod.combineQualities on all combos
 //   legacySignature(capabilities), convertLegacyRod(storedRod, partDocs)
 //                               converter for EXISTING crafted rods (no data rewrite)
 //   evaluateAllCombos()         all 2,450 catalog part combinations under today's and the proposed rules
-//   crateDefinitions()          proposed Gacha V2 box definitions with prices (formula of stage income)
-//   crateSlotOdds(tier)         per crate slot: P(part of each slot at each rarity)
-//   assembly(tier)              expected / median / P90 crates, $ and hours of stage income to assemble
-//                               the tier-appropriate set, plus leftover parts and salvage refund
+//   slotBalanceFeatured()       V2 `featured` groups that make each slot type equally likely per rarity
+//   crateDefinition(t), crateDefinitions()
+//                               proposed Gacha V2 box definitions (+ price: formula of stage income)
+//   openOutcomes(def, pityCounter)
+//                               every outcome of one open, exactly as the engine decides it
+//   crateSlotOdds(t)            per crate slot: P(rarity) and P(slot type)
+//   cratesDistribution(t, {need})
+//                               exact expected / median / P90 crates to collect the needed parts
+//   stageIncome(t), cratePrice(t)
+//                               income of the stage before tier t; crate price from it
+//   assembly(t)                 crates, $ and hours of stage income to assemble tier t's set, leftover
+//                               parts and salvage refund
 //   salvageValue(rarity)        cash for salvaging one part of that rarity
+//   validateCratesWithEngine(opens)
+//                               ASYNC, opt-in: real Gacha V2 openLine on an in-memory MongoDB (test
+//                               helpers, never production) vs cratesDistribution
 //   gearPath()                  integrator-facing path: per tier {tier, level, qualities, stats,
-//                               multiChance, meanFish, cooldownMs, maxDurability, repairCost, assembly...}
-//   lifecycle(archetype, opts)  curve.js-style lifecycle on this gear path, with crates bought from stage
+//                               multiChance, meanFish, cooldownMs, maxDurability, repairCost,
+//                               repairCostPerFish, assembly: {price, expectedCrates, expectedCost, ...}}
+//   lifecycle(archetype, opts)  curve.js-style lifecycle on this gear path, with crates bought from net
 //                               income (checks the chosen XP curve still meets the approved targets)
-//   ARCHETYPES                  casual / regular / active / grinder cadence
-//   report()                    every key number of docs/economy/5b/rods.md, computed
+//   report()                    every key number of docs/economy/5b/rods.md, computed (cached)
 const F = require('./framework');
 const CATALOG = require('../../../src/bootstrap/data/rodParts');
 const { baseTable } = require('../../../src/engine/gacha');
@@ -102,18 +119,21 @@ const PARAMS = deepFreeze({
 			sellBonus: { Common: 0, Uncommon: 0, Rare: 0.02, Ultra: 0.04, Legendary: 0.06, Lucky: 0.08 },
 		},
 	},
-	// Same-slot, same-rarity parts get a specialty tilt (derived from today's catalog identity: more legacy
-	// draws = faster action, more legacy durability = backbone, 'quick' = light retrieve, extra draw on a
-	// reel = trolling). Multipliers apply to that slot's stats; meanDelta is added to mean fish per cast.
+	// Same-slot, same-rarity parts are SIDE-GRADES: about the same net $/h, a different emphasis (XP pace,
+	// Giant or Legendary rate, repair frequency). Tilts follow today's catalog identity: more legacy draws =
+	// fast action, more legacy durability = backbone, 'quick' = light retrieve, a reel with an extra legacy
+	// draw = trolling. Multipliers apply to that slot's stats; meanDelta is added to mean fish per cast.
+	// Speed and Rare Find are worth several times more cash than Trophy or Luck (see report().statValue),
+	// so the Trophy/Luck side of each pair gets the larger multiplier.
 	variants: {
-		'Fiberglass Rod Piece': { label: 'Fast action', meanDelta: 0.03, durability: 0.85 },
-		'Graphite Rod Piece': { label: 'Backbone', meanDelta: -0.03, durability: 1.2 },
-		'Centerpin Reel': { label: 'Free-spool', fishingSpeed: 1.4, trophyChance: 0.6 },
-		'Jigging Reel': { label: 'Heavy drag', fishingSpeed: 0.6, trophyChance: 1.4 },
-		'Fly Fishing Reel': { label: 'Light retrieve', fishingSpeed: 1.4, trophyChance: 0.6 },
-		'Trolling Reel': { label: 'Trolling drag', fishingSpeed: 0.6, trophyChance: 1.4 },
-		'Swimbait Hook': { label: 'Big bait', rareFind: 0.8, luck: 1.3 },
-		'Worm Hook': { label: 'Natural bait', rareFind: 1.2, luck: 0.75 },
+		'Fiberglass Rod Piece': { label: 'Fast action', meanDelta: 0.02, durability: 0.75 },
+		'Graphite Rod Piece': { label: 'Backbone', meanDelta: -0.02, durability: 1.5 },
+		'Centerpin Reel': { label: 'Free-spool', fishingSpeed: 1.2, trophyChance: 0.5 },
+		'Jigging Reel': { label: 'Heavy drag', fishingSpeed: 0.8, trophyChance: 2.5 },
+		'Fly Fishing Reel': { label: 'Light retrieve', fishingSpeed: 1.2, trophyChance: 0.5 },
+		'Trolling Reel': { label: 'Trolling drag', fishingSpeed: 0.8, trophyChance: 2.5 },
+		'Swimbait Hook': { label: 'Big bait', rareFind: 0.85, luck: 1.5 },
+		'Worm Hook': { label: 'Natural bait', rareFind: 1.15, luck: 0.6 },
 	},
 	// Normal-player multi-catch ceiling (framework endgame mean).
 	multi: { ceilingMean: 1.8 },
@@ -121,7 +141,6 @@ const PARAMS = deepFreeze({
 		// Hours of play (regular cadence) one life of a MATCHED set lasts, by rod-piece rarity. The handle
 		// multiplies it. Durability still costs 1 per fish (the engine rule is unchanged).
 		lifeHours: { Common: 2.5, Uncommon: 3, Rare: 4, Ultra: 5, Legendary: 6, Lucky: 8 },
-		designOverheadS: 4,
 		roundTo: 50,
 	},
 	repair: {
@@ -163,8 +182,9 @@ const PARAMS = deepFreeze({
 
 // ---------------------------------------------------------------------------------------------
 // Helpers
-const MODELLED_BIOMES = F.BIOME_ORDER.filter((b) => b !== 'Mountain Stream'); // future content (3 fish)
-const biomeForLevel = (L) => [...MODELLED_BIOMES].reverse().find((b) => L >= F.BIOME_LEVEL[b]);
+// Shared (framework assumptions): live biomes and the biome unlocked at a level.
+const MODELLED_BIOMES = F.LIVE_BIOMES;
+const biomeForLevel = (L) => F.biomeAt(L);
 const tierLevel = (t) => PARAMS.partLevel[PARAMS.referenceRarity[t]];
 const homeBiome = (t) => biomeForLevel(tierLevel(t));
 const stageBiome = (t) => biomeForLevel(tierLevel(t) - 10);
@@ -248,7 +268,7 @@ function performance(parts, { playerLevel = Infinity } = {}) {
 	};
 }
 
-const fishPerHour = (perf, overheadS = PARAMS.durability.designOverheadS) => (3600 / (perf.cooldownMs / 1000 + overheadS)) * perf.meanFish;
+const fishPerHour = (perf, overheadS = F.DESIGN_OVERHEAD_S) => (3600 / (perf.cooldownMs / 1000 + overheadS)) * perf.meanFish;
 
 /** Durability base of a rod piece rarity: its matched set lasts lifeHours[rarity] at the design cadence. */
 const baseDurabilityCache = new Map();
@@ -301,19 +321,15 @@ function oldRod() {
 }
 
 const rodOutcome = (rod, biome, extra = {}) => F.castOutcome({ biome, qualities: rod.qualities, stats: rod.stats, multiChance: rod.multiChance, ...extra });
-const rodHourly = (rod, biome, overheadS = 4) => F.hourly(rodOutcome(rod, biome), overheadS);
+const rodHourly = (rod, biome, overheadS = F.DESIGN_OVERHEAD_S) => F.hourly(rodOutcome(rod, biome), overheadS);
 /** Repair cost / fish income earned by one durability life (cadence-independent: both are per fish). */
 function upkeepShare(rod, biome) {
 	if (!rod.maxDurability || !rod.repairCost) return 0;
 	return rod.repairCost / (rod.maxDurability * rodOutcome(rod, biome).valuePerFish);
 }
 
-const ARCHETYPES = {
-	casual: { minutesPerDay: 12.5, overheadS: 7 },
-	regular: { minutesPerDay: 45, overheadS: 4 },
-	active: { minutesPerDay: 120, overheadS: 3 },
-	grinder: { minutesPerDay: 300, overheadS: 2 },
-};
+// Shared player archetypes (framework assumptions).
+const ARCHETYPES = F.ARCHETYPES;
 
 // ---------------------------------------------------------------------------------------------
 // Today's rules (for Current -> Proposed and the legacy converter).
@@ -408,8 +424,9 @@ function legacyIndexMap() {
 	legacyIndex = new Map();
 	for (const r of evaluateAllCombos()) {
 		const cur = legacyIndex.get(r.legacy.signature);
-		// Conservative: the weakest catalog combination consistent with what is stored.
-		if (!cur || r.tier < cur.tier || (r.tier === cur.tier && r.oceanCashPerHour < cur.oceanCashPerHour)) legacyIndex.set(r.legacy.signature, r);
+		// Conservative: the weakest catalog combination (power = $/h in Ocean, where every rod can fish)
+		// consistent with what is stored; ties go to the lower tier.
+		if (!cur || r.oceanCashPerHour < cur.oceanCashPerHour - 1e-9 || (Math.abs(r.oceanCashPerHour - cur.oceanCashPerHour) <= 1e-9 && r.tier < cur.tier)) legacyIndex.set(r.legacy.signature, r);
 	}
 	return legacyIndex;
 }
@@ -427,7 +444,7 @@ function legacyIndexMap() {
 function convertLegacyRod(stored, partDocs = null) {
 	let method = 'parts';
 	let rod;
-	if (partDocs && Object.values(partDocs).filter(Boolean).length === 4) rod = craftRod(partDocs, { playerLevel: stored.playerLevel ?? Infinity });
+	if (partDocs && Object.values(partDocs).filter(Boolean).length === 4) {rod = craftRod(partDocs, { playerLevel: stored.playerLevel ?? Infinity });}
 	else {
 		const hit = legacyIndexMap().get(legacySignature(stored.capabilities || []));
 		if (hit) {
@@ -494,16 +511,6 @@ function crateDefinition(t) {
 	};
 }
 
-/** Share of each slot type among parts of rarity r under the definition's featured weights. */
-function slotShares(def, r) {
-	const pool = PART_POOLS[r];
-	const w = (name) => (def.pool.featured || []).filter((f) => f.names.includes(name)).reduce((a, f) => a * f.weight, 1);
-	const total = pool.reduce((s, p) => s + w(p.name), 0);
-	const out = Object.fromEntries(Object.keys(SLOTS).map((s) => [s, 0]));
-	for (const p of pool) out[SLOT_OF_TYPE[p.type]] += w(p.name) / total;
-	return out;
-}
-
 /** Per crate slot i: the rarity table the engine rolls (base, floor, guaranteed-slot mask), and pity. */
 function slotTables(def, pityCounter = null) {
 	let table = baseTable(def, PART_POOLS);
@@ -530,19 +537,57 @@ function slotTables(def, pityCounter = null) {
 	});
 }
 
-/** P(crate slot yields a part of `slot` with rarity >= need), per crate slot. */
-function categoryProb(tables, def, slot, need) {
-	return tables.map((t) => RARITIES.filter((r) => RARITIES.indexOf(r) >= RARITIES.indexOf(lower(need)) && PART_POOLS[r].length).reduce((s, r) => s + t[r] * slotShares(def, r)[slot], 0));
+const featuredWeight = (def, name) => (def.pool.featured || []).filter((f) => f.names.includes(name)).reduce((a, f) => a * f.weight, 1);
+
+/**
+ * Every outcome of ONE open, exactly as the engine decides it: each slot rolls its rarity from its
+ * table (independent strategy), then picks a part of that rarity weighted by `featured`; with
+ * duplicates 'unique' a part already taken in this open is skipped while another remains. At most
+ * (3 rarities x 6 parts)^3 leaves. Returns [{ p, picks: [{ name, type, rarity }] }].
+ */
+const outcomeCache = new Map();
+function openOutcomes(def, pityCounter = null) {
+	const key = `${def.id}|${pityCounter}`;
+	if (outcomeCache.has(key)) return outcomeCache.get(key);
+	if (def.strategy !== 'independent') throw new Error('only independent slots are modelled');
+	const tables = slotTables(def, pityCounter);
+	const outcomes = [];
+	const rec = (i, p, taken, picks) => {
+		if (i === tables.length) {
+			outcomes.push({ p, picks });
+			return;
+		}
+		for (const r of RARITIES) {
+			const pr = tables[i][r];
+			if (!pr) continue;
+			let cands = PART_POOLS[r];
+			if (def.duplicates === 'unique') {
+				const fresh = cands.filter((x) => !taken.has(x.name));
+				if (fresh.length) cands = fresh;
+			}
+			const tw = cands.reduce((a, x) => a + featuredWeight(def, x.name), 0);
+			for (const c of cands) rec(i + 1, (p * pr * featuredWeight(def, c.name)) / tw, new Set([...taken, c.name]), [...picks, { name: c.name, type: c.type, rarity: r }]);
+		}
+	};
+	rec(0, 1, new Set(), []);
+	outcomeCache.set(key, outcomes);
+	return outcomes;
 }
 
+/** Per crate slot (exact, incl. 'unique'): P(rarity) and P(slot type). */
 function crateSlotOdds(t) {
 	const def = crateDefinition(t);
-	const tables = slotTables(def, def.pity ? 0 : null);
-	return tables.map((tab, i) => ({
-		slot: i,
-		rarity: Object.fromEntries(RARITIES.filter((r) => tab[r] > 0).map((r) => [r, round4(tab[r])])),
-		bySlotType: Object.fromEntries(Object.keys(SLOTS).map((s) => [s, round4(RARITIES.reduce((a, r) => a + (PART_POOLS[r].length ? tab[r] * slotShares(def, r)[s] : 0), 0))])),
-	}));
+	const outcomes = openOutcomes(def, def.pity ? 0 : null);
+	return Array.from({ length: def.slots }, (_, i) => {
+		const rarity = {};
+		const bySlotType = Object.fromEntries(Object.keys(SLOTS).map((x) => [x, 0]));
+		for (const o of outcomes) {
+			const pick = o.picks[i];
+			rarity[pick.rarity] = (rarity[pick.rarity] || 0) + o.p;
+			bySlotType[SLOT_OF_TYPE[pick.type]] += o.p;
+		}
+		return { slot: i, rarity: Object.fromEntries(Object.entries(rarity).map(([k, v]) => [k, round4(v)])), bySlotType: Object.fromEntries(Object.entries(bySlotType).map(([k, v]) => [k, round4(v)])) };
+	});
 }
 
 /** Slots (and the rarity each needs) to go from tier t-1's set to tier t's set. */
@@ -553,50 +598,56 @@ function neededSlots(t) {
 }
 
 /**
- * Crates-until-complete distribution. Without pity: exact coupon collector with unequal, slot-dependent
- * probabilities (inclusion-exclusion; slots treated as independent, so 'unique' only makes it slightly
- * better). With pity (single needed slot): exact Markov chain over the box's pity counter.
+ * Crates-until-complete distribution, exact: a Markov chain over (needed slots collected, box pity
+ * counter) whose per-open transitions come from openOutcomes (so 'unique', featured weights, the
+ * guaranteed slot, the floor and pity are all exactly the engine's rules).
  */
-function cratesDistribution(t, maxN = 2000) {
+function cratesDistribution(t, { need = neededSlots(t), maxN = 5000 } = {}) {
 	const def = crateDefinition(t);
-	const need = neededSlots(t);
+	const rules = Object.values(def.pity || {});
+	if (rules.length > 1) throw new Error('one pity rule per box is modelled');
+	const rule = rules[0] || null;
+	const full = (1 << need.length) - 1;
+	const hitMask = (picks) => need.reduce((m, n, j) => (picks.some((x) => SLOT_OF_TYPE[x.type] === n.slot && rank(canon(x.rarity)) >= rank(n.rarity)) ? m | (1 << j) : m), 0);
+	// Transition table per pity counter: Map `${mask}|${pityHit}` -> p.
+	const trans = new Map();
+	const transFor = (c) => {
+		if (!trans.has(c)) {
+			const agg = new Map();
+			for (const o of openOutcomes(def, rule ? c : null)) {
+				const k = `${hitMask(o.picks)}|${rule && o.picks.some((x) => rule.tiers.includes(x.rarity)) ? 1 : 0}`;
+				agg.set(k, (agg.get(k) || 0) + o.p);
+			}
+			trans.set(c, [...agg.entries()].map(([k, p]) => ({ mask: Number(k.split('|')[0]), pityHit: k.endsWith('|1'), p })));
+		}
+		return trans.get(c);
+	};
+	let state = new Map([['0|0', 1]]);
 	const survival = [];
-	if (def.pity) {
-		if (need.length !== 1) throw new Error('pity crates are modelled for a single needed slot');
-		let alive = 1;
-		for (let n = 0; n < maxN; n++) {
-			survival.push(alive);
-			const tables = slotTables(def, n); // survival = no hit yet, so the box counter equals n
-			const probs = categoryProb(tables, def, need[0].slot, need[0].rarity);
-			alive *= probs.reduce((a, p) => a * (1 - p), 1);
-			if (alive < 1e-12) break;
+	for (let n = 0; n < maxN; n++) {
+		const alive = [...state.entries()].filter(([k]) => Number(k.split('|')[0]) !== full).reduce((a, [, p]) => a + p, 0);
+		survival.push(alive);
+		if (alive < 1e-12) break;
+		const next = new Map();
+		for (const [k, p] of state) {
+			const [mask, c] = k.split('|').map(Number);
+			if (mask === full) continue;
+			for (const tr of transFor(c)) {
+				const nk = `${mask | tr.mask}|${rule ? (tr.pityHit ? 0 : c + 1) : 0}`;
+				next.set(nk, (next.get(nk) || 0) + p * tr.p);
+			}
 		}
-	}
-	else {
-		const tables = slotTables(def);
-		const cats = need.map((x) => categoryProb(tables, def, x.slot, x.rarity));
-		const subsets = [];
-		for (let mask = 1; mask < 1 << cats.length; mask++) {
-			const members = cats.filter((_, i) => mask & (1 << i));
-			// q = P(one crate yields none of the subset's categories); slots independent.
-			const q = tables.map((_, slot) => 1 - members.reduce((s, c) => s + c[slot], 0)).reduce((a, b) => a * b, 1);
-			subsets.push({ sign: members.length % 2 ? 1 : -1, q });
-		}
-		for (let n = 0; n < maxN; n++) {
-			const alive = subsets.reduce((s, x) => s + x.sign * x.q ** n, 0);
-			survival.push(alive);
-			if (alive < 1e-12) break;
-		}
+		state = next;
 	}
 	const expected = survival.reduce((a, b) => a + b, 0);
-	const quantile = (p) => survival.findIndex((s) => 1 - s >= p);
+	const quantile = (q) => survival.findIndex((x) => 1 - x >= q);
 	return { expected, median: quantile(0.5), p90: quantile(0.9), need };
 }
 
 /** Hourly income of the stage leading up to tier t (previous tier's set in the biome unlocked 10 levels earlier). */
 function stageIncome(t) {
 	const prev = t === 1 ? oldRod() : craftRod(referenceSet(t - 1));
-	return rodHourly(prev, stageBiome(t), PARAMS.durability.designOverheadS).cash;
+	return rodHourly(prev, stageBiome(t), F.DESIGN_OVERHEAD_S).cash;
 }
 
 /** Crate price: assemblyHours x stage income / expected crates to assemble. */
@@ -660,6 +711,63 @@ function assembly(t) {
 	};
 }
 
+/**
+ * ASYNC, opt-in (not used by report()): replays `opens` real Gacha V2 decisions (openLine) per tier crate
+ * on an in-memory MongoDB (test helpers, like scripts/economy/gacha-ev.js; never production) with the
+ * proposed definitions registered in-process only, and compares crates-to-complete with
+ * cratesDistribution. Tiers 1-4 (tier 5 has box pity, which needs persisted opens).
+ */
+async function validateCratesWithEngine(opens = 3000, tiers = [1, 2, 3, 4]) {
+	const { startDb, stopDb } = require('../../../test/helpers/db');
+	const { quiet, restore } = require('../../../test/helpers/quiet');
+	const { bootstrap } = require('../../../src/bootstrap');
+	const { BOXES } = require('../../../src/engine/gachaBoxes');
+	const { openLine } = require('../../../src/engine/gacha');
+	const { ItemData } = require('../../../src/schemas/ItemSchema');
+	const { User } = require('../../../src/schemas/UserSchema');
+	quiet();
+	const out = {};
+	try {
+		await startDb();
+		await bootstrap();
+		for (const t of tiers) {
+			const def = crateDefinition(t);
+			BOXES[def.name] = { ...def };
+			const userId = `rods-validate-${t}`;
+			const box = await ItemData.collection.insertOne({ name: def.name, type: 'gacha', rarity: 'Common', description: 'validation', count: 1e9, user: userId, __t: 'GachaData', capabilities: [], weights: {} });
+			await User.collection.insertOne({ userId, inventory: { gacha: [box.insertedId], fish: [], rods: [], baits: [], items: [], buffs: [], quests: [] }, pity: {}, xp: 0, level: 1 });
+			const need = neededSlots(t);
+			const byName = new Map(CATALOG.map((x) => [x.name, x]));
+			let have = new Set();
+			let n = 0;
+			const runs = [];
+			for (let i = 0; i < opens; i++) {
+				const res = await openLine({ userId, boxName: def.name });
+				if (res.status !== 'ok') throw new Error(JSON.stringify(res.failure));
+				n++;
+				for (const slot of res.slots) {
+					const part = byName.get(slot.reward.name);
+					for (const x of need) if (SLOT_OF_TYPE[part.type] === x.slot && rank(canon(slot.rarity)) >= rank(x.rarity)) have.add(x.slot);
+				}
+				if (have.size === need.length) {
+					runs.push(n);
+					n = 0;
+					have = new Set();
+				}
+			}
+			const mean = runs.reduce((a, b) => a + b, 0) / runs.length;
+			const se = Math.sqrt(runs.reduce((a, b) => a + (b - mean) ** 2, 0) / (runs.length - 1) / runs.length);
+			const exact = cratesDistribution(t).expected;
+			out[def.name] = { exact: round4(exact), engine: round4(mean), se: round4(se), z: round4((mean - exact) / se), completions: runs.length, opens };
+		}
+	}
+	finally {
+		await stopDb().catch(() => undefined);
+		restore();
+	}
+	return out;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Integrator-facing gear path and a lifecycle check against the approved XP-curve targets.
 function gearPath() {
@@ -683,6 +791,7 @@ function gearPath() {
 			maxDurability: rod.maxDurability,
 			lifeHoursRegular: rod.lifeHoursRegular,
 			repairCost: rod.repairCost,
+			repairCostPerFish: rod.repairCost / rod.maxDurability,
 			maxRepairs: rod.maxRepairs,
 			upkeepShareHome: upkeepShare(rod, homeBiome(t)),
 			assembly: { crate: a.crate, price: a.price, expectedCrates: a.expectedCrates, p90Crates: a.p90Crates, expectedCost: a.expectedCost, hoursOfStageIncome: a.hoursOfStageIncome },
@@ -691,15 +800,16 @@ function gearPath() {
 	return steps;
 }
 
-const DAILY_XP_PER_LEVEL = 60; // same assumption as curve.js (level-scaled daily quest)
-const TARGETS = { 20: [5, 6], 30: [12, 15], 40: [24, 30], 50: [40, 45] };
+// Shared lifecycle assumptions (framework): daily XP per level and the approved target windows.
+const DAILY_XP_PER_LEVEL = F.DAILY.xpPerLevel;
+const TARGETS = F.TARGET_WINDOWS;
 
 /**
  * Hours of play to each level on this gear path. Crates for tier t are bought from Lv (crate unlock)
  * with net income (fish income - repairs - otherSpendShare x income); the rod is equipped once the
  * expected assembly cost is paid AND the player reaches the tier's level. Same XP model as curve.js.
  */
-function lifecycle(arch, { otherSpendShare = 0, maxLevel = 60, steps = gearPath(), stepH = 1 / 60 } = {}) {
+function lifecycle(arch, { otherSpendShare = 0, maxLevel = F.LIFECYCLE.maxLevel, steps = gearPath(), stepH = F.LIFECYCLE.stepH } = {}) {
 	const a = typeof arch === 'string' ? ARCHETYPES[arch] : arch;
 	const cache = new Map();
 	const rates = (step, biome) => {
@@ -720,6 +830,7 @@ function lifecycle(arch, { otherSpendShare = 0, maxLevel = 60, steps = gearPath(
 	const reached = {};
 	const upgrades = {};
 	const totals = { gross: 0, repairs: 0, crates: 0 };
+	const xpFrom = { fishing: 0, daily: 0 };
 	while (h < 5000) {
 		const L = F.levelForXp(xp);
 		const cur = steps[idx];
@@ -741,10 +852,15 @@ function lifecycle(arch, { otherSpendShare = 0, maxLevel = 60, steps = gearPath(
 		}
 		const before = h;
 		xp += r.xp * stepH;
+		xpFrom.fishing += r.xp * stepH;
 		h += stepH;
-		if (Math.floor(h / dayH) !== Math.floor(before / dayH)) xp += DAILY_XP_PER_LEVEL * L;
+		if (Math.floor(h / dayH) !== Math.floor(before / dayH)) {
+			xp += DAILY_XP_PER_LEVEL * L;
+			xpFrom.daily += DAILY_XP_PER_LEVEL * L;
+		}
 		const L2 = F.levelForXp(xp);
-		for (const T of [10, 20, 30, 40, 50, 60]) if (T <= maxLevel && !reached[T] && L2 >= T) reached[T] = { hours: +h.toFixed(2), day: Math.ceil(h / dayH) };
+		// fishingXpShare: share of XP so far from fishing (the rest is curve.js's placeholder daily XP).
+		for (const T of F.LIFECYCLE.milestones) if (T <= maxLevel && !reached[T] && L2 >= T) reached[T] = { hours: +h.toFixed(2), day: Math.ceil(h / dayH), fishingXpShare: round4(xpFrom.fishing / (xpFrom.fishing + xpFrom.daily)) };
 		// Stop at maxLevel once every tier usable by then has been bought.
 		if (L2 >= maxLevel && !steps.slice(idx + 1).some((s) => s.level <= maxLevel)) break;
 	}
@@ -754,7 +870,6 @@ function lifecycle(arch, { otherSpendShare = 0, maxLevel = 60, steps = gearPath(
 const inTarget = (reached) => Object.fromEntries(Object.entries(TARGETS).map(([L, [lo, hi]]) => [L, { hours: reached[L]?.hours ?? null, target: `${lo}-${hi}h`, ok: reached[L] ? reached[L].hours >= lo && reached[L].hours <= hi : false }]));
 
 // ---------------------------------------------------------------------------------------------
-const pct = (x, d = 1) => `${(x * 100).toFixed(d)}%`;
 const r0 = (x) => Math.round(x);
 const quant = (arr, q) => {
 	const s = [...arr].sort((a, b) => a - b);
@@ -830,18 +945,46 @@ function buildReport() {
 	}]));
 
 	// Specialties: variants of the same slot at the same rarity, in the home biome (reference set otherwise).
+	const specialty = (rod, t) => {
+		const o = rodOutcome(rod, homeBiome(t));
+		const hr = F.hourly(o, 4);
+		return { xp: hr.xp, cash: hr.cash, net: hr.cash * (1 - upkeepShare(rod, homeBiome(t))), giant: o.rarity.giant * o.fishPerCast, legendaryPlus: (o.rarity.legendary + o.rarity.lucky) * o.fishPerCast, jackpot: rod.jackpot3plus };
+	};
 	const specialties = [];
 	for (const name of Object.keys(PARAMS.variants)) {
 		const part = CATALOG.find((p) => p.name === name);
 		const slot = SLOT_OF_TYPE[part.type];
 		const t = PARAMS.tierOfRarity[canon(part.rarity)];
-		const set = { ...matchedSet(canon(part.rarity)), [slot]: part };
-		const rod = craftRod(set);
+		const rod = craftRod({ ...matchedSet(canon(part.rarity)), [slot]: part });
 		const base = craftRod(matchedSet(canon(part.rarity)));
-		const hv = rodHourly(rod, homeBiome(t));
-		const hb = rodHourly(base, homeBiome(t));
-		specialties.push({ part: name, rarity: part.rarity, slot, variant: PARAMS.variants[name].label, xpVsBalanced: round4(hv.xp / hb.xp), cashVsBalanced: round4(hv.cash / hb.cash), lifeVsBalanced: round4(rod.maxDurability / base.maxDurability) });
+		const v = specialty(rod, t);
+		const b = specialty(base, t);
+		specialties.push({
+			part: name, rarity: part.rarity, slot, variant: PARAMS.variants[name].label, biome: homeBiome(t),
+			xpVsBalanced: round4(v.xp / b.xp), cashVsBalanced: round4(v.cash / b.cash), netCashVsBalanced: round4(v.net / b.net),
+			giantsVsBalanced: round4(v.giant / b.giant), legendaryPlusVsBalanced: round4(v.legendaryPlus / b.legendaryPlus),
+			jackpot3plus: round4(v.jackpot), lifeVsBalanced: round4(rod.maxDurability / base.maxDurability),
+		});
 	}
+	// Marginal value of each stat on the tier-3 reference in its home biome (why the variant multipliers differ).
+	const statValue = (() => {
+		const ref = craftRod(referenceSet(3));
+		const b = homeBiome(3);
+		const base = rodHourly(ref, b);
+		const bump = (mod) => {
+			const stats = { ...ref.stats, ...mod(ref.stats) };
+			const h = rodHourly({ ...ref, stats, cooldownMs: Math.max(F.COOLDOWN.minMs, Math.round(F.COOLDOWN.fishMs * (1 - stats.fishingSpeed))) }, b);
+			return { xp: round4(h.xp / base.xp - 1), cash: round4(h.cash / base.cash - 1) };
+		};
+		return {
+			biome: b,
+			'fishingSpeed +0.02': bump((x) => ({ fishingSpeed: x.fishingSpeed + 0.02 })),
+			'rareFind +0.2': bump((x) => ({ rareFind: x.rareFind + 0.2 })),
+			'trophyChance +0.2': bump((x) => ({ trophyChance: x.trophyChance + 0.2 })),
+			'luck +0.2': bump((x) => ({ luck: x.luck + 0.2 })),
+			'sellBonus +0.02': bump((x) => ({ sellBonus: x.sellBonus + 0.02 })),
+		};
+	})();
 
 	// Legacy converter calibration.
 	const idx = legacyIndexMap();
@@ -849,35 +992,51 @@ function buildReport() {
 	for (const c of combos) sigGroups.set(c.legacy.signature, [...(sigGroups.get(c.legacy.signature) || []), c]);
 	let exactTier = 0;
 	let underTier = 0;
+	let overTier = 0;
+	let overPower = 0;
 	for (const c of combos) {
 		const pick = idx.get(c.legacy.signature);
 		if (pick.tier === c.tier) exactTier++;
 		else if (pick.tier < c.tier) underTier++;
+		else overTier++;
+		if (pick.oceanCashPerHour > c.oceanCashPerHour + 1e-9) overPower++;
 	}
-	const sampleLegacy = convertLegacyRod({ capabilities: ['weak', 'strong', 'quick', '9', '5 count', '10500 durability'], durability: 4200, maxDurability: 10500, state: 'destroyed' });
+	const legacySamples = (() => {
+		// Today's "Custom (Rare parts)" representative rod as stored by generateStats.
+		const names = ['Graphite Rod Piece', 'Jigging Reel', 'Treble Hook', 'EVA Handle'];
+		const parts = Object.fromEntries(names.map((n) => CATALOG.find((p) => p.name === n)).map((p) => [SLOT_OF_TYPE[p.type], p]));
+		const legacy = legacyCraft(parts);
+		const stored = { capabilities: legacy.capabilities, durability: 4200, maxDurability: legacy.durability, repairCost: legacy.repairCost, requirements: { level: legacy.level }, state: 'destroyed' };
+		const view = (c) => ({ method: c.method, tier: c.rod.tier, level: c.rod.level, meanFish: c.rod.meanFish, stats: c.rod.stats, cooldownMs: c.rod.cooldownMs, durability: c.durability, state: c.state, repairCost: c.repairCost, repairs: 'unlimited' });
+		const lowLevel = craftRod(referenceSet(4), { playerLevel: 35 });
+		return {
+			stored: { parts: names, capabilities: legacy.capabilities, legacyLevel: legacy.level, legacyFishPerCast: legacy.fishPerCast, legacyRepairCost: legacy.repairCost, durability: `4200/${legacy.durability}`, state: 'destroyed' },
+			pathA: view(convertLegacyRod(stored, parts)),
+			pathB: view(convertLegacyRod(stored, null)),
+			pathC: view(convertLegacyRod({ capabilities: ['weak', '99', '9 count', '123 durability'], durability: 50, maxDurability: 123, state: 'broken' }, null)),
+			levelCap: { rod: 'Tier 4 Legendary set', playerLevel: 35, performsAs: Object.fromEntries(Object.entries(lowLevel.parts).map(([k, x]) => [k, x.effectiveRarity])), meanFish: lowLevel.meanFish, stats: lowLevel.stats, requirementShown: lowLevel.level },
+		};
+	})();
 
 	// Crates.
 	const crates = crateDefinitions().map((d) => ({ ...d, slotOdds: crateSlotOdds(d.tier) }));
 	const assemblies = TIERS.map(assembly);
 	const entryT1 = (() => {
-		// Budget T1: any Common+ part in every slot from Fishing Crates.
-		const def = crateDefinition(1);
-		const tables = slotTables(def);
-		const cats = Object.keys(SLOTS).map((s) => categoryProb(tables, def, s, 'Common'));
-		let e = 0;
-		for (let mask = 1; mask < 16; mask++) {
-			const members = cats.filter((_, i) => mask & (1 << i));
-			const q = tables.map((_, slot) => 1 - members.reduce((s, c) => s + c[slot], 0)).reduce((a, b) => a * b, 1);
-			e += (members.length % 2 ? 1 : -1) / (1 - q);
-		}
+		// Budget T1: a Common-or-better part in every slot from Fishing Crates (a matched Common set).
+		const d = cratesDistribution(1, { need: Object.keys(SLOTS).map((x) => ({ slot: x, rarity: 'Common' })) });
 		const rod = craftRod(matchedSet('Common'));
-		return { expectedCrates: e, expectedCost: e * cratePrice(1), hoursOfStageIncome: (e * cratePrice(1)) / stageIncome(1), meanFish: rod.meanFish, cashPerHourLake: r0(rodHourly(rod, 'Lake').cash) };
+		return { expectedCrates: +d.expected.toFixed(2), p90Crates: d.p90, expectedCost: r0(d.expected * cratePrice(1)), hoursOfStageIncome: +((d.expected * cratePrice(1)) / stageIncome(1)).toFixed(2), meanFish: rod.meanFish, cashPerHourLake: r0(rodHourly(rod, 'Lake').cash) };
 	})();
 	const salvage = Object.fromEntries(RARITY_ORDER.map((r) => [r, salvageValue(r)]));
 
 	// Lifecycle check (regular, and every archetype), rods-only and with 30% of income spent elsewhere.
 	const life = Object.fromEntries(Object.keys(ARCHETYPES).map((k) => [k, lifecycle(k)]));
 	const lifeOther = lifecycle('regular', { otherSpendShare: 0.3 });
+	const OTHER_SPEND = [0.3, 0.4, 0.5, 0.6];
+	const delayByOtherSpend = Object.fromEntries(OTHER_SPEND.map((o) => [o, Object.fromEntries(Object.keys(ARCHETYPES).map((k) => {
+		const v = lifecycle(k, { otherSpendShare: o });
+		return [k, Object.fromEntries(TIERS.map((t) => [t, v.upgrades[t] && v.reached[tierLevel(t)] ? +(v.upgrades[t].hours - v.reached[tierLevel(t)].hours).toFixed(2) : null]))];
+	}))]));
 	const stageHours = TIERS.map((t) => {
 		const reg = life.regular.reached;
 		const from = reg[tierLevel(t) - 10]?.hours ?? null;
@@ -887,7 +1046,7 @@ function buildReport() {
 	const stageShare = assemblies.map((a, i) => ({ tier: a.tier, assemblyShareOfStageIncome: stageHours[i].hours ? round4(a.hoursOfStageIncome / stageHours[i].hours) : null }));
 
 	return {
-		frameworkVersion: F.FRAMEWORK_VERSION,
+		...F.stamp(),
 		params: PARAMS.id,
 		curve: { ...F.CURVE },
 		slotFamilies: Object.fromEntries(Object.entries(PARAMS.slots).map(([k, v]) => [k, v.family])),
@@ -895,7 +1054,7 @@ function buildReport() {
 		gearPath: path.map((s) => ({
 			tier: s.tier, label: s.label, level: s.level, crateUnlockLevel: s.crateUnlockLevel, homeBiome: s.homeBiome, qualities: s.qualities, stats: s.stats,
 			meanFish: s.meanFish, multiChance: round4(s.multiChance), jackpot3plus: round4(s.jackpot3plus), jackpot5: round4(s.jackpot5), cooldownMs: s.cooldownMs,
-			maxDurability: s.maxDurability, lifeHoursRegular: s.lifeHoursRegular && +s.lifeHoursRegular.toFixed(2), repairCost: s.repairCost, upkeepShareHome: round4(s.upkeepShareHome),
+			maxDurability: s.maxDurability, lifeHoursRegular: s.lifeHoursRegular && +s.lifeHoursRegular.toFixed(2), repairCost: s.repairCost, repairCostPerFish: s.repairCostPerFish === undefined ? 0 : round4(s.repairCostPerFish), upkeepShareHome: round4(s.upkeepShareHome),
 			assembly: s.assembly && { ...s.assembly, expectedCrates: +s.assembly.expectedCrates.toFixed(2), expectedCost: r0(s.assembly.expectedCost), hoursOfStageIncome: +s.assembly.hoursOfStageIncome.toFixed(2) },
 		})),
 		rates,
@@ -908,10 +1067,17 @@ function buildReport() {
 			bestAtLevel,
 		},
 		specialties,
+		statValue,
 		upkeep: {
 			rule: `repairCost(rod-piece rarity) = ${PARAMS.repair.upkeepShare} x matched-set maxDurability x its $/fish at home; unlimited repairs`,
 			byTierHome: path.slice(1).map((s) => ({ tier: s.tier, repairCost: s.repairCost, maxDurability: s.maxDurability, lifeHoursRegular: +s.lifeHoursRegular.toFixed(2), shareHome: round4(s.upkeepShareHome), repairCostInMinutesOfHomeIncome: +((s.repairCost / rodHourly(s, s.homeBiome).cash) * 60).toFixed(1) })),
 			oldRod: 'unbreakable: no upkeep, no replacement, no soft-lock',
+			// What today's Old Rod repair ($1,000 per 1,000 fish, catalog rods.js) would cost under the proposed
+			// value model, as a share of Old Rod income: the sink the unbreakable rule gives up.
+			oldRodLegacyRepairShare: (() => {
+				const legacy = require('../../../src/bootstrap/data/rods.js').find((x) => x.name === 'Old Rod');
+				return Object.fromEntries(MODELLED_BIOMES.map((b) => [b, round4(legacy.repairCost / (legacy.maxDurability * rodOutcome(oldRod(), b).valuePerFish))]));
+			})(),
 		},
 		crates: crates.map((c) => ({ tier: c.tier, name: c.name, price: c.price, unlockLevel: c.shop.unlockLevel, existingItem: c.shop.existingItem, rarityTable: c.rarityTable, rarityFloor: c.rarityFloor, guaranteedSlots: c.guaranteedSlots, duplicates: c.duplicates, pity: c.pity, featured: c.pool.featured, slotOdds: c.slotOdds })),
 		assembly: assemblies.map((a) => ({ ...a, expectedCrates: +a.expectedCrates.toFixed(2), expectedCost: r0(a.expectedCost), p90Cost: r0(a.p90Cost), stageIncomePerHour: r0(a.stageIncomePerHour), hoursOfStageIncome: +a.hoursOfStageIncome.toFixed(2), p90HoursOfStageIncome: +a.p90HoursOfStageIncome.toFixed(2), expectedParts: +a.expectedParts.toFixed(1), leftoverParts: +a.leftoverParts.toFixed(1), salvageRefund: r0(a.salvageRefund), netCostAfterSalvage: r0(a.netCostAfterSalvage), salvageReturnPerCrate: round4(a.salvageReturnPerCrate) })),
@@ -923,14 +1089,23 @@ function buildReport() {
 			uniqueSignatures: [...sigGroups.values()].filter((g) => g.length === 1).length,
 			signatureTierExact: round4(exactTier / combos.length),
 			signatureTierUnder: round4(underTier / combos.length),
-			signatureTierOver: 0,
-			sample: { input: '["weak","strong","quick","9","5 count","10500 durability"], durability 4200/10500, destroyed, parts missing', method: sampleLegacy.method, tier: sampleLegacy.rod.tier, meanFish: sampleLegacy.rod.meanFish, durability: sampleLegacy.durability, state: sampleLegacy.state, repairCost: sampleLegacy.repairCost },
+			signatureTierOver: round4(overTier / combos.length),
+			signaturePowerOver: round4(overPower / combos.length),
+			samples: legacySamples,
+			// Grandfathered durability: legacy maxDurability / proposed, and the resulting upkeep at home.
+			grandfathered: {
+				durabilityRatio: spread(combos.map((c) => +(c.legacy.durability / c.maxDurability).toFixed(2))),
+				upkeepShareHome: spread(combos.map((c) => round4(c.repairCost / (Math.max(c.legacy.durability, c.maxDurability) * c.valuePerFish)))),
+			},
 		},
 		lifecycle: {
 			method: 'curve.js XP model (daily 60 x level XP); this gear path; crates bought from net income from the crate unlock level; rod equipped when paid for and at its level',
 			regular: { ...life.regular, targets: inTarget(life.regular.reached) },
 			regularWith30pctOtherSpend: { reached: lifeOther.reached, upgrades: lifeOther.upgrades, targets: inTarget(lifeOther.reached) },
 			archetypes: Object.fromEntries(Object.entries(life).map(([k, v]) => [k, { reached: v.reached, upgrades: v.upgrades, repairShare: round4(v.totals.repairShare), crateShare: round4(v.totals.crateShare) }])),
+			// Rod upgrade delay (hours of play after reaching the tier's level) when this share of fish income
+			// goes to other purchases (permits, bait, aquarium, ...). 0 = the rod is ready at the level.
+			delayByOtherSpend,
 			stageHoursRegular: stageHours,
 		},
 	};
@@ -948,7 +1123,7 @@ module.exports = {
 	tierLevel, homeBiome, stageBiome, capRarity, partProfile, matchedSet, referenceSet, performance, craftRod, oldRod,
 	rodOutcome, rodHourly, upkeepShare, baseDurability, repairCostFor,
 	legacyCombine, legacyCraft, verifyLegacyParity, legacySignature, convertLegacyRod, evaluateAllCombos,
-	crateDefinition, crateDefinitions, crateSlotOdds, cratesDistribution, cratePrice, stageIncome, assembly, salvageValue, slotBalanceFeatured,
+	crateDefinition, crateDefinitions, crateSlotOdds, openOutcomes, cratesDistribution, validateCratesWithEngine, cratePrice, stageIncome, assembly, salvageValue, slotBalanceFeatured,
 	gearPath, lifecycle, report,
 };
 

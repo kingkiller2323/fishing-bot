@@ -1,4 +1,7 @@
 {
+ "frameworkVersion": "5b.2",
+ "sharedDigest": "26bbca823c8b2b8b",
+ "gearPathSource": "provisional",
  "method": "exact analytic model; provisional normal rod path; level-scaled daily XP (60 x level); rod tiers bought after saving 1.5 h of stage income",
  "targets": {
   "20": [

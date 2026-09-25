@@ -27,13 +27,21 @@
 //                                XP-class bait, else 'cash') | a bait name. bait = null when none fits.
 //   baitMatrix()                 every bait × every typical stage (and Old Rod rows for starter baits)
 //   bandCheck()                  acceptance test of the pricing targets over the matrix
+//   strongAccessByBiome()        value of strong access to an Old Rod per biome (why starters are 1-biome)
 //   consumptionModel()           per-cast vs per-fish consumption numbers by rod tier and for Founder
 //   chaseMetrics()               Legendary+/Lucky catch rates and $ per extra catch for luck baits
 //   boosterPackOdds()            Lucky-item (Booster Pack) odds with luck baits (disclosed, never valued)
-//   gachaBaitValue()             bait liquid value per box open at current vs proposed prices
+//   gachaBaitValue()             bait liquid value per box open: current, proposed (1 unit/slot) and
+//                                proposed if a bait slot grants one pack
 //   currentBaits()               today's catalog + measured Old Rod economics (measurements.json)
-//   lifecycleSensitivity()       provisional lifecycle (mirrors curve.js) with/without bait
-//   report()                     all of the above, plus frameworkVersion
+//   lifecycle(policy, archetype) curve.js-style lifecycle with bait bought every cast ('none'|'cash'|'xp')
+//                                incl. the XP-source split (fishing / bait / daily) for requirement R2
+//   lifecycleSensitivity()       regular/grinder/casual lifecycles, approved windows, speed-up check
+//   report(opts)                 all of the above, plus frameworkVersion; opts.gearPath = withGear input
+//   withGear(gearPath)           the same API rebuilt on another rod path (e.g. rods.gearPath(): an
+//                                array old..t4 or { old, t1..t4 } of { level, qualities, stats,
+//                                multiChance | meanFish | mean }). Every price and check regenerates;
+//                                the functions above are withGear(PROVISIONAL.tiers).
 const F = require('./framework');
 const { drawDistribution } = require('../lib/catalog-model');
 const { PROFILES, BAIT_STATS } = require('../../../src/engine/balance');
@@ -48,34 +56,23 @@ const deepFreeze = (o) => {
 };
 
 // ---------------------------------------------------------------------------------------------
-// Provisional inputs shared with curve.js. curve.js does not export them (requiring it runs its
-// sweep and prints JSON), so they are mirrored here verbatim; see frameworkChangeRequests. They are
-// the task's provisional normal rod path and player archetypes, not bait design choices.
+// Shared inputs: a view of the framework's shared assumptions (gear path, archetypes, lifecycle), in the
+// shape this module uses. Nothing here is a bait design choice and nothing is copied: change them in
+// assumptions.js (with a FRAMEWORK_VERSION bump) and this view follows.
+const SHARED_PATH = F.gearPath();
 const PROVISIONAL = deepFreeze({
-	tiers: {
-		old: { level: 0, mean: 1.0, qualities: ['weak'], stats: {} },
-		t1: { level: 20, mean: 1.15, qualities: ['weak', 'strong'], stats: { rareFind: 0.2, luck: 0.1 } },
-		t2: { level: 30, mean: 1.3, qualities: ['weak', 'strong'], stats: { rareFind: 0.4, luck: 0.2, trophyChance: 0.1, fishingSpeed: 0.05 } },
-		t3: { level: 40, mean: 1.5, qualities: ['weak', 'strong'], stats: { rareFind: 0.6, luck: 0.4, trophyChance: 0.3, fishingSpeed: 0.1 } },
-		t4: { level: 50, mean: 1.65, qualities: ['weak', 'strong'], stats: { rareFind: 0.9, luck: 0.6, trophyChance: 0.5, fishingSpeed: 0.15 } },
-	},
-	tierOrder: ['old', 't1', 't2', 't3', 't4'],
-	// The tier a player typically holds while fishing each biome (biome unlock level = tier level).
-	typicalTier: { 'Ocean': 'old', 'River': 'old', 'Lake': 't1', 'Pond': 't2', 'Coast': 't3', 'Swamp': 't4' },
-	archetypes: {
-		casual: { minutesPerDay: 12.5, overheadS: 7 },
-		regular: { minutesPerDay: 45, overheadS: 4 },
-		active: { minutesPerDay: 120, overheadS: 3 },
-		grinder: { minutesPerDay: 300, overheadS: 2 },
-	},
-	lifecycle: { dailyXpPerLevel: 60, purchaseHours: 1.5, stepH: 1 / 60, maxLevel: 60 },
+	tiers: Object.fromEntries(SHARED_PATH.map((t) => [t.key, { level: t.level, mean: t.meanFish, qualities: [...t.qualities], stats: { ...t.stats } }])),
+	tierOrder: SHARED_PATH.map((t) => t.key),
+	// The tier a player typically holds while fishing each biome (the tier unlocked at the biome's level).
+	typicalTier: Object.fromEntries(F.LIVE_BIOMES.map((b) => [b, F.typicalTier(b, SHARED_PATH).key])),
+	archetypes: JSON.parse(JSON.stringify(F.ARCHETYPES)),
+	lifecycle: { dailyXpPerLevel: F.DAILY.xpPerLevel, purchaseHours: F.PURCHASE.saveHours, stepH: F.LIFECYCLE.stepH, maxLevel: F.LIFECYCLE.maxLevel },
 });
 
 // ---------------------------------------------------------------------------------------------
 // Design parameters (the only hard-coded bait numbers).
-const FRESH = ['River', 'Lake', 'Pond', 'Swamp'];
 const SALT = ['Ocean', 'Coast'];
-const ALL = ['Ocean', 'River', 'Lake', 'Pond', 'Coast', 'Swamp'];
+const ALL = [...F.LIVE_BIOMES];
 const PARAMS = deepFreeze({
 	consumption: {
 		unit: 'cast',
@@ -83,7 +80,8 @@ const PARAMS = deepFreeze({
 		// Consumed only on a successful cast in a biome where the bait works; elsewhere it does
 		// nothing (no stats, no XP) and is not used. Failed casts (NO_CATCH, broken rod...) use none.
 		onlyWhereItWorks: true,
-		profileIndependent: true, // Founder uses exactly 1 per cast too
+		// Founder uses exactly 1 per cast too.
+		profileIndependent: true,
 	},
 	pricing: {
 		// Money baits: cash return per $1 = returnTarget at the geometric centre of their home stages.
@@ -98,6 +96,10 @@ const PARAMS = deepFreeze({
 		// 6%: strong access is the largest lever (it opens half the catalog to an Old Rod), and at the
 		// target return its net gain in Ocean lands just under this; every other bait stays below ~3.5%.
 		netShareMax: 0.06,
+		// XP baits are an optional money-to-progress converter, not a second curve: a regular player
+		// who runs the XP bait at every stage where one exists may reach any milestone at most this
+		// much sooner than the same player without bait (checked by lifecycleSensitivity()).
+		maxXpBaitSpeedup: 0.10,
 		// Sold in packs of `packSize` casts so small per-cast prices keep their precision (money is an
 		// integer). Pack prices round to $1 below $100 and to $5 above.
 		packSize: 10,
@@ -114,15 +116,18 @@ const PARAMS = deepFreeze({
 	// role, water/band, where it works, when the shop offers it, effect (framework stat model),
 	// pricing class and the stages it is priced at (geometric centre of their utilities).
 	baits: {
+		// Strong access is the only thing that makes bait matter to an Old Rod, and it is the largest
+		// lever in the game for one (strongAccessByBiome()). It is therefore limited to the two starter
+		// waters: across a whole water type an Old Rod + Worm would return up to ~10x in Swamp.
 		'Shrimp': {
-			role: 'strong access (saltwater starter)', band: 'starter', biomes: SALT, levelFromBiome: 'Ocean',
+			role: 'strong access (Ocean starter)', band: 'starter', biomes: ['Ocean'], levelFromBiome: 'Ocean',
 			grantsStrong: true, stats: {}, multiChance: 0, pricing: 'money', homeStages: ['ocean-old'],
-			description: 'Saltwater starter bait. Lets any rod reach strong fish in Ocean and Coast.',
+			description: 'Ocean starter bait: lets the Old Rod reach strong fish in the Ocean.',
 		},
 		'Worm': {
-			role: 'strong access (freshwater starter)', band: 'starter', biomes: FRESH, levelFromBiome: 'River',
+			role: 'strong access (River starter)', band: 'starter', biomes: ['River'], levelFromBiome: 'River',
 			grantsStrong: true, stats: {}, multiChance: 0, pricing: 'money', homeStages: ['river-old'],
-			description: 'Freshwater starter bait. Lets any rod reach strong fish in fresh water.',
+			description: 'River starter bait: lets the Old Rod reach strong fish in the River.',
 		},
 		'Fly': {
 			role: 'rarity targeting (Rare/Ultra)', band: 'mid', biomes: ['Lake', 'Pond'], levelFromBiome: 'Lake',
@@ -146,8 +151,8 @@ const PARAMS = deepFreeze({
 		},
 		'Lure': {
 			role: 'XP', band: 'mid', biomes: ['Lake', 'Pond'], levelFromBiome: 'Lake',
-			grantsStrong: false, stats: { xpBonus: 0.25 }, multiChance: 0, pricing: 'xp', homeStages: ['lake-t1', 'pond-t2'],
-			description: '+25% XP in Lake and Pond.',
+			grantsStrong: false, stats: { xpBonus: 0.15 }, multiChance: 0, pricing: 'xp', homeStages: ['lake-t1', 'pond-t2'],
+			description: '+15% XP in Lake and Pond.',
 		},
 		'Bloodworm': {
 			role: 'rarity + trophy (late)', band: 'late', biomes: ['Coast', 'Swamp'], levelFromBiome: 'Coast',
@@ -156,13 +161,16 @@ const PARAMS = deepFreeze({
 		},
 		'Magic Lure': {
 			role: 'endgame all-rounder (XP + every rarity stat)', band: 'late', biomes: ['Coast', 'Swamp'], levelFromBiome: 'Coast',
-			grantsStrong: false, stats: { rareFind: 0.75, trophyChance: 0.75, luck: 0.75, xpBonus: 0.3 }, multiChance: 0, pricing: 'xp', homeStages: ['coast-t3', 'swamp-t4'],
-			description: '+30% XP and +75% Rare Find, Trophy Chance and Luck in Coast and Swamp.',
+			grantsStrong: false, stats: { rareFind: 0.75, trophyChance: 0.75, luck: 0.75, xpBonus: 0.12 }, multiChance: 0, pricing: 'xp', homeStages: ['coast-t3', 'swamp-t4'],
+			description: '+12% XP and +75% Rare Find, Trophy Chance and Luck in Coast and Swamp.',
 		},
+		// Universal on purpose: the collection-completion tool for endgame players revisiting earlier
+		// biomes. Priced at the most valuable stage it works in, so it is never a money-maker below it.
+		// No strong access (legacy had it): an Old Rod + Strong Magnet in Swamp would return ~2.6x.
 		'Strong Magnet': {
 			role: 'luck / collection completion, any biome', band: 'universal', biomes: ALL, levelFromBiome: 'Coast',
-			grantsStrong: true, stats: { luck: 4.0 }, multiChance: 0, pricing: 'money', homeStages: ['swamp-t4'],
-			description: 'Luck +400% (Legendary and Lucky 5x) and strong-fish access in every biome. Priced for Swamp.',
+			grantsStrong: false, stats: { luck: 4.0 }, multiChance: 0, pricing: 'money', homeStages: ['swamp-t4'],
+			description: 'Luck +400% (Legendary and Lucky 5x) in every biome. Priced for Swamp.',
 		},
 	},
 });
@@ -190,26 +198,26 @@ const addStats = (a = {}, b = {}) => {
 	return o;
 };
 
-/** Normalises a stage to castOutcome input. */
-function stageGear(stage) {
-	const s = typeof stage === 'string' ? STAGES[stage] : stage;
-	if (!s) throw new Error(`Unknown stage ${stage}`);
-	const biome = cap(s.biome);
-	const tierName = s.tier || PROVISIONAL.typicalTier[biome] || 'old';
-	const gear = s.gear || (s.qualities || s.stats || s.mean || s.multiChance !== undefined ? s : PROVISIONAL.tiers[tierName]);
-	const multiChance = gear.multiChance !== undefined ? gear.multiChance : F.chanceForMean(gear.mean || 1);
-	return {
-		biome,
-		tier: s.gear || s.qualities ? (s.tier || 'custom') : tierName,
-		qualities: gear.qualities || ['weak'],
-		stats: { ...(gear.stats || {}) },
-		multiChance,
-		table: s.table,
-		sellMult: s.sellMult,
-		xpMult: s.xpMult,
-		overheadS: s.overheadS ?? 4,
-	};
+/** Normalises a gear path (array old..t4 or keyed object) to { old, t1..t4 }. */
+function normaliseGear(path) {
+	if (!path) return PROVISIONAL.tiers;
+	const entries = Array.isArray(path) ? path.map((t, i) => [PROVISIONAL.tierOrder[i], t]) : Object.entries(path);
+	const out = {};
+	for (const [name, t] of entries) {
+		if (!PROVISIONAL.tierOrder.includes(name)) continue;
+		out[name] = {
+			level: t.level ?? PROVISIONAL.tiers[name].level,
+			qualities: t.qualities || ['weak'],
+			stats: { ...(t.stats || {}) },
+			...(t.multiChance !== undefined ? { multiChance: t.multiChance } : { mean: t.meanFish ?? t.mean ?? 1 }),
+		};
+	}
+	for (const n of PROVISIONAL.tierOrder) if (!out[n]) throw new Error(`gear path is missing tier ${n}`);
+	return out;
 }
+const chanceOf = (gear) => (gear.multiChance !== undefined ? gear.multiChance : F.chanceForMean(gear.mean ?? gear.meanFish ?? 1));
+
+const stageLabel = (s) => (typeof s === 'string' ? s : `${cap(s.biome).toLowerCase()}-${s.tier || 'custom'}`);
 
 const outcomeCache = new Map();
 function outcome(g, bait) {
@@ -226,206 +234,6 @@ function outcome(g, bait) {
 	const key = JSON.stringify(input);
 	if (!outcomeCache.has(key)) outcomeCache.set(key, F.castOutcome(input));
 	return outcomeCache.get(key);
-}
-
-/** Expected effect of one bait at a stage (per cast, versus the same stage without bait). */
-function baitEffect(name, stage) {
-	const b = PARAMS.baits[name];
-	if (!b) throw new Error(`Unknown bait ${name}`);
-	const g = stageGear(stage);
-	const base = outcome(g, null);
-	const applies = b.biomes.includes(g.biome);
-	const w = applies ? outcome(g, b) : base;
-	return {
-		bait: name,
-		biome: g.biome,
-		tier: g.tier,
-		applies,
-		extraValuePerCast: w.valuePerCast - base.valuePerCast,
-		extraXpPerCast: w.xpPerCast - base.xpPerCast,
-		cashPerXp: base.valuePerCast / base.xpPerCast,
-		base,
-		with: w,
-	};
-}
-
-/** Pricing utility at a stage: what the price is set against. */
-function pricingUtility(name, stage) {
-	const e = baitEffect(name, stage);
-	const b = PARAMS.baits[name];
-	if (b.pricing === 'money') return e.extraValuePerCast / PARAMS.pricing.returnTarget;
-	return e.extraValuePerCast + PARAMS.pricing.xpPriceK * e.extraXpPerCast * e.cashPerXp;
-}
-
-/** Pack price (integer $) for a raw per-cast price. */
-function roundPack(perCast) {
-	const pack = perCast * PARAMS.pricing.packSize;
-	const rule = PARAMS.pricing.packRoundTo.find((x) => pack < x.below);
-	return Math.max(1, Math.round(pack / rule.step) * rule.step);
-}
-
-let priceMemo = null;
-/** Shop prices, computed from castOutcome at each bait's home stages. */
-function prices() {
-	if (priceMemo) return priceMemo;
-	priceMemo = {};
-	for (const name of BAIT_NAMES) {
-		const b = PARAMS.baits[name];
-		const utilities = b.homeStages.map((s) => pricingUtility(name, s));
-		const rawPrice = geomean(utilities);
-		const packPrice = roundPack(rawPrice);
-		priceMemo[name] = {
-			price: packPrice / PARAMS.pricing.packSize,
-			packPrice,
-			packSize: PARAMS.pricing.packSize,
-			rawPrice: r3(rawPrice),
-			pricing: b.pricing,
-			homeStages: [...b.homeStages],
-			levelRequirement: F.BIOME_LEVEL[b.levelFromBiome],
-		};
-	}
-	return priceMemo;
-}
-const priceOf = (name) => prices()[name].price;
-
-/** Effect + price at a stage, with every comparison metric. */
-function evaluate(name, stage) {
-	const e = baitEffect(name, stage);
-	const price = priceOf(name);
-	const cost = e.applies ? price : 0;
-	const xpValue = e.extraXpPerCast * e.cashPerXp;
-	return {
-		bait: name,
-		biome: e.biome,
-		tier: e.tier,
-		applies: e.applies,
-		price,
-		costPerCast: cost,
-		extraValuePerCast: e.extraValuePerCast,
-		extraXpPerCast: e.extraXpPerCast,
-		netValuePerCast: e.extraValuePerCast - cost,
-		netShareOfCast: (e.extraValuePerCast - cost) / e.base.valuePerCast,
-		cashReturn: cost > 0 ? e.extraValuePerCast / cost : null,
-		utilityReturn: cost > 0 ? (e.extraValuePerCast + xpValue) / cost : null,
-		netCostPerXp: e.extraXpPerCast > 1e-9 ? (cost - e.extraValuePerCast) / e.extraXpPerCast : null,
-		stageCashPerXp: e.cashPerXp,
-		xpPriceRatio: e.extraXpPerCast > 1e-9 ? (cost - e.extraValuePerCast) / e.extraXpPerCast / e.cashPerXp : null,
-		baseValuePerCast: e.base.valuePerCast,
-		baseXpPerCast: e.base.xpPerCast,
-		fishPerCast: e.with.fishPerCast,
-		jackpot3plus: e.with.jackpot3plus,
-		baseJackpot3plus: e.base.jackpot3plus,
-	};
-}
-
-/**
- * What a player who uses bait equips at this stage.
- * @param stage stage id or object (see stageGear)
- * @param opts { goal: 'cash' | 'xp' | <bait name> }
- */
-function baitOption(stage, { goal = 'cash' } = {}) {
-	const none = { bait: null, costPerCast: 0, extraValuePerCast: 0, extraXpPerCast: 0, netValuePerCast: 0, goal };
-	const g = stageGear(stage);
-	const usable = BAIT_NAMES.filter((n) => PARAMS.baits[n].biomes.includes(g.biome));
-	const pick = (rows) => (rows.length ? rows[0] : null);
-	let chosen = null;
-	if (PARAMS.baits[goal]) {
-		chosen = usable.includes(goal) ? evaluate(goal, stage) : null;
-	}
-	else if (goal === 'xp') {
-		const rows = usable.filter((n) => PARAMS.baits[n].pricing === 'xp').map((n) => evaluate(n, stage)).filter((r) => r.extraXpPerCast > 0)
-			.sort((a, b) => b.extraXpPerCast - a.extraXpPerCast);
-		chosen = pick(rows) || baitOption(stage, { goal: 'cash' });
-		if (chosen && chosen.bait === null) return { ...chosen, goal };
-	}
-	else {
-		const rows = usable.map((n) => evaluate(n, stage)).filter((r) => r.netValuePerCast > 0).sort((a, b) => b.netValuePerCast - a.netValuePerCast);
-		chosen = pick(rows);
-	}
-	if (!chosen) return none;
-	return {
-		bait: chosen.bait,
-		costPerCast: chosen.costPerCast,
-		extraValuePerCast: chosen.extraValuePerCast,
-		extraXpPerCast: chosen.extraXpPerCast,
-		netValuePerCast: chosen.netValuePerCast,
-		cashReturn: chosen.cashReturn,
-		xpPriceRatio: chosen.xpPriceRatio,
-		role: PARAMS.baits[chosen.bait].role,
-		goal,
-	};
-}
-
-const rowOut = (x) => ({
-	bait: x.bait, biome: x.biome, tier: x.tier, applies: x.applies, price: x.price,
-	extraValuePerCast: r2(x.extraValuePerCast), extraXpPerCast: r3(x.extraXpPerCast),
-	cashReturn: r2(x.cashReturn), utilityReturn: r2(x.utilityReturn),
-	netCostPerXp: r2(x.netCostPerXp), stageCashPerXp: r2(x.stageCashPerXp), xpPriceRatio: r2(x.xpPriceRatio),
-	netShareOfCast: r4(x.netShareOfCast), baseValuePerCast: r2(x.baseValuePerCast),
-});
-
-/** Every bait at every typical stage it works in; starter baits also with an Old Rod elsewhere. */
-function baitMatrix() {
-	const out = {};
-	for (const name of BAIT_NAMES) {
-		const b = PARAMS.baits[name];
-		const home = b.homeStages.map((s) => ({ stage: s, ...rowOut(evaluate(name, s)) }));
-		const elsewhere = TYPICAL_STAGE_IDS.filter((s) => !b.homeStages.includes(s) && b.biomes.includes(STAGES[s].biome))
-			.map((s) => ({ stage: s, ...rowOut(evaluate(name, s)) }));
-		const transitional = Object.keys(STAGES).filter((s) => STAGES[s].kind === 'transitional' && b.biomes.includes(STAGES[s].biome))
-			.map((s) => ({ stage: s, ...rowOut(evaluate(name, s)) }));
-		const oldRodElsewhere = b.grantsStrong
-			? b.biomes.filter((bi) => !b.homeStages.includes(`${bi.toLowerCase()}-old`)).map((bi) => ({ stage: `${bi.toLowerCase()}-old`, atypical: PROVISIONAL.typicalTier[bi] !== 'old', ...rowOut(evaluate(name, { biome: bi, tier: 'old' })) }))
-			: [];
-		out[name] = { home, elsewhere, transitional, oldRodElsewhere };
-	}
-	return out;
-}
-
-/** Checks the pricing targets at every home stage; flags a bait that is too good anywhere typical. */
-function bandCheck() {
-	const P = PARAMS.pricing;
-	const issues = [];
-	const summary = {};
-	for (const name of BAIT_NAMES) {
-		const b = PARAMS.baits[name];
-		const home = b.homeStages.map((s) => evaluate(name, s));
-		const typicalElsewhere = TYPICAL_STAGE_IDS.filter((s) => !b.homeStages.includes(s) && b.biomes.includes(STAGES[s].biome)).map((s) => evaluate(name, s));
-		if (b.pricing === 'money') {
-			const rets = home.map((h) => h.cashReturn);
-			const shares = home.map((h) => h.netShareOfCast);
-			summary[name] = { pricing: 'money', cashReturnRange: [r2(Math.min(...rets)), r2(Math.max(...rets))], netShareMax: r4(Math.max(...shares)) };
-			for (const h of home) {
-				if (h.cashReturn < P.moneyReturnBand[0] || h.cashReturn > P.moneyReturnBand[1]) issues.push(`${name} @ ${h.biome}/${h.tier}: cash return ${r2(h.cashReturn)} outside ${P.moneyReturnBand}`);
-				if (h.netShareOfCast > P.netShareMax) issues.push(`${name} @ ${h.biome}/${h.tier}: net gain ${r4(h.netShareOfCast)} of cast value > ${P.netShareMax}`);
-			}
-			for (const h of typicalElsewhere) if (h.cashReturn !== null && h.cashReturn > P.moneyReturnBand[1]) issues.push(`${name} @ ${h.biome}/${h.tier} (not home): cash return ${r2(h.cashReturn)} above band`);
-		}
-		else {
-			const us = home.map((h) => h.utilityReturn);
-			const ks = home.map((h) => h.xpPriceRatio);
-			summary[name] = { pricing: 'xp', utilityReturnRange: [r2(Math.min(...us)), r2(Math.max(...us))], xpPriceRatioRange: [r2(Math.min(...ks)), r2(Math.max(...ks))] };
-			for (const h of home) if (h.utilityReturn < P.xpUtilityBand[0] || h.utilityReturn > P.xpUtilityBand[1]) issues.push(`${name} @ ${h.biome}/${h.tier}: utility return ${r2(h.utilityReturn)} outside ${P.xpUtilityBand}`);
-		}
-	}
-	return { pass: issues.length === 0, issues, summary, bands: { moneyReturn: P.moneyReturnBand, xpUtility: P.xpUtilityBand, netShareMax: P.netShareMax } };
-}
-
-// ---------------------------------------------------------------------------------------------
-/** Per-cast vs per-fish consumption by rod tier (framework multi-catch) and for today's Founder. */
-function consumptionModel() {
-	const tiers = PROVISIONAL.tierOrder.map((t) => {
-		const d = F.fishDistribution(F.chanceForMean(PROVISIONAL.tiers[t].mean));
-		return { tier: t, perFishUnitsPerCast: r3(d.mean), perCastUnitsPerCast: PARAMS.consumption.perCast, pUnitsAtLeast3PerFish: r4(d.p3plus), pUnits5PerFish: r4(d.p5) };
-	});
-	const fb = PROFILES.founder.bonusDraws;
-	const total = Object.values(fb).reduce((s, p) => s + p, 0);
-	const founderDraws = 1 + Object.entries(fb).reduce((s, [k, p]) => s + Number(k) * p / total, 0);
-	return {
-		rule: PARAMS.consumption,
-		byTier: tiers,
-		founderToday: { expectedDrawsStarterRod: r2(founderDraws), perFishUnitsPerCast: r2(founderDraws), perCastUnitsPerCast: PARAMS.consumption.perCast },
-	};
 }
 
 /** Lucky-fish / Lucky-item split of one draw (drawDistribution over the cast's final table). */
@@ -447,84 +255,14 @@ function drawSplit(g, bait, table) {
 	return { legendaryPlusFish, luckyFish, booster, luckyItems };
 }
 
-/** Collection-chase metrics for the luck baits (and Magic Lure) at their home stages and in Ocean. */
-function chaseMetrics() {
-	const rows = [];
-	const cases = [
-		['Magnet', 'lake-t1'], ['Magnet', 'pond-t2'],
-		['Strong Magnet', 'coast-t3'], ['Strong Magnet', 'swamp-t4'], ['Strong Magnet', 'ocean-old'], ['Strong Magnet', 'river-old'],
-		['Magic Lure', 'coast-t3'], ['Magic Lure', 'swamp-t4'],
-	];
-	for (const [name, s] of cases) {
-		const g = stageGear(s);
-		const b = PARAMS.baits[name];
-		const o0 = outcome(g, null);
-		const o1 = outcome(g, b);
-		const s0 = drawSplit(g, null, o0.table);
-		const s1 = drawSplit(g, b, o1.table);
-		const lp0 = s0.legendaryPlusFish * o0.fishPerCast;
-		const lp1 = s1.legendaryPlusFish * o1.fishPerCast;
-		const lu0 = s0.luckyFish * o0.fishPerCast;
-		const lu1 = s1.luckyFish * o1.fishPerCast;
-		const price = priceOf(name);
-		const net = price - (o1.valuePerCast - o0.valuePerCast);
-		rows.push({
-			bait: name, stage: s, price,
-			castsPerLegendaryPlus: { without: Math.round(1 / lp0), with: Math.round(1 / lp1) },
-			castsPerLuckyFish: { without: Math.round(1 / lu0), with: Math.round(1 / lu1) },
-			netCostPerExtraLegendaryPlus: Math.round(net / (lp1 - lp0)),
-			netCostPerExtraLegendaryPlusInHoursOfIncome: r2(net / (lp1 - lp0) / F.hourly(o0).cash),
-		});
-	}
-	return rows;
-}
-
-/** Booster Pack (Lucky item) odds with luck baits. Disclosed only: never valued in any model. */
-function boosterPackOdds() {
-	const rows = [];
-	for (const [name, s] of [[null, 'ocean-old'], [null, 'swamp-t4'], ['Magnet', 'pond-t2'], ['Strong Magnet', 'swamp-t4'], ['Strong Magnet', 'ocean-old'], ['Magic Lure', 'swamp-t4']]) {
-		const g = stageGear(s);
-		const b = name ? PARAMS.baits[name] : null;
-		const o = outcome(g, b);
-		const sp = drawSplit(g, b, o.table);
-		const perCast = sp.booster * o.fishPerCast;
-		rows.push({
-			bait: name, stage: s,
-			castsPerBoosterPack: Math.round(1 / perCast),
-			hoursPerBoosterPackRegular: Math.round(1 / perCast / F.hourly(o, 4).casts),
-			baitSpendPerBoosterPack: name ? Math.round(priceOf(name) / perCast) : 0,
-		});
-	}
-	// Founder today (per draw; Founder draw counts belong to the Founder design).
-	const fg = { ...stageGear('swamp-t4'), table: F.FOUNDER_RARITY_TABLE };
-	const f0 = drawSplit(fg, null, outcome(fg, null).table);
-	const fsm = drawSplit(fg, PARAMS.baits['Strong Magnet'], outcome(fg, PARAMS.baits['Strong Magnet']).table);
-	return {
-		note: 'Lucky items are excluded from castOutcome value; Booster Packs stay an Easter egg and are counted in no income or progression model.',
-		normal: rows,
-		founderPerDraw: { withoutBait: Math.round(1 / f0.booster), withStrongMagnet: Math.round(1 / fsm.booster) },
-	};
-}
-
-/** Liquid value of the bait share of each box per open, current vs proposed prices (1 unit per slot). */
-function gachaBaitValue() {
-	const current = Object.fromEntries(CURRENT_CATALOG.map((b) => [b.name, b.price]));
-	const out = {};
-	for (const [box, d] of Object.entries(GACHA_EV)) {
-		let cur = 0;
-		let prop = 0;
-		let units = 0;
-		for (const [name, r] of Object.entries(d.rewards || {})) {
-			if (r.type !== 'bait') continue;
-			const u = r.p * d.slots;
-			units += u;
-			cur += u * (current[name] ?? r.price ?? 0);
-			prop += u * (PARAMS.baits[name] ? priceOf(name) : 0);
-		}
-		out[box] = { baitUnitsPerOpen: r3(units), currentBaitValuePerOpen: r2(cur), proposedBaitValuePerOpen: r2(prop) };
-	}
-	return out;
-}
+const rowOut = (x) => ({
+	bait: x.bait, biome: x.biome, tier: x.tier, applies: x.applies, price: x.price,
+	extraValuePerCast: r2(x.extraValuePerCast), extraXpPerCast: r3(x.extraXpPerCast),
+	cashReturn: r2(x.cashReturn), utilityReturn: r2(x.utilityReturn),
+	netCostPerXp: r2(x.netCostPerXp), stageCashPerXp: r2(x.stageCashPerXp), xpPriceRatio: r2(x.xpPriceRatio),
+	netShareOfCast: r4(x.netShareOfCast), baseValuePerCast: r2(x.baseValuePerCast),
+	extraXpShare: r4(x.extraXpPerCast / x.baseXpPerCast), fishPerCast: r3(x.fishPerCast), jackpot3plus: [r4(x.baseJackpot3plus), r4(x.jackpot3plus)],
+});
 
 // ---------------------------------------------------------------------------------------------
 /** Today's catalog bait and its measured Old Rod economics (real engine, measurements.json). */
@@ -549,152 +287,527 @@ function currentBaits() {
 			bestReturnPerDollar: best?.returnPerDollar ?? null, bestBiome: best?.biome ?? null,
 			costPerCastRange: [Math.min(...perBiome.map((x) => x.costPerCast)), Math.max(...perBiome.map((x) => x.costPerCast))],
 			medianExtraXpPerCast: perBiome.map((x) => x.extraXpPerCast).sort((a, c) => a - c)[Math.floor(perBiome.length / 2)],
+			medianCostPerExtraXp: (() => {
+				const v = perBiome.map((x) => x.costPerExtraXp).filter((x) => x !== null).sort((a, c) => a - c);
+				return v.length ? v[Math.floor(v.length / 2)] : null;
+			})(),
 			perBiome,
 		};
 	});
 }
 
-// ---------------------------------------------------------------------------------------------
-// Provisional lifecycle, mirroring scripts/economy/5b/curve.js step for step (1-minute steps,
-// highest unlocked biome, 60 XP × level daily, a tier bought after saving purchaseHours of the
-// no-bait stage income), with bait bought every cast from baitOption(). With policy 'none' it must
-// reproduce curve.json; bandCheck-independent cross-check reported as baselineMatchesCurveJson.
 const biomeAt = (L) => [...ALL].reverse().find((b) => L >= F.BIOME_LEVEL[b]);
-const lcCache = new Map();
-function lcRates(biome, tier, overheadS, policy) {
-	const key = `${biome}|${tier}|${overheadS}|${policy}`;
-	if (!lcCache.has(key)) {
-		const stage = { biome, tier, overheadS };
-		const g = stageGear(stage);
-		const o = outcome(g, null);
-		const h = F.hourly(o, overheadS);
-		const opt = policy === 'none' ? { bait: null, costPerCast: 0, extraValuePerCast: 0, extraXpPerCast: 0 } : baitOption(stage, { goal: policy });
-		lcCache.set(key, {
-			grossNoBait: h.cash,
-			cash: h.cash + h.casts * (opt.extraValuePerCast - opt.costPerCast),
-			xp: h.xp + h.casts * opt.extraXpPerCast,
-			spend: h.casts * opt.costPerCast,
-			extra: h.casts * opt.extraValuePerCast,
-			bait: opt.bait,
-		});
+
+/**
+ * The whole bait model on one rod path. Everything that depends on gear lives in here, so a new
+ * gear path (the rods design, or a later framework version) regenerates every number.
+ */
+function createBaitModel(gearPath = null) {
+	const TIERS = normaliseGear(gearPath);
+	const gearSource = gearPath ? 'custom' : 'provisional';
+
+	/** Normalises a stage to castOutcome input. */
+	function stageGear(stage) {
+		const s = typeof stage === 'string' ? STAGES[stage] : stage;
+		if (!s) throw new Error(`Unknown stage ${stage}`);
+		const biome = cap(s.biome);
+		const tierName = s.tier || PROVISIONAL.typicalTier[biome] || 'old';
+		const gear = s.gear || (s.qualities || s.stats || s.mean || s.meanFish || s.multiChance !== undefined ? s : TIERS[tierName]);
+		if (!gear) throw new Error(`Unknown tier ${tierName}`);
+		const multiChance = chanceOf(gear);
+		return {
+			biome,
+			tier: s.gear || s.qualities ? (s.tier || 'custom') : tierName,
+			qualities: gear.qualities || ['weak'],
+			stats: { ...(gear.stats || {}) },
+			multiChance,
+			table: s.table,
+			sellMult: s.sellMult,
+			xpMult: s.xpMult,
+			overheadS: s.overheadS ?? 4,
+		};
 	}
-	return lcCache.get(key);
-}
 
-function lifecycle(policy = 'none', archName = 'regular') {
-	const arch = PROVISIONAL.archetypes[archName];
-	const { dailyXpPerLevel, purchaseHours, stepH, maxLevel } = PROVISIONAL.lifecycle;
-	const order = PROVISIONAL.tierOrder;
-	let xp = 0;
-	let h = 0;
-	let tierIdx = 0;
-	let saving = 0;
-	let spend = 0;
-	let extra = 0;
-	let gross = 0;
-	const dayH = arch.minutesPerDay / 60;
-	const reached = {};
-	const baitsUsed = new Set();
-	while (h < 2000) {
-		const L = F.levelForXp(xp);
-		const cur = order[tierIdx];
-		const next = order[tierIdx + 1];
-		const r = lcRates(biomeAt(L), cur, arch.overheadS, policy);
-		if (r.bait) baitsUsed.add(r.bait);
-		if (next && L >= PROVISIONAL.tiers[next].level) {
-			saving += r.cash * stepH;
-			if (saving >= r.grossNoBait * purchaseHours) {
-				tierIdx++;
-				saving = 0;
-			}
-		}
-		xp += r.xp * stepH;
-		spend += r.spend * stepH;
-		extra += r.extra * stepH;
-		gross += r.grossNoBait * stepH;
-		const before = h;
-		h += stepH;
-		if (Math.floor(h / dayH) !== Math.floor(before / dayH)) xp += dailyXpPerLevel * L;
-		const L2 = F.levelForXp(xp);
-		for (const T of [10, 20, 30, 40, 50, 60]) if (!reached[T] && L2 >= T) reached[T] = r2(h);
-		if (L2 >= maxLevel) break;
-	}
-	return {
-		policy, archetype: archName, hoursToLevel: reached,
-		baitSpendShareOfIncome: r4(spend / gross), baitExtraValueShareOfIncome: r4(extra / gross), netEffectShareOfIncome: r4((extra - spend) / gross),
-		baitsUsed: [...baitsUsed],
-	};
-}
-
-function lifecycleSensitivity() {
-	const regular = Object.fromEntries(['none', 'cash', 'xp'].map((p) => [p, lifecycle(p, 'regular')]));
-	const grinder = Object.fromEntries(['none', 'xp'].map((p) => [p, lifecycle(p, 'grinder')]));
-	const casual = Object.fromEntries(['none', 'cash'].map((p) => [p, lifecycle(p, 'casual')]));
-	const ref = CURVE_JSON.archetypes?.regular || {};
-	const matches = Object.entries(regular.none.hoursToLevel).every(([L, hrs]) => ref[L] === undefined || Math.abs(ref[L].hours - hrs) < 0.02);
-	const curveMatches = CURVE_JSON.chosen === F.CURVE.quartic;
-	return { regular, grinder, casual, baselineMatchesCurveJson: matches && curveMatches, curveJsonQuartic: CURVE_JSON.chosen, frameworkQuartic: F.CURVE.quartic };
-}
-
-// ---------------------------------------------------------------------------------------------
-/** Current -> proposed rows for all 10 baits (proposed metrics at each home stage). */
-function currentVsProposed() {
-	const cur = Object.fromEntries(currentBaits().map((c) => [c.name, c]));
-	const p = prices();
-	return BAIT_NAMES.map((name) => {
+	/** Expected effect of one bait at a stage (per cast, versus the same stage without bait). */
+	function baitEffect(name, stage) {
 		const b = PARAMS.baits[name];
-		const c = cur[name];
+		if (!b) throw new Error(`Unknown bait ${name}`);
+		const g = stageGear(stage);
+		const base = outcome(g, null);
+		const applies = b.biomes.includes(g.biome);
+		const w = applies ? outcome(g, b) : base;
 		return {
 			bait: name,
-			current: {
-				price: c.price, consumption: c.consumption, biomes: c.biomes, capabilities: c.capabilities, engineStats: c.engineStats, xpMultiplier: c.xpMultiplier,
-				bestReturnPerDollarOldRod: c.bestReturnPerDollar, bestBiome: c.bestBiome, costPerCastRange: c.costPerCastRange, medianExtraXpPerCast: c.medianExtraXpPerCast,
-			},
-			proposed: {
-				role: b.role, band: b.band, price: p[name].price, rawPrice: p[name].rawPrice, levelRequirement: p[name].levelRequirement,
-				consumption: '1 per cast where it works', biomes: b.biomes, grantsStrong: b.grantsStrong, stats: b.stats, multiChance: b.multiChance, pricing: b.pricing,
-				home: b.homeStages.map((s) => rowOut(evaluate(name, s))),
-			},
+			biome: g.biome,
+			tier: g.tier,
+			applies,
+			extraValuePerCast: w.valuePerCast - base.valuePerCast,
+			extraXpPerCast: w.xpPerCast - base.xpPerCast,
+			cashPerXp: base.valuePerCast / base.xpPerCast,
+			base,
+			with: w,
 		};
-	});
-}
+	}
 
-function stageOptions() {
-	return Object.keys(STAGES).map((s) => {
-		const cash = baitOption(s, { goal: 'cash' });
-		const xp = baitOption(s, { goal: 'xp' });
-		const trim = (o) => ({ bait: o.bait, costPerCast: o.costPerCast, extraValuePerCast: r2(o.extraValuePerCast), extraXpPerCast: r3(o.extraXpPerCast), netValuePerCast: r2(o.netValuePerCast) });
-		return { stage: s, kind: STAGES[s].kind, cash: trim(cash), xp: trim(xp) };
-	});
-}
+	/** Pricing utility at a stage: what the price is set against. */
+	function pricingUtility(name, stage) {
+		const e = baitEffect(name, stage);
+		const b = PARAMS.baits[name];
+		if (b.pricing === 'money') return e.extraValuePerCast / PARAMS.pricing.returnTarget;
+		return e.extraValuePerCast + PARAMS.pricing.xpPriceK * e.extraXpPerCast * e.cashPerXp;
+	}
 
-function report() {
+	/** Pack price (integer $) for a raw per-cast price. */
+	function roundPack(perCast) {
+		const pack = perCast * PARAMS.pricing.packSize;
+		const rule = PARAMS.pricing.packRoundTo.find((x) => pack < x.below);
+		return Math.max(1, Math.round(pack / rule.step) * rule.step);
+	}
+
+	let priceMemo = null;
+	/** Shop prices, computed from castOutcome at each bait's home stages. */
+	function prices() {
+		if (priceMemo) return priceMemo;
+		priceMemo = {};
+		for (const name of BAIT_NAMES) {
+			const b = PARAMS.baits[name];
+			const utilities = b.homeStages.map((s) => pricingUtility(name, s));
+			const rawPrice = geomean(utilities);
+			const packPrice = roundPack(rawPrice);
+			priceMemo[name] = {
+				price: packPrice / PARAMS.pricing.packSize,
+				packPrice,
+				packSize: PARAMS.pricing.packSize,
+				rawPrice: r3(rawPrice),
+				pricing: b.pricing,
+				homeStages: [...b.homeStages],
+				levelRequirement: F.BIOME_LEVEL[b.levelFromBiome],
+			};
+		}
+		return priceMemo;
+	}
+	const priceOf = (name) => prices()[name].price;
+
+	/** Effect + price at a stage, with every comparison metric. */
+	function evaluate(name, stage) {
+		const e = baitEffect(name, stage);
+		const price = priceOf(name);
+		const cost = e.applies ? price : 0;
+		const xpValue = e.extraXpPerCast * e.cashPerXp;
+		return {
+			bait: name,
+			biome: e.biome,
+			tier: e.tier,
+			applies: e.applies,
+			price,
+			costPerCast: cost,
+			extraValuePerCast: e.extraValuePerCast,
+			extraXpPerCast: e.extraXpPerCast,
+			netValuePerCast: e.extraValuePerCast - cost,
+			netShareOfCast: (e.extraValuePerCast - cost) / e.base.valuePerCast,
+			cashReturn: cost > 0 ? e.extraValuePerCast / cost : null,
+			utilityReturn: cost > 0 ? (e.extraValuePerCast + xpValue) / cost : null,
+			netCostPerXp: e.extraXpPerCast > 1e-9 ? (cost - e.extraValuePerCast) / e.extraXpPerCast : null,
+			stageCashPerXp: e.cashPerXp,
+			xpPriceRatio: e.extraXpPerCast > 1e-9 ? (cost - e.extraValuePerCast) / e.extraXpPerCast / e.cashPerXp : null,
+			baseValuePerCast: e.base.valuePerCast,
+			baseXpPerCast: e.base.xpPerCast,
+			fishPerCast: e.with.fishPerCast,
+			jackpot3plus: e.with.jackpot3plus,
+			baseJackpot3plus: e.base.jackpot3plus,
+		};
+	}
+
+	/**
+	 * What a player who uses bait equips at this stage.
+	 * @param stage stage id or object (see stageGear)
+	 * @param opts { goal: 'cash' | 'xp' | <bait name> }
+	 */
+	function baitOption(stage, { goal = 'cash' } = {}) {
+		const none = { bait: null, costPerCast: 0, extraValuePerCast: 0, extraXpPerCast: 0, netValuePerCast: 0, goal };
+		const g = stageGear(stage);
+		const usable = BAIT_NAMES.filter((n) => PARAMS.baits[n].biomes.includes(g.biome));
+		const pick = (rows) => (rows.length ? rows[0] : null);
+		let chosen = null;
+		if (PARAMS.baits[goal]) {
+			chosen = usable.includes(goal) ? evaluate(goal, stage) : null;
+		}
+		else if (goal === 'xp') {
+			const rows = usable.filter((n) => PARAMS.baits[n].pricing === 'xp').map((n) => evaluate(n, stage)).filter((r) => r.extraXpPerCast > 0)
+				.sort((a, b) => b.extraXpPerCast - a.extraXpPerCast);
+			chosen = pick(rows) || baitOption(stage, { goal: 'cash' });
+			if (chosen && chosen.bait === null) return { ...chosen, goal };
+		}
+		else {
+			const rows = usable.map((n) => evaluate(n, stage)).filter((r) => r.netValuePerCast > 0).sort((a, b) => b.netValuePerCast - a.netValuePerCast);
+			chosen = pick(rows);
+		}
+		if (!chosen) return none;
+		return {
+			bait: chosen.bait,
+			costPerCast: chosen.costPerCast,
+			extraValuePerCast: chosen.extraValuePerCast,
+			extraXpPerCast: chosen.extraXpPerCast,
+			netValuePerCast: chosen.netValuePerCast,
+			cashReturn: chosen.cashReturn,
+			xpPriceRatio: chosen.xpPriceRatio,
+			role: PARAMS.baits[chosen.bait].role,
+			goal,
+		};
+	}
+
+	/** Every bait at every typical stage it works in; starter baits also with an Old Rod elsewhere. */
+	function baitMatrix() {
+		const out = {};
+		for (const name of BAIT_NAMES) {
+			const b = PARAMS.baits[name];
+			const home = b.homeStages.map((s) => ({ stage: s, ...rowOut(evaluate(name, s)) }));
+			const elsewhere = TYPICAL_STAGE_IDS.filter((s) => !b.homeStages.includes(s) && b.biomes.includes(STAGES[s].biome))
+				.map((s) => ({ stage: s, ...rowOut(evaluate(name, s)) }));
+			const transitional = Object.keys(STAGES).filter((s) => STAGES[s].kind === 'transitional' && b.biomes.includes(STAGES[s].biome))
+				.map((s) => ({ stage: s, ...rowOut(evaluate(name, s)) }));
+			const oldRodElsewhere = b.grantsStrong
+				? b.biomes.filter((bi) => !b.homeStages.includes(`${bi.toLowerCase()}-old`)).map((bi) => ({ stage: `${bi.toLowerCase()}-old`, atypical: PROVISIONAL.typicalTier[bi] !== 'old', ...rowOut(evaluate(name, { biome: bi, tier: 'old' })) }))
+				: [];
+			out[name] = { home, elsewhere, transitional, oldRodElsewhere };
+		}
+		return out;
+	}
+
+	/** Checks the pricing targets at every home stage; flags a bait that is too good anywhere typical. */
+	function bandCheck() {
+		const P = PARAMS.pricing;
+		const issues = [];
+		const summary = {};
+		for (const name of BAIT_NAMES) {
+			const b = PARAMS.baits[name];
+			const home = b.homeStages.map((s) => evaluate(name, s));
+			const typicalElsewhere = TYPICAL_STAGE_IDS.filter((s) => !b.homeStages.includes(s) && b.biomes.includes(STAGES[s].biome)).map((s) => evaluate(name, s));
+			if (b.pricing === 'money') {
+				const rets = home.map((h) => h.cashReturn);
+				const shares = home.map((h) => h.netShareOfCast);
+				summary[name] = { pricing: 'money', cashReturnRange: [r2(Math.min(...rets)), r2(Math.max(...rets))], netShareMax: r4(Math.max(...shares)) };
+				for (const h of home) {
+					if (h.cashReturn < P.moneyReturnBand[0] || h.cashReturn > P.moneyReturnBand[1]) issues.push(`${name} @ ${h.biome}/${h.tier}: cash return ${r2(h.cashReturn)} outside ${P.moneyReturnBand}`);
+					if (h.netShareOfCast > P.netShareMax) issues.push(`${name} @ ${h.biome}/${h.tier}: net gain ${r4(h.netShareOfCast)} of cast value > ${P.netShareMax}`);
+				}
+				for (const h of typicalElsewhere) if (h.cashReturn !== null && h.cashReturn > P.moneyReturnBand[1]) issues.push(`${name} @ ${h.biome}/${h.tier} (not home): cash return ${r2(h.cashReturn)} above band`);
+			}
+			else {
+				const us = home.map((h) => h.utilityReturn);
+				const ks = home.map((h) => h.xpPriceRatio);
+				summary[name] = { pricing: 'xp', utilityReturnRange: [r2(Math.min(...us)), r2(Math.max(...us))], xpPriceRatioRange: [r2(Math.min(...ks)), r2(Math.max(...ks))] };
+				for (const h of home) if (h.utilityReturn < P.xpUtilityBand[0] || h.utilityReturn > P.xpUtilityBand[1]) issues.push(`${name} @ ${h.biome}/${h.tier}: utility return ${r2(h.utilityReturn)} outside ${P.xpUtilityBand}`);
+			}
+		}
+		return { pass: issues.length === 0, issues, summary, bands: { moneyReturn: P.moneyReturnBand, xpUtility: P.xpUtilityBand, netShareMax: P.netShareMax } };
+	}
+
+	/**
+	 * Evidence for the starter baits' biome lists: what strong access is worth to an Old Rod in each
+	 * biome, and the return it would have at the starter bait's price of that water type.
+	 */
+	function strongAccessByBiome() {
+		return ALL.map((biome) => {
+			const g = stageGear({ biome, tier: 'old' });
+			const o0 = outcome(g, null);
+			const o1 = outcome(g, { grantsStrong: true, stats: {} });
+			const starter = SALT.includes(biome) ? 'Shrimp' : 'Worm';
+			const extra = o1.valuePerCast - o0.valuePerCast;
+			return {
+				biome, oldRodValuePerCast: r2(o0.valuePerCast), strongAccessExtraPerCast: r2(extra), strongAccessShare: r4(extra / o0.valuePerCast),
+				starterOfWaterType: starter, returnAtStarterPrice: r2(extra / priceOf(starter)),
+				starterWorksHere: PARAMS.baits[starter].biomes.includes(biome), typicalTierHere: PROVISIONAL.typicalTier[biome],
+			};
+		});
+	}
+
+	// ---------------------------------------------------------------------------------------------
+	/** Per-cast vs per-fish consumption by rod tier (framework multi-catch) and for today's Founder. */
+	function consumptionModel() {
+		const tiers = PROVISIONAL.tierOrder.map((t) => {
+			const d = F.fishDistribution(chanceOf(TIERS[t]));
+			return { tier: t, perFishUnitsPerCast: r3(d.mean), perCastUnitsPerCast: PARAMS.consumption.perCast, pUnitsAtLeast3PerFish: r4(d.p3plus), pUnits5PerFish: r4(d.p5) };
+		});
+		const fb = PROFILES.founder.bonusDraws;
+		const total = Object.values(fb).reduce((s, p) => s + p, 0);
+		const founderDraws = 1 + Object.entries(fb).reduce((s, [k, p]) => s + Number(k) * p / total, 0);
+		return {
+			rule: PARAMS.consumption,
+			byTier: tiers,
+			founderToday: { expectedDrawsStarterRod: r2(founderDraws), perFishUnitsPerCast: r2(founderDraws), perCastUnitsPerCast: PARAMS.consumption.perCast },
+		};
+	}
+
+	/** Collection-chase metrics for the luck baits (and Magic Lure) at their home stages and in Ocean. */
+	function chaseMetrics() {
+		const rows = [];
+		const cases = [
+			['Magnet', 'lake-t1'], ['Magnet', 'pond-t2'],
+			['Strong Magnet', 'coast-t3'], ['Strong Magnet', 'swamp-t4'],
+			// Endgame player (Tier 4) back in the starter waters to finish the collection (Magikarp, Pearl...).
+			['Strong Magnet', { biome: 'Ocean', tier: 't4' }], ['Strong Magnet', { biome: 'River', tier: 't4' }],
+		];
+		for (const [name, s] of cases) {
+			const g = stageGear(s);
+			const b = PARAMS.baits[name];
+			const o0 = outcome(g, null);
+			const o1 = outcome(g, b);
+			const s0 = drawSplit(g, null, o0.table);
+			const s1 = drawSplit(g, b, o1.table);
+			const lp0 = s0.legendaryPlusFish * o0.fishPerCast;
+			const lp1 = s1.legendaryPlusFish * o1.fishPerCast;
+			const lu0 = s0.luckyFish * o0.fishPerCast;
+			const lu1 = s1.luckyFish * o1.fishPerCast;
+			const price = priceOf(name);
+			const net = price - (o1.valuePerCast - o0.valuePerCast);
+			rows.push({
+				bait: name, stage: stageLabel(s), price,
+				castsPerLegendaryPlus: { without: Math.round(1 / lp0), with: Math.round(1 / lp1) },
+				castsPerLuckyFish: { without: Math.round(1 / lu0), with: Math.round(1 / lu1) },
+				// Negative = the bait pays for itself in cash while tripling-to-quintupling the chase odds.
+				netCostPerExtraLegendaryPlus: Math.round(net / (lp1 - lp0)),
+				netCostPerExtraLegendaryPlusInMinutesOfIncome: r2((60 * net) / (lp1 - lp0) / F.hourly(o0).cash),
+				netCostPerExtraLuckyFish: Math.round(net / (lu1 - lu0)),
+			});
+		}
+		return rows;
+	}
+
+	/** Booster Pack (Lucky item) odds with luck baits. Disclosed only: never valued in any model. */
+	function boosterPackOdds() {
+		const rows = [];
+		for (const [name, s] of [[null, 'ocean-old'], [null, 'swamp-t4'], ['Magnet', 'pond-t2'], ['Strong Magnet', 'swamp-t4'], ['Strong Magnet', { biome: 'Ocean', tier: 't4' }], ['Magic Lure', 'swamp-t4']]) {
+			const g = stageGear(s);
+			const b = name ? PARAMS.baits[name] : null;
+			const o = outcome(g, b);
+			const sp = drawSplit(g, b, o.table);
+			const perCast = sp.booster * o.fishPerCast;
+			// Pinned rule (proposed engine change): the Lucky-item branch keeps the rate of the profile's
+			// unmodified table, so luck from rods/bait raises Lucky FISH only.
+			const baseTable = F.castOutcome({ biome: g.biome, qualities: g.qualities }).table;
+			const pinned = drawSplit({ ...g, qualities: b && b.grantsStrong ? [...new Set([...g.qualities, 'strong'])] : g.qualities }, null, baseTable).booster * o.fishPerCast;
+			rows.push({
+				bait: name, stage: stageLabel(s),
+				castsPerBoosterPack: Math.round(1 / perCast),
+				hoursPerBoosterPackRegular: Math.round(1 / perCast / F.hourly(o, F.ARCHETYPES[F.REFERENCE_ARCHETYPE].overheadS).casts),
+				baitSpendPerBoosterPack: name ? Math.round(priceOf(name) / perCast) : 0,
+				castsPerBoosterPackIfPinned: Math.round(1 / pinned),
+			});
+		}
+		// Founder today (per draw; Founder draw counts belong to the Founder design).
+		const fg = { ...stageGear('swamp-t4'), table: F.FOUNDER_RARITY_TABLE };
+		const f0 = drawSplit(fg, null, outcome(fg, null).table);
+		const fsm = drawSplit(fg, PARAMS.baits['Strong Magnet'], outcome(fg, PARAMS.baits['Strong Magnet']).table);
+		return {
+			note: 'Lucky items are excluded from castOutcome value; Booster Packs stay an Easter egg and are counted in no income or progression model. "IfPinned" = proposed rule: luck stats raise Lucky fish, never the Lucky-item rate.',
+			normal: rows,
+			founderPerDraw: { withoutBait: Math.round(1 / f0.booster), withStrongMagnet: Math.round(1 / fsm.booster) },
+		};
+	}
+
+	/** Liquid value of the bait share of each box per open, current vs proposed prices (1 unit per slot). */
+	function gachaBaitValue() {
+		const current = Object.fromEntries(CURRENT_CATALOG.map((b) => [b.name, b.price]));
+		const out = {};
+		for (const [box, d] of Object.entries(GACHA_EV)) {
+			let cur = 0;
+			let prop = 0;
+			let units = 0;
+			for (const [name, r] of Object.entries(d.rewards || {})) {
+				if (r.type !== 'bait') continue;
+				const u = r.p * d.slots;
+				units += u;
+				cur += u * (current[name] ?? r.price ?? 0);
+				prop += u * (PARAMS.baits[name] ? priceOf(name) : 0);
+			}
+			out[box] = { baitUnitsPerOpen: r3(units), currentBaitValuePerOpen: r2(cur), proposedBaitValuePerOpen: r2(prop), proposedIfSlotGrantsAPack: r2(prop * PARAMS.pricing.packSize) };
+		}
+		return out;
+	}
+
+	// ---------------------------------------------------------------------------------------------
+	// Provisional lifecycle, mirroring scripts/economy/5b/curve.js step for step (1-minute steps,
+	// highest unlocked biome, 60 XP × level daily, a tier bought after saving purchaseHours of the
+	// no-bait stage income), with bait bought every cast from baitOption(). With policy 'none' it must
+	// reproduce curve.json; bandCheck-independent cross-check reported as baselineMatchesCurveJson.
+	const lcCache = new Map();
+	function lcRates(biome, tier, overheadS, policy) {
+		const key = `${biome}|${tier}|${overheadS}|${policy}`;
+		if (!lcCache.has(key)) {
+			const stage = { biome, tier, overheadS };
+			const g = stageGear(stage);
+			const o = outcome(g, null);
+			const h = F.hourly(o, overheadS);
+			const opt = policy === 'none' ? { bait: null, costPerCast: 0, extraValuePerCast: 0, extraXpPerCast: 0 } : baitOption(stage, { goal: policy });
+			lcCache.set(key, {
+				grossNoBait: h.cash,
+				cash: h.cash + h.casts * (opt.extraValuePerCast - opt.costPerCast),
+				xp: h.xp + h.casts * opt.extraXpPerCast,
+				xpNoBait: h.xp,
+				xpBait: h.casts * opt.extraXpPerCast,
+				spend: h.casts * opt.costPerCast,
+				extra: h.casts * opt.extraValuePerCast,
+				bait: opt.bait,
+			});
+		}
+		return lcCache.get(key);
+	}
+
+	function lifecycle(policy = 'none', archName = 'regular') {
+		const arch = PROVISIONAL.archetypes[archName];
+		const { dailyXpPerLevel, purchaseHours, stepH, maxLevel } = PROVISIONAL.lifecycle;
+		const order = PROVISIONAL.tierOrder;
+		let xp = 0;
+		let h = 0;
+		let tierIdx = 0;
+		let saving = 0;
+		let spend = 0;
+		let extra = 0;
+		let gross = 0;
+		const xpBy = { fishing: 0, bait: 0, daily: 0 };
+		const xpAt = {};
+		const dayH = arch.minutesPerDay / 60;
+		const reached = {};
+		const baitsUsed = new Set();
+		while (h < 2000) {
+			const L = F.levelForXp(xp);
+			const cur = order[tierIdx];
+			const next = order[tierIdx + 1];
+			const r = lcRates(biomeAt(L), cur, arch.overheadS, policy);
+			if (r.bait) baitsUsed.add(r.bait);
+			if (next && L >= TIERS[next].level) {
+				saving += r.cash * stepH;
+				if (saving >= r.grossNoBait * purchaseHours) {
+					tierIdx++;
+					saving = 0;
+				}
+			}
+			xp += r.xp * stepH;
+			xpBy.fishing += r.xpNoBait * stepH;
+			xpBy.bait += r.xpBait * stepH;
+			spend += r.spend * stepH;
+			extra += r.extra * stepH;
+			gross += r.grossNoBait * stepH;
+			const before = h;
+			h += stepH;
+			if (Math.floor(h / dayH) !== Math.floor(before / dayH)) {
+				xp += dailyXpPerLevel * L;
+				xpBy.daily += dailyXpPerLevel * L;
+			}
+			const L2 = F.levelForXp(xp);
+			for (const T of F.LIFECYCLE.milestones) {
+				if (!reached[T] && L2 >= T) {
+					reached[T] = r2(h);
+					const tot = xpBy.fishing + xpBy.bait + xpBy.daily;
+					xpAt[T] = { day: Math.ceil(h / dayH), fishingShare: r4(xpBy.fishing / tot), baitShare: r4(xpBy.bait / tot), dailyShare: r4(xpBy.daily / tot) };
+				}
+			}
+			if (L2 >= maxLevel) break;
+		}
+		return {
+			policy, archetype: archName, gear: gearSource, hoursToLevel: reached, xpSources: xpAt,
+			baitSpendShareOfIncome: r4(spend / gross), baitExtraValueShareOfIncome: r4(extra / gross), netEffectShareOfIncome: r4((extra - spend) / gross),
+			baitsUsed: [...baitsUsed],
+		};
+	}
+
+	function lifecycleSensitivity() {
+		const regular = Object.fromEntries(['none', 'cash', 'xp'].map((p) => [p, lifecycle(p, 'regular')]));
+		const grinder = Object.fromEntries(['none', 'xp'].map((p) => [p, lifecycle(p, 'grinder')]));
+		const casual = Object.fromEntries(['none', 'cash'].map((p) => [p, lifecycle(p, 'casual')]));
+		const ref = CURVE_JSON.archetypes?.regular || {};
+		const matches = Object.entries(regular.none.hoursToLevel).every(([L, hrs]) => ref[L] === undefined || Math.abs(ref[L].hours - hrs) < 0.02);
+		const curveMatches = CURVE_JSON.chosen === F.CURVE.quartic;
+		// Approved windows (curve.json targets) for the regular player, with and without bait.
+		const windows = Object.entries(CURVE_JSON.targets || {}).map(([L, [lo, hi]]) => {
+			const row = { level: Number(L), window: [lo, hi] };
+			for (const p of ['none', 'cash', 'xp']) {
+				const hrs = regular[p].hoursToLevel[L];
+				row[p] = { hours: hrs, inWindow: hrs >= lo && hrs <= hi, speedupVsNoBait: r4(1 - hrs / regular.none.hoursToLevel[L]) };
+			}
+			return row;
+		});
+		const maxSpeedup = Math.max(...Object.keys(regular.none.hoursToLevel).filter((L) => Number(L) >= 20).map((L) => 1 - regular.xp.hoursToLevel[L] / regular.none.hoursToLevel[L]));
+		return {
+			regular, grinder, casual, windows,
+			xpBaitSpeedupCheck: { maxSpeedup: r4(maxSpeedup), limit: PARAMS.pricing.maxXpBaitSpeedup, pass: maxSpeedup <= PARAMS.pricing.maxXpBaitSpeedup + 1e-9 },
+			baselineMatchesCurveJson: matches && curveMatches, curveJsonQuartic: CURVE_JSON.chosen, frameworkQuartic: F.CURVE.quartic,
+		};
+	}
+
+	// ---------------------------------------------------------------------------------------------
+	/** Current -> proposed rows for all 10 baits (proposed metrics at each home stage). */
+	function currentVsProposed() {
+		const cur = Object.fromEntries(currentBaits().map((c) => [c.name, c]));
+		const p = prices();
+		return BAIT_NAMES.map((name) => {
+			const b = PARAMS.baits[name];
+			const c = cur[name];
+			return {
+				bait: name,
+				current: {
+					price: c.price, consumption: c.consumption, biomes: c.biomes, capabilities: c.capabilities, engineStats: c.engineStats, xpMultiplier: c.xpMultiplier,
+					bestReturnPerDollarOldRod: c.bestReturnPerDollar, bestBiome: c.bestBiome, costPerCastRange: c.costPerCastRange, medianExtraXpPerCast: c.medianExtraXpPerCast, medianCostPerExtraXp: c.medianCostPerExtraXp,
+				},
+				proposed: {
+					role: b.role, band: b.band, price: p[name].price, rawPrice: p[name].rawPrice, levelRequirement: p[name].levelRequirement,
+					consumption: '1 per cast where it works', biomes: b.biomes, grantsStrong: b.grantsStrong, stats: b.stats, multiChance: b.multiChance, pricing: b.pricing,
+					home: b.homeStages.map((s) => rowOut(evaluate(name, s))),
+				},
+			};
+		});
+	}
+
+	function stageOptions() {
+		return Object.keys(STAGES).map((s) => {
+			const cash = baitOption(s, { goal: 'cash' });
+			const xp = baitOption(s, { goal: 'xp' });
+			const trim = (o) => ({ bait: o.bait, costPerCast: o.costPerCast, extraValuePerCast: r2(o.extraValuePerCast), extraXpPerCast: r3(o.extraXpPerCast), netValuePerCast: r2(o.netValuePerCast) });
+			return { stage: s, kind: STAGES[s].kind, cash: trim(cash), xp: trim(xp) };
+		});
+	}
+
+	function report() {
+		return {
+			...F.stamp(),
+			curve: { ...F.CURVE },
+			gear: { source: gearSource, tiers: TIERS },
+			params: {
+				consumption: PARAMS.consumption,
+				pricing: PARAMS.pricing,
+				bands: PARAMS.bands,
+			},
+			prices: prices(),
+			currentVsProposed: currentVsProposed(),
+			bandCheck: bandCheck(),
+			matrix: baitMatrix(),
+			strongAccess: strongAccessByBiome(),
+			stageOptions: stageOptions(),
+			consumption: consumptionModel(),
+			chase: chaseMetrics(),
+			boosterPack: boosterPackOdds(),
+			gacha: gachaBaitValue(),
+			lifecycle: lifecycleSensitivity(),
+		};
+	}
+
 	return {
-		frameworkVersion: F.FRAMEWORK_VERSION,
-		curve: { ...F.CURVE },
-		params: {
-			consumption: PARAMS.consumption,
-			pricing: PARAMS.pricing,
-			bands: PARAMS.bands,
-		},
-		prices: prices(),
-		currentVsProposed: currentVsProposed(),
-		bandCheck: bandCheck(),
-		matrix: baitMatrix(),
-		stageOptions: stageOptions(),
-		consumption: consumptionModel(),
-		chase: chaseMetrics(),
-		boosterPack: boosterPackOdds(),
-		gacha: gachaBaitValue(),
-		lifecycle: lifecycleSensitivity(),
+		tiers: TIERS, gearSource,
+		stageGear, baitEffect, prices, priceOf, evaluate, baitOption,
+		baitMatrix, bandCheck, strongAccessByBiome, consumptionModel, chaseMetrics, boosterPackOdds, gachaBaitValue,
+		lifecycle, lifecycleSensitivity, currentVsProposed, stageOptions, report,
 	};
 }
+
+const DEFAULT = createBaitModel();
 
 module.exports = {
 	PARAMS, STAGES, PROVISIONAL,
-	stageGear, baitEffect, prices, priceOf, evaluate, baitOption,
-	baitMatrix, bandCheck, consumptionModel, chaseMetrics, boosterPackOdds, gachaBaitValue,
-	currentBaits, lifecycle, lifecycleSensitivity, currentVsProposed, report,
+	withGear: createBaitModel,
+	currentBaits,
+	...DEFAULT,
+	report: (opts = {}) => (opts.gearPath ? createBaitModel(opts.gearPath).report() : DEFAULT.report()),
 };
 
-if (require.main === module) process.stdout.write(`${JSON.stringify(report(), null, 1)}\n`);
+if (require.main === module) process.stdout.write(`${JSON.stringify(module.exports.report(), null, 1)}\n`);

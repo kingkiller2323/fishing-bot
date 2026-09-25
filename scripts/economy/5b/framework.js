@@ -3,13 +3,19 @@
 //
 // Subsystem designs (rods, bait, quests, streak, aquarium, founder, buffs, permits) price themselves
 // against castOutcome()/hourly() so every number in Phase 5B comes from one consistent model.
+const crypto = require('node:crypto');
 const { drawDistribution, FISH, currentValue } = require('../lib/catalog-model');
 const { buildTable } = require('../../../src/engine/rarity');
 const { NORMAL_RARITY_TABLE, FOUNDER_RARITY_TABLE, RARITIES } = require('../../../src/engine/balance');
+// Shared assumptions (archetypes, targets, lifecycle, biome levels, gear path) live in assumptions.js
+// and are re-exported below; modules import them from here and never redefine them.
+const A = require('./assumptions');
 
 // Framework version: every subsystem module reports against this. Bump it whenever a shared value
 // below changes, and regenerate every subsystem report (they compute from here; nothing is scaled).
-const FRAMEWORK_VERSION = '5b.1';
+// 5b.1: curve quartic 0.0475 (curve.js). 5b.2: shared values centralised in assumptions.js; Tier 5
+// (Lv 60, ~1.8 fish) added to the shared provisional gear path. Curve and all other values unchanged.
+const FRAMEWORK_VERSION = '5b.2';
 
 // ---------------------------------------------------------------------------------------------
 // XP curve: xp(L) = 100·L² + QUARTIC·L⁴. Smooth everywhere (no kink at Lv 20); close to today at low
@@ -31,8 +37,6 @@ function levelForXp(xp, c = CURVE) {
 // The species factor keeps each fish's identity from today's catalog (its value relative to the other
 // fish of the same biome and rarity), clamped so rarity and biome order always hold.
 // Size/weight rolls still scale an individual catch around this expectation (trophies stay special).
-const BIOME_ORDER = ['Ocean', 'River', 'Lake', 'Pond', 'Coast', 'Swamp', 'Mountain Stream'];
-const BIOME_LEVEL = { 'Ocean': 0, 'River': 10, 'Lake': 20, 'Pond': 30, 'Coast': 40, 'Swamp': 50, 'Mountain Stream': 60 };
 // Base value of a Common weak fish in each biome (Old Rod average $/fish = 1.40 × this).
 const BIOME_VALUE = { 'Ocean': 18, 'River': 29, 'Lake': 43, 'Pond': 61, 'Coast': 82, 'Swamp': 107, 'Mountain Stream': 143 };
 const RARITY_VALUE = { common: 1, uncommon: 1.6, rare: 3, ultra: 6, giant: 12, legendary: 25, lucky: 50 };
@@ -139,15 +143,47 @@ function castOutcome(g) {
 }
 
 /** Per-hour rates at a human cadence (cooldown + reaction overhead seconds). */
-function hourly(o, overheadS = 4) {
+function hourly(o, overheadS = A.DESIGN_OVERHEAD_S) {
 	const casts = 3600 / (o.cooldownMs / 1000 + overheadS);
 	return { casts, xp: casts * o.xpPerCast, cash: casts * o.valuePerCast, fish: casts * o.fishPerCast, durability: casts * o.durabilityPerCast };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Shared digest: a hash of every shared value (the assumptions above + this file's constants, and the
+// designed gear path once GEAR_PATH_SOURCE is 'rods'). Each FRAMEWORK_VERSION pins its digest, so a
+// shared value cannot change without a version bump; every subsystem report carries both.
+const VERSION_DIGESTS = { '5b.1': '7a3ceb5551f3e41f', '5b.2': '26bbca823c8b2b8b' };
+const canonical = (v) => {
+	if (Array.isArray(v)) return v.map(canonical);
+	if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical(v[k])]));
+	return typeof v === 'number' ? Number(v.toPrecision(12)) : v;
+};
+let digestCache = null;
+function sharedValues() {
+	const data = Object.fromEntries(Object.entries(A).filter(([, v]) => typeof v !== 'function'));
+	data.gearPath = A.gearPath().map((t) => ({ tier: t.tier, level: t.level, meanFish: t.meanFish, qualities: t.qualities, stats: t.stats }));
+	return { assumptions: data, framework: { CURVE, BIOME_VALUE, RARITY_VALUE, QUALITY_VALUE, SPECIES_CLAMP, XP_PER_FISH_MEAN, XP_RARITY, MULTI, COOLDOWN, NORMAL_RARITY_TABLE, FOUNDER_RARITY_TABLE } };
+}
+/** sha256 (first 16 hex) of the canonical shared values. */
+function sharedDigest() {
+	if (!digestCache) digestCache = crypto.createHash('sha256').update(JSON.stringify(canonical(sharedValues()))).digest('hex').slice(0, 16);
+	return digestCache;
+}
+/** Throws if the shared values no longer match the digest pinned for FRAMEWORK_VERSION. */
+function verifyShared() {
+	const pinned = VERSION_DIGESTS[FRAMEWORK_VERSION];
+	const actual = sharedDigest();
+	if (pinned !== actual) throw new Error(`Shared Phase 5B values changed (digest ${actual}, pinned ${pinned} for ${FRAMEWORK_VERSION}): bump FRAMEWORK_VERSION, pin the new digest and regenerate every subsystem report.`);
+	return { frameworkVersion: FRAMEWORK_VERSION, sharedDigest: actual };
+}
+/** Stamp for every subsystem report(): { frameworkVersion, sharedDigest } (verified). */
+const stamp = () => verifyShared();
+
 module.exports = {
-	FRAMEWORK_VERSION,
+	...A,
+	FRAMEWORK_VERSION, VERSION_DIGESTS, sharedDigest, sharedValues, verifyShared, stamp,
 	CURVE, xpForLevel, levelForXp,
-	BIOME_ORDER, BIOME_LEVEL, BIOME_VALUE, RARITY_VALUE, QUALITY_VALUE, SPECIES_CLAMP, proposedValue, speciesFactor, isStrong,
+	BIOME_VALUE, RARITY_VALUE, QUALITY_VALUE, SPECIES_CLAMP, proposedValue, speciesFactor, isStrong,
 	XP_PER_FISH_MEAN, XP_RARITY, MULTI, fishDistribution, chanceForMean,
 	COOLDOWN, castOutcome, hourly,
 	NORMAL_RARITY_TABLE, FOUNDER_RARITY_TABLE,
