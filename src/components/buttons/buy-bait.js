@@ -1,4 +1,4 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, ButtonStyle, ButtonBuilder, ComponentType, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder, ButtonStyle, ButtonBuilder, ComponentType, EmbedBuilder, MessageFlags } = require('discord.js');
 const { Utils } = require('../../class/Utils');
 const { Item, ItemData } = require('../../schemas/ItemSchema');
 const { User } = require('../../class/User');
@@ -16,7 +16,7 @@ module.exports = {
 			if (options.length === 0) {
 				return await interaction.reply({
 					content: 'There is no bait for you to buy!',
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 					components: [],
 				});
 			}
@@ -107,7 +107,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 		
 		return await selection.reply({
 			embeds: embeds,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 			components: [],
 		});
 	}
@@ -152,7 +152,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 			
 			return await i.reply({
 				embeds: embeds,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 				components: [],
 			});
 		}
@@ -175,7 +175,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 			
 			return await i.reply({
 				embeds: embeds,
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 				components: [],
 			});
 		}

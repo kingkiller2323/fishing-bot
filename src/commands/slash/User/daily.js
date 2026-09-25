@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { Quest } = require('../../../class/Quest');
 const { Item } = require('../../../schemas/ItemSchema');
 const { User } = require('../../../class/User');
@@ -28,7 +28,7 @@ module.exports = {
 			}
 			return await interaction.reply({
 				content: 'You already have a daily quest in progress. Come back tomorrow!',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 		}
 
@@ -41,7 +41,7 @@ module.exports = {
 			}
 			return await interaction.reply({
 				content: 'You have already accepted or completed your daily quest. Come back tomorrow!',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 		}
 		else {

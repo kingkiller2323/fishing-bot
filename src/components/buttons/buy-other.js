@@ -1,4 +1,4 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, ComponentType, ButtonBuilder, ButtonStyle, EmbedBuilder, Colors } = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder, ComponentType, ButtonBuilder, ButtonStyle, EmbedBuilder, Colors, MessageFlags } = require('discord.js');
 const { Utils } = require('../../class/Utils');
 const { Item, ItemData } = require('../../schemas/ItemSchema');
 const { User } = require('../../class/User');
@@ -16,7 +16,7 @@ module.exports = {
 			if (options.length === 0) {
 				return await interaction.reply({
 					content: 'There is nothing for you to buy!',
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 					components: [],
 				});
 			}
@@ -123,7 +123,7 @@ const processItemSelection = async (selection, userData, analyticsObject) => {
 		
 		return await selection.reply({
 			embeds: embeds,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 			components: [],
 		});
 	}
@@ -167,7 +167,7 @@ const processItemSelection = async (selection, userData, analyticsObject) => {
 
 					await i.reply({
 						embeds: embeds,
-						ephemeral: true,
+						flags: MessageFlags.Ephemeral,
 						components: [],
 					});
 				}
@@ -214,7 +214,7 @@ const processItemSelection = async (selection, userData, analyticsObject) => {
 
 		await selection.followUp({
 			embeds: embeds,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 			components: [],
 		});
 	}
@@ -273,6 +273,6 @@ const buyItem = async (i, originalItem, userData, amount) => {
 	return await i.reply({
 		components: [],
 		embeds: embeds,
-		ephemeral: true,
+		flags: MessageFlags.Ephemeral,
 	});
 };

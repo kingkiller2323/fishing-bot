@@ -83,7 +83,7 @@ async function spawn(actor, target, fishName, { count = 1, size, weight } = {}) 
 	const s = Number.isFinite(size) ? size : parseFloat((await Utils.binomialRandomInRange(10, 0.5, template.minSize, template.maxSize)).toFixed(3));
 	const w = Number.isFinite(weight) ? weight : parseFloat((await Utils.binomialRandomInRange(10, 0.5, template.minWeight, template.maxWeight)).toFixed(3));
 	const value = parseInt(await require('../class/Fish').Fish.calculateSellValue(template.baseValue, s, w, template.rarity), 10);
-	const fields = Object.fromEntries(Object.entries(template).filter(([k]) => !['_id', '__v', 'createdAt', 'updatedAt', 'appliedCasts'].includes(k)));
+	const fields = Object.fromEntries(Object.entries(template).filter(([k]) => !['_id', '__v', 'createdAt', 'updatedAt', 'appliedOps', 'appliedCasts'].includes(k)));
 	const _id = new ObjectId();
 	const now = new Date();
 	await FishData.collection.insertOne({

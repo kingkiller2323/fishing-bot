@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ButtonStyle, ActionRowBuilder, ButtonBuilder, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ButtonStyle, ActionRowBuilder, ButtonBuilder, ComponentType, MessageFlags } = require('discord.js');
 const { User } = require('../../../class/User');
 const config = require('../../../config');
 const { Interaction } = require('../../../class/Interaction');
@@ -158,7 +158,7 @@ module.exports = {
 
 		const wait = remainingMs(user.id);
 		if (wait > 0) {
-			return interaction.reply({ content: `🎣 Slow down! You can cast again in ${(wait / 1000).toFixed(1)}s.`, ephemeral: true });
+			return interaction.reply({ content: `🎣 Slow down! You can cast again in ${(wait / 1000).toFixed(1)}s.`, flags: MessageFlags.Ephemeral });
 		}
 
 		await interaction.deferReply();

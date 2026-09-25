@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ComponentType, MessageFlags } = require('discord.js');
 const { Biome } = require('../../../schemas/BiomeSchema');
 const { User } = require('../../../class/User');
 const { Interaction } = require('../../../class/Interaction');
@@ -117,7 +117,7 @@ module.exports = {
 				}
 				await i.reply({
 					content: `You need to be level ${reqLevel} to switch to the ${originalBiome.name}!`,
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 			}
 		});

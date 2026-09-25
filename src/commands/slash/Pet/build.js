@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { Utils } = require('../../../class/Utils');
 const { Aquarium } = require('../../../class/Aquarium');
 const { Habitat } = require('../../../schemas/HabitatSchema');
@@ -37,7 +37,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('User not found.');
 			}
-			return interaction.followUp({ content: 'There was an error retrieving your data!', ephemeral: true });
+			return interaction.followUp({ content: 'There was an error retrieving your data!', flags: MessageFlags.Ephemeral });
 		}
 
 		const name = interaction.options.getString('name');
@@ -48,7 +48,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('Aquarium already exists.');
 			}
-			return interaction.followUp({ content: 'You already have an aquarium with that name!', ephemeral: true });
+			return interaction.followUp({ content: 'You already have an aquarium with that name!', flags: MessageFlags.Ephemeral });
 		}
 
 		let waterType = interaction.options.getString('watertype');
@@ -76,7 +76,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('No license found.');
 			}
-			return interaction.followUp({ content: 'You do not have an aquarium license for that water type!', ephemeral: true });
+			return interaction.followUp({ content: 'You do not have an aquarium license for that water type!', flags: MessageFlags.Ephemeral });
 		}
 
 		try {

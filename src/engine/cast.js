@@ -7,7 +7,7 @@
 // Persistence model (see applyCastResult):
 //   1. The CastResult is journaled as a 'pending' Cast document before any game state changes.
 //   2. Side documents are written idempotently: new FishData use ids pre-generated in the result,
-//      and rod/bait/quest/pond updates are guarded by `appliedCasts` so a retry never re-applies.
+//      and rod/bait/quest/pond updates are guarded by `appliedOps` (rewards.notApplied) so a retry never re-applies.
 //   3. The commit point is ONE atomic update of the user document that adds the catches to the
 //      inventory and awards XP, cash, stats, level and pity together. Rewards and catch ownership
 //      therefore can never be persisted without each other.
@@ -30,7 +30,7 @@ const { rng } = require('./rng');
 const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, levelForXp, activeEvent } = require('./balance');
 const { resolveModifiers, rollDraws } = require('./modifiers');
 const { applyPity, roll, toPercent } = require('./rarity');
-const { oid, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
+const { oid, notApplied, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
 const MAX_DRAW_ATTEMPTS = 25;
@@ -376,7 +376,7 @@ async function writeCast(result, { session, fault }) {
 
 	await fault('rod');
 	await ItemData.collection.updateOne(
-		{ _id: oid(result.rod.id), appliedCasts: { $ne: castId } },
+		{ _id: oid(result.rod.id), ...notApplied(castId) },
 		{ $set: { durability: result.rod.after.durability, state: result.rod.after.state, updatedAt: now }, $inc: { fishCaught: result.units }, $push: guardPush(castId) },
 		opts,
 	);
@@ -384,7 +384,7 @@ async function writeCast(result, { session, fault }) {
 	await fault('bait');
 	if (result.bait) {
 		await ItemData.collection.updateOne(
-			{ _id: oid(result.bait.id), appliedCasts: { $ne: castId } },
+			{ _id: oid(result.bait.id), ...notApplied(castId) },
 			{ $set: { count: result.bait.after.count, updatedAt: now }, $push: guardPush(castId) },
 			opts,
 		);
@@ -394,14 +394,14 @@ async function writeCast(result, { session, fault }) {
 	for (const q of result.quests) {
 		const set = { progress: q.after, updatedAt: now };
 		if (q.completed) Object.assign(set, { status: 'completed', endDate: now.getTime() });
-		await QuestData.collection.updateOne({ _id: oid(q.questId), appliedCasts: { $ne: castId } }, { $set: set, $push: guardPush(castId) }, opts);
+		await QuestData.collection.updateOne({ _id: oid(q.questId), ...notApplied(castId) }, { $set: set, $push: guardPush(castId) }, opts);
 	}
 
 	await fault('pond');
 	if (result.pond) {
 		const set = { count: result.pond.after, lastFished: now.getTime(), updatedAt: now };
 		if (result.pond.warn) set.warning = true;
-		await Pond.collection.updateOne({ id: result.pond.id, appliedCasts: { $ne: castId } }, { $set: set, $push: guardPush(castId) }, opts);
+		await Pond.collection.updateOne({ id: result.pond.id, ...notApplied(castId) }, { $set: set, $push: guardPush(castId) }, opts);
 	}
 
 	// Commit point: catches, XP, cash, stats, level and pity in one atomic update.
@@ -425,7 +425,7 @@ async function writeCast(result, { session, fault }) {
 		set['inventory.equippedBait'] = null;
 		update.$pull = { 'inventory.baits': oid(result.bait.id) };
 	}
-	await UserModel.collection.updateOne({ userId, appliedCasts: { $ne: castId } }, update, opts);
+	await UserModel.collection.updateOne({ userId, ...notApplied(castId) }, update, opts);
 
 	await fault('grants');
 	for (const grant of result.writes.grants) await grantItem(userId, grant, session);

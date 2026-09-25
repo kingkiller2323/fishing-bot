@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } = require('discord.js');
 const dev = require('../../../engine/dev');
 const branding = require('../../../branding');
 
@@ -47,7 +47,7 @@ module.exports = {
 		developers: true,
 	},
 	run: async (client, interaction) => {
-		await interaction.deferReply({ ephemeral: true });
+		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 		const actor = interaction.user.id;
 		const target = interaction.options.getUser('user') || interaction.user;
 		const group = interaction.options.getSubcommandGroup(false);

@@ -40,7 +40,13 @@ const itemSchema = new Schema({
 		type: [String],
 		default: ['weak'],
 	},
-	// Cast journal guard: ids of casts already applied to this document (last few only).
+	// Idempotency guard: keys of operations (casts, gacha opens, grants) already applied to this
+	// document (last few only). See engine/rewards.js notApplied/appliedTo.
+	appliedOps: {
+		type: [String],
+		default: undefined,
+	},
+	// Legacy name of appliedOps (Phase 2-4). Read by the guards, never written; ages out naturally.
 	appliedCasts: {
 		type: [String],
 		default: undefined,

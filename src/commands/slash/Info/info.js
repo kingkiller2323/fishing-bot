@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { User } = require('../../../class/User');
 const { ItemData } = require('../../../schemas/ItemSchema');
 const { WeatherPattern } = require('../../../class/WeatherPattern');
@@ -81,7 +81,7 @@ module.exports = {
 				await interaction.reply({ embeds: [embed] });
 			} catch (error) {
 				console.error(error);
-				await interaction.reply({ content: 'There was an error fetching the weather information.', ephemeral: true });
+				await interaction.reply({ content: 'There was an error fetching the weather information.', flags: MessageFlags.Ephemeral });
 			}
 		}
 		else if (subcommand === 'forecast') {

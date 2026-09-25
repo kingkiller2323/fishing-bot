@@ -20,7 +20,7 @@ const { rng } = require('./rng');
 const { BALANCE_VERSION, RARITIES, STAT_CAPS, resolveProfile, activeEvent } = require('./balance');
 const { buildTable, applyPity, normalize, roll, toPercent } = require('./rarity');
 const { boxDefinition } = require('./gachaBoxes');
-const { oid, guardPush, grantItem, buildFishDoc, insertFishDocs, rollFishStats } = require('./rewards');
+const { oid, notApplied, appliedTo, guardPush, grantItem, buildFishDoc, insertFishDocs, rollFishStats } = require('./rewards');
 const { withUserLock } = require('./userLock');
 
 const HIGH_TIER = ['legendary', 'lucky'];
@@ -248,12 +248,12 @@ async function writeOpen(result, { session, fault }) {
 
 	await fault('consume');
 	const consumed = await ItemData.collection.updateOne(
-		{ _id: oid(result.box.id), appliedCasts: { $ne: openId }, count: { $gte: 1 } },
+		{ _id: oid(result.box.id), ...notApplied(openId), count: { $gte: 1 } },
 		{ $inc: { count: -1 }, $set: { updatedAt: now }, $push: guardPush(openId) },
 		opts,
 	);
 	if (consumed.matchedCount === 0) {
-		const already = await ItemData.collection.findOne({ _id: oid(result.box.id), appliedCasts: openId }, opts);
+		const already = await ItemData.collection.findOne({ _id: oid(result.box.id), ...appliedTo(openId) }, opts);
 		if (!already) throw new Error('The box is no longer available.');
 	}
 
@@ -270,7 +270,7 @@ async function writeOpen(result, { session, fault }) {
 		$push: { 'inventory.fish': { $each: result.writes.fishDocs.map((d) => oid(d._id)) }, ...guardPush(openId) },
 	};
 	if (result.box.depleted) update.$pull = { 'inventory.gacha': oid(result.box.id) };
-	await UserModel.collection.updateOne({ userId, appliedCasts: { $ne: openId } }, update, opts);
+	await UserModel.collection.updateOne({ userId, ...notApplied(openId) }, update, opts);
 
 	await fault('grants');
 	for (const grant of result.writes.grants) await grantItem(userId, grant, session);

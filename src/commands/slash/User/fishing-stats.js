@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { fishingStats } = require('../../../engine/cast');
 const { privateStatsFields } = require('../../../engine/presentation');
 const { Cast } = require('../../../schemas/CastSchema');
@@ -14,7 +14,7 @@ module.exports = {
 	},
 	run: async (client, interaction) => {
 		// Always private: this is where profile details (e.g. Founder bonuses) are shown.
-		await interaction.deferReply({ ephemeral: true });
+		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 		const userId = interaction.user.id;
 		const userDoc = await User.get(userId);
 		const stats = await fishingStats(userId);

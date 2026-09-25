@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ComponentType, MessageFlags } = require('discord.js');
 const { Quest: QuestSchema } = require('../../../schemas/QuestSchema');
 const { User } = require('../../../class/User');
 const { Quest } = require('../../../class/Quest');
@@ -82,7 +82,7 @@ module.exports = {
 				canAccept = false;
 				await i.reply({
 					content: `You need to be level ${reqLevel} to start this quest!`,
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 				return;
 			}
@@ -100,7 +100,7 @@ module.exports = {
 					canAccept = false;
 					await i.reply({
 						content: `You need to complete the previous quest(s) to start this quest!\n\n**Required Quests:**\n${originalQuest.requirements.previous.join('\n')}`,
-						ephemeral: true,
+						flags: MessageFlags.Ephemeral,
 					});
 					return;
 				}
@@ -116,7 +116,7 @@ module.exports = {
 				}
 				await i.reply({
 					content: `You already have a quest with the title **${title}**!`,
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 				return;
 			}

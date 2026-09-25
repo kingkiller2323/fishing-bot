@@ -1,4 +1,4 @@
-const { ButtonStyle, ActionRowBuilder, ButtonBuilder, EmbedBuilder } = require('discord.js');
+const { ButtonStyle, ActionRowBuilder, ButtonBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { RodData } = require('../../schemas/RodSchema');
 const { User } = require('../../class/User');
 const config = require('../../config');
@@ -21,7 +21,7 @@ module.exports = {
 			}
 			await interaction.reply({
 				content: 'You do not have a rod equipped!',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}
@@ -33,7 +33,7 @@ module.exports = {
 			}
 			await interaction.reply({
 				content: 'Your rod can\'t be repaired!',
-				ephemeral: true,
+				flags: MessageFlags.Ephemeral,
 			});
 			return;
 		}

@@ -1,4 +1,5 @@
 /* eslint-disable no-mixed-spaces-and-tabs */
+const { MessageFlags } = require('discord.js');
 const config = require('../../config');
 const { Utils } = require('../../class/Utils');
 const { Interaction } = require('../../class/Interaction');
@@ -22,7 +23,7 @@ module.exports = {
                         config.messageSettings.notHasPermissionComponent !== ''
                         	? config.messageSettings.notHasPermissionComponent
                         	: 'You do not have permission to use this component',
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 				return false;
 			}

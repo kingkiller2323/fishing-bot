@@ -1,4 +1,5 @@
 /* eslint-disable no-mixed-spaces-and-tabs */
+const { MessageFlags } = require('discord.js');
 const config = require('../../config');
 const { User } = require('../../class/User');
 const { Item } = require('../../schemas/ItemSchema');
@@ -102,7 +103,7 @@ module.exports = {
                                 config.messageSettings.developerMessage !== ''
                             	? config.messageSettings.developerMessage
                             	: 'You are not authorized to use this command',
-						ephemeral: true,
+						flags: MessageFlags.Ephemeral,
 					});
 
 					return;
@@ -116,7 +117,7 @@ module.exports = {
                             	? config.messageSettings.missingDevIDsMessage
                             	: 'This is a developer only command, but unable to execute due to missing user IDs in configuration file.',
 
-						ephemeral: true,
+						flags: MessageFlags.Ephemeral,
 					});
 
 					return;
@@ -132,7 +133,7 @@ module.exports = {
                         	? config.messageSettings.nsfwMessage
                         	: 'The current channel is not a NSFW channel',
 
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 
 				return;
@@ -172,7 +173,7 @@ module.exports = {
 
 						await interaction.reply({
 							content: cooldownMessage,
-							ephemeral: true,
+							flags: MessageFlags.Ephemeral,
 						});
 
 						return;

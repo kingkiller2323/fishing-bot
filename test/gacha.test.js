@@ -261,7 +261,7 @@ test('applying the same result twice never duplicates rewards or consumes twice'
 	assert.equal((await userDoc('twice')).stats.gachaBoxesOpened, 1);
 	for (const s of r.slots) {
 		if (s.reward.kind === 'fish') assert.equal(await FishData.countDocuments({ _id: s.reward.id }), 1);
-		else assert.equal(await ItemData.countDocuments({ user: 'twice', appliedCasts: `${r.openId}:slot:${s.slot}` }), 1);
+		else assert.equal(await ItemData.countDocuments({ user: 'twice', appliedOps: `${r.openId}:slot:${s.slot}` }), 1);
 	}
 });
 
@@ -294,7 +294,7 @@ for (const step of ['consume', 'fish', 'commit']) {
 		assert.equal(after.stats.gachaBoxesOpened, 1);
 		assert.equal(await itemsOwned(id, 'Voter\'s Crate'), 1);
 		assert.equal(after.inventory.fish.length, r.slots.filter((s) => s.reward.kind === 'fish').length);
-		for (const s of r.slots.filter((x) => x.reward.kind === 'item')) assert.equal(await ItemData.countDocuments({ user: id, appliedCasts: `${r.openId}:slot:${s.slot}` }), 1);
+		for (const s of r.slots.filter((x) => x.reward.kind === 'item')) assert.equal(await ItemData.countDocuments({ user: id, appliedOps: `${r.openId}:slot:${s.slot}` }), 1);
 		assert.equal((await GachaOpen.findById(r.openId).lean()).status, 'applied');
 	});
 }
@@ -357,4 +357,30 @@ test('GachaResult records the full decision', async () => {
 		assert.ok(s.rarity && s.reward.name && s.reward.quantity === 1);
 	}
 	assert.equal(BOXES['Voter\'s Crate'].slots, r.slots.length);
+});
+
+test('legacy appliedCasts guards (pre-rename journals) are still honoured: recovery never re-applies', async () => {
+	await makeUser('legacy-guard');
+	await giveBox('legacy-guard', 'Daily Box', 2);
+	rng.seed(11);
+	const r = await openLine({ userId: 'legacy-guard', boxName: 'Daily Box' });
+	await applyGachaResult(r);
+	const before = await userDoc('legacy-guard');
+	const itemsBefore = await ItemData.find({ user: 'legacy-guard' }).lean();
+
+	// Rewrite every guard key into the legacy field, as Phase 2-4 code stored it, and re-open the journal.
+	await UserModel.collection.updateOne({ userId: 'legacy-guard' }, { $rename: { appliedOps: 'appliedCasts' } });
+	await ItemData.collection.updateMany({ user: 'legacy-guard', appliedOps: { $exists: true } }, { $rename: { appliedOps: 'appliedCasts' } });
+	await GachaOpen.updateOne({ _id: r.openId }, { $set: { status: 'pending' } });
+	assert.equal(await ItemData.countDocuments({ user: 'legacy-guard', appliedOps: { $exists: true } }), 0);
+
+	await recoverPendingOpens({ userId: 'legacy-guard' });
+	const after = await userDoc('legacy-guard');
+	assert.equal(after.stats.gachaBoxesOpened, before.stats.gachaBoxesOpened);
+	assert.equal(after.inventory.fish.length, before.inventory.fish.length);
+	assert.equal(after.inventory.money, before.inventory.money);
+	assert.equal(await itemsOwned('legacy-guard', 'Daily Box'), 1);
+	const itemsAfter = await ItemData.find({ user: 'legacy-guard' }).lean();
+	assert.deepEqual(itemsAfter.map((i) => [String(i._id), i.count]).sort(), itemsBefore.map((i) => [String(i._id), i.count]).sort());
+	assert.equal((await GachaOpen.findById(r.openId).lean()).status, 'applied');
 });

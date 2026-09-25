@@ -1,4 +1,4 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, ComponentType, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder, ComponentType, EmbedBuilder, MessageFlags } = require('discord.js');
 const { Utils } = require('../../class/Utils');
 const { Item } = require('../../schemas/ItemSchema');
 const { User } = require('../../class/User');
@@ -16,7 +16,7 @@ module.exports = {
 			if (options.length === 0) {
 				return await interaction.reply({
 					content: 'There is no fishing rod for you to buy!',
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 					components: [],
 				});
 			}
@@ -114,7 +114,7 @@ const processRodSelection = async (selection, userData, analyticsObject) => {
 
 		return await selection.reply({
 			embeds: embeds,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 			components: [],
 		});
 	}
@@ -136,7 +136,7 @@ const processRodSelection = async (selection, userData, analyticsObject) => {
 		return await selection.reply({
 			components: [],
 			embeds: embeds,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 		});
 	}
 	else {
@@ -156,7 +156,7 @@ const processRodSelection = async (selection, userData, analyticsObject) => {
 
 		await selection.reply({
 			embeds: embeds,
-			ephemeral: true,
+			flags: MessageFlags.Ephemeral,
 			components: [],
 		});
 	}

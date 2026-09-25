@@ -1,7 +1,7 @@
 const { User } = require('../../class/User');
 const { FishData } = require('../../schemas/FishSchema');
 const { BuffData } = require('../../schemas/BuffSchema');
-const { ButtonBuilder, EmbedBuilder } = require('discord.js');
+const { ButtonBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../../config');
 const { partitionProtected } = require('../../engine/protection');
 const { withUserLock } = require('../../engine/userLock');
@@ -41,7 +41,7 @@ module.exports = {
 			if (fishArray.length === 0 && lockedFish.length > 0) {
 				await interaction.reply({
 					content: '🔒 These fish are locked. Unlock them with `/unlock` if you really want to sell them.',
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 				return;
 			}
@@ -54,7 +54,7 @@ module.exports = {
 				}
 				await interaction.reply({
 					content: 'This catch has already been sold!',
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 				return;
 			}

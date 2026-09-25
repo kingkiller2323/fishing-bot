@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const config = require('./config');
 const { Interaction } = require('./class/Interaction');
 
@@ -40,7 +40,7 @@ module.exports = async (interaction, pages, analyticsObject = null, deferred = f
 		});
 
 		mc.on('collect', async (i) => {
-			if (i.user.id !== interaction.user.id) return i.reply({ content: 'You are not allowed to do this!', ephemeral: true });
+			if (i.user.id !== interaction.user.id) return i.reply({ content: 'You are not allowed to do this!', flags: MessageFlags.Ephemeral });
 
 			await i.deferUpdate({});
 

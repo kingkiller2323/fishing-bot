@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const buttonPagination = require('../../../buttonPagination');
 const { QuestData } = require('../../../schemas/QuestSchema');
 const { Item } = require('../../../schemas/ItemSchema');
@@ -27,7 +27,7 @@ module.exports = {
 				}
 				return await interaction.reply({
 					content: 'You do not have any quests! Accept one using /start-quest or /daily.',
-					ephemeral: true,
+					flags: MessageFlags.Ephemeral,
 				});
 			}
 

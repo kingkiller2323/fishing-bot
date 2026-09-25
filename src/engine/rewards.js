@@ -8,11 +8,18 @@ const { Utils } = require('../class/Utils');
 
 const APPLIED_KEEP = 50;
 const oid = (id) => (id instanceof ObjectId ? id : new ObjectId(String(id)));
-/** Journal guard: remember that operation `key` was applied to a document (last few only). */
-const guardPush = (key) => ({ appliedCasts: { $each: [key], $slice: -APPLIED_KEEP } });
+// Idempotency guard shared by casts, gacha opens and grants. Keys live in `appliedOps`; the legacy
+// `appliedCasts` field (the pre-rename name) is still honoured on read so journals written before the
+// rename can never be re-applied, but nothing writes it any more.
+/** Filter clause: operation `key` has NOT been applied to the document yet. */
+const notApplied = (key) => ({ appliedOps: { $ne: key }, appliedCasts: { $ne: key } });
+/** Filter clause: operation `key` HAS been applied to the document. */
+const appliedTo = (key) => ({ $or: [{ appliedOps: key }, { appliedCasts: key }] });
+/** Update clause: remember that operation `key` was applied to a document (last few only). */
+const guardPush = (key) => ({ appliedOps: { $each: [key], $slice: -APPLIED_KEEP } });
 
 // Fields that belong to a stored document itself and must not be copied into a clone.
-const DOC_OWN_FIELDS = ['_id', '__v', 'createdAt', 'updatedAt', 'appliedCasts'];
+const DOC_OWN_FIELDS = ['_id', '__v', 'createdAt', 'updatedAt', 'appliedOps', 'appliedCasts'];
 const copyFields = (doc) => Object.fromEntries(Object.entries(doc).filter(([key]) => !DOC_OWN_FIELDS.includes(key)));
 
 /** Rolls size/weight for a fish template and its raw (unmodified) sale value. */
@@ -83,7 +90,7 @@ async function grantItem(userId, grant, session) {
 	const users = UserModel.collection;
 
 	// Already applied (either as a new stack or an increment of an existing one)?
-	const done = await items.findOne({ user: userId, appliedCasts: grant.key }, opts);
+	const done = await items.findOne({ user: userId, ...appliedTo(grant.key) }, opts);
 	if (done) {
 		const info = GRANT_TYPES[done.type] || GRANT_TYPES.default;
 		await users.updateOne({ userId }, { $addToSet: { [`inventory.${info.array}`]: done._id } }, opts);
@@ -99,7 +106,7 @@ async function grantItem(userId, grant, session) {
 		const owned = userDoc?.inventory?.[info.array] || [];
 		const existing = owned.length ? await items.findOne({ _id: { $in: owned }, name: template.name }, opts) : null;
 		if (existing && (info.stack === true || existing.count)) {
-			await items.updateOne({ _id: existing._id, appliedCasts: { $ne: grant.key } }, { $inc: { count: grant.count }, $push: guardPush(grant.key) }, opts);
+			await items.updateOne({ _id: existing._id, ...notApplied(grant.key) }, { $inc: { count: grant.count }, $push: guardPush(grant.key) }, opts);
 			return;
 		}
 	}
@@ -107,7 +114,7 @@ async function grantItem(userId, grant, session) {
 	const fields = copyFields(template);
 	const now = new Date();
 	try {
-		await items.insertOne({ ...fields, ...(info.extra || {}), _id: oid(grant.newId), __t: info.t, user: userId, obtained: Date.now(), count: grant.count, appliedCasts: [grant.key], createdAt: now, updatedAt: now }, opts);
+		await items.insertOne({ ...fields, ...(info.extra || {}), _id: oid(grant.newId), __t: info.t, user: userId, obtained: Date.now(), count: grant.count, appliedOps: [grant.key], createdAt: now, updatedAt: now }, opts);
 	}
 	catch (error) {
 		if (error.code !== 11000) throw error;
@@ -116,4 +123,4 @@ async function grantItem(userId, grant, session) {
 }
 
 
-module.exports = { oid, guardPush, copyFields, rollFishStats, buildFishDoc, insertFishDocs, grantItem, GRANT_TYPES };
+module.exports = { oid, notApplied, appliedTo, guardPush, copyFields, rollFishStats, buildFishDoc, insertFishDocs, grantItem, GRANT_TYPES };

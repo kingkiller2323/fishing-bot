@@ -1,6 +1,8 @@
 // Founder subtlety: same power, private presentation, exact reward bookkeeping.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { MessageFlags } = require('discord.js');
+const isEphemeral = (s) => Boolean((s?.flags ?? 0) & MessageFlags.Ephemeral);
 const { startDb, stopDb } = require('./helpers/db');
 const { quiet, restore } = require('./helpers/quiet');
 const { seedGame, makeUser } = require('./helpers/fixtures');
@@ -71,7 +73,7 @@ test('public catch cards do not expose Founder status and look like any other ca
 	const founderCard = fi.sent.find((s) => s.kind === 'followUp');
 	const memberCard = mi.sent.find((s) => s.kind === 'followUp');
 	assert.ok(!PROFILE_TELLS.test(json(founderCard)), json(founderCard));
-	assert.ok(!fi.sent.some((s) => s.ephemeral), 'no extra private messages during normal play');
+	assert.ok(!fi.sent.some(isEphemeral), 'no extra private messages during normal play');
 	const f = founderCard.embeds[0].toJSON();
 	const m = memberCard.embeds[0].toJSON();
 	assert.deepEqual(Object.keys(f).sort(), Object.keys(m).sort());
@@ -181,7 +183,7 @@ test('/fishing-stats is private and holds the Founder breakdown; members see onl
 	const fi = interactionFor(founder);
 	await statsCommand.run({}, fi);
 	assert.equal(fi.sent[0].kind, 'defer');
-	assert.equal(fi.sent[0].ephemeral, true);
+	assert.ok(isEphemeral(fi.sent[0]));
 	const founderView = json(fi.sent.find((s) => s.kind === 'edit'));
 	assert.match(founderView, /Founder/);
 	assert.match(founderView, /XP ×5/);
@@ -192,7 +194,7 @@ test('/fishing-stats is private and holds the Founder breakdown; members see onl
 	const mi = interactionFor(member);
 	await statsCommand.run({}, mi);
 	const memberView = json(mi.sent.find((s) => s.kind === 'edit'));
-	assert.equal(mi.sent[0].ephemeral, true);
+	assert.ok(isEphemeral(mi.sent[0]));
 	assert.ok(!/Founder|Base \d|Pity/.test(memberView));
 	assert.match(memberView, /Standard · competitive/);
 });
@@ -245,7 +247,7 @@ test('public sale shows the base value, the balance receives the final value, pr
 	await statsCommand.run({}, fi);
 	const view = json(fi.sent.find((s) => s.kind === 'edit'));
 	assert.ok(view.includes(`Base $${base.toLocaleString('en-US')} · Founder +$${(final - base).toLocaleString('en-US')} · Final $${final.toLocaleString('en-US')}`), view);
-	assert.equal(fi.sent[0].ephemeral, true);
+	assert.ok(isEphemeral(fi.sent[0]));
 });
 
 test('public quest rewards show base amounts; the account gets the Founder amounts', async () => {

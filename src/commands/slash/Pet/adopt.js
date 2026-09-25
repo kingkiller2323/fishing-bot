@@ -48,7 +48,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('User not found.');
 			}
-			return interaction.editReply({ content: 'There was an error retrieving your data!', ephemeral: true });
+			return interaction.editReply({ content: 'There was an error retrieving your data!' });
 		}
 
 		const inventory = await user.getInventory();
@@ -62,7 +62,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('Invalid fish species.');
 			}
-			return interaction.editReply({ content: 'That species does not exist!', ephemeral: true });
+			return interaction.editReply({ content: 'That species does not exist!' });
 		}
 
 		const name = interaction.options.getString('name');
@@ -73,7 +73,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('Name already in use.');
 			}
-			return interaction.editReply({ content: 'That name is already in use!', ephemeral: true });
+			return interaction.editReply({ content: 'That name is already in use!' });
 		}
 
 		const aquariumName = interaction.options.getString('aquarium');
@@ -85,7 +85,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('Invalid aquarium.');
 			}
-			return interaction.editReply({ content: 'That aquarium does not exist! Use the `build` command to construct one.', ephemeral: true });
+			return interaction.editReply({ content: 'That aquarium does not exist! Use the `build` command to construct one.' });
 		}
 
 		// find the desired aquarium in user's inventory
@@ -98,14 +98,14 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('Aquarium is full.');
 			}
-			return interaction.editReply({ content: 'Your aquarium is full! Use the `upgrade` command to increase its capacity.', ephemeral: true });
+			return interaction.editReply({ content: 'Your aquarium is full! Use the `upgrade` command to increase its capacity.' });
 		}
 
 		// find the desired fish in user's inventory
 		const fishes = await user.getFish();
 		const fishInInventory = fishes.find((f) => f.name.toLowerCase() === species.toLowerCase() && !isProtected(f));
 		if (!fishInInventory) {
-			return interaction.editReply({ content: 'You do not have that fish in your inventory! Make sure it is unlocked.', ephemeral: true });
+			return interaction.editReply({ content: 'You do not have that fish in your inventory! Make sure it is unlocked.' });
 		}
 
 		// check if biome origin is the same as the aquarium's water type
@@ -149,7 +149,7 @@ module.exports = {
 				await analyticsObject.setStatus('failed');
 				await analyticsObject.setStatusMessage('Fish not found in inventory.');
 			}
-			return interaction.editReply({ content: 'You do not have that fish in your inventory! Make sure it is unlocked.', ephemeral: true });
+			return interaction.editReply({ content: 'You do not have that fish in your inventory! Make sure it is unlocked.' });
 		}
 
 		if (success) {
