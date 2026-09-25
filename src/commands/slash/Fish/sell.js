@@ -45,7 +45,8 @@ module.exports = {
 		}
 
 		const result = await withUserLock(interaction.user.id, () => Fish.sellByRarity(interaction.user.id, rarity));
-		sold = result.total;
+		// Public message shows base value; the balance receives result.total.
+		sold = result.baseTotal;
 		const keptNote = result.protected > 0 ? `\n🔒 ${result.protected} locked fish ${result.protected === 1 ? 'was' : 'were'} kept.` : '';
 
 		if (process.env.ANALYTICS || config.client.analytics) {

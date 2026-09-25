@@ -6,8 +6,14 @@ const money = (n) => `$${Math.round(n).toLocaleString('en-US')}`;
 const num = (n) => Math.round(n).toLocaleString('en-US');
 const pct = (p) => (p >= 1 ? p.toFixed(1) : p >= 0.1 ? p.toFixed(2) : p.toFixed(3));
 
+/** "Base 60 · Founder +240 · Final 300" (just the final amount when there is no profile bonus). */
+function breakdown(line, format, label) {
+	if (!line.profileBonus) return format(line.final);
+	return `Base ${format(line.base)} · ${label} +${format(line.profileBonus)} · Final ${format(line.final)}`;
+}
+
 /** Builds the private stats view (plain data -> embed fields). */
-function privateStatsFields({ stats, lastCast }) {
+function privateStatsFields({ stats, lastCast, lastSale = null }) {
 	const fields = [];
 	if (stats.status !== 'ok') {
 		fields.push({ name: 'Fishing', value: stats.failure?.message || 'Unavailable right now.' });
@@ -33,15 +39,28 @@ function privateStatsFields({ stats, lastCast }) {
 		].join('\n'),
 	});
 
+	const label = stats.profile === 'founder' ? 'Founder' : 'Bonus';
 	if (lastCast?.rewards) {
 		const r = lastCast.rewards;
-		const show = (label, x, fmt) => (x.profileBonus
-			? `${label} ${fmt(x.final)} (${fmt(x.base)} + ${fmt(x.profileBonus)} bonus)`
-			: `${label} ${fmt(x.final)}`);
-		const parts = [show('XP', r.xp, num)];
-		if (r.catchValue.final) parts.push(show('Catch value', r.catchValue, money));
-		if (r.questCash.final) parts.push(show('Quest cash', r.questCash, money));
-		fields.push({ name: 'Last cast', value: parts.join('\n') });
+		const parts = [`**XP:** ${breakdown(r.xp, num, label)}`];
+		if (r.catchValue.final) parts.push(`**Catch value:** ${breakdown(r.catchValue, money, label)}`);
+		if (r.questXp.final) parts.push(`**Quest XP:** ${breakdown(r.questXp, num, label)}`);
+		if (r.questCash.final) parts.push(`**Quest cash:** ${breakdown(r.questCash, money, label)}`);
+		fields.push({ name: 'Last cast (you earned)', value: parts.join('\n') });
+	}
+
+	if (lastSale && Number.isFinite(lastSale.final)) {
+		const sale = { base: lastSale.base ?? lastSale.final, final: lastSale.final };
+		sale.profileBonus = sale.final - sale.base;
+		fields.push({ name: 'Last sale (you received)', value: breakdown(sale, money, label) });
+	}
+
+	// Pity is never shown during play; only here, privately, when it is active for the profile.
+	const pity = stats.pity?.config;
+	if (pity) {
+		const c = stats.pity.counters || {};
+		const lines = Object.entries(pity).map(([name, rule]) => `${name === 'lucky' ? 'Lucky' : 'Legendary+'}: ${c[rule.counter] || 0} casts since last · boost from ${rule.softStart} · guaranteed at ${rule.hard}`);
+		fields.push({ name: 'Pity', value: lines.join('\n') });
 	}
 	return fields;
 }

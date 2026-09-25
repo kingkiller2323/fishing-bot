@@ -102,6 +102,11 @@ const FishSchema = new Schema({
 		default: 'all',
 	},
 	// Catch metadata (FishData only), written by the cast engine.
+	// valueBase: sale value without the player's profile bonus (public display); `value` is the
+	// true value that is paid out.
+	valueBase: {
+		type: Number,
+	},
 	castId: {
 		type: String,
 	},

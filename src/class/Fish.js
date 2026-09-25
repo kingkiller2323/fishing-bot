@@ -3,6 +3,7 @@ const { BuffData } = require('../schemas/BuffSchema');
 const { Utils } = require('./Utils');
 const { User } = require('../class/User');
 const { partitionProtected } = require('../engine/protection');
+const { recordSale } = require('../engine/sales');
 
 
 class Fish {
@@ -31,13 +32,18 @@ class Fish {
 		const { allowed, protected: protectedFish } = partitionProtected(matching);
 
 		let totalValue = 0;
-		for (const f of allowed) totalValue += f.value * cashMultiplier * f.count;
+		let baseTotal = 0;
+		for (const f of allowed) {
+			totalValue += f.value * cashMultiplier * f.count;
+			baseTotal += (f.valueBase ?? f.value) * cashMultiplier * f.count;
+		}
 
 		const removed = await user.removeListOfFish(allowed.map((f) => f._id));
 		if (removed.length !== allowed.length) throw new Error('Inventory changed while selling; nothing was paid out.');
 		await user.addMoney(totalValue);
+		if (allowed.length > 0) await recordSale(userId, baseTotal, totalValue);
 
-		return { total: totalValue, sold: allowed.length, protected: protectedFish.length };
+		return { total: totalValue, baseTotal: Math.round(baseTotal), sold: allowed.length, protected: protectedFish.length };
 	};
 
 	static async getCount(userId, fishName) {

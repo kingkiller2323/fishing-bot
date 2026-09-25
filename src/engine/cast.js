@@ -256,6 +256,7 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 				size,
 				weight,
 				value,
+				valueBase,
 				guild: guildId || fields.guild,
 				locked,
 				castId,
@@ -579,7 +580,7 @@ async function fishingStats(userId) {
 		environment: result.environment,
 		modifiers: result.modifiers,
 		odds: result.rarity.table,
-		pity: { counters: result.pity.before, applied: result.pity.applied },
+		pity: { counters: result.pity.before, applied: result.pity.applied, config: resolveProfile(userId, await UserModel.findOne({ userId: String(userId) }).lean()).pity },
 		cooldownMs: result.cooldownMs,
 	};
 }

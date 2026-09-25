@@ -185,14 +185,78 @@ test('/fishing-stats is private and holds the Founder breakdown; members see onl
 	const founderView = json(fi.sent.find((s) => s.kind === 'edit'));
 	assert.match(founderView, /Founder/);
 	assert.match(founderView, /XP ×5/);
-	assert.match(founderView, /bonus\)/, 'last cast shows base + bonus');
-	assert.ok(!/pity|castsSince/i.test(founderView), 'pity stays invisible');
+	assert.match(founderView, /Base \d+ · Founder \+\d+ · Final \d+/, 'last cast shows base / Founder / final');
+	assert.match(founderView, /Pity/, 'pity is visible privately to the Founder');
 
 	const member = { id: MEMBER, globalName: 'Pat', username: 'pat' };
 	const mi = interactionFor(member);
 	await statsCommand.run({}, mi);
 	const memberView = json(mi.sent.find((s) => s.kind === 'edit'));
 	assert.equal(mi.sent[0].ephemeral, true);
-	assert.ok(!/Founder|bonus\)/.test(memberView));
+	assert.ok(!/Founder|Base \d|Pity/.test(memberView));
 	assert.match(memberView, /Standard · competitive/);
+});
+
+test('public /fish shows base XP while the account receives the Founder-adjusted XP', async () => {
+	const founder = { id: FOUNDER, displayName: 'Casey', globalName: 'Casey', username: 'casey' };
+	await useTestRod(FOUNDER, { capabilities: ['weak', '1'] });
+	resetCooldowns();
+	const { User: UserModel } = require('../src/schemas/UserSchema');
+	const { Cast } = require('../src/schemas/CastSchema');
+	const before = (await UserModel.findOne({ userId: FOUNDER }).lean()).xp;
+	const fi = interactionFor(founder);
+	await fishCommand.run({}, fi, null, founder);
+	const cast = (await Cast.findOne({ userId: FOUNDER }).sort({ createdAt: -1 }).lean()).result;
+	const card = fi.sent.find((s) => s.kind === 'followUp').embeds[0].toJSON();
+	assert.match(card.description, new RegExp(`\\*\\*\\+${cast.rewards.catchXp.base} XP\\*\\*`));
+	assert.ok(cast.rewards.catchXp.final > cast.rewards.catchXp.base);
+	assert.ok(!card.description.includes(`+${cast.rewards.catchXp.final} XP`));
+	const after = (await UserModel.findOne({ userId: FOUNDER }).lean()).xp;
+	assert.equal(after - before, cast.rewards.xp.final, 'account gets the true final XP');
+});
+
+test('public sale shows the base value, the balance receives the final value, private view has both', async () => {
+	const sellOneFish = require('../src/components/buttons/sell-one-fish');
+	const { User: UserModel } = require('../src/schemas/UserSchema');
+	await useTestRod(FOUNDER, { capabilities: ['weak', '1'] });
+	const r = await castLine({ userId: FOUNDER });
+	await applyCastResult(r);
+	const base = r.rewards.catchValue.base;
+	const final = r.rewards.catchValue.final;
+	assert.equal(final, base + r.rewards.catchValue.profileBonus);
+	assert.ok(final > base);
+
+	const moneyBefore = (await UserModel.findOne({ userId: FOUNDER }).lean()).inventory.money;
+	const calls = {};
+	await sellOneFish.run({}, {
+		user: { id: FOUNDER },
+		message: { embeds: [{ data: { title: 'catch' }, toJSON() { return this.data; } }], components: [{ components: [{ type: 2, custom_id: 'a', style: 1, label: 'Fish again' }, { type: 2, custom_id: 'b', style: 4, label: 'Sell' }] }] },
+		reply: async (p) => { calls.reply = p; },
+		update: async (p) => { calls.update = p; },
+	}, null, r.castId);
+	const soldText = calls.update.embeds[0].toJSON().fields.at(-1).value;
+	assert.equal(soldText, `You sold this catch for $${base.toLocaleString('en-US')}.`);
+	const doc = await UserModel.findOne({ userId: FOUNDER }).lean();
+	assert.equal(doc.inventory.money - moneyBefore, final, 'balance receives the true value');
+	assert.equal(doc.stats.lastSale.base, base);
+	assert.equal(doc.stats.lastSale.final, final);
+
+	const fi = interactionFor({ id: FOUNDER, globalName: 'Casey', username: 'casey' });
+	await statsCommand.run({}, fi);
+	const view = json(fi.sent.find((s) => s.kind === 'edit'));
+	assert.ok(view.includes(`Base $${base.toLocaleString('en-US')} · Founder +$${(final - base).toLocaleString('en-US')} · Final $${final.toLocaleString('en-US')}`), view);
+	assert.equal(fi.sent[0].ephemeral, true);
+});
+
+test('public quest rewards show base amounts; the account gets the Founder amounts', async () => {
+	const founder = { id: FOUNDER, displayName: 'Casey', globalName: 'Casey', username: 'casey' };
+	await useTestRod(FOUNDER, { capabilities: ['weak', '1'] });
+	await giveQuest(FOUNDER, { title: 'Public quest', progressMax: 1, xp: 20, cash: 9 });
+	resetCooldowns();
+	const fi = interactionFor(founder);
+	await fishCommand.run({}, fi, null, founder);
+	const card = fi.sent.find((s) => s.kind === 'followUp').embeds[0].toJSON();
+	const quest = card.fields.find((f) => /Quest/.test(f.name)).value;
+	assert.match(quest, /\+20 XP · \+\$9/);
+	assert.ok(!/\+100 XP|\$45/.test(quest));
 });

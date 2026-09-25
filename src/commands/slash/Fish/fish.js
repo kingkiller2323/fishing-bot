@@ -61,12 +61,14 @@ const followUpMessage = async (interaction, user, result) => {
 		embed
 			.setTitle(`🎣 ${user.displayName}'s catch`)
 			.setColor(catchColor(catches))
-			.setDescription(`${catches.map(formatCatch).join('\n')}\n\n**+${result.xp.catch} XP**`);
+			// Public amounts are the base-game rewards; the account receives the final (profile) amounts.
+			// The real breakdown is in the private /fishing-stats.
+			.setDescription(`${catches.map(formatCatch).join('\n')}\n\n**+${result.rewards.catchXp.base} XP**`);
 
 		const completed = result.quests.filter((q) => q.completed);
 		if (completed.length > 0) {
 			const questLines = completed.map((q) => {
-				const rewards = [`+${q.xp} XP`, `+$${q.cash.toLocaleString('en-US')}`, ...q.rewards.map((r) => r.name)];
+				const rewards = [`+${q.reward.xp.base} XP`, `+$${q.reward.cash.base.toLocaleString('en-US')}`, ...q.rewards.map((r) => r.name)];
 				return `✅ **${q.title}**\n-# ${rewards.join(' · ')}`;
 			});
 			fields.push({ name: '📜 Quest complete', value: questLines.join('\n') });

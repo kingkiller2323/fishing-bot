@@ -5,6 +5,7 @@ const { ButtonBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
 const { partitionProtected } = require('../../engine/protection');
 const { withUserLock } = require('../../engine/userLock');
+const { recordSale } = require('../../engine/sales');
 
 module.exports = {
 	customId: 'sell-one-fish',
@@ -63,11 +64,14 @@ module.exports = {
 			const cashBuff = activeBuffs.find((buff) => buff.capabilities.includes('cash'));
 			const cashMultiplier = cashBuff ? parseFloat(cashBuff?.capabilities[1]) : 1;
 
+			// `total` is paid; `publicTotal` (base values, no profile bonus) is what the message shows.
 			let total = 0;
+			let publicTotal = 0;
 			for (const fish of fishArray) {
 				const fishData = await FishData.findById(fish.valueOf());
 				const value = fishData.value * cashMultiplier * fishData.count;
 				total += value;
+				publicTotal += (fishData.valueBase ?? fishData.value) * cashMultiplier * fishData.count;
 				// newFish.push(...userData.inventory.fish.filter(x => x._id.valueOf() !== fishData._id.valueOf()));
 				await userData.removeFish(fishData._id, fishData.count);
 				await userData.addMoney(value);
@@ -82,11 +86,13 @@ module.exports = {
 			}
 		
 			// disable the sell button
+			await recordSale(interaction.user.id, publicTotal, total);
+
 			const components = interaction.message.components;
 			const keptNote = lockedFish.length > 0 ? `\n🔒 ${lockedFish.length} locked fish kept.` : '';
 			const embeds = [
 				EmbedBuilder.from(interaction.message.embeds[0])
-					.addFields({ name: '💰 Sold', value: `You sold this catch for $${total.toLocaleString('en-US')}.${keptNote}` }),
+					.addFields({ name: '💰 Sold', value: `You sold this catch for $${Math.round(publicTotal).toLocaleString('en-US')}.${keptNote}` }),
 				...interaction.message.embeds.slice(1),
 			];
 			components[0].components[1] = ButtonBuilder.from(components[0].components[1])

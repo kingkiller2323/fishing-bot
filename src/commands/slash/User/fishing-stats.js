@@ -16,7 +16,7 @@ module.exports = {
 		// Always private: this is where profile details (e.g. Founder bonuses) are shown.
 		await interaction.deferReply({ ephemeral: true });
 		const userId = interaction.user.id;
-		await User.get(userId);
+		const userDoc = await User.get(userId);
 		const stats = await fishingStats(userId);
 		const last = await Cast.findOne({ userId, status: 'applied' }).sort({ createdAt: -1 }).lean();
 
@@ -25,7 +25,7 @@ module.exports = {
 				new EmbedBuilder()
 					.setTitle('🎣 Your fishing stats')
 					.setColor(branding.color)
-					.addFields(privateStatsFields({ stats, lastCast: last?.result }))
+					.addFields(privateStatsFields({ stats, lastCast: last?.result, lastSale: userDoc?.stats?.lastSale }))
 					.setFooter({ text: `${branding.name} · only you can see this` }),
 			],
 		});

@@ -52,6 +52,12 @@ const UserSchema = new Schema ({
 			type: Number,
 			default: 0,
 		},
+		// Most recent sale, for the private /fishing-stats view (public output shows `base`).
+		lastSale: {
+			base: { type: Number },
+			final: { type: Number },
+			at: { type: Date },
+		},
 		fishStats: {
 			type: Map,
 			of: Number,

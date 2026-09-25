@@ -36,7 +36,7 @@ test('sell by rarity skips locked fish and pays only for sold ones', async () =>
 
 	const result = await Fish.sellByRarity('seller-rarity', 'common');
 
-	assert.deepEqual(result, { total: 70, sold: 1, protected: 1 });
+	assert.deepEqual(result, { total: 70, baseTotal: 70, sold: 1, protected: 1 });
 	const after = await reload(user);
 	const inv = after.user.inventory.fish.map(String);
 	assert.ok(inv.includes(String(keep._id)), 'locked fish kept');
