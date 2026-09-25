@@ -46,6 +46,8 @@ module.exports = {
 
 		if (subcommand === 'view') {
 			// get aquariums owned by the user
+			// Finish any aquarium move that was interrupted before reading membership.
+			await Aquarium.reconcileOwner(interaction.user.id);
 			const aquariums = await Habitat.find({ owner: interaction.user.id });
 			if (!aquariums.length) {
 				if (process.env.ANALYTICS || config.client.analytics) {
@@ -209,7 +211,8 @@ module.exports = {
 		}
 
 		else if (subcommand === 'move') {
-			const fish = interaction.options.getString('fish');
+			// The slash option is registered as `pet`.
+			const fish = interaction.options.getString('pet');
 			// find the pet fish owned by user
 			const petFishData = await PetFish.findOne({ name: fish, owner: interaction.user.id });
 			if (!petFishData) {
@@ -232,7 +235,7 @@ module.exports = {
 			}
 				
 			// check if the fish is already in the aquarium
-			if (aquariumData.fish.includes(petFishData.id)) {
+			if (aquariumData.fish.some((f) => String(f) === String(petFishData._id))) {
 				if (process.env.ANALYTICS || config.client.analytics) {
 					await analyticsObject.setStatus('failed');
 					await analyticsObject.setStatusMessage('Fish already in specified aquarium.');

@@ -41,6 +41,14 @@ const AquariumSchema = new Schema({
 		type: Date,
 		default: Date.now,
 	},
+	// Decay clocks: the point up to which hourly cleanliness/temperature drift has been applied.
+	// Absent on older aquariums, which fall back to lastCleaned / lastAdjusted.
+	cleanlinessUpdatedAt: {
+		type: Date,
+	},
+	temperatureUpdatedAt: {
+		type: Date,
+	},
 	type: {
 		type: String,
 		default: 'aquarium',

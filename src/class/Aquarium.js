@@ -1,5 +1,9 @@
 const { default: mongoose } = require('mongoose');
 const { Habitat } = require('../schemas/HabitatSchema');
+const { PetFish } = require('../schemas/PetSchema');
+
+const HOUR_MS = 3_600_000;
+let transactionSupport = null;
 
 class Aquarium {
 	constructor(data) {
@@ -58,78 +62,132 @@ class Aquarium {
 		return this.aquarium.fish.length >= this.aquarium.size;
 	}
 
-	async updateStatus() {
-		const now = new Date();
-		const lastCleaned = new Date(this.aquarium.lastCleaned);
-		const lastAdjusted = new Date(this.aquarium.lastAdjusted);
+	/** Applies targeted $set updates (never overwrites the fish list) and mirrors them locally. */
+	async update(fields) {
+		Object.assign(this.aquarium, fields);
+		await Habitat.updateOne({ _id: this.aquarium._id }, { $set: fields });
+		return this.aquarium;
+	}
 
-		const timeSinceCleaned = now - lastCleaned;
-		const timeSinceAdjusted = now - lastAdjusted;
+	/**
+	 * Applies hourly decay since the last time it was applied: cleanliness -1/hour (floor 0),
+	 * temperature +1/hour. The decay clocks advance by the whole hours consumed, so calling this
+	 * repeatedly never re-applies the same elapsed time.
+	 */
+	async updateStatus(now = new Date()) {
+		const cleanFrom = new Date(this.aquarium.cleanlinessUpdatedAt || this.aquarium.lastCleaned || now);
+		const tempFrom = new Date(this.aquarium.temperatureUpdatedAt || this.aquarium.lastAdjusted || now);
+		const cleanHours = Math.max(0, Math.floor((now - cleanFrom) / HOUR_MS));
+		const tempHours = Math.max(0, Math.floor((now - tempFrom) / HOUR_MS));
 
-		const cleanlinessDecay = Math.floor(timeSinceCleaned / 3600000);
-		const temperatureDecay = Math.floor(timeSinceAdjusted / 3600000);
-
-		this.aquarium.cleanliness -= cleanlinessDecay;
-		this.aquarium.temperature += temperatureDecay;
-
-		return this.save();
+		const fields = {};
+		if (cleanHours > 0 || !this.aquarium.cleanlinessUpdatedAt) {
+			fields.cleanliness = Math.max(0, this.aquarium.cleanliness - cleanHours);
+			fields.cleanlinessUpdatedAt = new Date(cleanFrom.getTime() + cleanHours * HOUR_MS);
+		}
+		if (tempHours > 0 || !this.aquarium.temperatureUpdatedAt) {
+			fields.temperature = this.aquarium.temperature + tempHours;
+			fields.temperatureUpdatedAt = new Date(tempFrom.getTime() + tempHours * HOUR_MS);
+		}
+		if (Object.keys(fields).length > 0) await this.update(fields);
+		return this.aquarium;
 	}
 
 	async addFish(fishId) {
-		this.aquarium.fish.push(fishId);
-		return this.save();
+		await Habitat.updateOne({ _id: this.aquarium._id }, { $addToSet: { fish: fishId } });
+		if (!this.aquarium.fish.some((f) => String(f) === String(fishId))) this.aquarium.fish.push(fishId);
+		return this.aquarium;
 	}
 
 	async removeFish(fishId) {
-		this.aquarium.fish = this.aquarium.fish.filter((fish) => {
-			// console.log(fish._id.valueOf(), fishId.valueOf(), fish._id.valueOf() !== fishId.valueOf());
-			return fish._id.valueOf() !== fishId.valueOf();
-		});
-		return this.save();
+		await Habitat.updateOne({ _id: this.aquarium._id }, { $pull: { fish: fishId } });
+		this.aquarium.fish = this.aquarium.fish.filter((f) => String(f) !== String(fishId));
+		return this.aquarium;
 	}
 
-	async moveFish(pet, newAquarium) {
-		const session = await mongoose.startSession();
-		session.startTransaction();
+	async hasFish(fishId) {
+		return this.aquarium.fish.some((f) => String(f) === String(fishId));
+	}
 
-		try {
-			const petId = await pet.getId();
-			const petHabitat = new Aquarium(await pet.getHabitat());
-			const habitatId = await newAquarium.getId();
+	/**
+	 * Moves a pet into this aquarium. The pet's `aquarium` field is the source of truth for where it
+	 * lives; the aquariums' `fish` lists are kept consistent with it.
+	 *
+	 * With a transaction-capable MongoDB (replica set / sharded) all three writes commit atomically.
+	 * Standalone MongoDB (Railway's default) cannot run transactions, so the writes are ordered and
+	 * idempotent instead: the pet is re-pointed first, then Aquarium.reconcilePet() adds it here and
+	 * pulls it from any other aquarium. If the process dies part-way, running reconcilePet again
+	 * (it runs on every /aquarium view) finishes the move.
+	 */
+	async moveFish(pet, newAquarium = this) {
+		const petId = await pet.getId();
+		const targetId = await newAquarium.getId();
 
-			// ensure pet data is properly updated
-			await pet.updateHabitat(habitatId, { session });
-
-			// update aquarium data
-			await petHabitat.removeFish(petId, { session });
-			await newAquarium.addFish(petId, { session });
-
-			await session.commitTransaction();
+		if (await Aquarium.supportsTransactions()) {
+			const session = await mongoose.startSession();
+			try {
+				await session.withTransaction(async () => {
+					await PetFish.updateOne({ _id: petId }, { $set: { aquarium: targetId } }, { session });
+					await Habitat.updateMany({ _id: { $ne: targetId }, fish: petId }, { $pull: { fish: petId } }, { session });
+					await Habitat.updateOne({ _id: targetId }, { $addToSet: { fish: petId } }, { session });
+				});
+			}
+			finally {
+				await session.endSession();
+			}
 		}
-		catch (error) {
-			await session.abortTransaction();
-			throw error;
+		else {
+			await PetFish.updateOne({ _id: petId }, { $set: { aquarium: targetId } });
+			await Aquarium.reconcilePet(petId);
 		}
-		finally {
-			session.endSession();
+
+		pet.pet.aquarium = targetId;
+		if (!newAquarium.aquarium.fish.some((f) => String(f) === String(petId))) newAquarium.aquarium.fish.push(petId);
+	}
+
+	/** Makes aquarium membership match the pet's `aquarium` field. Idempotent. */
+	static async reconcilePet(petId) {
+		const pet = await PetFish.findById(petId).select('aquarium').lean();
+		if (!pet) return;
+		if (pet.aquarium) {
+			await Habitat.updateOne({ _id: pet.aquarium }, { $addToSet: { fish: petId } });
+			await Habitat.updateMany({ _id: { $ne: pet.aquarium }, fish: petId }, { $pull: { fish: petId } });
 		}
+		else {
+			await Habitat.updateMany({ fish: petId }, { $pull: { fish: petId } });
+		}
+	}
+
+	/** Repairs membership for every pet an owner has (recovers interrupted moves). */
+	static async reconcileOwner(owner) {
+		const pets = await PetFish.find({ owner }).select('_id').lean();
+		for (const pet of pets) await Aquarium.reconcilePet(pet._id);
+	}
+
+	/** True when the connected MongoDB can run multi-document transactions. Cached per process. */
+	static async supportsTransactions() {
+		if (transactionSupport === null) {
+			try {
+				const hello = await mongoose.connection.db.admin().command({ hello: 1 });
+				transactionSupport = Boolean(hello.setName) || hello.msg === 'isdbgrid';
+			}
+			catch {
+				transactionSupport = false;
+			}
+		}
+		return transactionSupport;
 	}
 
 	async upgrade(size) {
-		this.aquarium.size = size;
-		return this.save();
+		return this.update({ size });
 	}
 
-	async clean() {
-		this.aquarium.cleanliness = 100;
-		this.aquarium.lastCleaned = new Date();
-		return this.save();
+	async clean(now = new Date()) {
+		return this.update({ cleanliness: 100, lastCleaned: now, cleanlinessUpdatedAt: now });
 	}
 
-	async adjustTemperature(newTemperature) {
-		this.aquarium.temperature = newTemperature;
-		this.aquarium.lastAdjusted = new Date();
-		return this.save();
+	async adjustTemperature(newTemperature, now = new Date()) {
+		return this.update({ temperature: newTemperature, lastAdjusted: now, temperatureUpdatedAt: now });
 	}
 
 	async compareBiome(biome) {

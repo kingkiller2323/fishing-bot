@@ -1,8 +1,9 @@
 const { User } = require('../../class/User');
 const { FishData } = require('../../schemas/FishSchema');
 const { BuffData } = require('../../schemas/BuffSchema');
-const { ButtonComponent, ButtonBuilder } = require('discord.js');
+const { ButtonBuilder, EmbedBuilder } = require('discord.js');
 const config = require('../../config');
+const { partitionProtected } = require('../../engine/protection');
 
 module.exports = {
 	customId: 'sell-one-fish',
@@ -30,7 +31,16 @@ module.exports = {
 		// 	return;
 		// }
 
-		const fishArray = (await userData.getFish()).filter(fish => fish.catchId == catchId);
+		const catchFish = (await userData.getFish()).filter(fish => fish.catchId == catchId);
+		const { allowed: fishArray, protected: lockedFish } = partitionProtected(catchFish);
+
+		if (fishArray.length === 0 && lockedFish.length > 0) {
+			await interaction.reply({
+				content: '🔒 These fish are locked. Unlock them with `/unlock` if you really want to sell them.',
+				ephemeral: true,
+			});
+			return;
+		}
 		// let newFish = (await userData.getInventory()).fish;
 
 		if (fishArray.length === 0) {
@@ -69,10 +79,13 @@ module.exports = {
 		}
 		
 		// disable the sell button
-		const embeds = interaction.message.embeds
-		const components = interaction.message.components
-
-		embeds[0].fields.push({ name: 'Sold Fish', value: `You sold this catch for a total of $${total.toLocaleString()}!` });
+		const components = interaction.message.components;
+		const keptNote = lockedFish.length > 0 ? `\n🔒 ${lockedFish.length} locked fish kept.` : '';
+		const embeds = [
+			EmbedBuilder.from(interaction.message.embeds[0])
+				.addFields({ name: '💰 Sold', value: `You sold this catch for $${total.toLocaleString('en-US')}.${keptNote}` }),
+			...interaction.message.embeds.slice(1),
+		];
 		components[0].components[1] = ButtonBuilder.from(components[0].components[1])
 		components[0].components[1].setDisabled(true);
 

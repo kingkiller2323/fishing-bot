@@ -6,6 +6,20 @@ const { User } = require('../class/User');
 const { WeatherPattern } = require('./WeatherPattern');
 const { Season } = require('./Season');
 const { rng } = require('../engine/rng');
+const { partitionProtected } = require('../engine/protection');
+
+// Rarity re-rolls allowed per fish before falling back (see generateFish).
+const MAX_DRAW_ATTEMPTS = 25;
+const RARITY_ORDER = ['Common', 'Uncommon', 'Rare', 'Ultra', 'Giant', 'Legendary', 'Lucky'];
+
+/** Thrown when a cast cannot produce any fish (misconfigured catalog), instead of looping forever. */
+class NoCatchError extends Error {
+	constructor(message) {
+		super(message);
+		this.name = 'NoCatchError';
+		this.code = 'NO_CATCH';
+	}
+}
 
 class Fish {
 	// constructor(data) {
@@ -46,7 +60,7 @@ class Fish {
 			if (countCapability) {
 				const countMatch = countCapability.match(/^(\d+)/);
 				if (countMatch && countMatch[1]) {
-					count = countMatch[1];
+					count = Number(countMatch[1]);
 				}
 			}
 		}
@@ -107,54 +121,53 @@ class Fish {
 		return await uniqueFishArray.map(element => element.item);
 	};
 	
+	/**
+	 * Draws `number` fish for one cast. Each draw rolls a rarity from the rod/bait weights and picks a
+	 * fish of that rarity available in the player's biome, weather and season whose qualities match
+	 * the capabilities. A rarity with no eligible fish is re-rolled, at most MAX_DRAW_ATTEMPTS times
+	 * (the same odds as the old unbounded retry); then a deterministic fallback fish is used, and if
+	 * even that is impossible a NoCatchError is thrown instead of recursing forever.
+	 */
 	static async generateFish(number, count, capabilities, choices, weights, user, weather, season) {
 		const choice = [];
+		const currentBiome = await user.getCurrentBiome();
+		const biome = currentBiome.charAt(0).toUpperCase() + currentBiome.slice(1);
+		const currentWeather = await weather.getWeather();
+		const weatherType = currentWeather.charAt(0).toUpperCase() + currentWeather.slice(1);
+		const currentSeason = season.season;
+		const matchesCapabilities = (candidate) => capabilities.some((capability) => (candidate?.qualities || []).includes(capability));
+
 		for (let i = 0; i < number; i++) {
-		
-			let draw = await Utils.getWeightedChoice(choices, weights);
-			draw = draw.charAt(0).toUpperCase() + draw.slice(1);
-			const currentBiome = await user.getCurrentBiome();
-			const biome = currentBiome.charAt(0).toUpperCase() + currentBiome.slice(1);
+			let picked = null;
+			for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS && !picked; attempt++) {
+				let draw = await Utils.getWeightedChoice(choices, weights);
+				if (!draw) break;
+				draw = draw.charAt(0).toUpperCase() + draw.slice(1);
 
-			const currentWeather = await weather.getWeather();
-			const weatherType = currentWeather.charAt(0).toUpperCase() + currentWeather.slice(1);
-			const currentSeason = season.season;
-		
-			let weatherFish = await FishSchema.find({ rarity: draw, biome: biome, weather: weatherType, season: currentSeason }) || [];
-			let weatherlessFish = await FishSchema.find({ rarity: draw, biome: biome, weather: 'all', season: currentSeason}) || [];
-			let seasonlessFish = await FishSchema.find({ rarity: draw, biome: biome, weather: weatherType, season: 'all' }) || [];
-			let globalFish = await FishSchema.find({ rarity: draw, biome: biome, weather: 'all', season: 'all' }) || [];
-			let f = weatherFish.concat(weatherlessFish, seasonlessFish, globalFish);
+				let candidates = await FishSchema.find({
+					rarity: draw,
+					biome: biome,
+					weather: { $in: [weatherType, 'all'] },
+					season: { $in: [currentSeason, 'all'] },
+					user: null,
+				});
 
-			if (draw === 'Lucky') {
-				const itemFind = await Utils.getWeightedChoice(['fish', 'item'], [80, 20]);
-				if (itemFind === 'item') {
-					const options = await Item.find({ rarity: draw });
-					const random = Math.floor(rng.random() * options.length);
-					f = [options[random]];
+				if (draw === 'Lucky') {
+					const itemFind = await Utils.getWeightedChoice(['fish', 'item'], [80, 20]);
+					if (itemFind === 'item') {
+						const options = await Item.find({ rarity: draw, user: null });
+						// An empty Lucky item pool falls back to Lucky fish instead of crashing.
+						if (options.length > 0) candidates = [rng.pick(options)];
+					}
 				}
+
+				const valid = candidates.filter(matchesCapabilities);
+				if (valid.length > 0) picked = rng.pick(valid);
 			}
-			const filteredChoices = await Promise.all(f.map(async fishObj => {
-				await new Promise(resolve => setTimeout(resolve, 100));
-		
-				const isMatch = capabilities.some(capability => fishObj.qualities.includes(capability));
-		
-				if (isMatch) {
-					return fishObj;
-				}
-				else {
-					return null;
-				}
-			}));
-		
-			// Remove null values (fish that didn't match the capabilities) from the array
-			const validChoices = filteredChoices.filter(choice => choice !== null);
-		
-			if (validChoices.length === 0) {
-				return await this.generateFish(number, count, capabilities, choices, weights, user, weather, season);
-			}
-		
-			choice.push(validChoices[Math.floor(rng.random() * validChoices.length)]);
+
+			if (!picked) picked = await this.fallbackFish(biome, capabilities);
+			if (!picked) throw new NoCatchError(`No catchable fish in ${biome} for capabilities [${capabilities.join(', ')}]`);
+			choice.push(picked);
 		}
 
 		// merge any duplicate fish
@@ -176,50 +189,62 @@ class Fish {
 			clonedChoice.push(await user.sendToInventory(fish, fish.count));
 		}
 
-		// Check for locked status and update the cloned fish as necessary.
+		// A species the player has locked stays protected: new catches of it are locked too.
 		if (user) {
-			const fishIds = (await user.getInventory()).fish;
-			const lockedFishToUpdate = await FishData.find({ _id: { $in: fishIds }, name: clonedChoice.name, locked: true });
-	
-			if (lockedFishToUpdate.length > 0) {
-				const updateOperations = lockedFishToUpdate.map(fishToUpdate => ({
-					updateOne: {
-						filter: { _id: fishToUpdate._id },
-						update: { locked: true },
-					},
-				}));
-	
-				await FishData.bulkWrite(updateOperations);
+			const newIds = clonedChoice.map((c) => c.item._id);
+			const names = [...new Set(clonedChoice.map((c) => c.item.name))];
+			const lockedNames = await FishData.distinct('name', {
+				_id: { $in: (await user.getInventory()).fish, $nin: newIds },
+				name: { $in: names },
+				locked: true,
+			});
+			const toLock = clonedChoice.filter((c) => lockedNames.includes(c.item.name));
+			if (toLock.length > 0) {
+				toLock.forEach((c) => { c.item.locked = true; });
+				await FishData.updateMany({ _id: { $in: toLock.map((c) => c.item._id) } }, { $set: { locked: true } });
 			}
 		}
-	
+
 		return clonedChoice;
 	};
-	
+
+	/**
+	 * Deterministic last resort when rarity re-rolls found nothing: the lowest-rarity year-round
+	 * fish in the biome that matches the capabilities (bootstrap guarantees one per rarity/quality).
+	 */
+	static async fallbackFish(biome, capabilities) {
+		const candidates = await FishSchema.find({ biome, weather: 'all', season: 'all', user: null }).sort({ name: 1 });
+		const eligible = candidates.filter((f) => capabilities.some((c) => (f.qualities || []).includes(c)));
+		eligible.sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
+		return eligible[0] || null;
+	}
+
+	/**
+	 * Sells every unprotected fish of a rarity (or 'all'). Locked fish are never sold.
+	 * @returns {Promise<{ total: number, sold: number, protected: number }>}
+	 */
 	static async sellByRarity(userId, targetRarity) {
-		let totalValue = 0;
-		const fishToRemove = [];
 		const user = new User(await User.get(userId));
-	
+
 		// check for buffs
 		const activeBuffs = await BuffData.find({ user: userId, active: true });
 		const cashBuff = activeBuffs.find((buff) => buff.capabilities.includes('cash'));
 		const cashMultiplier = cashBuff ? parseFloat(cashBuff.capabilities[1]) : 1;
-	
-		const fishList = await user.getFish();
-		fishList.forEach(async (f) => {
-			if (f.rarity.toLowerCase() === targetRarity.toLowerCase() || targetRarity.toLowerCase() === 'all') {
-				totalValue += f.value * cashMultiplier * f.count;
-				fishToRemove.push(f._id);
-			}
-		});
-	
-		await user.removeListOfFish(fishToRemove);
+
+		const target = targetRarity.toLowerCase();
+		const matching = (await user.getFish()).filter((f) => target === 'all' || f.rarity.toLowerCase() === target);
+		const { allowed, protected: protectedFish } = partitionProtected(matching);
+
+		let totalValue = 0;
+		for (const f of allowed) totalValue += f.value * cashMultiplier * f.count;
+
+		const removed = await user.removeListOfFish(allowed.map((f) => f._id));
+		if (removed.length !== allowed.length) throw new Error('Inventory changed while selling; nothing was paid out.');
 		await user.addMoney(totalValue);
-	
-		return totalValue;
+
+		return { total: totalValue, sold: allowed.length, protected: protectedFish.length };
 	};
-	
+
 	static async getCount(userId, fishName) {
 		const user = new User(await User.get(userId));
 		const fishIds = (await user.getInventory()).fish;
@@ -262,4 +287,4 @@ class Fish {
 	}
 }
 
-module.exports = { Fish };
+module.exports = { Fish, NoCatchError };

@@ -43,7 +43,9 @@ module.exports = {
 			});
 		}
 
-		sold = await Fish.sellByRarity(interaction.user.id, rarity);
+		const result = await Fish.sellByRarity(interaction.user.id, rarity);
+		sold = result.total;
+		const keptNote = result.protected > 0 ? `\n🔒 ${result.protected} locked fish ${result.protected === 1 ? 'was' : 'were'} kept.` : '';
 
 		if (process.env.ANALYTICS || config.client.analytics) {
 			await analyticsObject.setStatus('completed');
@@ -53,7 +55,7 @@ module.exports = {
 			embeds: [
 				new EmbedBuilder()
 					.setTitle('Fish Sold')
-					.setDescription(`Successfully sold **${rarity}** fish for $${sold}.`)
+					.setDescription(`Successfully sold **${rarity}** fish for $${sold.toLocaleString('en-US')}.${keptNote}`)
 					.setColor('Green'),
 			],
 		});

@@ -8,6 +8,7 @@ const { PetFish } = require('../../../schemas/PetSchema');
 const { User } = require('../../../class/User');
 const config = require('../../../config');
 const { Icons } = require('../../../class/Icons');
+const { isProtected } = require('../../../engine/protection');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -102,7 +103,10 @@ module.exports = {
 
 		// find the desired fish in user's inventory
 		const fishes = await user.getFish();
-		const fishInInventory = await fishes.find((f) => f.name.toLowerCase() === species.toLowerCase() && !f.locked);
+		const fishInInventory = fishes.find((f) => f.name.toLowerCase() === species.toLowerCase() && !isProtected(f));
+		if (!fishInInventory) {
+			return interaction.editReply({ content: 'You do not have that fish in your inventory! Make sure it is unlocked.', ephemeral: true });
+		}
 
 		// check if biome origin is the same as the aquarium's water type
 		if (!await aquarium.compareBiome(fishInInventory.biome)) {
@@ -112,9 +116,6 @@ module.exports = {
 			}
 			return await interaction.followUp(`**${fishInInventory.name}** cannot live in a ${await aquarium.getWaterType()} aquarium.`);
 		}
-
-		// remove fish from inventory
-		await user.removeFish(fishInInventory.id);
 
 		let success = false;
 		let newPet;
@@ -139,6 +140,8 @@ module.exports = {
 			success = await newPet.save();
 			if (success) {
 				await aquarium.addFish(await newPet.getId());
+				// Only take the fish once the pet exists, so a failed adoption never loses it.
+				await user.removeFish(fishInInventory.id);
 			}
 		}
 		else {

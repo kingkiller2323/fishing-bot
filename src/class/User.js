@@ -7,6 +7,7 @@ const config = require('../config');
 const fetch = require('node-fetch');
 const { QuestData } = require('../schemas/QuestSchema');
 const { rng } = require('../engine/rng');
+const { assertRemovable, partitionProtected, isProtected } = require('../engine/protection');
 
 class User {
 	constructor(data) {
@@ -118,11 +119,17 @@ class User {
 		return fish;
 	}
 
-	async removeFish(fishId, count) {
+	/**
+	 * Removes `count` of a fish stack from the inventory. Locked fish are refused
+	 * (ProtectedFishError) unless `force` is set.
+	 */
+	async removeFish(fishId, count, { force = false } = {}) {
 		if (!count || count < 1) count = 1;
 
 		// if fish count is greater than 1, decrement count
 		const fish = await FishData.findById(fishId);
+		if (!fish) return;
+		assertRemovable(fish, { force });
 		if (fish.count >= 1) {
 			fish.count -= count;
 			await fish.save();
@@ -136,10 +143,16 @@ class User {
 		return;
 	}
 
-	async removeListOfFish(fishIds) {
-		fishIds = fishIds.map((f) => f.valueOf());
-		this.user.inventory.fish = this.user.inventory.fish.filter((f) => !fishIds.includes(f.valueOf()));
+	/**
+	 * Removes whole fish stacks from the inventory. Locked fish are skipped unless `force` is set.
+	 * @returns {Promise<string[]>} ids actually removed
+	 */
+	async removeListOfFish(fishIds, { force = false } = {}) {
+		const fish = await FishData.find({ _id: { $in: fishIds } });
+		const removable = partitionProtected(fish, { force }).allowed.map((f) => String(f._id));
+		this.user.inventory.fish = this.user.inventory.fish.filter((f) => !removable.includes(String(f)));
 		await this.save();
+		return removable;
 	}
 
 	async getCodes() {
@@ -248,19 +261,17 @@ class User {
 		return totalValue;
 	}
 
+	/**
+	 * The player's best (largest-size) aquarium license for a water type, or null.
+	 * Water types are compared case-insensitively ('Freshwater' aquarium vs 'freshwater' license).
+	 */
 	async getAquariumLicense(waterType) {
 		const inventory = await this.getInventory();
-		if (inventory.items) {
-			// check if user has an aquarium license
-			const items = await Promise.all(inventory.items.map(async (i) => await ItemData.findById(i)));
-			const licenses = (await Promise.all(items.map(async (i) => i))).filter(i => i.type === 'license');
-			const aquariumLicenses = await licenses.filter(async (l) => !l.name.toLowerCase().includes('aquarium'));
-			// find the license that matches the waterType
-			const waterLicenses = await aquariumLicenses.filter(async (l) => !l.aquarium.waterType.includes(waterType));
-			// find the license with the highest size constraint
-			const sortedLicenses = await waterLicenses.sort((a, b) => b.aquarium.size - a.aquarium.size);
-			return sortedLicenses[0];
-		}
+		const wanted = String(waterType || '').toLowerCase();
+		const licenses = await ItemData.find({ _id: { $in: inventory.items || [] }, type: 'license' });
+		const matching = licenses.filter((l) => (l.aquarium?.waterType || []).some((w) => String(w).toLowerCase() === wanted));
+		matching.sort((a, b) => (b.aquarium?.size || 0) - (a.aquarium?.size || 0));
+		return matching[0] || null;
 	}
 
 	async decreaseRodDurability(amount) {
@@ -390,12 +401,13 @@ class User {
 		}
 	}
 
-	async removeItems(itemIds) {
+	async removeItems(itemIds, { force = false } = {}) {
 		const user = this.user;
 		const inventory = user.inventory;
 		const items = await ItemData.find({ _id: { $in: itemIds } });
 
-		items.forEach(async (item) => {
+		for (const item of items) {
+			if (!force && isProtected(item)) continue;
 			if (item.count <= 0) {
 				switch (item.type) {
 				case 'rod':
@@ -426,7 +438,7 @@ class User {
 				itemObject.count--;
 				await itemObject.save();
 			}
-		});
+		}
 
 		await this.save();
 	}

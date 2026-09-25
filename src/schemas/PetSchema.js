@@ -12,7 +12,7 @@ const PetSchema = new Schema({
 	},
 	adoptTime: {
 		type: Date,
-		default: Date.now(),
+		default: Date.now,
 	},
 	name: {
 		type: String,
@@ -51,22 +51,22 @@ const PetSchema = new Schema({
 	lastFed: {
 		type: Date,
 		required: true,
-		default: Date.now(),
+		default: Date.now,
 	},
 	lastPlayed: {
 		type: Date,
 		required: true,
-		default: Date.now(),
+		default: Date.now,
 	},
 	lastBred: {
 		type: Date,
 		required: true,
-		default: Date.now(),
+		default: Date.now,
 	},
 	lastUpdated: {
 		type: Date,
 		required: true,
-		default: Date.now(),
+		default: Date.now,
 	},
 	species: {
 		type: String,

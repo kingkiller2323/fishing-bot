@@ -18,7 +18,15 @@ const updateUserWithFish = async (interaction, userId) => {
 	let rod = await user.getEquippedRod();
 	const bait = await user.getEquippedBait();
 	const biome = await user.getCurrentBiome();
-	const fishArray = await Fish.reel(rod._id, bait, biome, interaction.guild.id, user);
+	let fishArray;
+	try {
+		fishArray = await Fish.reel(rod._id, bait, biome, interaction.guild.id, user);
+	}
+	catch (error) {
+		if (error.code !== 'NO_CATCH') throw error;
+		console.error(error);
+		return { fish: [], questsCompleted: [], xp: 0, rodState: '', success: false, message: 'Nothing is biting here right now. Try another biome or bait.' };
+	}
 	let xp = 0;
 	let levelUp = false;
 

@@ -5,6 +5,10 @@ const { User } = require('../schemas/UserSchema');
 const { Utils } = require('../class/Utils');
 const { rng } = require('../engine/rng');
 
+// Environmental factors (cleanliness/temperature) affect every pet except one whose unlocked
+// genetic-drift trait is Adaptive.
+const isAdaptive = (traits) => traits?.geneticDrift?.trait === 'Adaptive' && Boolean(traits?.geneticDrift?.unlocked);
+
 class Pet {
 	constructor(data) {
 		this.pet = new PetFish(data);
@@ -190,7 +194,7 @@ class Pet {
 		}
 
 		// Apply cleanliness and temperature factors
-		if (!traits.geneticDrift.trait === 'Adaptive' && traits.geneticDrift.unlocked) {
+		if (!isAdaptive(traits)) {
 			hungerIncrease *= cleanlinessFactor * temperatureFactor;
 		}
 
@@ -203,11 +207,13 @@ class Pet {
 		const baseMoodDecreasePerMinute = 100 / 360;
 		const baseMoodDecrease = elapsedTimeSincePlayed * baseMoodDecreasePerMinute;
 
-		const cleanlinessFactor = cleanliness / 100;
+		// A dirtier tank makes mood fall faster (factor >= 1). This used to be cleanliness / 100,
+		// which made dirty tanks slow mood loss; it was dormant behind the broken Adaptive check.
+		const cleanlinessFactor = 1 + ((100 - cleanliness) / 100);
 
-		// Calculate the temperature factor (deviation from 0 negatively impacts mood)
+		// Calculate the temperature factor (deviation from 0 makes mood fall faster)
 		const temperatureDeviation = Math.abs(temperature);
-		const temperatureFactor = 1 - (temperatureDeviation / 100);
+		const temperatureFactor = 1 + (temperatureDeviation / 100);
 
 		const traits = await this.getTraits();
 		const moodTraits = ['Aggressive', 'Calm', 'Friendly', 'Timid', 'Curious'];
@@ -216,7 +222,7 @@ class Pet {
 		let moodDecrease = baseMoodDecrease;
 
 		// Apply cleanliness and temperature factors
-		if (!traits.geneticDrift.trait === 'Adaptive' && traits.geneticDrift.unlocked) {
+		if (!isAdaptive(traits)) {
 			moodDecrease *= cleanlinessFactor * temperatureFactor;
 		}
 
@@ -230,8 +236,8 @@ class Pet {
 		// Aggressive fish should negatively impact the mood of other fish
 		// Friendly fish should positively impact the mood of other fish
 		const aquarium = await this.getHabitat();
-		let otherFish = aquarium.fish.filter(fish => fish.id !== this.pet.id);
-		otherFish = await Promise.all(otherFish.map(async (fishId) => await PetFish.findById(fishId)));
+		let otherFish = (aquarium?.fish || []).filter((fishId) => String(fishId) !== String(this.pet._id));
+		otherFish = (await Promise.all(otherFish.map(async (fishId) => await PetFish.findById(fishId)))).filter(Boolean);
 
 		// Adjust mood based on other fish
 		for (const fish of otherFish) {
@@ -256,7 +262,8 @@ class Pet {
 
 		const baseStressIncrease = stressOverTime * baseStressIncreasePerMinute;
 
-		const cleanlinessFactor = cleanliness / 100;
+		// A dirtier tank raises stress faster (factor >= 1); previously inverted like mood.
+		const cleanlinessFactor = 1 + ((100 - cleanliness) / 100);
 
 		const temperatureDeviation = Math.abs(temperature);
 		const temperatureFactor = 1 + (temperatureDeviation / 100);
@@ -268,7 +275,7 @@ class Pet {
 		let stressIncrease = baseStressIncrease;
 
 		// Apply cleanliness and temperature factors
-		if (!traits.geneticDrift.trait === 'Adaptive' && traits.geneticDrift.unlocked) {
+		if (!isAdaptive(traits)) {
 			stressIncrease *= cleanlinessFactor * temperatureFactor;
 		}
 
@@ -282,8 +289,8 @@ class Pet {
 		// Aggressive fish should negatively impact the mood of other fish
 		// Friendly fish should positively impact the mood of other fish
 		const aquarium = await this.getHabitat();
-		let otherFish = aquarium.fish.filter(fish => fish.id !== this.pet.id);
-		otherFish = await Promise.all(otherFish.map(async (fishId) => await PetFish.findById(fishId)));
+		let otherFish = (aquarium?.fish || []).filter((fishId) => String(fishId) !== String(this.pet._id));
+		otherFish = (await Promise.all(otherFish.map(async (fishId) => await PetFish.findById(fishId)))).filter(Boolean);
 
 		// Adjust mood based on other fish
 		for (const fish of otherFish) {
@@ -396,7 +403,7 @@ class Pet {
 	}
 
 	async updateHabitat(habitatId) {
-		this.pet.habitat = habitatId;
+		this.pet.aquarium = habitatId;
 		return this.save();
 	}
 
