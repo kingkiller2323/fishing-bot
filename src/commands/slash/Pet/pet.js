@@ -5,6 +5,7 @@ const { PetFish } = require('../../../schemas/PetSchema');
 const { Habitat } = require('../../../schemas/HabitatSchema');
 const buttonPagination = require('../../../buttonPagination');
 const config = require('../../../config');
+const { Icons } = require('../../../class/Icons');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -52,7 +53,7 @@ module.exports = {
 				const aquarium = new Aquarium(await Habitat.findById(await pet.getHabitat()));
 				await pet.updateStatus(aquarium);
 				const petData = await pet.getFishData();
-				fields.push({ name: `<${petData.icon?.animated ? 'a' : ''}:${petData.icon?.data}> ${await pet.getName()}`, value: `**Species**: ${await pet.getSpecies()}\n**Age**: ${await pet.getAge()}\n**Health**: ${await pet.getHealth()}%\n**Hunger**: ${await pet.getHunger()}%\n**Mood**: ${await pet.getMood()}%\n**Stress**: ${await pet.getStress()}%\n**XP**: ${await pet.getXP()}\n\n**Traits**: ${(await pet.getUnlockedTraitNames()).join(', ')}` });
+				fields.push({ name: `${Icons.of(petData)} ${await pet.getName()}`, value: `**Species**: ${await pet.getSpecies()}\n**Age**: ${await pet.getAge()}\n**Health**: ${await pet.getHealth()}%\n**Hunger**: ${await pet.getHunger()}%\n**Mood**: ${await pet.getMood()}%\n**Stress**: ${await pet.getStress()}%\n**XP**: ${await pet.getXP()}\n\n**Traits**: ${(await pet.getUnlockedTraitNames()).join(', ')}` });
 			}
 
 			const chunkSize = 1;

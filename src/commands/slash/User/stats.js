@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const buttonPagination = require('../../../buttonPagination');
 const { User } = require('../../../class/User');
+const config = require('../../../config');
 
 module.exports = {
 	structure: new SlashCommandBuilder()

@@ -7,6 +7,7 @@ const { Item, ItemData } = require('../schemas/ItemSchema');
 const { BaitData } = require('../schemas/BaitSchema');
 const { User } = require('../schemas/UserSchema');
 const { StringSelectMenuOptionBuilder } = require('discord.js');
+const { Icons } = require('./Icons');
 const { LicenseData } = require('../schemas/LicenseSchema');
 const { WeatherType } = require('../schemas/WeatherTypeSchema');
 const { Season } = require('../schemas/SeasonSchema');
@@ -334,7 +335,7 @@ class Utils {
 					return new StringSelectMenuOptionBuilder()
 						.setLabel(item.name)
 						.setDescription(`$${item.price.toLocaleString()} | ${item.description}`)
-						.setEmoji(item.toJSON().icon.data.split(':')[1])
+						.setEmoji(Icons.component(item))
 						.setValue(value);
 				}
 			}

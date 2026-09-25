@@ -7,7 +7,7 @@ const springFish = [
 	  'value': 80,
 	  'icon': {
 		'animated': false,
-		'data': 'Rainbow_Trout:1244064595681869834',
+		'data': 'Rainbow_Trout',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -23,7 +23,7 @@ const springFish = [
 	  'value': 110,
 	  'icon': {
 		'animated': false,
-		'data': 'Smallmouth_Bass:1244065949930487889',
+		'data': 'Smallmouth_Bass',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -39,7 +39,7 @@ const springFish = [
 	  'value': 50,
 	  'icon': {
 		'animated': false,
-		'data': 'Perch:1244064588530581544',
+		'data': 'Perch',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -55,7 +55,7 @@ const springFish = [
 	  'value': 75,
 	  'icon': {
 		'animated': false,
-		'data': 'Pike:1244065312924504094',
+		'data': 'Pike',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -71,7 +71,7 @@ const springFish = [
 	  'value': 100,
 	  'icon': {
 		'animated': false,
-		'data': 'Flounder:1244065151825481779',
+		'data': 'Flounder',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -87,7 +87,7 @@ const springFish = [
 	  'value': 85,
 	  'icon': {
 		'animated': false,
-		'data': 'Scorpion_Carp:1244065942909096038',
+		'data': 'Scorpion_Carp',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -103,7 +103,7 @@ const springFish = [
 	  'value': 30,
 	  'icon': {
 		'animated': false,
-		'data': 'Radioactive_Carp:1244065170150658148',
+		'data': 'Radioactive_Carp',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -119,7 +119,7 @@ const springFish = [
 	  'value': 120,
 	  'icon': {
 		'animated': false,
-		'data': 'Eel:1244064547313291285',
+		'data': 'Eel',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -135,7 +135,7 @@ const springFish = [
 	  'value': 95,
 	  'icon': {
 		'animated': false,
-		'data': 'Rainbow_Trout:1244064595681869834',
+		'data': 'Rainbow_Trout',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -151,7 +151,7 @@ const springFish = [
 	  'value': 70,
 	  'icon': {
 		'animated': false,
-		'data': 'Red_Snapper:1244064598722875392',
+		'data': 'Red_Snapper',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -171,7 +171,7 @@ const summerFish = [
 	  'value': 250,
 	  'icon': {
 		'animated': false,
-		'data': 'Ice_Pip:1244064559942205472',
+		'data': 'Ice_Pip',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -187,7 +187,7 @@ const summerFish = [
 	  'value': 140,
 	  'icon': {
 		'animated': false,
-		'data': 'Tuna:1244065971543609394',
+		'data': 'Tuna',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -203,7 +203,7 @@ const summerFish = [
 	  'value': 90,
 	  'icon': {
 		'animated': false,
-		'data': 'Red_Snapper:1244064598722875392',
+		'data': 'Red_Snapper',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -219,7 +219,7 @@ const summerFish = [
 	  'value': 50,
 	  'icon': {
 		'animated': false,
-		'data': 'Flounder:1244065151825481779',
+		'data': 'Flounder',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -235,7 +235,7 @@ const summerFish = [
 	  'value': 75,
 	  'icon': {
 		'animated': false,
-		'data': 'Catfish:1244065147769851904',
+		'data': 'Catfish',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -251,7 +251,7 @@ const summerFish = [
 	  'value': 120,
 	  'icon': {
 		'animated': false,
-		'data': 'Tilapia:1244066064531329084',
+		'data': 'Tilapia',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -267,7 +267,7 @@ const summerFish = [
 	  'value': 130,
 	  'icon': {
 		'animated': false,
-		'data': 'Void_Salmon:1244066120542064731',
+		'data': 'Void_Salmon',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -283,7 +283,7 @@ const summerFish = [
 	  'value': 80,
 	  'icon': {
 		'animated': false,
-		'data': 'Pike:1244065312924504094',
+		'data': 'Pike',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -299,7 +299,7 @@ const summerFish = [
 	  'value': 45,
 	  'icon': {
 		'animated': false,
-		'data': 'Perch:1244064588530581544',
+		'data': 'Perch',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -315,7 +315,7 @@ const summerFish = [
 	  'value': 180,
 	  'icon': {
 		'animated': true,
-		'data': 'Ghostfish:1244064550471598213',
+		'data': 'Ghostfish',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -335,7 +335,7 @@ const autumnFish = [
 	  'value': 120,
 	  'icon': {
 		'animated': false,
-		'data': 'Son_of_Crimsonfish:1244065950915891242',
+		'data': 'Son_of_Crimsonfish',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -351,7 +351,7 @@ const autumnFish = [
 	  'value': 60,
 	  'icon': {
 		'animated': false,
-		'data': 'Carp:1244064525859422228',
+		'data': 'Carp',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -367,7 +367,7 @@ const autumnFish = [
 	  'value': 75,
 	  'icon': {
 		'animated': false,
-		'data': 'Sunfish:1244065960982482945',
+		'data': 'Sunfish',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -383,7 +383,7 @@ const autumnFish = [
 	  'value': 100,
 	  'icon': {
 		'animated': false,
-		'data': 'Smallmouth_Bass:1244065949930487889',
+		'data': 'Smallmouth_Bass',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -399,7 +399,7 @@ const autumnFish = [
 	  'value': 90,
 	  'icon': {
 		'animated': false,
-		'data': 'Eel:1244064547313291285',
+		'data': 'Eel',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -415,7 +415,7 @@ const autumnFish = [
 	  'value': 50,
 	  'icon': {
 		'animated': false,
-		'data': 'Perch:1244064588530581544',
+		'data': 'Perch',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -431,7 +431,7 @@ const autumnFish = [
 	  'value': 135,
 	  'icon': {
 		'animated': false,
-		'data': 'Red_Snapper:1244064598722875392',
+		'data': 'Red_Snapper',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -447,7 +447,7 @@ const autumnFish = [
 	  'value': 85,
 	  'icon': {
 		'animated': false,
-		'data': 'Herring:1244065154493059153',
+		'data': 'Herring',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -463,7 +463,7 @@ const autumnFish = [
 	  'value': 35,
 	  'icon': {
 		'animated': false,
-		'data': 'Tiger_Trout:1244065964501368872',
+		'data': 'Tiger_Trout',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -479,7 +479,7 @@ const autumnFish = [
 	  'value': 80,
 	  'icon': {
 		'animated': false,
-		'data': 'Pike:1244065312924504094',
+		'data': 'Pike',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -499,7 +499,7 @@ const winterFish = [
 	  'value': 130,
 	  'icon': {
 		'animated': false,
-		'data': 'Salmon:1244064602682036234',
+		'data': 'Salmon',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -515,7 +515,7 @@ const winterFish = [
 	  'value': 65,
 	  'icon': {
 		'animated': false,
-		'data': 'Ice_Pip:1244064559942205472',
+		'data': 'Ice_Pip',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -531,7 +531,7 @@ const winterFish = [
 	  'value': 80,
 	  'icon': {
 		'animated': false,
-		'data': 'Perch:1244064588530581544',
+		'data': 'Perch',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -547,7 +547,7 @@ const winterFish = [
 	  'value': 200,
 	  'icon': {
 		'animated': false,
-		'data': 'Glacierfish:1244064552341999726',
+		'data': 'Glacierfish',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -563,7 +563,7 @@ const winterFish = [
 	  'value': 45,
 	  'icon': {
 		'animated': false,
-		'data': 'Shad:1244065946457473044',
+		'data': 'Shad',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -579,7 +579,7 @@ const winterFish = [
 	  'value': 90,
 	  'icon': {
 		'animated': false,
-		'data': 'Ice_Pip:1244064559942205472',
+		'data': 'Ice_Pip',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -595,7 +595,7 @@ const winterFish = [
 	  'value': 95,
 	  'icon': {
 		'animated': false,
-		'data': 'Ice_Pip:1244064559942205472',
+		'data': 'Ice_Pip',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -611,7 +611,7 @@ const winterFish = [
 	  'value': 150,
 	  'icon': {
 		'animated': false,
-		'data': 'Red_Snapper:1244064598722875392',
+		'data': 'Red_Snapper',
 	  },
 	  'qualities': ['strong'],
 	  'type': 'fish',
@@ -627,7 +627,7 @@ const winterFish = [
 	  'value': 50,
 	  'icon': {
 		'animated': false,
-		'data': 'Herring:1244065154493059153',
+		'data': 'Herring',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',
@@ -643,7 +643,7 @@ const winterFish = [
 	  'value': 80,
 	  'icon': {
 		'animated': true,
-		'data': 'Ice_Pip:1244064559942205472',
+		'data': 'Ice_Pip',
 	  },
 	  'qualities': ['weak'],
 	  'type': 'fish',

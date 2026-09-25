@@ -10,7 +10,7 @@ module.exports = [
 		biomes: ['river', 'lake', 'pond', 'swamp'],
 		icon: {
 			animated: false,
-			data: '',
+			data: 'Bait',
 		},
 		weights: {
 			common: 7000,
@@ -39,6 +39,10 @@ module.exports = [
 			legendary: 20,
 			lucky: 1,
 		},
+		icon: {
+			animated: false,
+			data: 'Bait',
+		},
 	},
 	{
 		name: 'Shrimp',
@@ -56,6 +60,10 @@ module.exports = [
 			giant: 50,
 			legendary: 20,
 			lucky: 1,
+		},
+		icon: {
+			animated: false,
+			data: 'Bait',
 		},
 	},
 	{
@@ -76,6 +84,10 @@ module.exports = [
 			legendary: 20,
 			lucky: 1,
 		},
+		icon: {
+			animated: false,
+			data: 'Spinner',
+		},
 	},
 	{
 		name: 'Fly',
@@ -94,6 +106,10 @@ module.exports = [
 			giant: 50,
 			legendary: 20,
 			lucky: 1,
+		},
+		icon: {
+			animated: false,
+			data: 'Bait',
 		},
 	},
 	{
@@ -114,6 +130,10 @@ module.exports = [
 			legendary: 20,
 			lucky: 1,
 		},
+		icon: {
+			animated: false,
+			data: 'Bait',
+		},
 	},
 	{
 		name: 'Lure',
@@ -132,6 +152,10 @@ module.exports = [
 			giant: 50,
 			legendary: 20,
 			lucky: 1,
+		},
+		icon: {
+			animated: false,
+			data: 'Spinner',
 		},
 	},
 	{
@@ -152,6 +176,10 @@ module.exports = [
 			legendary: 20,
 			lucky: 1,
 		},
+		icon: {
+			animated: false,
+			data: 'Spinner',
+		},
 	},
 	{
 		name: 'Magnet',
@@ -171,6 +199,10 @@ module.exports = [
 			legendary: 0,
 			lucky: 3,
 		},
+		icon: {
+			animated: false,
+			data: 'Magnet',
+		},
 	},
 	{
 		name: 'Strong Magnet',
@@ -189,6 +221,10 @@ module.exports = [
 			giant: 0,
 			legendary: 0,
 			lucky: 10,
+		},
+		icon: {
+			animated: false,
+			data: 'Magnet',
 		},
 	},
 ];

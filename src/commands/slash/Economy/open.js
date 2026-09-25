@@ -7,6 +7,7 @@ const {
 } = require('discord.js');
 const { User } = require('../../../class/User');
 const config = require('../../../config');
+const { Icons } = require('../../../class/Icons');
 
 module.exports = {
 	customId: 'open-again',
@@ -36,7 +37,7 @@ module.exports = {
 		if (opened) {
 			for (const object of opened) {
 				const item = object.item;
-				description += `<${item.icon?.animated ? 'a' : ''}:${item.icon?.data}> ${object.count}x ${item.name}\n`;
+				description += `${Icons.of(item)} ${object.count}x ${item.name}\n`;
 			}
 
 			if (process.env.ANALYTICS || config.client.analytics) {

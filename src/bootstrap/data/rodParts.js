@@ -8,7 +8,7 @@ module.exports = [
 		rarity: 'Common',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -19,7 +19,7 @@ module.exports = [
 		rarity: 'Uncommon',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -30,7 +30,7 @@ module.exports = [
 		rarity: 'Rare',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -41,7 +41,7 @@ module.exports = [
 		rarity: 'Rare',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -52,7 +52,7 @@ module.exports = [
 		rarity: 'Ultra',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -63,7 +63,7 @@ module.exports = [
 		rarity: 'Legendary',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -74,7 +74,7 @@ module.exports = [
 		rarity: 'Lucky',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -85,7 +85,7 @@ module.exports = [
 		rarity: 'Common',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -96,7 +96,7 @@ module.exports = [
 		rarity: 'Uncommon',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -107,7 +107,7 @@ module.exports = [
 		rarity: 'Ultra',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -118,7 +118,7 @@ module.exports = [
 		rarity: 'Common',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -129,7 +129,7 @@ module.exports = [
 		rarity: 'Uncommon',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -140,7 +140,7 @@ module.exports = [
 		rarity: 'Ultra',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -151,7 +151,7 @@ module.exports = [
 		rarity: 'Ultra',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -162,7 +162,7 @@ module.exports = [
 		rarity: 'Legendary',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -173,7 +173,7 @@ module.exports = [
 		rarity: 'Rare',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -184,7 +184,7 @@ module.exports = [
 		rarity: 'Rare',
 		icon: {
 			animated: false,
-			data: 'Lead_Bobber:1244066505755459674',
+			data: 'Lead_Bobber',
 		},
 	},
 	{
@@ -195,7 +195,7 @@ module.exports = [
 		rarity: 'Common',
 		icon: {
 			animated: false,
-			data: 'Barbed_Hook:1244066488969596949',
+			data: 'Barbed_Hook',
 		},
 	},
 	{
@@ -206,7 +206,7 @@ module.exports = [
 		rarity: 'Uncommon',
 		icon: {
 			animated: false,
-			data: 'Barbed_Hook:1244066488969596949',
+			data: 'Barbed_Hook',
 		},
 	},
 	{
@@ -217,7 +217,7 @@ module.exports = [
 		rarity: 'Rare',
 		icon: {
 			animated: false,
-			data: 'Barbed_Hook:1244066488969596949',
+			data: 'Barbed_Hook',
 		},
 	},
 	{
@@ -228,7 +228,7 @@ module.exports = [
 		rarity: 'Ultra',
 		icon: {
 			animated: false,
-			data: 'Barbed_Hook:1244066488969596949',
+			data: 'Barbed_Hook',
 		},
 	},
 	{
@@ -239,7 +239,7 @@ module.exports = [
 		rarity: 'Legendary',
 		icon: {
 			animated: false,
-			data: 'Wild_Bait:1244066803936661540',
+			data: 'Wild_Bait',
 		},
 	},
 	{
@@ -250,7 +250,7 @@ module.exports = [
 		rarity: 'Legendary',
 		icon: {
 			animated: false,
-			data: 'Wild_Bait:1244066803936661540',
+			data: 'Wild_Bait',
 		},
 	},
 	{
@@ -261,7 +261,7 @@ module.exports = [
 		rarity: 'Legendary',
 		icon: {
 			animated: false,
-			data: 'Wild_Bait:1244066803936661540',
+			data: 'Wild_Bait',
 		},
 	},
 	{
@@ -272,7 +272,7 @@ module.exports = [
 		rarity: 'Common',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -283,7 +283,7 @@ module.exports = [
 		rarity: 'Uncommon',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -294,7 +294,7 @@ module.exports = [
 		rarity: 'Rare',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -305,7 +305,7 @@ module.exports = [
 		rarity: 'Ultra',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 	{
@@ -316,7 +316,7 @@ module.exports = [
 		rarity: 'Legendary',
 		icon: {
 			animated: false,
-			data: 'Stick:1247950254360363078',
+			data: 'Stick',
 		},
 	},
 ];

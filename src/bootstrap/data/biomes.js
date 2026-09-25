@@ -5,7 +5,7 @@ module.exports = [
 		requirements: ['Level 0'],
 		icon: {
 			animated: false,
-			data: 'rawfish:1209352519726276648',
+			data: 'Ocean',
 		},
 	},
 	{
@@ -13,7 +13,7 @@ module.exports = [
 		requirements: ['Level 10'],
 		icon: {
 			animated: false,
-			data: 'rawfish:1209352519726276648',
+			data: 'River',
 		},
 	},
 	{
@@ -21,7 +21,7 @@ module.exports = [
 		requirements: ['Level 20'],
 		icon: {
 			animated: false,
-			data: 'rawfish:1209352519726276648',
+			data: 'Lake',
 		},
 	},
 	{
@@ -29,7 +29,7 @@ module.exports = [
 		requirements: ['Level 30'],
 		icon: {
 			animated: false,
-			data: 'rawfish:1209352519726276648',
+			data: 'Pond',
 		},
 	},
 	{
@@ -37,7 +37,7 @@ module.exports = [
 		requirements: ['Level 40'],
 		icon: {
 			animated: false,
-			data: 'rawfish:1209352519726276648',
+			data: 'Coast',
 		},
 	},
 	{
@@ -45,7 +45,7 @@ module.exports = [
 		requirements: ['Level 50'],
 		icon: {
 			animated: false,
-			data: 'rawfish:1209352519726276648',
+			data: 'Swamp',
 		},
 	},
 ];

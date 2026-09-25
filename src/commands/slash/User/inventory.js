@@ -6,6 +6,7 @@ const { Fish } = require('../../../class/Fish');
 const { Biome } = require('../../../schemas/BiomeSchema');
 const { ItemData } = require('../../../schemas/ItemSchema');
 const config = require('../../../config');
+const { Icons } = require('../../../class/Icons');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -42,7 +43,7 @@ module.exports = {
 						if (!fishNames.has(fish.name)) {
 							fishNames.add(fish.name);
 							const fishCount = await Fish.getCount(await user.getUserId(), fish.name);
-							fishInventory[fish.rarity.toLowerCase()].push(`**${fishCount}** <${fish.icon?.animated ? 'a' : ''}:${fish.icon?.data}> ${fish.name} ${fish.locked ? '🔒' : ''}\n`);
+							fishInventory[fish.rarity.toLowerCase()].push(`**${fishCount}** ${Icons.of(fish)} ${fish.name} ${fish.locked ? '🔒' : ''}\n`);
 						}
 					}),
 				);
@@ -64,9 +65,9 @@ module.exports = {
 			const balance = `
 			**Balance:** $${inventory.money.toLocaleString()}\n`;
 			const level = `**Level ${await user.getLevel()}**. ${await user.getXPToNextLevel()} to next level.\n`;
-			const rod = `**Currently using**: <${equippedRod?.icon?.animated ? 'a' : ''}:${equippedRod?.icon?.data || ''}> ${equippedRod?.name || 'None'}\n${equippedRod?.durability || 0} / ${equippedRod?.maxDurability || 0}\n`;
-			const bait = `**With**: <${equippedBait?.icon?.animated ? 'a' : ''}:${equippedBait?.icon?.data || ''}>${equippedBait?.name || 'None'}\n`;
-			const biomeString = `**Current biome**: <${biome.icon?.animated ? 'a' : ''}:${biome.icon?.data || ''}> ${biome.name.charAt(0).toUpperCase() + biome.name.slice(1) || 'Ocean'}\n`;
+			const rod = `**Currently using**: ${Icons.of(equippedRod)} ${equippedRod?.name || 'None'}\n${equippedRod?.durability || 0} / ${equippedRod?.maxDurability || 0}\n`;
+			const bait = `**With**: ${Icons.of(equippedBait)} ${equippedBait?.name || 'None'}\n`;
+			const biomeString = `**Current biome**: ${Icons.of(biome)} ${biome.name.charAt(0).toUpperCase() + biome.name.slice(1) || 'Ocean'}\n`;
 			const inventoryValueString = `**Inventory value**: $${await inventoryValue.toLocaleString()}\n\n`;
 			const description = balance + level + rod + (equippedBait ? bait : '') + biomeString + inventoryValueString;
 
@@ -80,7 +81,7 @@ module.exports = {
 				const rodObject = await ItemData.findById(rodId);
 				const rodsOfType = await ItemData.find({ name: rodObject.name, user: await user.getUserId() });
 				const count = rodsOfType.length;
-				rods[rodObject.name] = `x${count || 1} <${rodObject.icon?.animated ? 'a' : ''}:${rodObject.icon?.data || ''}> ${rodObject.name || ''}\n`;
+				rods[rodObject.name] = `x${count || 1} ${Icons.of(rodObject)} ${rodObject.name || ''}\n`;
 			}
 
 			if (Object.keys(rods).length > 0) {
@@ -94,7 +95,7 @@ module.exports = {
 			for (let i = 0; i < inventory.baits.length; i++) {
 				const baitId = inventory.baits[i].valueOf();
 				const baitObject = await ItemData.findById(baitId);
-				baits[baitObject.name] = `x${baitObject.count} <${baitObject.icon?.animated ? 'a' : ''}:${baitObject.icon?.data || ''}> ${baitObject.name || ''}\n`;
+				baits[baitObject.name] = `x${baitObject.count} ${Icons.of(baitObject)} ${baitObject.name || ''}\n`;
 			}
 
 			if (Object.keys(baits).length > 0) {
@@ -110,21 +111,21 @@ module.exports = {
 				const itemObject = await ItemData.findById(itemId);
 				const itemsOfType = await ItemData.find({ name: itemObject.name, user: await user.getUserId() });
 				const count = itemsOfType.length;
-				items[itemObject.name] = `x${count} <${itemObject.icon?.animated ? 'a' : ''}:${itemObject.icon?.data || ''}> ${itemObject.name || ''}\n`;
+				items[itemObject.name] = `x${count} ${Icons.of(itemObject)} ${itemObject.name || ''}\n`;
 			}
 
 			for (let i = 0; i < inventory.gacha?.length; i++) {
 				const itemId = inventory.gacha[i].valueOf();
 				const itemObject = await ItemData.findById(itemId);
 				const count = itemObject.count;
-				items[itemObject.name] = `x${count} <${itemObject.icon?.animated ? 'a' : ''}:${itemObject.icon?.data || ''}> ${itemObject.name || ''}\n`;
+				items[itemObject.name] = `x${count} ${Icons.of(itemObject)} ${itemObject.name || ''}\n`;
 			}
 
 			for (let i = 0; i < inventory.buffs?.length; i++) {
 				const itemId = inventory.buffs[i].valueOf();
 				const itemObject = await ItemData.findById(itemId);
 				const count = itemObject.count;
-				items[itemObject.name] = `x${count} <${itemObject.icon?.animated ? 'a' : ''}:${itemObject.icon?.data || ''}> ${itemObject.name || ''}\n`;
+				items[itemObject.name] = `x${count} ${Icons.of(itemObject)} ${itemObject.name || ''}\n`;
 			}
 
 			if (Object.keys(items).length > 0) {

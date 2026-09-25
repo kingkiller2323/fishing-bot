@@ -6,6 +6,8 @@ const { Item } = require('../../../schemas/ItemSchema');
 const { User } = require('../../../class/User');
 const config = require('../../../config');
 const { Interaction } = require('../../../class/Interaction');
+const { Icons } = require('../../../class/Icons');
+const branding = require('../../../branding');
 
 const updateUserWithFish = async (interaction, userId) => {
 	const user = new User(await User.get(userId));
@@ -155,78 +157,105 @@ const updateUserWithFish = async (interaction, userId) => {
 	}
 };
 
+// Presentation helpers for the catch embed.
+const RARITY_ORDER = Object.keys(branding.rarityColors);
+const formatMeasure = (n) => n.toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 2 : 1 });
+
+const formatCatch = (f) => {
+	const count = f.count > 1 ? ` ×${f.count}` : '';
+	let line = `${Icons.of(f)} **${f.name}**${count} · ${f.rarity}`;
+	// Size/weight only exist on fish (a Lucky draw can also return an item).
+	if (Number.isFinite(f.size) && Number.isFinite(f.weight)) {
+		line += `\n-# ↳ ${formatMeasure(f.size)} cm · ${formatMeasure(f.weight)} kg`;
+	}
+	return line;
+};
+
+const catchColor = (fishArray) => {
+	const best = fishArray.reduce((top, f) => Math.max(top, RARITY_ORDER.indexOf(f.rarity)), -1);
+	return best >= 0 ? branding.rarityColors[RARITY_ORDER[best]] : branding.color;
+};
+
 const followUpMessage = async (interaction, user, fishArray, completedQuests, xp, rodState, bait, levelUp, success, message) => {
 	const fields = [];
-	let fishString = '';
-	let questString = '';
-	let totalQuestXp = 0;
-	let totalQuestCash = 0;
-	const questRewards = [];
+	const warnings = [];
 	let fishAgainDisabled = false;
 	const userObj = new User(await User.get(user.id));
+
+	const embed = new EmbedBuilder().setFooter({ text: branding.name });
 
 	let catchId;
 	if (success) {
 		fishArray.forEach(f => {
 			if (!catchId) catchId = f.catchId;
-			fishString += `<${f.icon?.animated ? 'a' : ''}:${f.icon?.data}> ${f.count} **${f.rarity}** ${f.name} \n-# <:blankblock:1304335977275457567> ${f.size}cm, ${f.weight}kg\n`;
-			// fields.push({ name: 'Congratulations!', value: `<${f.icon?.animated ? 'a' : ''}:${f.icon?.data}> ${user.globalName} caught ${f.count} **${f.rarity}** ${f.name}!` });
 		});
 
-		fishString += `+ ${xp} XP\n`;
-		fields.push({ name: `${user.displayName} Caught:`, value: fishString });
+		embed
+			.setTitle(`🎣 ${user.displayName}'s catch`)
+			.setColor(catchColor(fishArray))
+			.setDescription(`${fishArray.map(formatCatch).join('\n')}\n\n**+${xp} XP**`);
 
 		if (completedQuests.length > 0) {
+			const questLines = [];
 			for await (const quest of completedQuests) {
-				questString += `**${await quest.getTitle()}** completed\n`;
-				totalQuestXp += await quest.getXP();
-				totalQuestCash += await quest.getCash();
+				const rewards = [`+${await quest.getXP()} XP`, `+$${((await quest.getCash()) || 0).toLocaleString('en-US')}`];
 
 				const reward = await quest.getReward();
 				if (reward && reward.length > 0) {
 					for await (const rew of reward) {
 						const r = await Item.findById(rew);
-						questRewards.push(r.name);
+						if (r) rewards.push(`${Icons.of(r)} ${r.name}`);
 					}
 				}
-				// fields.push({ name: 'Quest Completed!', value: `**${quest.title}** completed!` });
+				questLines.push(`✅ **${await quest.getTitle()}**\n-# ${rewards.join(' · ')}`);
 			}
-			questString += `+ ${totalQuestXp} XP, + $${totalQuestCash}\n ${questRewards.length > 0 ? questRewards.join(', ') : ''}`;
-			fields.push({ name: 'Quest complete:', value: questString });
-		}
-		if (rodState === 'broken') {
-			fishAgainDisabled = true;
-			fields.push({ name: 'Uh oh!', value: 'Your fishing rod has broken!' });
-		}
-		else if (rodState === 'destroyed') {
-			fishAgainDisabled = true;
-			fields.push({ name: 'Uh oh!', value: 'Your fishing rod has been destroyed! Looks like you need to buy a new one..' });
-		}
-
-		if (bait?.count == 0) {
-			fields.push({ name: 'Uh oh!', value: 'You ran out of bait!' });
+			fields.push({ name: '📜 Quest complete', value: questLines.join('\n') });
 		}
 
 		if (levelUp) {
-			fields.push({ name: 'Level Up!', value: `${user.globalName} has leveled up to level **${await userObj.getLevel()}**!` });
+			fields.push({ name: '⭐ Level up!', value: `You reached level **${await userObj.getLevel()}**.` });
+		}
+
+		if (rodState === 'broken') {
+			fishAgainDisabled = true;
+			warnings.push('Your fishing rod has broken! Repair it to keep fishing.');
+		}
+		else if (rodState === 'destroyed') {
+			fishAgainDisabled = true;
+			warnings.push('Your fishing rod has been destroyed! Looks like you need to buy a new one.');
+		}
+
+		if (bait?.count == 0) {
+			warnings.push('You ran out of bait!');
+		}
+
+		if (warnings.length > 0) {
+			fields.push({ name: '⚠️ Heads up', value: warnings.join('\n') });
 		}
 	}
 	else {
-		fields.push({ name: 'Uh oh!', value: message });
+		embed
+			.setTitle('🎣 No catch')
+			.setColor(branding.errorColor)
+			.setDescription(message || 'Something went wrong while fishing.');
 		fishAgainDisabled = true;
 	}
+
+	if (fields.length > 0) embed.addFields(fields);
 
 	let components = [
 		new ActionRowBuilder()
 			.addComponents(
 				new ButtonBuilder()
 					.setCustomId('fish-again')
-					.setLabel('Fish again!')
+					.setLabel('Fish again')
+					.setEmoji('🎣')
 					.setStyle(ButtonStyle.Primary)
 					.setDisabled(fishAgainDisabled),
 				new ButtonBuilder()
 					.setCustomId(`sell-one-fish:${catchId || 0}`)
 					.setLabel('Sell')
+					.setEmoji('💰')
 					.setStyle(ButtonStyle.Danger)
 					.setDisabled(fishArray.length === 0),
 			),
@@ -239,19 +268,14 @@ const followUpMessage = async (interaction, user, fishArray, completedQuests, xp
 					new ButtonBuilder()
 						.setCustomId('repair-rod')
 						.setLabel('Repair Rod')
+						.setEmoji('🔧')
 						.setStyle(ButtonStyle.Primary),
 				),
 		];
 	}
 
 	return await interaction.followUp({
-		embeds: [
-			new EmbedBuilder()
-				.setTitle('Fished!')
-				.addFields(
-					fields,
-				),
-		],
+		embeds: [embed],
 		components: components,
 	});
 };

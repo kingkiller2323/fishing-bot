@@ -20,7 +20,7 @@ module.exports = [
 		repairCost: 1000,
 		icon: {
 			animated: false,
-			data: 'old_rod:1210508306662301706',
+			data: 'old_rod',
 		},
 	},
 ];

@@ -9,7 +9,7 @@ module.exports = [
 		length: 3600,
 		icon: {
 			animated: false,
-			data: '',
+			data: 'Double_XP',
 		},
 	},
 
@@ -22,7 +22,7 @@ module.exports = [
 		length: 3600,
 		icon: {
 			animated: false,
-			data: '',
+			data: 'Double_Cash',
 		},
 	},
 
@@ -35,7 +35,7 @@ module.exports = [
 		length: 3600,
 		icon: {
 			animated: false,
-			data: '',
+			data: 'Lucky_Draw',
 		},
 	},
 ];

@@ -1,4 +1,5 @@
 const { Utils } = require('../../class/Utils');
+const { Icons } = require('../../class/Icons');
 
 module.exports = {
 	// 'ready' is deprecated in discord.js v14.22+ in favour of 'clientReady' (Events.ClientReady).
@@ -14,5 +15,6 @@ module.exports = {
 		// Static game data (seasons, weather, fish, items, quests) is seeded by src/bootstrap
 		// before login, so there is nothing left to initialize here.
 		Utils.log('Logged in as: ' + client.user.tag, 'done');
+		await Icons.init(client);
 	},
 };

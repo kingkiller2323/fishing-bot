@@ -1,8 +1,8 @@
 // Idempotent seeding of the static FishingRPG catalog.
 //
 // Every step inserts only the documents whose natural key is missing, so running the
-// bootstrap on every deploy is safe: existing catalog rows are never modified or duplicated,
-// and user/progression collections (users, *datas, pets, habitats, guilds, ponds, codes,
+// bootstrap on every deploy is safe: existing catalog rows are never duplicated and their gameplay
+// fields are never modified (only the presentation-only `icon` is kept in sync), and user/progression collections (users, *datas, pets, habitats, guilds, ponds, codes,
 // interactions, commands) are never touched.
 const { Utils } = require('../class/Utils');
 const { WeatherType } = require('../schemas/WeatherTypeSchema');
@@ -161,6 +161,30 @@ async function resolveQuestRewards(docs) {
 	}));
 }
 
+/**
+ * Icons are presentation-only, so unlike gameplay fields they are kept in sync with the seed data:
+ * catalog rows whose `icon` differs from the seed (e.g. legacy 'Sardine:<foreign emoji id>') are updated.
+ */
+async function syncIcons(step, docs) {
+	const lookup = step.lookup || step.model;
+	const wanted = new Map();
+	for (const doc of docs) {
+		if (doc.icon) wanted.set(keyOf(step, doc), { animated: Boolean(doc.icon.animated), data: doc.icon.data ?? '' });
+	}
+	if (wanted.size === 0) return 0;
+
+	const rows = await lookup.find(step.scope || {}).select(`${step.keyFields.join(' ')} icon`).lean();
+	let updated = 0;
+	for (const row of rows) {
+		const icon = wanted.get(keyOf(step, row));
+		if (!icon) continue;
+		if (row.icon?.data === icon.data && Boolean(row.icon?.animated) === icon.animated) continue;
+		await lookup.updateOne({ _id: row._id }, { $set: { icon } });
+		updated++;
+	}
+	return updated;
+}
+
 async function runStep(step) {
 	const docs = step.docs();
 	const have = await existingKeys(step);
@@ -178,13 +202,16 @@ async function runStep(step) {
 		await step.model.insertMany(missing, { ordered: true });
 	}
 
+	const iconsUpdated = await syncIcons(step, docs);
+
 	const duplicates = [...have.entries()].filter(([, count]) => count > 1).map(([key]) => key);
 	if (duplicates.length > 0) {
 		log(`${step.name}: ${duplicates.length} key(s) have duplicate rows in the database: ${duplicates.slice(0, 5).join(', ')}${duplicates.length > 5 ? ', ...' : ''}`, 'warn');
 	}
 
-	log(`${step.name}: ${docs.length} defined, ${docs.length - missing.length} already present, ${missing.length} inserted.`, missing.length > 0 ? 'done' : 'info');
-	return { step: step.name, defined: docs.length, inserted: missing.length, duplicates };
+	const iconNote = iconsUpdated > 0 ? `, ${iconsUpdated} icon(s) updated` : '';
+	log(`${step.name}: ${docs.length} defined, ${docs.length - missing.length} already present, ${missing.length} inserted${iconNote}.`, missing.length + iconsUpdated > 0 ? 'done' : 'info');
+	return { step: step.name, defined: docs.length, inserted: missing.length, iconsUpdated, duplicates };
 }
 
 /**

@@ -2,6 +2,8 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { BuffData } = require('../../../schemas/BuffSchema');
 const { User } = require('../../../class/User');
 const buttonPagination = require('../../../buttonPagination');
+const { Icons } = require('../../../class/Icons');
+const config = require('../../../config');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -30,7 +32,7 @@ module.exports = {
 						const buff = await BuffData.findById(buffObject.valueOf());
 						if (!buffNames.has(buff.name)) {
 							buffNames.add(buff.name);
-							buffInventory.push(`**${buff.count}** <${buff.icon?.animated ? 'a' : ''}:${buff.icon?.data}> ${buff.name}\n`);
+							buffInventory.push(`**${buff.count}** ${Icons.of(buff)} ${buff.name}\n`);
 						}
 					}),
 				);

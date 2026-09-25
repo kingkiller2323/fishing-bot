@@ -5,35 +5,35 @@ module.exports = [
 		weather: 'Sunny',
 		icon: {
 			animated: true,
-			data: 'SunAnimated:1304870451885117553',
+			data: 'SunAnimated',
 		},
 	},
 	{
 		weather: 'Rainy',
 		icon: {
 			animated: true,
-			data: 'RainAnimated:1304870440010907648',
+			data: 'RainAnimated',
 		},
 	},
 	{
 		weather: 'Cloudy',
 		icon: {
 			animated: true,
-			data: 'StormAnimated:1304870401033371722',
+			data: 'StormAnimated',
 		},
 	},
 	{
 		weather: 'Snowy',
 		icon: {
 			animated: true,
-			data: 'SnowAnimated:1304870416443113572',
+			data: 'SnowAnimated',
 		},
 	},
 	{
 		weather: 'Windy',
 		icon: {
 			animated: true,
-			data: 'FallWindAnimated:1304870425645551746',
+			data: 'FallWindAnimated',
 		},
 	},
 ];

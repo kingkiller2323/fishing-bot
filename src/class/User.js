@@ -626,7 +626,7 @@ class User {
 				var isVoted = JSON.parse(json).voted;
 
 				if (isVoted === 0) {
-					return { voted: false, message: "You haven't voted yet!\nYou can vote at https://top.gg/bot/1209026334970482698/vote" };
+					return { voted: false, message: `You haven't voted yet!\nYou can vote at https://top.gg/bot/${process.env.CLIENT_ID || config.client.id}/vote` };
 				}
 
 				// update user stats

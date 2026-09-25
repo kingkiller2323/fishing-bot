@@ -12,7 +12,7 @@ const seasonSchema = new Schema({
 		},
 		data: {
 			type: String,
-			default: 'rawfish:1209352519726276648',
+			default: '',
 		},
 	},
 	type: {

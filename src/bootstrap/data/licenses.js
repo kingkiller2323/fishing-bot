@@ -12,7 +12,7 @@ module.exports = [
 		},
 		icon: {
 			animated: false,
-			data: 'old_rod:1210508306662301706',
+			data: 'License',
 		},
 		aquarium: {
 			waterType: ['freshwater'],
@@ -35,7 +35,7 @@ module.exports = [
 		},
 		icon: {
 			animated: false,
-			data: 'old_rod:1210508306662301706',
+			data: 'License',
 		},
 		aquarium: {
 			waterType: ['saltwater'],
@@ -57,7 +57,7 @@ module.exports = [
 		},
 		icon: {
 			animated: false,
-			data: 'old_rod:1210508306662301706',
+			data: 'License',
 		},
 		aquarium: {
 			waterType: ['freshwater'],
@@ -79,7 +79,7 @@ module.exports = [
 		},
 		icon: {
 			animated: false,
-			data: 'old_rod:1210508306662301706',
+			data: 'License',
 		},
 		aquarium: {
 			waterType: ['saltwater'],
@@ -101,7 +101,7 @@ module.exports = [
 		},
 		icon: {
 			animated: false,
-			data: 'old_rod:1210508306662301706',
+			data: 'License',
 		},
 		aquarium: {
 			waterType: ['freshwater'],
@@ -123,7 +123,7 @@ module.exports = [
 		},
 		icon: {
 			animated: false,
-			data: 'old_rod:1210508306662301706',
+			data: 'License',
 		},
 		aquarium: {
 			waterType: ['saltwater'],

@@ -25,7 +25,7 @@ const LicenseSchema = new Schema({
 		},
 		data: {
 			type: String,
-			default: 'old_rod:1210508306662301706',
+			default: '',
 		},
 	},
 	aquarium: {

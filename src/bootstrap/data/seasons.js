@@ -5,7 +5,7 @@ module.exports = [
 		season: 'Spring',
 		icon: {
 			animated: false,
-			data: 'Spring:1304870493882548304',
+			data: 'Spring',
 		},
 		startMonth: 'March',
 		startDay: '20',
@@ -17,7 +17,7 @@ module.exports = [
 		season: 'Summer',
 		icon: {
 			animated: false,
-			data: 'Summer:1304870481987637402',
+			data: 'Summer',
 		},
 		startMonth: 'June',
 		startDay: '21',
@@ -29,7 +29,7 @@ module.exports = [
 		season: 'Fall',
 		icon: {
 			animated: false,
-			data: 'Fall:1304870471430570174',
+			data: 'Fall',
 		},
 		startMonth: 'September',
 		startDay: '22',
@@ -41,7 +41,7 @@ module.exports = [
 		season: 'Winter',
 		icon: {
 			animated: false,
-			data: 'Winter:1304870462441918504',
+			data: 'Winter',
 		},
 		startMonth: 'December',
 		startDay: '1',

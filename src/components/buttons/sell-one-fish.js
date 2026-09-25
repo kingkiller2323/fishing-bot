@@ -2,6 +2,7 @@ const { User } = require('../../class/User');
 const { FishData } = require('../../schemas/FishSchema');
 const { BuffData } = require('../../schemas/BuffSchema');
 const { ButtonComponent, ButtonBuilder } = require('discord.js');
+const config = require('../../config');
 
 module.exports = {
 	customId: 'sell-one-fish',

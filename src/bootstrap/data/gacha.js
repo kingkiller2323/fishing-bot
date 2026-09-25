@@ -10,7 +10,7 @@ module.exports = [
 		items: 3,
 		icon: {
 			animated: false,
-			data: 'Treasure_Chest:1244066065751867423',
+			data: 'Treasure_Chest',
 		},
 		weights: {
 			common: 7000,
@@ -29,7 +29,7 @@ module.exports = [
 		capabilities: ['buff'],
 		icon: {
 			animated: false,
-			data: 'Treasure_Chest:1244066065751867423',
+			data: 'Treasure_Chest',
 		},
 		weights: {
 			common: 0,
@@ -49,7 +49,7 @@ module.exports = [
 		items: 3,
 		icon: {
 			animated: false,
-			data: 'Treasure_Chest:1244066065751867423',
+			data: 'Treasure_Chest',
 		},
 		weights: {
 			common: 3000,
@@ -69,7 +69,7 @@ module.exports = [
 		items: 3,
 		icon: {
 			animated: false,
-			data: 'Treasure_Chest:1244066065751867423',
+			data: 'Treasure_Chest',
 		},
 		weights: {
 			common: 7000,

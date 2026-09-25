@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { Quest } = require('../../../class/Quest');
 const { Item } = require('../../../schemas/ItemSchema');
 const { User } = require('../../../class/User');
+const config = require('../../../config');
 
 module.exports = {
 	structure: new SlashCommandBuilder()

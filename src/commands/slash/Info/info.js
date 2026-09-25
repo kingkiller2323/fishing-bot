@@ -4,6 +4,7 @@ const { ItemData } = require('../../../schemas/ItemSchema');
 const { WeatherPattern } = require('../../../class/WeatherPattern');
 const buttonPagination = require('../../../buttonPagination');
 const { Season } = require('../../../class/Season');
+const { Icons } = require('../../../class/Icons');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -43,7 +44,7 @@ module.exports = {
 			const embed = new EmbedBuilder()
 				.setTitle('Fishing Rod Information')
 				.addFields(
-					{ name: 'Rod', value: `<${rod.icon?.animated ? 'a' : ''}:${rod.icon?.data}> **${rod.rarity}** ${rod.name}`, inline: false },
+					{ name: 'Rod', value: `${Icons.of(rod)} **${rod.rarity}** ${rod.name}`, inline: false },
 					{ name: 'Description', value: rod.description, inline: false },
 					{ name: 'Durability', value: `${rod.durability}/${rod.maxDurability}`, inline: true },
 					{ name: 'State', value: `${rod.state} - ${rod.maxRepairs - rod.repairs}/${rod.maxRepairs} repairs left\nRepair Cost: $${rod.repairCost}`, inline: true },
@@ -114,7 +115,7 @@ module.exports = {
 			const embed = new EmbedBuilder()
 				.setTitle('Current Season')
 				.addFields(
-					{ name: 'Season', value: `<${season.icon?.animated ? 'a' : ''}:${season.icon?.data}> ${season.season}`, inline: false },
+					{ name: 'Season', value: `${Icons.of(season)} ${season.season}`, inline: false },
 					{ name: 'Start Date', value: `${season.startMonth} ${season.startDay}`, inline: true },
 					{ name: 'Common Weather Types', value: commonWeather, inline: true },
 				)

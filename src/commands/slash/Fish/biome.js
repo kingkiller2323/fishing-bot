@@ -3,6 +3,7 @@ const { Biome } = require('../../../schemas/BiomeSchema');
 const { User } = require('../../../class/User');
 const { Interaction } = require('../../../class/Interaction');
 const config = require('../../../config');
+const { Icons } = require('../../../class/Icons');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -44,7 +45,7 @@ module.exports = {
 					return new StringSelectMenuOptionBuilder()
 						.setLabel(biome.name)
 						.setDescription(`${biome.requirements}`)
-						.setEmoji(biome.toJSON().icon.data.split(':')[1])
+						.setEmoji(Icons.component(biome))
 						.setValue(value);
 				}
 

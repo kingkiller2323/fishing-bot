@@ -6,6 +6,7 @@ const { Aquarium } = require('../../../class/Aquarium');
 const { Pet } = require('../../../class/Pet');
 const buttonPagination = require('../../../buttonPagination');
 const config = require('../../../config');
+const { Icons } = require('../../../class/Icons');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -66,7 +67,7 @@ module.exports = {
 				for (const f of fish) {
 					const pet = new Pet(f);
 					const fishData = await pet.getFishData();
-					information.value += `<${fishData.icon?.animated ? 'a' : ''}:${fishData.icon?.data}> ${f.name} `;
+					information.value += `${Icons.of(fishData)} ${f.name} `;
 				}
 				fields.push(information);
 			}

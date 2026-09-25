@@ -1,5 +1,6 @@
 const { WeatherPattern: WeatherPatternSchema } = require('../schemas/WeatherPatternSchema');
 const { WeatherType } = require('../schemas/WeatherTypeSchema');
+const { Icons } = require('./Icons');
 
 class WeatherPattern {
 	constructor(data) {
@@ -19,8 +20,7 @@ class WeatherPattern {
 	}
 
 	async getIcon() {
-		const icon = `<${this.weather.icon?.animated ? 'a' : ''}:${this.weather.icon?.data}>`;
-		return icon;
+		return Icons.render(this.weather?.icon, 'weather');
 	}
 
 	async getType() {
