@@ -89,7 +89,9 @@ class WeatherPattern {
 	}
 
 	static async getWeatherTypeByName(name) {
-		const weatherType = await WeatherType.findOne({ weather: name.toLowerCase(), type: 'weather' });
+		// Weather names are stored Capitalized ("Sunny"); accept any casing from callers.
+		const canonical = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+		const weatherType = await WeatherType.findOne({ weather: canonical, type: 'weather' });
 		return new WeatherPattern(weatherType);
 	}
 }

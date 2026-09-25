@@ -5,6 +5,8 @@ const events = require("../handlers/events");
 const deploy = require("../handlers/deploy");
 const mongoose = require("../handlers/mongoose");
 const components = require("../handlers/components");
+const { bootstrap } = require("../bootstrap");
+const { Utils } = require("./Utils");
 
 module.exports = class extends Client {
     collection = {
@@ -40,7 +42,17 @@ module.exports = class extends Client {
         events(this);
         components(this);
 
-        if (config.handler.mongodb.enabled) mongoose();
+        if (config.handler.mongodb.enabled) {
+            // Connect and seed/validate static game data before accepting any interactions.
+            try {
+                await mongoose();
+                await bootstrap();
+            }
+            catch (error) {
+                Utils.log(`Startup aborted: ${error.stack || error}`, 'err');
+                process.exit(1);
+            }
+        }
 
         await this.login(process.env.CLIENT_TOKEN || config.client.token);
 
