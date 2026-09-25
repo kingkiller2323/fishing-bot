@@ -4,7 +4,7 @@
 const measurements = require('../../docs/economy/measurements.json');
 const { resolveModifiers } = require('../../src/engine/modifiers');
 const { buildTable } = require('../../src/engine/rarity');
-const { PROFILES, NORMAL_RARITY_TABLE, RARITIES } = require('../../src/engine/balance');
+const { PROFILES, NORMAL_RARITY_TABLE } = require('../../src/engine/balance');
 const baitData = require('../../src/bootstrap/data/bait');
 const rodParts = require('../../src/bootstrap/data/rodParts');
 const { drawDistribution, summarize } = require('./lib/catalog-model');

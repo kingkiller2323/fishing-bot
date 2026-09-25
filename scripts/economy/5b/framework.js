@@ -7,10 +7,17 @@ const { drawDistribution, FISH, currentValue } = require('../lib/catalog-model')
 const { buildTable } = require('../../../src/engine/rarity');
 const { NORMAL_RARITY_TABLE, FOUNDER_RARITY_TABLE, RARITIES } = require('../../../src/engine/balance');
 
+// Framework version: every subsystem module reports against this. Bump it whenever a shared value
+// below changes, and regenerate every subsystem report (they compute from here; nothing is scaled).
+const FRAMEWORK_VERSION = '5b.1';
+
 // ---------------------------------------------------------------------------------------------
-// XP curve: xp(L) = 100·L² + QUARTIC·L⁴. Smooth everywhere (no kink at Lv 20); identical to today at
-// low levels and steeper as levels rise. Levels never drop: level = max(stored level, curve level).
-const CURVE = { base: 100, quartic: 0.03 };
+// XP curve: xp(L) = 100·L² + QUARTIC·L⁴. Smooth everywhere (no kink at Lv 20); close to today at low
+// levels and steeper as levels rise. Levels never drop: level = max(stored level, curve level).
+// QUARTIC is chosen by scripts/economy/5b/curve.js (best fit of the regular player's hours of play to
+// the approved windows L20 5-6h, L30 12-15h, L40 24-30h, L50 40-45h on the provisional rod path):
+// 0.0475 -> L20 47,600 XP (5.6h), L30 128,475 (13.5h), L40 281,600 (25.5h), L50 546,875 (42.7h).
+const CURVE = { base: 100, quartic: 0.0475 };
 const xpForLevel = (L, c = CURVE) => c.base * L * L + c.quartic * L ** 4;
 /** Closed form: quadratic in x = L². */
 function levelForXp(xp, c = CURVE) {
@@ -138,6 +145,7 @@ function hourly(o, overheadS = 4) {
 }
 
 module.exports = {
+	FRAMEWORK_VERSION,
 	CURVE, xpForLevel, levelForXp,
 	BIOME_ORDER, BIOME_LEVEL, BIOME_VALUE, RARITY_VALUE, QUALITY_VALUE, SPECIES_CLAMP, proposedValue, speciesFactor, isStrong,
 	XP_PER_FISH_MEAN, XP_RARITY, MULTI, fishDistribution, chanceForMean,
