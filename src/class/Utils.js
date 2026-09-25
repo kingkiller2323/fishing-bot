@@ -54,47 +54,6 @@ class Utils {
 		return Math.floor(rng.random() * max);
 	};
 
-	static async sumArrays(arr1, arr2) {
-		if (arr1.length == arr2.length) {
-			const sum = [];
-			for (let i = 0; i < arr1.length; i++) {
-				sum.push(arr1[i] + arr2[i]);
-			}
-			return sum;
-		}
-		else if (arr1.length > arr2.length) {
-			return arr1;
-		}
-		else {
-			return arr2;
-		}
-	};
-
-	static async sumCountsInArrays (arr1, arr2) {
-		const arrays = arr1.concat(arr2);
-		const result = [];
-
-		for (let i = 0; i < arrays.length; i++) {
-			const countMatch = arrays[i].match(/\d+ count/);
-			const numberMatch = arrays[i].match(/^\d+$/);
-
-			if (countMatch) {
-				const matches = countMatch.map(match => parseInt(match));
-				const sum = matches.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-				result.push(`${sum} count`);
-			}
-			else if (numberMatch) {
-				const sum = numberMatch.reduce((accumulator, currentValue) => accumulator + currentValue, 0);
-				result.push(`${sum}`);
-			}
-			else {
-				result.push(arrays[i]);
-			}
-		}
-
-		return result;
-	};
-
 	static async getWeightedChoice(choices, weights) {
 		const sumOfWeights = weights.reduce((acc, x) => acc + x, 0);
 		let randomInt = this.getRandomInteger(sumOfWeights) + 1;

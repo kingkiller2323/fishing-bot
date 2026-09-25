@@ -120,6 +120,15 @@ const UserSchema = new Schema ({
 		species: { type: [String], default: undefined },
 		rules: { type: [Schema.Types.Mixed], default: undefined },
 	},
+	// Developer overrides (set only through /dev). `profile`: 'founder' | 'normal' | 'test' overrides
+	// FOUNDER_IDS; `luck`: temporary extra Luck. Any active luck override makes catches non-competitive.
+	devOverrides: {
+		profile: { type: String, enum: ['founder', 'normal', 'test', null], default: undefined },
+		luck: {
+			value: { type: Number },
+			expiresAt: { type: Date },
+		},
+	},
 	// Cast journal guard: ids of casts already applied to this document (last few only).
 	appliedCasts: {
 		type: [String],

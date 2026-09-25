@@ -3,6 +3,7 @@ const buttonPagination = require('../../../buttonPagination');
 const { RodData } = require('../../../schemas/RodSchema');
 const { User } = require('../../../class/User');
 const config = require('../../../config');
+const { resolveProfile } = require('../../../engine/balance');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -27,6 +28,7 @@ module.exports = {
 			const user = new User(await User.get(target.id));
 			const rods = await RodData.find({ user: interaction.user.id });
 			const stats = await user.getStats();
+			const isFounder = resolveProfile(target.id, user.user).name === 'founder';
 
 			let fields = [{
 				name: `Level ${await user.getLevel() || 0}`,
@@ -53,7 +55,7 @@ module.exports = {
 
 				embeds.push(new EmbedBuilder()
 					.setFooter({ text: `Page ${Math.floor(i / chunkSize) + 1} / ${Math.ceil(fields.length / chunkSize)} ` })
-					.setTitle(`${interaction.user.globalName}'s Profile`)
+					.setTitle(`${interaction.user.globalName}'s Profile${isFounder ? ' · 👑 Founder' : ''}`)
 					.setColor('Green')
 					.addFields(chunk),
 				);

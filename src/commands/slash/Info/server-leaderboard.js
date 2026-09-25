@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { FishData } = require('../../../schemas/FishSchema');
 const buttonPagination = require('../../../buttonPagination');
 const config = require('../../../config');
+const { competitiveCatches } = require('../../../engine/competitive');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -34,7 +35,7 @@ module.exports = {
 				const embeds = [];
 				const fields = [];
 	
-				const fish = await FishData.find({});
+				const fish = await FishData.find(competitiveCatches());
 				const now = new Date();
 				const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 	
@@ -100,7 +101,7 @@ module.exports = {
 				const embeds = [];
 				const fields = [];
 	
-				const fish = await FishData.find({});
+				const fish = await FishData.find(competitiveCatches());
 				const now = new Date();
 				const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 	
@@ -166,7 +167,7 @@ module.exports = {
 				const embeds = [];
 				const fields = [];
 	
-				const fish = await FishData.find({});
+				const fish = await FishData.find(competitiveCatches());
 				const now = new Date();
 				const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 	

@@ -6,6 +6,8 @@ const { Icons } = require('../../../class/Icons');
 const branding = require('../../../branding');
 const { castLine, applyCastResult, recoverPendingCasts } = require('../../../engine/cast');
 const { withUserLock } = require('../../../engine/userLock');
+const { remainingMs, startCooldown } = require('../../../engine/cooldown');
+const { COOLDOWN } = require('../../../engine/balance');
 
 /**
  * One cast: decide everything (castLine), then persist it once (applyCastResult).
@@ -15,7 +17,12 @@ const cast = (interaction, userId) => withUserLock(userId, async () => {
 	// Make sure the player exists (creates the account and starter rod on first cast).
 	await User.get(userId);
 	await recoverPendingCasts({ userId });
+	// Authoritative cooldown check, inside the lock so simultaneous clicks cannot both cast.
+	const wait = remainingMs(userId);
+	if (wait > 0) return { status: 'failed', failure: { code: 'COOLDOWN', message: `Slow down! You can cast again in ${(wait / 1000).toFixed(1)}s.` } };
 	const result = await castLine({ userId, guildId: interaction.guild?.id, channelId: interaction.channel?.id });
+	// Fishing Speed shortens the cooldown; failed casts use the base cooldown.
+	startCooldown(userId, result.cooldownMs || COOLDOWN.fishMs);
 	if (result.status === 'ok') await applyCastResult(result);
 	return result;
 });
@@ -47,7 +54,9 @@ const followUpMessage = async (interaction, user, result) => {
 	let fishAgainDisabled = false;
 	const rodState = success ? result.rod.after.state : result.rodState;
 
-	const embed = new EmbedBuilder().setFooter({ text: branding.name });
+	// Subtle profile indicator: only Founder casts mention it.
+	const footer = success && result.profile === 'founder' ? `${branding.name} · 👑 Founder` : branding.name;
+	const embed = new EmbedBuilder().setFooter({ text: footer });
 
 	if (success) {
 		embed
@@ -137,15 +146,19 @@ module.exports = {
 	structure: new SlashCommandBuilder()
 		.setName('fish')
 		.setDescription('Fish!'),
-	options: {
-		cooldown: 5000,
-	},
+	// No static cooldown: /fish and Fish again share the engine cooldown (Fishing Speed aware).
+	options: {},
 	/**
      * @param {ExtendedClient} client
      * @param {ChatInputCommandInteraction} interaction
      */
 	async run(client, interaction, analyticsObject, user = null) {
 		if (user === null) user = interaction.user;
+
+		const wait = remainingMs(user.id);
+		if (wait > 0) {
+			return interaction.reply({ content: `🎣 Slow down! You can cast again in ${(wait / 1000).toFixed(1)}s.`, ephemeral: true });
+		}
 
 		await interaction.deferReply();
 

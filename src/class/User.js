@@ -8,7 +8,7 @@ const fetch = require('node-fetch');
 const { QuestData } = require('../schemas/QuestSchema');
 const { rng } = require('../engine/rng');
 const { assertRemovable, partitionProtected, isProtected } = require('../engine/protection');
-const { levelForXp } = require('../engine/balance');
+const { levelForXp, resolveProfile } = require('../engine/balance');
 
 class User {
 	constructor(data) {
@@ -368,7 +368,9 @@ class User {
 			// check for active buffs
 			const activeBuffs = await BuffData.find({ user: await this.getUserId(), active: true });
 			const gachaBuff = activeBuffs.find((buff) => buff.capabilities.includes('gacha'));
-			const gachaMultiplier = gachaBuff ? parseFloat(gachaBuff.capabilities[1]) : 1;
+			// Gacha luck hook (Phase 4 reworks gacha): buff multiplier x profile gacha luck (Founder 3x).
+			const profileGachaLuck = resolveProfile(this.user.userId, this.user).multipliers.gachaLuck;
+			const gachaMultiplier = (gachaBuff ? parseFloat(gachaBuff.capabilities[1]) : 1) * profileGachaLuck;
 
 			// multiply rare+ item weights by gachaMultiplier
 			const weightValues = Object.values(weights);

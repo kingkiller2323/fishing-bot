@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const { startDb, stopDb } = require('./helpers/db');
 const { quiet, restore } = require('./helpers/quiet');
 const { seedGame, makeUser } = require('./helpers/fixtures');
-const { addPoolFish, useTestRod, useTestBait, giveQuest, userDoc } = require('./helpers/castFixtures');
+const { addPoolFish, useTestRod, useTestBait, giveQuest, userDoc, withRarityTable } = require('./helpers/castFixtures');
 const { castLine, applyCastResult, recoverPendingCasts } = require('../src/engine/cast');
 const { withUserLock } = require('../src/engine/userLock');
 const { BALANCE_VERSION } = require('../src/engine/balance');
@@ -279,8 +279,7 @@ test('pity counters increment, and reset atomically on a qualifying catch', asyn
 	await applyCastResult(r);
 	assert.equal((await userDoc('pity')).pity.castsSinceLegendary, 1);
 
-	await useTestRod('pity', { capabilities: ['weak', '1'], weights: { common: 0, uncommon: 0, rare: 0, ultra: 0, giant: 0, legendary: 1, lucky: 0 } });
-	r = await castLine({ userId: 'pity' });
+	r = await withRarityTable('normal', { legendary: 1 }, () => castLine({ userId: 'pity' }));
 	assert.equal(r.catches[0].rarity, 'Legendary');
 	await applyCastResult(r);
 	const pity = (await userDoc('pity')).pity;
@@ -349,9 +348,9 @@ test('depleted bait is unequipped and removed from the inventory in the commit',
 
 test('a Lucky item catch is granted to the inventory exactly once', async () => {
 	// Lucky-only odds in a biome with no Lucky fish: every successful draw is a catalog item.
-	await player('lucky-item', { capabilities: ['weak', '1'], weights: { common: 0, uncommon: 0, rare: 0, ultra: 0, giant: 0, legendary: 0, lucky: 1 } });
+	await player('lucky-item', { capabilities: ['weak', '1'] });
 	rng.seed(11);
-	const r = await castLine({ userId: 'lucky-item' });
+	const r = await withRarityTable('normal', { lucky: 1 }, () => castLine({ userId: 'lucky-item' }));
 	assert.equal(r.status, 'ok');
 	assert.equal(r.catches[0].kind, 'item');
 	assert.equal(r.writes.fishDocs.length, 0);

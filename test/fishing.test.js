@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const { startDb, stopDb } = require('./helpers/db');
 const { quiet, restore } = require('./helpers/quiet');
 const { seedGame, makeUser, giveFish } = require('./helpers/fixtures');
-const { addPoolFish, useTestRod } = require('./helpers/castFixtures');
-const { castLine, applyCastResult, parseCapabilities } = require('../src/engine/cast');
+const { addPoolFish, useTestRod, withRarityTable } = require('./helpers/castFixtures');
+const { castLine, applyCastResult } = require('../src/engine/cast');
 const { Fish: FishTemplate, FishData } = require('../src/schemas/FishSchema');
 const { User: UserModel } = require('../src/schemas/UserSchema');
 const { rng } = require('../src/engine/rng');
@@ -20,13 +20,6 @@ test.after(async () => {
 	rng.reset();
 	await stopDb();
 	restore();
-});
-
-test('capability parsing: bare number = draws, "N count" = fish per draw, always numbers', () => {
-	assert.deepEqual(parseCapabilities(['weak', '3']), { draws: 3, perDraw: 1 });
-	assert.deepEqual(parseCapabilities(['weak', '2 count']), { draws: 1, perDraw: 2 });
-	assert.deepEqual(parseCapabilities(['weak', '01', '2 count']), { draws: 1, perDraw: 2 });
-	assert.deepEqual(parseCapabilities(['weak']), { draws: 1, perDraw: 1 });
 });
 
 test('a normal Ocean cast catches catalog fish matching the rod', async () => {
@@ -51,11 +44,11 @@ test('casts are reproducible under a seed', async () => {
 	assert.deepEqual(await names('seed-a'), await names('seed-b'));
 });
 
-test('an unrollable rarity table falls back deterministically instead of recursing', async () => {
+test('a rarity with no eligible fish falls back deterministically instead of recursing', async () => {
 	await makeUser('fisher-fallback');
-	// All-zero weights: no rarity can ever be rolled, so every re-roll fails.
-	await useTestRod('fisher-fallback', { capabilities: ['weak'], weights: { common: 0, uncommon: 0, rare: 0, ultra: 0, giant: 0, legendary: 0, lucky: 0 } });
-	const result = await castLine({ userId: 'fisher-fallback' });
+	await useTestRod('fisher-fallback', { capabilities: ['weak'] });
+	// Only Giant can be rolled, and the test biome has no Giant fish: every re-roll fails.
+	const result = await withRarityTable('normal', { giant: 1 }, () => castLine({ userId: 'fisher-fallback' }));
 	assert.equal(result.status, 'ok');
 	// Lowest rarity, then alphabetical, among year-round Testpool fish with 'weak'.
 	assert.equal(result.catches[0].name, 'Pool Minnow');
@@ -71,13 +64,13 @@ test('a truly impossible cast fails cleanly and quickly', async () => {
 	assert.ok(Date.now() - started < 5000);
 });
 
-test('no artificial per-draw delay (10 draws well under the old 1s floor)', async () => {
+test('no artificial per-draw delay (5 draws well under the old 500ms floor)', async () => {
 	await makeUser('fisher-speed');
-	await useTestRod('fisher-speed', { capabilities: ['weak', '10'] });
+	await useTestRod('fisher-speed', { capabilities: ['weak', '5'] });
 	const started = Date.now();
 	const result = await castLine({ userId: 'fisher-speed' });
-	assert.equal(result.units, 10);
-	assert.ok(Date.now() - started < 1000, `took ${Date.now() - started}ms`);
+	assert.equal(result.units, 5);
+	assert.ok(Date.now() - started < 500, `took ${Date.now() - started}ms`);
 });
 
 test('auto-locked species: new catches start locked', async () => {

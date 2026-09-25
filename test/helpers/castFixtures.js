@@ -52,4 +52,17 @@ async function giveQuest(userId, fields = {}) {
 
 const userDoc = (userId) => UserModel.findOne({ userId }).lean();
 
-module.exports = { POOL, addPoolFish, useTestRod, useTestBait, giveQuest, userDoc };
+/** Runs `fn` with a profile's rarity table temporarily replaced (e.g. { legendary: 1 }). */
+async function withRarityTable(profileName, table, fn) {
+	const { PROFILES } = require('../../src/engine/balance');
+	const saved = PROFILES[profileName].rarityTable;
+	PROFILES[profileName].rarityTable = table;
+	try {
+		return await fn();
+	}
+	finally {
+		PROFILES[profileName].rarityTable = saved;
+	}
+}
+
+module.exports = { POOL, addPoolFish, useTestRod, useTestBait, giveQuest, userDoc, withRarityTable };
