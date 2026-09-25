@@ -25,6 +25,8 @@ module.exports = {
 	},
 	users: {
 		developers: envList(process.env.DEVELOPER_IDS),
+		// Boosted-gameplay accounts. Independent of DEVELOPER_IDS (command access).
+		founders: envList(process.env.FOUNDER_IDS),
 	},
 	development: {
 		// When GUILD_ID is set, slash commands are registered to that guild only (private deployment).

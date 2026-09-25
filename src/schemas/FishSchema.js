@@ -101,6 +101,19 @@ const FishSchema = new Schema({
 		type: String,
 		default: 'all',
 	},
+	// Catch metadata (FishData only), written by the cast engine.
+	castId: {
+		type: String,
+	},
+	profile: {
+		type: String,
+	},
+	balanceVersion: {
+		type: String,
+	},
+	competitiveEligible: {
+		type: Boolean,
+	},
 }, { timestamps: true });
 
 const Fish = model('Fish', FishSchema);

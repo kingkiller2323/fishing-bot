@@ -10,6 +10,7 @@ const { Item } = require('../schemas/ItemSchema');
 const { Quest } = require('../schemas/QuestSchema');
 const { Season } = require('../class/Season');
 const { STEPS, seedStatic, missingKeys, log, CATALOG } = require('./seed');
+const { runMigrations } = require('./migrations');
 
 const FORECAST_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -168,7 +169,7 @@ async function validate() {
 	// Not fatal: such fish are simply never drawn. Reported so the seed data can be corrected.
 	if (badFish.length > 0) log(`${badFish.length} fish reference an unknown biome/weather/season and can never be caught: ${badFish.map((f) => `${f.name} (${f.biome}/${f.weather}/${f.season})`).join(', ')}`, 'warn');
 
-	// Fish.generateFish() retries until it finds a match, so every rarity x biome x quality needs a year-round fish.
+	// The cast engine falls back to a year-round fish, so every rarity x biome x quality needs one.
 	const gaps = [];
 	for (const rarity of RARITIES) {
 		for (const biome of biomeNames) {
@@ -229,6 +230,11 @@ async function bootstrap() {
 	await ensureActiveSeason();
 	await ensureWeatherPatterns();
 	await validate();
+	await runMigrations(log);
+	// Finish casts whose persistence was interrupted (e.g. the process died mid-cast).
+	const { recoverPendingCasts } = require('../engine/cast');
+	const recovered = await recoverPendingCasts();
+	if (recovered > 0) log(`Recovered ${recovered} interrupted cast(s).`, 'warn');
 	log(`Bootstrap complete in ${Date.now() - started}ms.`, 'done');
 }
 

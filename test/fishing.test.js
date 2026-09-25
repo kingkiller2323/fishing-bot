@@ -1,20 +1,20 @@
+// Draw behaviour of the cast engine: bounded re-rolls, fallback, determinism, speed, locking.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { startDb, stopDb } = require('./helpers/db');
 const { quiet, restore } = require('./helpers/quiet');
 const { seedGame, makeUser, giveFish } = require('./helpers/fixtures');
-const { Fish, NoCatchError } = require('../src/class/Fish');
-const { FishData } = require('../src/schemas/FishSchema');
+const { addPoolFish, useTestRod } = require('./helpers/castFixtures');
+const { castLine, applyCastResult, parseCapabilities } = require('../src/engine/cast');
+const { Fish: FishTemplate, FishData } = require('../src/schemas/FishSchema');
+const { User: UserModel } = require('../src/schemas/UserSchema');
 const { rng } = require('../src/engine/rng');
-
-const weather = { getWeather: async () => 'Sunny' };
-const season = { season: 'Fall' };
-const LEGACY = { common: 7000, uncommon: 2500, rare: 500, ultra: 100, giant: 50, legendary: 20, lucky: 1 };
 
 test.before(async () => {
 	quiet();
 	await startDb();
 	await seedGame();
+	await addPoolFish([{ name: 'Pool Minnow', rarity: 'Common' }, { name: 'Pool Perch', rarity: 'Common' }]);
 });
 test.after(async () => {
 	rng.reset();
@@ -22,80 +22,97 @@ test.after(async () => {
 	restore();
 });
 
-test('a normal draw returns catalog fish matching the capabilities', async () => {
-	const user = await makeUser('fisher-normal');
+test('capability parsing: bare number = draws, "N count" = fish per draw, always numbers', () => {
+	assert.deepEqual(parseCapabilities(['weak', '3']), { draws: 3, perDraw: 1 });
+	assert.deepEqual(parseCapabilities(['weak', '2 count']), { draws: 1, perDraw: 2 });
+	assert.deepEqual(parseCapabilities(['weak', '01', '2 count']), { draws: 1, perDraw: 2 });
+	assert.deepEqual(parseCapabilities(['weak']), { draws: 1, perDraw: 1 });
+});
+
+test('a normal Ocean cast catches catalog fish matching the rod', async () => {
+	await makeUser('fisher-normal');
 	rng.seed(1);
-	const caught = await Fish.generateFish(3, 1, ['weak', '3'], Object.keys(LEGACY), Object.values(LEGACY), user, weather, season);
-	assert.ok(caught.length >= 1 && caught.length <= 3);
-	for (const { item } of caught) {
-		assert.equal(item.biome, 'Ocean');
-		assert.ok(item.qualities.includes('weak') || item.type !== 'fish');
+	const result = await castLine({ userId: 'fisher-normal' });
+	assert.equal(result.status, 'ok');
+	for (const c of result.catches) {
+		assert.equal(typeof c.count, 'number');
+		if (c.kind === 'fish') assert.ok(c.qualities.includes('weak'));
 	}
 });
 
-test('draws are reproducible under a seed', async () => {
+test('casts are reproducible under a seed', async () => {
 	const names = async (id) => {
-		const user = await makeUser(id);
+		await makeUser(id);
 		rng.seed(4242);
 		const out = [];
-		for (let i = 0; i < 5; i++) {
-			const caught = await Fish.generateFish(1, 1, ['weak'], Object.keys(LEGACY), Object.values(LEGACY), user, weather, season);
-			out.push(caught[0].item.name);
-		}
+		for (let i = 0; i < 5; i++) out.push((await castLine({ userId: id })).catches.map((c) => c.name).join(','));
 		return out;
 	};
 	assert.deepEqual(await names('seed-a'), await names('seed-b'));
 });
 
-test('an impossible rarity falls back deterministically instead of recursing', async () => {
-	const user = await makeUser('fisher-fallback');
-	// 'mythic' matches no fish, so every re-roll fails and the fallback is used.
-	const caught = await Fish.generateFish(1, 1, ['weak'], ['mythic'], [1], user, weather, season);
-	// Lowest rarity, then alphabetical, year-round Ocean fish with the 'weak' quality.
-	const expected = (await require('../src/schemas/FishSchema').Fish.find({ biome: 'Ocean', weather: 'all', season: 'all', rarity: 'Common', qualities: 'weak' }).sort({ name: 1 }))[0].name;
-	assert.equal(caught[0].item.name, expected);
+test('an unrollable rarity table falls back deterministically instead of recursing', async () => {
+	await makeUser('fisher-fallback');
+	// All-zero weights: no rarity can ever be rolled, so every re-roll fails.
+	await useTestRod('fisher-fallback', { capabilities: ['weak'], weights: { common: 0, uncommon: 0, rare: 0, ultra: 0, giant: 0, legendary: 0, lucky: 0 } });
+	const result = await castLine({ userId: 'fisher-fallback' });
+	assert.equal(result.status, 'ok');
+	// Lowest rarity, then alphabetical, among year-round Testpool fish with 'weak'.
+	assert.equal(result.catches[0].name, 'Pool Minnow');
 });
 
-test('a truly impossible cast throws NoCatchError quickly', async () => {
-	const user = await makeUser('fisher-impossible');
+test('a truly impossible cast fails cleanly and quickly', async () => {
+	await makeUser('fisher-impossible');
+	await useTestRod('fisher-impossible', { capabilities: ['no-such-quality'] });
 	const started = Date.now();
-	await assert.rejects(
-		() => Fish.generateFish(1, 1, ['no-such-quality'], Object.keys(LEGACY), Object.values(LEGACY), user, weather, season),
-		(error) => error instanceof NoCatchError && error.code === 'NO_CATCH',
-	);
-	assert.ok(Date.now() - started < 5000, 'bounded, not recursive');
+	const result = await castLine({ userId: 'fisher-impossible' });
+	assert.equal(result.status, 'failed');
+	assert.equal(result.failure.code, 'NO_CATCH');
+	assert.ok(Date.now() - started < 5000);
 });
 
 test('no artificial per-draw delay (10 draws well under the old 1s floor)', async () => {
-	const user = await makeUser('fisher-speed');
-	rng.seed(3);
+	await makeUser('fisher-speed');
+	await useTestRod('fisher-speed', { capabilities: ['weak', '10'] });
 	const started = Date.now();
-	await Fish.generateFish(10, 1, ['weak', 'strong'], Object.keys(LEGACY), Object.values(LEGACY), user, weather, season);
+	const result = await castLine({ userId: 'fisher-speed' });
+	assert.equal(result.units, 10);
 	assert.ok(Date.now() - started < 1000, `took ${Date.now() - started}ms`);
 });
 
-test('new catches of a locked species are locked too', async () => {
-	const user = await makeUser('fisher-locked');
-	// Lock every Common Ocean species the player could catch with a 'weak' rod.
-	const { Fish: FishTemplate } = require('../src/schemas/FishSchema');
-	const species = await FishTemplate.find({ biome: 'Ocean', rarity: 'Common', qualities: 'weak', user: null });
-	for (const s of species) await giveFish(user, s.name, { locked: true });
-
-	rng.seed(5);
-	const caught = await Fish.generateFish(1, 1, ['weak'], ['common'], [1], user, weather, season);
-	const stored = await FishData.findById(caught[0].item._id);
-	assert.equal(stored.locked, true);
-	assert.equal(caught[0].item.locked, true);
+test('auto-locked species: new catches start locked', async () => {
+	await makeUser('fisher-autolock');
+	await useTestRod('fisher-autolock', { capabilities: ['weak', '4'] });
+	await UserModel.updateOne({ userId: 'fisher-autolock' }, { $set: { 'autoLock.species': ['pool minnow', 'pool perch'] } });
+	const result = await castLine({ userId: 'fisher-autolock' });
+	await applyCastResult(result);
+	for (const c of result.catches) {
+		assert.equal(c.locked, true);
+		assert.equal((await FishData.findById(c.id)).locked, true);
+	}
 });
 
-test('a count capability produces a numeric count', async () => {
-	const user = await makeUser('fisher-count');
-	rng.seed(8);
-	const caught = await Fish.sendToUser(['weak', '2 count'], ['common'], [1], 'guild', user, weather, season);
-	for (const f of caught) assert.equal(typeof f.count, 'number');
-	// sendToUser still fires its size/weight/value saves without awaiting them (Phase 2 fixes this);
-	// let them land before the test ends.
-	await new Promise((resolve) => setTimeout(resolve, 300));
+test('individually locking one fish does not auto-lock its species', async () => {
+	const user = await makeUser('fisher-individual');
+	await useTestRod('fisher-individual', { capabilities: ['weak', '4'] });
+	await UserModel.updateOne({ userId: 'fisher-individual' }, { $set: { 'autoLock.species': [] } });
+	const template = await FishTemplate.findOne({ name: 'Pool Minnow' });
+	await giveFish(user, template.name, { locked: true });
+	const result = await castLine({ userId: 'fisher-individual' });
+	assert.ok(result.catches.every((c) => c.locked === false));
 });
 
-test.todo('sendToUser awaits every catch write before returning (Foundation V2 Phase 2)');
+test('new accounts start with empty auto-lock rules', async () => {
+	await makeUser('fresh-account');
+	const doc = await UserModel.findOne({ userId: 'fresh-account' }).lean();
+	assert.deepEqual(doc.autoLock.species, []);
+});
+
+test('legacy accounts (no autoLock field) keep species carry-over from locked fish', async () => {
+	const user = await makeUser('fisher-legacy');
+	await useTestRod('fisher-legacy', { capabilities: ['weak', '6'] });
+	await UserModel.updateOne({ userId: 'fisher-legacy' }, { $unset: { autoLock: 1 } });
+	await giveFish(user, 'Pool Minnow', { locked: true });
+	const result = await castLine({ userId: 'fisher-legacy' });
+	for (const c of result.catches) assert.equal(c.locked, c.name === 'Pool Minnow');
+});

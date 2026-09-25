@@ -5,6 +5,7 @@ const {
 const { User } = require('../../../class/User');
 const { Utils } = require('../../../class/Utils');
 const config = require('../../../config');
+const { setOwnedSpeciesLocked, setSpeciesAutoLock } = require('../../../engine/locking');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -43,14 +44,10 @@ module.exports = {
 			return;
 		}
 		try {
-			// Find all fish objects with the specified name and update their 'locked' property
-			const fishList = await user.getFish();
-			fishList.forEach(async fish => {
-				if (fish.name.toLowerCase() === name.toLowerCase()) {
-					fish.locked = false;
-					await fish.save();
-				}
-			});
+			// Species command: (un)lock every owned fish of the species and switch auto-lock for
+			// future catches. Individual-catch locking is a separate concept (engine/locking.js).
+			await setOwnedSpeciesLocked(interaction.user.id, name, false);
+			await setSpeciesAutoLock(interaction.user.id, name, false);
 			if (process.env.ANALYTICS || config.client.analytics) {
 				await analyticsObject.setStatus('completed');
 				await analyticsObject.setStatusMessage('Unlocked fish.');

@@ -216,8 +216,8 @@ module.exports = {
 					});
 			}
 
+			// Atomic and awaited: a whole-document save here could overwrite a concurrent cast.
 			await data.incrementCommandCount();
-			data.save();
 
 			// check for active buffs
 			const activeBuffs = await BuffData.find({ user: interaction.user.id, active: true });

@@ -60,6 +60,11 @@ const questSchema = new Schema({
 		type: Boolean,
 		default: false,
 	},
+	// Cast journal guard: ids of casts already applied to this document (last few only).
+	appliedCasts: {
+		type: [String],
+		default: undefined,
+	},
 	progressType: {
 		fish: [{
 			type: String,

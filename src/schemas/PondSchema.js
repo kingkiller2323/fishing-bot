@@ -18,6 +18,11 @@ const PondSchema = new Schema({
 		type: Number,
 		default: 0,
 	},
+	// Cast journal guard: ids of casts already applied to this document (last few only).
+	appliedCasts: {
+		type: [String],
+		default: undefined,
+	},
 	warning: {
 		type: Boolean,
 		default: false,

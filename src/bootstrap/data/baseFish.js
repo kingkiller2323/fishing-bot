@@ -1,6 +1,6 @@
 // Static seed data. Moved from src/scripts/generateFish.js; consumed by src/bootstrap/seed.js.
 // Builds the base fish catalog: one fish for every rarity x biome x quality combination.
-// Fish.generateFish() relies on this grid being complete (it retries until a matching fish exists).
+// The cast engine's fallback relies on this grid being complete (src/engine/cast.js).
 
 function buildBaseFish() {
 	// There are 7 unique rarities (Common, Uncommon, Rare, Ultra, Giant, Legendary, Lucky), 6 unique biomes (Ocean, River, Lake, Pond, Swamp, Coast) and 2 unique qualities (strong, weak). Generate enough fish to populate every combination possible.

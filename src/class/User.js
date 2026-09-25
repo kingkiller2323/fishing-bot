@@ -8,6 +8,7 @@ const fetch = require('node-fetch');
 const { QuestData } = require('../schemas/QuestSchema');
 const { rng } = require('../engine/rng');
 const { assertRemovable, partitionProtected, isProtected } = require('../engine/protection');
+const { levelForXp } = require('../engine/balance');
 
 class User {
 	constructor(data) {
@@ -30,9 +31,10 @@ class User {
 		return this.user.commands;
 	}
 
+	/** Atomic increment: never rewrites the rest of the player document. */
 	async incrementCommandCount() {
-		this.user.commands++;
-		return await this.save();
+		this.user.commands = (this.user.commands || 0) + 1;
+		await UserSchema.updateOne({ _id: this.user._id }, { $inc: { commands: 1 } });
 	}
 
 	async getCurrentBiome() {
@@ -238,9 +240,7 @@ class User {
 	}
 
 	async getLevel() {
-		const xp = await this.getXP();
-		const level = Math.floor(0.1 * Math.sqrt(xp));
-		return Math.max(level, 1);
+		return levelForXp(await this.getXP());
 	}
 
 	async getXPToNextLevel() {
@@ -408,7 +408,8 @@ class User {
 
 		for (const item of items) {
 			if (!force && isProtected(item)) continue;
-			if (item.count <= 0) {
+			// Use one: stacks above 1 are decremented; the last one leaves the inventory.
+			if ((item.count || 0) <= 1) {
 				switch (item.type) {
 				case 'rod':
 					inventory.rods = inventory.rods.filter((r) => r.valueOf() !== item.id);
@@ -433,10 +434,8 @@ class User {
 					break;
 				}
 			}
-			else {
-				const itemObject = await ItemData.findById(item);
-				itemObject.count--;
-				await itemObject.save();
+			if ((item.count || 0) >= 1) {
+				await ItemData.updateOne({ _id: item._id }, { $inc: { count: -1 } });
 			}
 		}
 
@@ -697,6 +696,8 @@ class User {
 				fish: [],
 				quests: [],
 			},
+			// New accounts start with no auto-lock rules (legacy accounts are migrated at startup).
+			autoLock: { species: [], rules: [] },
 			type: 'user',
 		});
 		await data.save();

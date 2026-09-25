@@ -4,6 +4,7 @@ const {
 } = require('discord.js');
 const { Fish } = require('../../../class/Fish');
 const config = require('../../../config');
+const { withUserLock } = require('../../../engine/userLock');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -43,7 +44,7 @@ module.exports = {
 			});
 		}
 
-		const result = await Fish.sellByRarity(interaction.user.id, rarity);
+		const result = await withUserLock(interaction.user.id, () => Fish.sellByRarity(interaction.user.id, rarity));
 		sold = result.total;
 		const keptNote = result.protected > 0 ? `\n🔒 ${result.protected} locked fish ${result.protected === 1 ? 'was' : 'were'} kept.` : '';
 

@@ -108,6 +108,23 @@ const UserSchema = new Schema ({
 			ref: 'Code',
 		}],
 	},
+	// Explicit pity counters, reset atomically when the qualifying result happens.
+	pity: {
+		castsSinceLegendary: { type: Number, default: 0 },
+		castsSinceLucky: { type: Number, default: 0 },
+		gachaSinceHighTier: { type: Number, default: 0 },
+	},
+	// Automatic protection of future catches. Individual protection is FishData.locked.
+	// `species` is undefined on accounts created before this existed (see bootstrap migration).
+	autoLock: {
+		species: { type: [String], default: undefined },
+		rules: { type: [Schema.Types.Mixed], default: undefined },
+	},
+	// Cast journal guard: ids of casts already applied to this document (last few only).
+	appliedCasts: {
+		type: [String],
+		default: undefined,
+	},
 	isAdmin: {
 		type: Boolean,
 		default: false,

@@ -40,6 +40,11 @@ const itemSchema = new Schema({
 		type: [String],
 		default: ['weak'],
 	},
+	// Cast journal guard: ids of casts already applied to this document (last few only).
+	appliedCasts: {
+		type: [String],
+		default: undefined,
+	},
 	icon: {
 		animated: {
 			type: Boolean,

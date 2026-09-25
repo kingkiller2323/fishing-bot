@@ -104,6 +104,16 @@ test('Sell button refuses a fully locked catch', async () => {
 	assert.ok((await reload(user)).user.inventory.fish.map(String).includes(String(f._id)));
 });
 
+test('Sell button finds a catch by cast id', async () => {
+	const user = await makeUser('button-castid');
+	const f = await giveFish(user, 'Tuna', { value: 40 });
+	await FishData.updateOne({ _id: f._id }, { $set: { castId: 'aaaaaaaaaaaaaaaaaaaaaaaa' } });
+	const interaction = sellInteraction('button-castid');
+	await sellOneFish.run({}, interaction, null, 'aaaaaaaaaaaaaaaaaaaaaaaa');
+	assert.ok(interaction.calls.update.embeds[0].toJSON().fields.some((field) => /\$40/.test(field.value)));
+	assert.ok(!(await reload(user)).user.inventory.fish.map(String).includes(String(f._id)));
+});
+
 test('Sell button sells unlocked fish, keeps locked ones and shows the sale', async () => {
 	const user = await makeUser('button-mixed');
 	const locked = await giveFish(user, 'Sardine', { locked: true, value: 10 });
