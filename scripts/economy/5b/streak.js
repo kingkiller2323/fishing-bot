@@ -29,7 +29,8 @@
 //   streakValue(day, level, opts)
 //                                INTEGRATOR ENTRY POINT. Expected value of the box earned on streak day
 //                                `day` at `level`: { cashEquivalent, items, xp, box, breakdown }.
-//                                xp is Double XP buff XP only (no direct XP). opts: { archetype, tier }
+//                                xp is Double XP buff XP only (no direct XP).
+//                                opts: { archetype (name or {minutesPerDay, overheadS}), tier, profile }
 //   perClaimValue(level, opts)   average over one 7-day cycle (6 crates + 1 chest), per claimed day
 //   attendanceModel(p, days)     exact DP over (streak, grace, gap) for daily attendance probability p:
 //                                claims, crates, chests, grace used, decays, resets
@@ -40,6 +41,12 @@
 //                                no-miss-grinder adversarial scenarios, verdicts
 //   t1PartsFromStreak()          days of streak drops to complete a T1 Uncommon part set (rods interplay)
 //   topggComparison()            today's Top.gg reward (today's model and the new value model) vs streak
+//   founderView()                private Founder EV per crate/chest (Founder gacha stats, sell multiplier)
+//   ruleExamples()               worked traces of the gate, ladder, grace, decay and reset rules
+//   jackpots(level)              Legendary/Lucky odds per crate, chest, week and 30 days
+//   doubleXpDayShare()           share of streak days bringing a Double XP buff (the bound on streak XP)
+//   attendanceTable()            attendanceModel for 7..3 days a week, proposed rules and the alternative
+//   baselineMatchesCurveJson()   lifecycle with the streak off reproduces docs/economy/5b/curve.json
 //   checks()                     design-target checks (pass/fail)
 //   report()                     every number in docs/economy/5b/streak.md (cached), with ...F.stamp()
 const F = require('./framework');
@@ -755,6 +762,64 @@ function topggComparison() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Exciting outcomes: Legendary/Lucky rewards (fish only in these pools) per box, week and 30 days.
+function jackpots(level = F.gearPath()[1].level) {
+	const hi = ['legendary', 'lucky'];
+	const box = (name) => {
+		const ev = boxEV(name, { level });
+		const perSlot = ev.slotTables.map((t) => hi.reduce((a, r) => a + (t[r] || 0), 0));
+		return { expected: perSlot.reduce((a, b) => a + b, 0), pAtLeastOne: 1 - perSlot.reduce((a, q) => a * (1 - q), 1) };
+	};
+	const crate = box(PARAMS.ladder.dailyBox);
+	const chest = box(PARAMS.ladder.milestoneBox);
+	const n = PARAMS.ladder.cycle;
+	const pWeek = 1 - (1 - crate.pAtLeastOne) ** (n - 1) * (1 - chest.pAtLeastOne);
+	return { level, crate, chest, pAtLeastOnePerWeek: pWeek, expectedPer30Days: (30 / n) * ((n - 1) * crate.expected + chest.expected) };
+}
+
+/** Structural bound: streak XP is at most the share of streak days that bring a Double XP buff. */
+function doubleXpDayShare() {
+	const L = F.gearPath()[1].level;
+	const n = PARAMS.ladder.cycle;
+	const dxp = (name) => boxEV(name, { level: L }).buffs['Double XP'] || 0;
+	return ((n - 1) * dxp(PARAMS.ladder.dailyBox) + dxp(PARAMS.ladder.milestoneBox)) / n;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Worked rule traces (what the engine tests assert), produced by the same pure functions.
+function ruleExamples() {
+	const trace = (label, days, start = {}) => {
+		let st = { ...defaultState(), ...start };
+		const steps = days.map((d) => {
+			const r = advanceStreak(st, d);
+			st = r.state;
+			return { day: d, credited: r.credited, streak: st.count, grace: st.grace, box: r.box, graceUsed: r.graceUsed || 0, decayedBy: r.decayedBy || 0, reset: Boolean(r.reset), badges: r.badges || [] };
+		});
+		return { label, start, steps };
+	};
+	const G = PARAMS.gate.successfulCasts;
+	let gs = defaultState();
+	const gate = [];
+	for (let i = 1; i <= G + 1; i++) {
+		const r = onSuccessfulCast(gs, 100);
+		gs = r.state;
+		if (i >= G - 1) gate.push({ cast: i, castsToday: gs.castsToday, credited: Boolean(r.credit), box: r.credit?.box || null });
+	}
+	const next = onSuccessfulCast(gs, 101);
+	gate.push({ cast: 'first cast of the next day', castsToday: next.state.castsToday, credited: Boolean(next.credit) });
+	const week = Array.from({ length: PARAMS.ladder.cycle }, (_, i) => i + 1);
+	return {
+		gate,
+		firstWeek: trace('seven days in a row', week),
+		sameDayTwice: trace('same day credited twice', [1, 1]),
+		missCovered: trace('streak 10, one missed day, 1 token', [12], { count: 10, best: 10, total: 10, lastDay: 10, grace: 1 }),
+		missUncovered: trace('streak 10, two missed days, 1 token', [13], { count: 10, best: 10, total: 10, lastDay: 10, grace: 1 }),
+		newStreakMiss: trace('streak 5, one missed day, no token', [7], { count: 5, best: 5, total: 5, lastDay: 5, grace: 0 }),
+		longGap: trace('streak 40, away a full week', [48], { count: 40, best: 40, total: 40, lastDay: 40, grace: 2 }),
+	};
+}
+
+// ---------------------------------------------------------------------------------------------
 function founderView() {
 	return F.LIVE_BIOMES.map((b) => {
 		const L = F.BIOME_LEVEL[b];
@@ -770,7 +835,9 @@ function founderView() {
 	});
 }
 
+let baselineCache = null;
 function baselineMatchesCurveJson() {
+	if (baselineCache) return baselineCache;
 	const rows = {};
 	let ok = CURVE_JSON.chosen === F.CURVE.quartic;
 	for (const name of Object.keys(F.ARCHETYPES)) {
@@ -779,7 +846,8 @@ function baselineMatchesCurveJson() {
 		rows[name] = Object.fromEntries(Object.keys(cj).map((k) => [k, { mine: lc.reached[k], curveJson: cj[k] }]));
 		for (const k of Object.keys(cj)) ok = ok && lc.reached[k] && lc.reached[k].hours === cj[k].hours && lc.reached[k].day === cj[k].day;
 	}
-	return { match: ok, rows };
+	baselineCache = { match: Boolean(ok), rows };
+	return baselineCache;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -793,6 +861,8 @@ function checks() {
 	const shares = Object.fromEntries(Object.entries(av).map(([k, v]) => [k, v.periods[30].streakShareOfFishing]));
 	const order = ['casual', 'regular', 'active', 'grinder'];
 	const maxStreakXpShare = Math.max(...Object.values(r.archetypes).flatMap((a) => Object.values(a.decomposition).map((d) => d.share.streak)));
+	const minDailyXpShare = Math.max(...r.minimumDaily.streakOnly.rows.map((x) => x.minimumDaily.streakXpShare));
+	const bound = doubleXpDayShare();
 	const list = [
 		{ id: 'no-direct-cash-or-xp', pass: PARAMS.direct.cash === 0 && PARAMS.direct.xp === 0 },
 		{ id: 'no-booster-pack-no-old-rod', pass: !pools.includes('gacha') && !pools.includes('rod') },
@@ -801,6 +871,7 @@ function checks() {
 		{ id: 'grinder-30d-share-max', value: shares.grinder, max: T.grinder30dShareMax, pass: shares.grinder <= T.grinder30dShareMax },
 		{ id: 'casual-gains-relatively-most', value: order.map((k) => round(shares[k], 4)), pass: order.every((k, i) => i === 0 || shares[order[i - 1]] > shares[k]) },
 		{ id: 'streak-xp-share-max', value: maxStreakXpShare, max: T.streakXpShareMax, pass: maxStreakXpShare <= T.streakXpShareMax },
+		{ id: 'streak-xp-within-double-xp-bound', value: { archetypes: maxStreakXpShare, minimumDaily: minDailyXpShare }, max: bound, pass: maxStreakXpShare <= bound && minDailyXpShare <= bound },
 		{ id: 'r2-minimum-daily', pass: !r.minimumDaily.streakOnly.leadsAnywhere && !r.minimumDaily.withProvisionalDaily.leadsAnywhere },
 		{ id: 'r2-no-miss-grinder', value: r.noMissGrinder.maxHoursDelta, max: T.grinderHoursDeltaMax, pass: r.noMissGrinder.maxHoursDelta <= T.grinderHoursDeltaMax },
 		{ id: 'regular-in-windows-with-streak', pass: r.noMissGrinder.regularStillInWindows },
@@ -834,7 +905,11 @@ function report() {
 		}];
 	}));
 	const legacy = F.LIVE_BIOMES.map((b) => ({ biome: b, level: F.BIOME_LEVEL[b], ...(({ liquid, fishValue, salvage, baitUsable, buffs }) => ({ liquid, fishValue, salvage, baitUsable, buffs }))(boxEV(legacyVotersCrate(), { level: F.BIOME_LEVEL[b] })) }));
-	const attendance = [1, 6 / 7, 5 / 7, 4 / 7, 3 / 7].map((p) => ({ p: round(p, 4), d30: attendanceModel(p, 30), d365: attendanceModel(p, 365) }));
+	const ladderAt = F.gearPath()[1].level;
+	const ladder = Array.from({ length: PARAMS.ladder.cycle + 1 }, (_, i) => {
+		const v = streakValue(i + 1, ladderAt);
+		return { streakDay: i + 1, box: v.box, cashEquivalent: v.cashEquivalent, xp: v.xp, fish: v.items.fish, breakdown: v.breakdown };
+	});
 	reportCache = {
 		...F.stamp(),
 		gearPathSource: F.GEAR_PATH_SOURCE,
@@ -844,7 +919,11 @@ function report() {
 		legacyVotersCrate: legacyVotersCrate(),
 		values: crate,
 		legacyVotersCrateValue: legacy,
-		attendance,
+		ladder: { level: ladderAt, days: ladder },
+		rules: ruleExamples(),
+		jackpots: jackpots(),
+		doubleXpDayShare: doubleXpDayShare(),
+		attendance: attendanceTable(),
 		archetypeValue: archetypeValue(),
 		r2: r2(),
 		t1PartsFromStreak: t1PartsFromStreak(),
@@ -861,8 +940,9 @@ module.exports = {
 	dayIndex, defaultState, boxForDay, applyGap, advanceStreak, onSuccessfulCast,
 	boxDefinitions, legacyVotersCrate, boxEV,
 	stageRates, streakValue, perClaimValue,
-	attendanceModel, lifecycle, minimumDailyArchetype,
-	archetypeValue, r2, t1PartsFromStreak, topggComparison, founderView, baselineMatchesCurveJson, checks,
+	attendanceModel, attendanceTable, lifecycle, minimumDailyArchetype,
+	archetypeValue, r2, t1PartsFromStreak, topggComparison, founderView, baselineMatchesCurveJson, ruleExamples,
+	jackpots, doubleXpDayShare, checks,
 	report,
 };
 

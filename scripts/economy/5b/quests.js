@@ -18,16 +18,16 @@
 //                           quests with pity rules, legacy title map, guardrails)
 //   KINDS                   ['story', 'daily', 'weekly', 'repeatable']
 //   SCHEMA                  the additive QuestSchema / UserSchema fields the implementation adds (data)
-//   kindOf(questDoc)        kind of a template or instance; legacy docs without `kind` resolve through
-//                           PARAMS.legacyMap by title (else 'daily' for daily:true, 'legacy' otherwise)
+//   kindOf(questDoc)        kind of a template or instance; pre-5B documents (no `kind`) are 'legacy'
 //   periodKey(kind, ms)     UTC period key: daily 'D2026-09-25', weekly ISO 'W2026-39', else null
 //   expiresAt(kind, ms)     end of the instance's period (ms), or null for story/repeatable
 //   canStart(template, state, ms)
 //                           the start rule for story/repeatable templates: { ok, reason }. state =
 //                           { level, questLog: { [key]: { completions, lastCompletedAt } }, active: [keys],
 //                           repeatableCompletionsToday }
-//   resolveLegacy(doc)      read-time mapping of a pre-5B QuestData document (no write): template key,
-//                           kind, effective progressType/progressMax, whether it blocks /daily
+//   resolveLegacy(doc)      read-time mapping of a pre-5B QuestData document (no write): the template it
+//                           maps to, effective progressType/progressMax, reward rule; never blocks /daily
+//   ruleExamples()          worked examples of periodKey/expiresAt/canStart/resolveLegacy (test cases)
 //   speciesFamily(biome, suffix)
 //                           catalog species of a biome whose name ends with `suffix` (e.g. River 'Trout')
 //   catalogIntegrity(quests)
@@ -38,13 +38,15 @@
 //                           exact distribution of fish needed for `count` catches under an applyPity-style
 //                           rule { softStart, rampPerPoint, maxBonus, hard } on a meter that each fish
 //                           advances by `weight` (1 + Luck): mean / P50 / P90 / max fish
-//   --- bound to the shared gear path (F.gearPath()); withGear(path) rebuilds them on another path ---
+//   --- bound to the shared gear path F.gearPath() ---
 //   bands(), bandFor(level) level bands (one per live biome stage + the post-50 band keyed to Mountain
 //                           Stream's level) with their typical gear
 //   stageRates(band, archetype)
 //                           F.hourly(F.castOutcome(...)) for a band's biome and gear at an archetype's cadence
 //   perFish(band, predicate, key)
 //                           probability that one caught fish matches predicate(template, rarity)
+//   stageFish(biome)        fish a player catches in a biome's stage by fishing alone (stage XP / XP per fish)
+//   pityRule(pity, count)   a story quest's pity thresholds in meter points (shares of stageFish)
 //   templateTerms(kind, def, band)
 //                           computed terms of a template at a band: progressMax, target, cash, xp, boxes,
 //                           expected / P50 / P90 fish, minutes at casual and regular cadence, pity
@@ -69,7 +71,9 @@
 //   founder()               Founder quest multipliers on the proposed base rewards (base vs final)
 //   guardrails()            the R2 guardrail checks (pass/fail)
 //   report()                every key number of docs/economy/5b/quests.md, computed, with ...F.stamp()
-//   withGear(gearPath)      the same bound API rebuilt on another rod path (e.g. rods.gearPath())
+//   withGear(gearPath)      the same bound API rebuilt on another path, for sensitivity checks only. The
+//                           authoritative path is always F.gearPath() (R3: at the cutover it becomes the
+//                           rods path and every figure regenerates; this module never reads rods.js)
 const F = require('./framework');
 const { drawDistribution, FISH } = require('../lib/catalog-model');
 const LEGACY_QUESTS = require('../../../src/bootstrap/data/quests');
@@ -97,8 +101,8 @@ const PARAMS = deepFreeze({
 	version: 'quests-5b.2',
 	kinds: {
 		story: 'one-time: a permanent per-user completion; may have a level, prerequisites and a quest pity',
-		daily: 'one per UTC day, issued by /daily from the daily pool; expires at the end of its UTC day; never blocks the next day',
-		weekly: 'one per ISO week, issued with the first /daily of the week; expires at the end of the week',
+		daily: 'one per DCC day (UTC), issued by /daily or lazily on the first successful cast of the day; expires at the end of its day; never blocks the next day',
+		weekly: 'one per ISO week, issued with the week\'s first daily; expires at the end of the week',
 		repeatable: 'player-started, repeatable forever: per-title cooldown after completion, a daily completion cap across all repeatables, one active at a time',
 	},
 	period: { dayBoundaryUtcHour: 0, weekStart: 'ISO week (Monday 00:00 UTC)' },
@@ -243,18 +247,11 @@ const SCHEMA = deepFreeze({
 
 // ---------------------------------------------------------------------------------------------
 // Rule helpers (the representation the implementation would use; pure).
-const TEMPLATE_KEYS = new Set([
-	...PARAMS.daily.templates.map((t) => t.key), ...PARAMS.weekly.templates.map((t) => t.key),
-	...PARAMS.repeatable.templates.map((t) => t.key), ...PARAMS.story.map((t) => t.key),
-]);
 const kindOfKey = (key) => (key ? key.split('.')[0] : null);
 
-/** Kind of a template or instance. Pre-5B documents have no `kind`: resolved by title. */
+/** Kind of a template or instance; pre-5B documents (no `kind`) are 'legacy' (see resolveLegacy()). */
 function kindOf(q) {
-	if (q && KINDS.includes(q.kind)) return q.kind;
-	const mapped = q && PARAMS.legacyMap[q.title];
-	if (mapped) return kindOfKey(mapped);
-	return q && q.daily ? 'daily' : 'legacy';
+	return q && KINDS.includes(q.kind) ? q.kind : 'legacy';
 }
 
 /** UTC period key of a kind at time `ms`: one daily per UTC day, one weekly per ISO week. */
@@ -286,7 +283,6 @@ function expiresAt(kind, ms) {
 }
 
 const storyByKey = Object.fromEntries(PARAMS.story.map((s) => [s.key, s]));
-const repeatableByKey = Object.fromEntries(PARAMS.repeatable.templates.map((t) => [t.key, t]));
 const levelOfStory = (s) => F.BIOME_LEVEL[s.levelBiome];
 
 /**
@@ -341,18 +337,28 @@ function progressTypeFor(target) {
  * effective terms when it matches progress; stored fields stay as they are.
  */
 function resolveLegacy(doc) {
-	if (doc.kind) return { key: doc.key, kind: doc.kind, legacy: false };
+	if (KINDS.includes(doc.kind)) return { legacy: false, key: doc.key, kind: doc.kind };
 	const key = PARAMS.legacyMap[doc.title] || null;
-	const kind = key ? kindOfKey(key) : (doc.daily ? 'daily' : 'legacy');
-	const out = { key, kind, legacy: true, blocksDaily: false, expires: false, progressType: doc.progressType, progressMax: doc.progressMax, reward: 'stored terms (cash, xp, reward items) are honoured once' };
+	const mapsToKind = kindOfKey(key);
+	const out = {
+		legacy: true, kind: 'legacy', mapsTo: key, mapsToKind, wasDaily: Boolean(doc.daily),
+		// Legacy instances never block /daily and never expire; they complete once on their stored terms.
+		blocksDaily: false, expires: false,
+		progressType: doc.progressType, progressMax: doc.progressMax,
+		reward: 'stored terms (cash, xp, reward items), once; completion is logged in questLog under mapsTo',
+	};
 	const story = storyByKey[key];
 	if (story) {
-		// Story mapping: the new target (e.g. the real trout family) and a count never higher than stored.
-		out.progressType = { ...(doc.progressType || {}), ...progressTypeFor(story.target) };
-		if (story.count) out.progressMax = Math.min(doc.progressMax ?? story.count, story.count);
-		out.reward = 'the greater of the stored and the current template reward, once; completion is recorded in questLog (the story cannot be started again)';
+		// Count-based stories (the fixed trout/carp targets, Magikarp, Lucky Fisher): the new target and a
+		// count never higher than stored. Requirement-based stories keep their stored target and count.
+		if (story.count) {
+			out.progressType = { ...(doc.progressType || {}), ...progressTypeFor(story.target) };
+			out.progressMax = Math.min(doc.progressMax ?? story.count, story.count);
+		}
+		if (story.pity) out.pity = 'the story pity applies from deploy (pityCount starts at 0)';
+		out.reward = 'per component, the greater of the stored and the current template reward (cash, XP, boxes), once; logged in questLog so the story cannot be started again';
 	}
-	if (kind === 'repeatable') out.reward = 'stored terms, once; completion starts the new cooldown and counts toward the daily cap';
+	if (mapsToKind === 'repeatable') out.reward = 'stored terms, once; the completion starts the new cooldown and counts toward the daily cap';
 	// Items never progress quests (Lucky Fisher counted Booster Packs / Gold Rod Pieces before).
 	out.progressType = { ...(out.progressType || {}), kind: 'fish' };
 	return out;
@@ -454,8 +460,8 @@ function pityStats(p, rule, count = 1, weight = 1) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Gear normalisation: F.gearPath() ({tier, key, level, meanFish, qualities, stats}) or rods.gearPath()
-// ({tier, level, meanFish, multiChance, qualities, stats, ...}); keyed objects are accepted too.
+// Gear normalisation: F.gearPath() entries ({tier, key, level, meanFish, qualities, stats}, plus
+// multiChance once the shared path is the rods path); keyed objects are accepted too.
 function normalizePath(gearPath) {
 	const list = Array.isArray(gearPath) ? gearPath : Object.entries(gearPath).map(([key, g]) => ({ key, ...g }));
 	return list.map((g, i) => {
@@ -1260,6 +1266,7 @@ function build(gearPathInput, gearSource) {
 			guardrails: guardrails(),
 			replication: replicationCheck(),
 			founder: founder(),
+			ruleExamples: ruleExamples(),
 		};
 		return cached;
 	}
@@ -1271,25 +1278,37 @@ function build(gearPathInput, gearSource) {
 	};
 }
 
-const DEFAULT = build(F.gearPath(), 'shared');
-
-/** Robustness: the regular windows, R2 guardrails and key terms rebuilt on rods.gearPath(). */
-function onRodsPath() {
-	const m = build(require('./rods').gearPath(), 'rods');
-	const reg = m.lifecycle(F.ARCHETYPES[REF]);
-	const g = m.guardrails();
+/** Worked examples of the pure rule helpers (the cases the tests should pin). */
+function ruleExamples() {
+	const t0 = Date.UTC(2026, 8, 25, 21, 30); // Friday 21:30 UTC
+	const h = 3600e3;
+	const village = PARAMS.repeatable.templates[0];
+	const fishmonger = PARAMS.repeatable.templates[1];
+	const iso = (ms) => new Date(ms).toISOString();
 	return {
-		regularWindows: Object.fromEntries(Object.entries(F.TARGET_WINDOWS).map(([L, [lo, hi]]) => [L, { hours: reg.reached[L]?.hours ?? null, ok: reg.reached[L] ? reg.reached[L].hours >= lo && reg.reached[L].hours <= hi : false }])),
-		guardrailsPass: Object.values(g).every((x) => x.pass),
-		dailyXpByBand: m.bands().map((b) => ({ band: b.id, xp: m.templateTerms('daily', PARAMS.daily.templates[0], b).xp, cash: m.templateTerms('daily', PARAMS.daily.templates[0], b).cash })),
+		period: { at: iso(t0), daily: periodKey('daily', t0), dailyExpires: iso(expiresAt('daily', t0)), weekly: periodKey('weekly', t0), weeklyExpires: iso(expiresAt('weekly', t0)) },
+		canStart: {
+			storyLevelTooLow: canStart(storyByKey['story.lucky-fisher'], { level: 25, questLog: {} }, t0),
+			storyMissingPrerequisite: canStart(storyByKey['story.lucky-fisher'], { level: 31, questLog: {} }, t0),
+			storyOk: canStart(storyByKey['story.lucky-fisher'], { level: 31, questLog: { 'story.magikarp': { completions: 1 } } }, t0),
+			storyAlreadyDone: canStart(storyByKey['story.river-trout'], { level: 12, questLog: { 'story.river-trout': { completions: 1 } } }, t0),
+			repeatableCooldown: canStart(village, { level: 12, questLog: { [village.key]: { completions: 3, lastCompletedAt: t0 - 5 * h } } }, t0),
+			repeatableOtherTitle: canStart(fishmonger, { level: 12, questLog: { [village.key]: { completions: 3, lastCompletedAt: t0 - 5 * h } }, repeatableCompletionsToday: 1 }, t0),
+			repeatableDailyCap: canStart(fishmonger, { level: 12, questLog: {}, repeatableCompletionsToday: PARAMS.repeatable.dailyCap }, t0),
+			repeatableOneActive: canStart(fishmonger, { level: 12, questLog: {}, active: [village.key] }, t0),
+			dailyIsIssued: canStart(PARAMS.daily.templates[0], { level: 12 }, t0),
+		},
+		legacy: Object.fromEntries(LEGACY_QUESTS.map((q) => [q.title, (({ mapsTo, mapsToKind, progressMax, progressType, reward, pity }) => ({ mapsTo, mapsToKind, progressMax, fish: progressType.fish, rarity: progressType.rarity, kind: progressType.kind, reward, pity }))(resolveLegacy({ ...q, status: 'in_progress', progress: 0 }))])),
 	};
 }
 
+const DEFAULT = build(F.gearPath(), 'shared');
+
 module.exports = {
-	PARAMS, KINDS, SCHEMA, kindOf, periodKey, expiresAt, canStart, resolveLegacy, speciesFamily, catalogIntegrity, binomialAtLeast, fishForQuantile, pityStats,
+	PARAMS, KINDS, SCHEMA, kindOf, periodKey, expiresAt, canStart, resolveLegacy, ruleExamples, speciesFamily, catalogIntegrity, binomialAtLeast, fishForQuantile, pityStats,
 	...DEFAULT,
-	report: () => ({ ...DEFAULT.report(), onRodsPath: onRodsPath() }),
-	onRodsPath,
+	// Sensitivity only: the authoritative path is F.gearPath() (R3); at the cutover it becomes the rods path
+	// and every figure above regenerates without calling this.
 	withGear: (gearPath) => build(gearPath, 'custom'),
 };
 
