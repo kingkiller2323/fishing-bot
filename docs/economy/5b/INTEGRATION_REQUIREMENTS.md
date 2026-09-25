@@ -55,6 +55,24 @@ During integration, in this order:
 
 **Traceability:** the final Phase 5B report states the final framework version and shared digest at the top, and every table in it is generated at that version/digest.
 
+## R4: Core correctness, and candidate rules vs approved decisions
+Added before the migrated modules may certify the integrated lifecycle (c48e990). The adversarial pass re-verifies each point.
+1. **Candidate rules are proposals, not decisions.** Modelled rules the user has not approved stay `proposed` in `scripts/economy/5b/decisions.js`, with their alternatives. They are:
+   - pinned Lucky-item odds;
+   - stochastic durability;
+   - Mountain Stream value 149;
+   - catch-time Double Cash;
+   - the event budget;
+   - the UTC day boundary;
+   - the Founder public gate.
+
+   The final Phase 5B report lists them as decisions awaiting approval. `check-shared.js` rejects any registry entry claiming approval, and any entry whose value differs from what the model runs.
+2. **No stale stateful outcomes.** A custom `outcome()` is cached only with a provider-supplied, state-aware `outcomeCacheKey`; otherwise it is never cached. The test uses identical input at two state values, and a mutation check shows it fails with an input-only key.
+3. **Access gates are never bypassed.** No legally fishable biome throws (default), or with `onNoAccess: 'idle'` the player is explicitly blocked. There is no fallback to a default biome. Tested with all biomes denied.
+4. **One full outcome override per run.** Two `outcome()` providers throw; composition goes through `modifyCast`.
+
+These guards change no modelled value, so the framework stays **5b.3** (digest `e73d1be6aec26cdd`) and the provisional curve reproduction is byte-identical.
+
 ## Branch and deploy policy (Phase 5B)
 Railway deploys production from `main`, so every push to `main` rebuilds and restarts the live bot, even when the commit is analysis-only.
 - **Until Phase 5B integration is complete:** commit and push designer WIP and intermediate analysis **only to the session branch** `claude/vigilant-davinci-hf0q0d`. Never push intermediate snapshots to `main`. Production stays on its current healthy revision.
