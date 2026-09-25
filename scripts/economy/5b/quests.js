@@ -1202,6 +1202,7 @@ function build(gearPathInput, gearSource) {
 		});
 	}
 
+	const totalXpOf = (s) => sum(Object.values(s.xpBy));
 	let cached = null;
 	function report() {
 		if (cached) return cached;
@@ -1219,7 +1220,14 @@ function build(gearPathInput, gearSource) {
 			lifecycles[name].fishByBiome = withQ.fishByBiome;
 			const f = withQ.final;
 			const gross = sum(Object.values(f.cashBy));
-			lifecycles[name].incomeAtMaxLevel = { fishingCash: Math.round(f.cashBy.fishing), questCash: Math.round(gross - f.cashBy.fishing), questCashSharePct: pct((gross - f.cashBy.fishing) / gross), boxes: r1(sum(Object.values(f.boxesBy))), boxesBy: Object.fromEntries(Object.entries(f.boxesBy).map(([k, v]) => [k, r1(v)])) };
+			// Quest cash share if daily/weekly cash used another factor (daily/weekly cash is linear in it;
+			// the small effect on rod-purchase timing is ignored).
+			const dw = f.cashBy.daily + f.cashBy.weekly;
+			const cashFactorSensitivity = Object.fromEntries([0.5, 0.75, 1].map((k) => {
+				const qc = (k / PARAMS.daily.reward.cashK) * dw + f.cashBy.repeatable + f.cashBy.story;
+				return [k, pct(qc / (qc + f.cashBy.fishing))];
+			}));
+			lifecycles[name].incomeAtMaxLevel = { level: F.levelForXp(totalXpOf(f)), fishingCash: Math.round(f.cashBy.fishing), questCash: Math.round(gross - f.cashBy.fishing), questCashSharePct: pct((gross - f.cashBy.fishing) / gross), cashBy: Object.fromEntries(Object.entries(f.cashBy).map(([k, v]) => [k, Math.round(v)])), questCashSharePctByCashFactor: cashFactorSensitivity, boxes: r1(sum(Object.values(f.boxesBy))), boxesBy: Object.fromEntries(Object.entries(f.boxesBy).map(([k, v]) => [k, r1(v)])) };
 		}
 		const regular = cachedLifecycle(REF, F.ARCHETYPES[REF]);
 		const cat = catalog();
