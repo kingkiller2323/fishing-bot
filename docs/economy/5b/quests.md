@@ -18,7 +18,7 @@
 | Regular player, hours to L20 / L30 / L40 / L50 | 5.27 / 12.58 / 25.13 / 43.65 (windows 5–6 h, 12–15 h, 24–30 h, 40–45 h): all in window | §6.4 |
 | Same loop without the quest system | 6.38 / 15.38 / 31.08 / 54.10: 0 of 4 in window | §6.4 |
 | Minimum-daily player (R2) | XP per active hour 1.91–1.97× the regular player's; leads an engaged archetype at a calendar checkpoint: never | §7.2 |
-| No-miss grinder: play-hours saved by every quest type | at most 5.9% (limit 8%) | §7.3 |
+| No-miss grinder: play-hours saved by every quest type | at most 5.9% (limit 8%); 6.6% if rewards are credited on completion, as designed (sensitivity) | §7.3 |
 | Casual play-hours ÷ regular, L20–L50 | 0.882–0.946 with quests (policy 0.7–1); 1.329–1.345 without | §7.1 |
 | Daily/weekly XP ÷ XP of the fishing they require | 0.963–1.029 (limit 1.05) | §4 |
 | Quest cash share of all income to L60 | Casual 48.5%, Regular 22.4%, Active 9.1%, Grinder 3.5% | §6.3 |
@@ -32,7 +32,7 @@
 2. **Rewards scale with the stage** (§4). Dailies and weeklies pay the XP and cash of the fishing they require (P-DAILY-FACTOR), so a daily at most doubles its own session and the R2 guardrail holds by construction. Repeatables pay a bounded bonus on fishing the player does anyway. Story chapters pay minutes of the band's income.
 3. **Quests carry the curve's daily budget.** On the integrated loop the regular player meets every approved window with quests and misses every one without them (headline, §6.4). The streak design pays no direct XP.
 4. **R2 passes with structural guardrails** (§7): the minimum-daily player never leads an engaged archetype by calendar, the no-miss grinder gains little, and casual catch-up stays inside its policy band.
-5. **Correctness fixes ship first** (§1): the non-existent trout target, prerequisites that are never enforced (or looked up in the wrong collection), dailies that block forever, an unreachable Lucky Fisher, Magikarp without pity, and unlimited repeatables.
+5. **Correctness fixes ship first** (§1): the non-existent trout target, prerequisites that are never enforced (or looked up in the wrong collection), dailies that block forever, an unreachable Lucky Fisher, Magikarp without pity, and unlimited repeatables. Some of them need a proposed value before they can ship (the repeatable cooldown and cap, the daily sizing, the Lucky Fisher count and the pity table); the **Ships on** column of §1 says which.
 
 ---
 
@@ -40,17 +40,21 @@
 
 The evidence comes from code reading and from `report().currentCatalog`, `report().fixes` and `report().catalogIntegrity`. Today's quests are evaluated under the framework model at the gear of their stage.
 
+The **Ships on** column separates fixes that change no balance value (Q1 target, Q3, Q4, the Q5 expiry, Q8 and the item rule of Q6) from fixes that need a proposed value first: Q2 needs `P-QUESTS-REPEATABLE`, the Q5 requirement sizing needs `P-QUESTS-DAILY`, Q6 needs `P-QUESTS-LUCKY-FISHER` and `P-QUESTS-PITY`, and Q7 needs `P-QUESTS-PITY`. Those ship once the decision is approved.
+
 <!-- generated:quests-fixes -->
-| # | Bug | Evidence | Fix |
-| --- | --- | --- | --- |
-| Q1 | **"Catch 15 Trout" targets `golden trout`, which does not exist.** | `catalogIntegrity().today`; 12.8% of River fish match, so 118 fish for 15 | the **River trout family** (10 species, trout table): 34.8% match, 43 fish |
-| Q2 | **Non-daily quests repeat without limit.** `/start-quest` only blocks the same title *while it is in progress* (`startQuest.js:110`). | "Help the Village!" pays $3,000 + 300 XP for 30 fish: +468% of Ocean fishing cash and +54% XP (repeatability table) | the kind model (§2): story quests once-only (`questLog`); repeatables with a cooldown and a daily cap |
-| Q3 | **`/start-quest` never enforces prerequisites.** `if (prereq > 0)` (`startQuest.js:91`) compares the prerequisite *array* with a number (always false), and uses `some` instead of `every`. | latent today (no non-daily quest has prerequisites); the proposed Lucky Fisher requires Magikarp | `canStart()`: `prerequisites.every(k => questLog[k].completions > 0)` |
-| Q4 | **`/daily` looks for completed prerequisites in the catalog collection** (`Quest.js:130` queries `quests`; per-user copies live in `questdatas`). | Catch 250 Fish, Catch 500 Fish, Catch 750 Fish, Professional Fisher are **never issued**; every ineligible random pick recurses (`Quest.js:111/126/133`) | the eligible pool is filtered up front (kind `daily`, not retired, level) with no recursion; prerequisites come from `questLog` |
-| Q5 | **An unfinished daily never expires and blocks `/daily`** (`daily.js:23`, `Quest.js:119`). | "Catch 100 Fish": 100 fish, 20 casual min (1.6 casual sessions); "Catch 1 Legendary Fish": 509 fish, 102 casual min (8.1 casual sessions); "Catch 5 Ultra Fish": 509 fish, 102 casual min (8.1 casual sessions); "Catch 15 Rare Fish": 305 fish, 61 casual min (4.9 casual sessions) | dailies expire at the end of their DCC day (`status: 'expired'`, document kept) and never block; requirements sized to the casual session (§4) |
-| Q6 | **Lucky Fisher is out of reach, counts items, and rewards an item that does not exist.** | 25 Lucky catches, and Lucky ITEM catches progress it: 254,275 fish at its Lv 0 gear, 217,087 at Pond; reward Lucky Rod is not in the catalog (the quest pays no item) | 5 Lucky **fish**, items never progress a quest, a luck-weighted pity (§5.2); reward cash, XP and 2 Daily Boxes |
-| Q7 | **Magikarp has no pity.** | 1 per 12,713 Ocean fish on the Old Rod: 1,907 minutes of regular play | a quest pity on a luck-weighted meter: expected 115 fish, sure at 200 points (pity table) |
-| Q8 | **River quests are offered at Lv 0.** | trout and carp target River fish; River unlocks at Lv 10 | story level = the target biome's level (`F.BIOME_LEVEL`) |
+| # | Bug | Evidence | Fix | Ships on |
+| --- | --- | --- | --- | --- |
+| Q1 | **"Catch 15 Trout" targets `golden trout`, which does not exist.** | `catalogIntegrity().today`; 12.8% of River fish match, so 118 fish for 15 | the **River trout family** (10 species, trout table): 34.8% match, 43 fish | today's numbers (a correctness change): a catalog target fix (the target set is `P-QUESTS-TARGETS`); rewards unchanged |
+| Q2 | **Non-daily quests repeat without limit.** `/start-quest` only blocks the same title *while it is in progress* (`startQuest.js:110`). | "Help the Village!" pays $3,000 + 300 XP for 30 fish: +468% of Ocean fishing cash and +54% XP (repeatability table) | the kind model (§2): story quests once-only (`questLog`); repeatables with a cooldown and a daily cap | **needs proposed values:** `P-QUESTS-REPEATABLE` (cooldown 12 h, 2 per day); story once-only is a rule of `P-QUESTS-KINDS` (no value) |
+| Q3 | **`/start-quest` never enforces prerequisites.** `if (prereq > 0)` (`startQuest.js:91`) compares the prerequisite *array* with a number (always false), and uses `some` instead of `every`. | latent today (no non-daily quest has prerequisites); the proposed Lucky Fisher requires Magikarp | `canStart()`: `prerequisites.every(k => questLog[k].completions > 0)` | today's numbers (a correctness change) |
+| Q4 | **`/daily` looks for completed prerequisites in the catalog collection** (`Quest.js:130` queries `quests`; per-user copies live in `questdatas`). | Catch 250 Fish, Catch 500 Fish, Catch 750 Fish, Professional Fisher are **never issued**; every ineligible random pick recurses (`Quest.js:111/126/133`) | the eligible pool is filtered up front (kind `daily`, not retired, level) with no recursion; prerequisites come from `questLog` | today's numbers (a correctness change): prerequisites read from the user's quest documents; the retired-title filter comes with `P-QUESTS-RETIRE` |
+| Q5 | **An unfinished daily never expires and blocks `/daily`** (`daily.js:23`, `Quest.js:119`). | "Catch 100 Fish": 100 fish, 20 casual min (1.6 casual sessions); "Catch 1 Legendary Fish": 509 fish, 102 casual min (8.1 casual sessions); "Catch 5 Ultra Fish": 509 fish, 102 casual min (8.1 casual sessions); "Catch 15 Rare Fish": 305 fish, 61 casual min (4.9 casual sessions) | dailies expire at the end of their DCC day (`status: 'expired'`, document kept) and never block; requirements sized to the casual session (§4) | expiry: today's numbers (a correctness change). Requirement sizing: **needs proposed values:** `P-QUESTS-DAILY` |
+| Q6 | **Lucky Fisher is out of reach, counts items, and rewards an item that does not exist.** | 25 Lucky catches, and Lucky ITEM catches progress it: 254,275 fish at its Lv 0 gear, 217,087 at Pond; reward Lucky Rod is not in the catalog (the quest pays no item) | 5 Lucky **fish**, items never progress a quest, a luck-weighted pity (§5.2); reward cash, XP and 2 Daily Boxes | items never progress a quest: today's numbers (a correctness change). Count, pity and reward: **needs proposed values:** `P-QUESTS-LUCKY-FISHER`, `P-QUESTS-PITY` |
+| Q7 | **Magikarp has no pity.** | 1 per 12,713 Ocean fish on the Old Rod: 1,907 minutes of regular play | a quest pity on a luck-weighted meter: expected 115 fish, sure at 200 points (pity table) | **needs proposed values:** `P-QUESTS-PITY` |
+| Q8 | **River quests are offered at Lv 0.** | trout and carp target River fish; River unlocks at Lv 10 | story level = the target biome's level (`F.BIOME_LEVEL`) | today's numbers (a correctness change): the story level is the target biome's live unlock level (`P-QUESTS-STORY`) |
+
+"Today's numbers" means the fix changes no balance value. A fix that needs a value ships once the proposed decision that sets it is approved.
 
 <sub>Generated by `node scripts/economy/5b/render-docs.js` from `quests.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
 <!-- /generated:quests-fixes -->
@@ -299,6 +303,7 @@ Every archetype completes every chapter inside its stage on the integrated loop 
 ### 6.1 The day-end rule: `questIncome(level, fishPerDay, hoursPerDay, opts)`
 
 - **Returns** the expected quest income of one day: `{ cash, xp, boxes, band, breakdown: { daily, weekly, repeatable } }`. The system credits the daily and repeatables with it at each day end; `buffs.js` reads its `boxes`.
+- **Timing bias.** The design pays a daily, weekly or repeatable when it completes, during the session. The model credits them after the session. Totals per day are the same, but the XP arrives later in play-hours, so the model slightly understates how much quests speed up long sessions. The effect is measured in §7.3 (credit-timing table) with `system({ creditAt: 'completion' })`.
 - **Daily and weekly.** Completion comes from the day's (and week's) fish: deterministic for "any fish" templates, binomial for rarity templates, averaged over the template pool.
 - **Repeatable.** Completions = min(daily cap, fish ÷ fish per completion, cooldown-limited).
 - **Story** is one-time: `storyEvents()` gives each chapter's level, prerequisites, scope biome, expected fish and reward.
@@ -475,6 +480,35 @@ The grinder never misses a day and takes every daily, weekly, repeatable (up to 
 
 **Verdict: PASS.** Quest income is fixed per period and capped per day, so its share falls as playtime rises, and the targets (set for the regular player) are unaffected. The 24 h/day worst case is in §8.
 
+**Credit timing (sensitivity).** The table above credits daily, weekly and repeatable rewards at day end (§6.1). In the design they arrive on completion, during the session. For a long session that matters: the grinder reaches Lv 20 inside its first day, before any day-end credit. Crediting on completion raises the grinder's largest saving and moves the other archetypes slightly (credit-timing table). The guardrail still passes with the margin shown there, and the regular player stays inside every window. The R2 report's no-miss grinder (against fishing alone, without quests, streak and buffs) moves the same way (last column).
+
+<!-- generated:quests-credit-timing -->
+| Player | Level | Without quests (h) | Fishing only (h) | With quests: credited at day end (model) | credited on completion | Saved vs without quests: day end → completion | Saved vs fishing only: day end → completion |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Casual | L20 | 8.48 | 8.65 | 4.98 | 4.90 | 41.3% → **42.2%** | 42.4% → 43.4% |
+|  | L30 | 20.53 | 20.95 | 11.73 | 11.70 | 42.9% → **43.0%** | 44.0% → 44.2% |
+|  | L40 | 41.63 | 42.48 | 22.50 | 22.42 | 46.0% → **46.2%** | 47.0% → 47.2% |
+|  | L50 | 72.77 | 74.27 | 38.52 | 38.43 | 47.1% → **47.2%** | 48.1% → 48.2% |
+| Regular | L20 | 6.38 | 6.50 | 5.27 | 5.18 | 17.5% → **18.8%** | 19.0% → 20.3% |
+|  | L30 | 15.38 | 15.68 | 12.58 | 12.47 | 18.2% → **19.0%** | 19.8% → 20.5% |
+|  | L40 | 31.08 | 31.72 | 25.13 | 25.03 | 19.1% → **19.5%** | 20.8% → 21.1% |
+|  | L50 | 54.10 | 55.20 | 43.65 | 43.60 | 19.3% → **19.4%** | 20.9% → 21.0% |
+| Active | L20 | 5.73 | 5.77 | 5.05 | 4.97 | 11.9% → **13.4%** | 12.4% → 13.9% |
+|  | L30 | 13.80 | 13.92 | 12.67 | 12.57 | 8.2% → **8.9%** | 9.0% → 9.7% |
+|  | L40 | 27.87 | 28.12 | 25.28 | 25.17 | 9.3% → **9.7%** | 10.1% → 10.5% |
+|  | L50 | 48.37 | 48.85 | 44.02 | 43.95 | 9.0% → **9.1%** | 9.9% → 10.0% |
+| Grinder | L20 | 5.05 | 5.05 | 4.80 | 4.75 | 5.0% → **5.9%** | 5.0% → 5.9% |
+|  | L30 | 12.12 | 12.17 | 11.40 | 11.32 | 5.9% → **6.6%** | 6.3% → 7.0% |
+|  | L40 | 24.45 | 24.53 | 23.08 | 22.98 | 5.6% → **6.0%** | 5.9% → 6.3% |
+|  | L50 | 42.33 | 42.50 | 40.23 | 40.13 | 5.0% → **5.2%** | 5.3% → 5.6% |
+
+`creditTimingSensitivity()`: the integrated reference loop with `system({ creditAt: 'completion' })`, which credits the daily, repeatables and weekly during the session as the day's fish complete them (the same expected totals per day, up to floating-point rounding). "Without quests" excludes the quest system (this module's guardrail, §7.4); "fishing only" also excludes the streak and buffs (the R2 report's no-miss grinder, `r2.js`). No-miss grinder, largest saving: 5.9% → **6.6%** without quests, 6.3% → **7.0%** against fishing only (L30); limit 8%. Regular player on completion: L20 5.18, L30 12.47, L40 25.03, L50 43.60 (every window met). Casual ÷ regular hours on completion: 0.881–0.946.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `quests.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:quests-credit-timing -->
+
+The reported figures (headline, §7.4 and the R2 report) keep the day-end rule, so they are comparable with every other table at this framework version. Switching the model to on-completion crediting is a model change: it would regenerate `r2.json` and every table that uses the reference loop.
+
 ### 7.4 Guardrails (`report().guardrails`)
 
 <!-- generated:quests-guardrails -->
@@ -484,6 +518,7 @@ The grinder never misses a day and takes every daily, weekly, repeatable (up to 
 | Casual play-hours ÷ regular's (L20–L50) | 0.882–0.946 | 0.7–1 | yes |
 | Minimum-daily leads an engaged archetype at a calendar checkpoint | never | never | yes |
 | No-miss grinder: play-hours saved by quests | 5.9% | ≤ 8% | yes |
+| The same, rewards credited on completion (sensitivity, §7.3) | 6.6% (L30) | ≤ 8% | yes |
 
 <sub>Generated by `node scripts/economy/5b/render-docs.js` from `quests.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
 <!-- /generated:quests-guardrails -->
@@ -561,6 +596,7 @@ The repeatable is content you take while fishing anyway. It pays a bounded bonus
 
 - **The Founder's quest multipliers are unchanged.** The Founder design's profile (`founder.js` `founderProfile()`) copies today's `questXp` / `questCash`, and the quest system reads them from it in Founder runs. `cast.js` `rewardBreakdown` already splits base, profileBonus and final: public output shows the **base**, the account receives the **final**.
 - **Decision 6.** The base quest XP feeds the public/competitive XP counter (`ctx.addXp(kind, final, base)` books base XP to `ledger.publicXp`).
+- **Daily Boxes are opened with `/open`, a public reply rolled with the opener's gacha stats and pity.** A Founder reveals Legendary/Lucky slots more often than a normal player. The streak design shows the size for its boxes and lists the options (`P-STREAK-FOUNDER`, Founder reveal); the same choice applies to Daily Boxes.
 - **Quest pity is profile-independent.** The Founder's own rarity pity is separate; its Lucky table makes both chases trivial for them, which doesn't matter because the Founder isn't competitive.
 - **Buffs** (decision 8 belongs to the buffs design): quest rewards are not fish sales, so Double Cash never applies to quest cash, and Double XP doesn't apply to quest XP, as today.
 
@@ -612,7 +648,7 @@ The repeatable is content you take while fishing anyway. It pays a bounded bonus
 <!-- /generated:quests-daily-box -->
 
 - **Founder.** When `state.profile === 'founder'`, the system reads `questXp` / `questCash` from `founder.founderProfile()`, books `addXp(kind, base × questXp, base)` and cash base × questCash, and sells Daily Box fish at that profile's sell multiplier.
-- **Options (analysis only):** `boxValue` (`'liquid'` default, `'cashEquivalent'`, `'none'`), `parts` (toggles per kind), `rewardScale` (per-kind reward multipliers for sensitivity, §7.5), `weekdayOfDay0` (ISO weekday of calendar day 0, default Monday). The replay-only options of the migration stage (`terms`, `weekly`, `session`) are gone with the loop they replayed.
+- **Options (analysis only):** `boxValue` (`'liquid'` default, `'cashEquivalent'`, `'none'`), `parts` (toggles per kind), `rewardScale` (per-kind reward multipliers for sensitivity, §7.5), `creditAt` (`'dayEnd'` default; `'completion'` credits daily, weekly and repeatable rewards during the session, for the timing sensitivity of §7.3; the default path is unchanged), `weekdayOfDay0` (ISO weekday of calendar day 0, default Monday). The replay-only options of the migration stage (`terms`, `weekly`, `session`) are gone with the loop they replayed.
 
 **Parity record of the retired loop.** Before retirement, `validateSystem()` ran the system on the core against the module's own loop. With the old loop's conventions the replay was exact; with this design's rules (terms at issue, weekly by period, session by fish) the differences were small and each one is a deliberate rule. The system's code is unchanged by the retirement (bit-identical integrated runs before and after).
 
@@ -699,6 +735,8 @@ The repeatable is content you take while fishing anyway. It pays a bounded bonus
 - **Band steps.** A player's daily jumps at each biome level (bands table). This is intentional: the new band's fish are worth more.
 - **Weekly Legend Hunt variance.** Its P90 is far above its mean (effort table); it is offered only where that effort stays within the weekly's limit.
 - **Endgame band.** It fishes the last live biome until Mountain Stream ships. When the expansion lands, its band regenerates from the framework, and `story.mountain-stream` is designed then.
+- **Credit timing.** The model credits quest rewards at day end; the design pays them on completion. The no-miss grinder's saving is therefore somewhat higher than the headline figure, still under the guardrail (§7.3, credit-timing table).
+- **Fix ordering.** Q2, the Q5 sizing, Q6 and Q7 need proposed values (§1, Ships on); the others use today's numbers.
 - **Quests are the curve's daily budget.** If a later design adds direct daily XP, R1's refit must absorb it; don't shrink quests to compensate.
 - **Model note (not a design change).** Quest match odds (`perFish`, the pity chases) draw with the engine's Lucky-item share, not the framework's pinned rule (P-LUCKY), which leaves slightly more Lucky rolls as fish at higher Luck. The effect is small and in the player's favour; a shared per-fish match helper (species, family, rarity; fish vs Lucky-item split) in the framework would remove the difference, and quests and bait would both use it.
 

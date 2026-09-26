@@ -992,12 +992,40 @@ function ruleExamples() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Founder (private): the PROPOSED Founder profile (founder.founderProfile()) on the same boxes.
+// Founder: the PROPOSED Founder profile (founder.founderProfile()) on the same boxes. The sell multiplier
+// is private (it only changes what the contents sell for); the gacha stats change which rarities are
+// rolled, and /open shows every slot's rarity in a PUBLIC reply (src/commands/slash/Economy/open.js
+// deferReply() without flags, revealEmbed), so the rarity edge is visible on the reveal.
 function founderView() {
 	const prof = proposedFounder();
 	const hi = (ev) => (ev.rarity.legendary || 0) + (ev.rarity.lucky || 0);
+	// P(an open shows at least one Legendary/Lucky slot): what the public reveal can show.
+	const pHi = (ev) => 1 - ev.slotTables.reduce((a, t) => a * (1 - ((t.legendary || 0) + (t.lucky || 0))), 1);
+	const revealLevel = F.gearPath()[1].level;
+	const reveal = (box) => {
+		const nv = pHi(boxEV(box, { level: revealLevel }));
+		const fv = pHi(boxEV(box, { level: revealLevel, profile: prof }));
+		return { normal: nv, founder: fv, ratio: fv / nv };
+	};
+	const crateR = reveal(PARAMS.ladder.dailyBox);
+	const chestR = reveal(PARAMS.ladder.milestoneBox);
+	const cycleDays = PARAMS.ladder.cycle;
+	const cycle = (k) => 1 - (1 - crateR[k]) ** (cycleDays - 1) * (1 - chestR[k]);
+	const pity = prof.gacha?.pity?.legendaryPlus || null;
+	// Do the reveal odds depend on the stage? (the pools of some stages may lack a rarity)
+	const byStage = F.LIVE_BIOMES.map((b) => [PARAMS.ladder.dailyBox, PARAMS.ladder.milestoneBox].map((box) => [boxEV(box, { level: F.BIOME_LEVEL[b] }), boxEV(box, { level: F.BIOME_LEVEL[b], profile: prof })].map(pHi))).flat(2);
+	const ref = [crateR.normal, crateR.founder, chestR.normal, chestR.founder];
+	const sameAtEveryStage = byStage.every((x, i) => Math.abs(x - ref[i % 4]) < 1e-9);
 	return {
-		profile: { source: 'founder.founderProfile()', sell: prof.multipliers.sell, gachaStats: { ...(prof.gacha?.stats || {}) }, todaySell: PROFILES.founder.multipliers.sell },
+		profile: { source: 'founder.founderProfile()', sell: prof.multipliers.sell, gachaStats: { ...(prof.gacha?.stats || {}) }, todaySell: PROFILES.founder.multipliers.sell, gachaPity: pity ? { softStart: pity.softStart, hard: pity.hard } : null },
+		reveal: {
+			level: revealLevel,
+			crate: crateR,
+			chest: chestR,
+			cycle: { normal: cycle('normal'), founder: cycle('founder'), ratio: cycle('founder') / cycle('normal') },
+			sameAtEveryStage,
+			surface: '/open (public reply; every slot\'s rarity, Legendary/Lucky marked)',
+		},
 		stages: F.LIVE_BIOMES.map((b) => {
 			const L = F.BIOME_LEVEL[b];
 			const n = boxEV(PARAMS.ladder.dailyBox, { level: L });
@@ -1129,7 +1157,7 @@ const DECISIONS = [
 	{
 		id: 'P-STREAK-BAIT-PACK', status: 'proposed',
 		title: 'A bait reward in a streak box is one pack; packs for bait the player cannot use yet keep until usable',
-		modelled: `baitGrant '${PARAMS.baitGrant}'`,
+		modelled: `baitGrant '${PARAMS.baitGrant}'; a pack below its bait's shop level is valued at zero. The wait is enforced by biome access, except for Strong Magnet (every live biome), which needs the bait design's use-time level check`,
 		alternatives: ['one unit (worth almost nothing at the new bait prices)'],
 		source: 'streak design (bait design recommendation)', why: 'a bait reward should be worth using',
 		get: () => PARAMS.baitGrant, expected: 'pack',
@@ -1168,10 +1196,15 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-STREAK-FOUNDER', status: 'proposed',
-		title: 'Founder: the same gate, boxes and public catch-card line; the Founder gacha stats and sell multiplier apply privately to the box contents',
-		modelled: 'boxContents(..., \'founder\') = the proposed founder.founderProfile() (gacha stats, sell multiplier); gate counts casts',
-		alternatives: ['Founder-specific streak boxes'],
-		source: 'streak design', why: 'nothing public differs (A-FOUNDER-VISIBLE); the private value follows the Founder profile (Founder table)',
+		title: 'Founder: the same gate, boxes and public catch-card line. The sell multiplier on box contents is private; the Founder gacha stats (and gacha pity) roll the box, so the rarity edge shows on the public /open reveal',
+		modelled: 'boxContents(..., \'founder\') = the proposed founder.founderProfile() (gacha stats, sell multiplier); gate counts casts; /open stays a public reply rolled with the opener\'s gacha stats and pity (Founder reveal table)',
+		alternatives: [
+			'accept the visible rarity edge on /open, as with the kept catch-card rarity edge (P-FOUNDER-KEPT)',
+			'roll Founder box opens on the normal table and pay the Founder edge privately as extra value (the reveal then matches a normal player\'s odds)',
+			'make /open ephemeral for every player (no public reveal for anyone)',
+			'Founder-specific streak boxes',
+		],
+		source: 'streak design', why: 'the gate, the catch-card line and box fish (competitiveEligible false) are identical for every profile; what differs publicly is the rarity mix a Founder reveals on /open (Founder reveal table), a slower tell than the kept catch-card rarity edge. The user picks one of the alternatives',
 	},
 	{
 		id: 'P-STREAK-TARGETS', status: 'proposed',
@@ -1346,7 +1379,8 @@ function markdownTables() {
 		['Regular player with the streak (reference loop)', `${Object.entries(r2r.noMissGrinder.regularHours).map(([L, h]) => `L${L} ${hrs(h)}`).join(', ')}; ${r2r.noMissGrinder.regularStillInWindows ? 'every approved window met' : 'a window is MISSED'}`, 'R2 grinder'],
 		['Today\'s vote rule on the new value model (casual, 30 days)', `${usd(tg.newValueModel.casual.topggRule30d)} = ${pct(tg.newValueModel.casual.topggShareOfFishing, 0)} of fishing income, against the streak's ${pct(tg.newValueModel.casual.streakShareOfFishing)}`, 'Top.gg'],
 		['Legendary/Lucky in streak boxes', `${pct(jp.crate.pAtLeastOne)} of crates, ${pct(jp.chest.pAtLeastOne)} of chests, ${pct(jp.pAtLeastOnePerWeek, 0)} of weeks`, 'Box contents'],
-		['Founder box value (proposed profile, private)', `a crate is worth ${range(fv.stages.map((s) => s.crate.ratio), (x) => `${fx(x, 1)}×`)} a normal one`, 'Founder'],
+		['Founder box value (proposed profile, private: sell multiplier)', `a crate is worth ${range(fv.stages.map((s) => s.crate.ratio), (x) => `${fx(x, 1)}×`)} a normal one`, 'Founder'],
+		['Founder box reveal on /open (public: gacha stats)', `a Legendary/Lucky slot in ${pct(fv.reveal.crate.founder, 2)} of Founder crates against ${pct(fv.reveal.crate.normal, 2)} of normal ones; chests ${pct(fv.reveal.chest.founder, 2)} against ${pct(fv.reveal.chest.normal, 2)} (pity not modelled)`, 'Founder reveal'],
 		['Design checks', `${R.checks.list.filter((c) => c.pass).length} of ${R.checks.list.length} pass`, 'Checks'],
 	]);
 
@@ -1525,6 +1559,15 @@ function markdownTables() {
 	out['streak-founder'] = mdTable(['Stage', 'Crate: normal', 'Founder', 'ratio', 'Legendary+ per crate: normal', 'Founder', 'Chest: normal', 'Founder', 'ratio'], fv.stages.map((s) => [
 		`${s.biome} (Lv ${s.level})`, usd(s.crate.normal), usd(s.crate.founder), `${fx(s.crate.ratio, 1)}×`, fx(s.crate.normalLegendaryPlus, 3), fx(s.crate.founderLegendaryPlus, 3), usd(s.chest.normal), usd(s.chest.founder), `${fx(s.chest.ratio, 1)}×`,
 	])) + `\n\nLiquid value (fish + salvage). Founder: the proposed profile (\`${fv.profile.source}\`): gacha stats ${Object.entries(fv.profile.gachaStats).map(([k, v]) => `${k} +${pct(v, 0)}`).join(', ')}, sell ×${fv.profile.sell} (today's profile: ×${fv.profile.todaySell}). Founder pity is not modelled (it can only raise these).`;
+
+	// Founder: what the public /open reveal shows.
+	const rv = fv.reveal;
+	const pityText = fv.profile.gachaPity ? `The Founder gacha pity (a Legendary+ slot ramps from open ${fv.profile.gachaPity.softStart} and is certain by open ${fv.profile.gachaPity.hard} without one) is not modelled: it can only raise the Founder column.` : 'The Founder profile has no gacha pity.';
+	out['streak-founder-reveal'] = mdTable(['Opens shown on the public /open reveal', 'Normal: holds a Legendary/Lucky slot', 'Founder', 'Founder ÷ normal'], [
+		[P.ladder.dailyBox, pct(rv.crate.normal, 2), pct(rv.crate.founder, 2), `${fx(rv.crate.ratio, 1)}×`],
+		[P.ladder.milestoneBox, pct(rv.chest.normal, 2), pct(rv.chest.founder, 2), `${fx(rv.chest.ratio, 1)}×`],
+		[`One ${P.ladder.cycle}-day cycle (${P.ladder.cycle - 1} crates + 1 chest): at least one`, pct(rv.cycle.normal, 1), pct(rv.cycle.founder, 1), `${fx(rv.cycle.ratio, 1)}×`],
+	]) + `\n\nAt Lv ${rv.level}, from \`boxEV\` slot tables (${rv.sameAtEveryStage ? 'the same at every live stage' : '**differs by stage**'}). Surface: ${rv.surface}. ${pityText}`;
 
 	// Top.gg.
 	out['streak-topgg'] = mdTable(['Player', 'Votes/day', 'Today (Phase 5 simulation, 30 d): votes vs fishing', 'Today\'s vote rule on the new value model (integrated, 30 d)', 'Proposed streak (integrated, 30 d)'], Object.keys(todayC).map((a) => {

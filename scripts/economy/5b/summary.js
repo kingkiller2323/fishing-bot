@@ -194,7 +194,9 @@ function normalizeChecks(module, raw) {
 		return raw.map((c) => ({ module, id: c.id || c.name || c.check, text: c.check || c.text || c.name || c.id, pass: c.pass ?? c.ok, detail: c.detail ?? c.value }));
 	}
 	if (Array.isArray(raw.checks)) return normalizeChecks(module, raw.checks);
-	return Object.entries(raw).filter(([k]) => k !== 'pass').map(([k, v]) => ({ module, id: k, text: k, pass: v === true || (typeof v === 'string' && !/fail/i.test(v)), detail: v }));
+	if (Array.isArray(raw.list)) return normalizeChecks(module, raw.list);
+	const words = (k) => k.replace(/([A-Z]|\d+)/g, ' $1').toLowerCase().replace(/\s+/g, ' ').trim();
+	return Object.entries(raw).filter(([k]) => k !== 'pass').map(([k, v]) => ({ module, id: k, text: `${words(k)} (\`${k}\`)`, pass: v === true || (typeof v === 'string' && !/fail/i.test(v)), detail: v === false ? `fails (${module}.md, Checks)` : v }));
 }
 function openChecksTable() {
 	const rows = [];
@@ -205,6 +207,20 @@ function openChecksTable() {
 		else if (typeof mod.report === 'function' && m === 'founder') raw = mod.report().checks;
 		for (const c of normalizeChecks(m, raw)) if (c.pass === false) rows.push(c);
 	}
+	// Design flags that are not module checks but fail a stated target (each computed, never typed).
+	const bait = require('./bait');
+	const vol = bait.volumeCheck();
+	if (!vol.pass) {
+		const sp = vol.summary.Spinner;
+		rows.push({ module: 'bait', text: 'Spinner keeps every rod tier inside its multi-catch band (decision 2; P-BAIT-SPINNER-TIERS)', detail: `tiers above the mid band: ${sp.tiersAboveBand.join(', ')}; above the ${fmt(sp.ceiling, 2)} ceiling: ${sp.tiersAboveCeiling.join(', ')}; highest mean ${fmt(sp.maxMeanWith, 2)}` });
+	}
+	const xpRow = bait.xpSizing().rows.find((r) => r.id === 'proposed');
+	const out = xpRow.windows.filter((w) => !w.inWindow);
+	if (out.length) rows.push({ module: 'bait', text: 'A regular player on XP bait every cast stays inside the approved windows (P-BAIT-XP-SIZING)', detail: out.map((w) => `Lv ${w.level} ${fmt(w.hours, 2)} h (window ${w.window[0]}–${w.window[1]} h)`).join('; ') });
+	const streak = require('./streak');
+	const cap = streak.PARAMS.targets.regular30dShareMax;
+	const reg30 = streak.archetypeValue().regular.periods[30];
+	if (reg30 && reg30.withLuckyDrawShareOfFishing > cap) rows.push({ module: 'streak', text: `Regular player's 30-day streak value ≤ ${pct(cap, 0)} of fishing income (P-STREAK-TARGETS), once the Lucky Draw from streak boxes is attributed`, detail: `${pct(reg30.streakShareOfFishing)} without the Lucky Draw (the target's basis, passes); ${pct(reg30.withLuckyDrawShareOfFishing)} with it` });
 	const detail = (d) => (d == null ? '—' : typeof d === 'string' ? d : JSON.stringify(d).slice(0, 220));
 	if (!rows.length) return 'Every module design check passes.';
 	return `${table(['Module', 'Check', 'Result'], rows.map((c) => [c.module, c.text, detail(c.detail)]))}\n\nNone of these was tuned away: each is a design choice for you, with its options in the module doc and in §17.`;
@@ -243,9 +259,13 @@ function headlineTable() {
 	}).join(' · ');
 	const gear = F.gearPath();
 	const prices = require('./world').permitPriceMap();
-	const sinks = ARCH.map((a) => I.sinkSummary(reference(a)));
+	const sinks = ARCH.map((a) => {
+		const r = reference(a);
+		const income = Object.values(r.ledger.cash).reduce((x, y) => x + y, 0);
+		const spend = (c) => Object.values(r.ledger.spend[c] || {}).reduce((x, y) => x + y, 0) / income;
+		return { upkeep: spend('upkeep'), progression: spend('progression'), saved: r.final.money / income, savedNet: r.final.money / (income - (r.ledger.cash.salvage || 0) - (r.ledger.cash.luckyDraw || 0)) };
+	});
 	const range = (xs, f) => `${f(Math.min(...xs))}–${f(Math.max(...xs))}`;
-	const share = (s, c) => s.byCategory[c]?.share ?? 0;
 	const catchUp = Object.values(r2.catchUp);
 	const D = require('./decisions');
 	const counts = D.table().reduce((a, d) => ({ ...a, [d.status]: (a[d.status] || 0) + 1 }), {});
@@ -256,9 +276,9 @@ function headlineTable() {
 		['Normal fish per cast by gear step (multi-catch mean)', gear.map((t) => `${t.key === 'old' ? 'Old Rod' : t.key.toUpperCase()} ${fmt(t.meanFish, 2)}`).join(' · ')],
 		['Chance of a 3+ fish jackpot by gear step', gear.map((t) => pct(t.jackpot3plus ?? 0)).join(' · ')],
 		['Permit prices', Object.entries(prices).map(([b, p]) => `${b} ${money(p)}`).join(' · ')],
-		['Share of all income to Lv 60: upkeep / progression / saved', `${range(sinks.map((s) => share(s, 'upkeep')), pct)} / ${range(sinks.map((s) => share(s, 'progression')), pct)} / ${range(sinks.map((s) => s.savedShare), pct)}`],
+		['Share of all income to Lv 60: upkeep / progression / saved (saved net of crate rebates)', `${range(sinks.map((x) => x.upkeep), pct)} / ${range(sinks.map((x) => x.progression), pct)} / ${range(sinks.map((x) => x.saved), pct)} (${range(sinks.map((x) => x.savedNet), pct)})`],
 		['Minimum-daily player (R2)', `${r2.minimumDaily.leadsAnEngagedArchetypeOnDays.length ? 'LEADS an engaged player' : 'never leads an engaged player by calendar day'}; XP per active hour ${equalLevelRange(r2)} the regular player's at equal level (Lv 20–50), ${fmt(r2.minimumDaily.xpPerActiveHourVsRegular, 2)}× on day 365`],
-		['No-miss grinder (R2): play-hours saved by every daily/streak/repeatable reward', `at most ${pct(r2.noMissGrinder.maxShareOfHoursSaved)}`],
+		['No-miss grinder (R2): play-hours saved by every daily/streak/repeatable reward', `at most ${pct(r2.noMissGrinder.maxShareOfHoursSaved)} with rewards credited at day end (the model); on-completion crediting in §5.2`],
 		['Decisions awaiting approval', Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(' · ')],
 	]);
 }
@@ -279,14 +299,14 @@ function stampTable() {
 
 // Module tables re-emitted verbatim (same block ids as in the module docs).
 const REEMIT = {
-	rods: ['rods-current-proposed', 'rods-gear-path', 'rods-crates', 'rods-upkeep'],
+	rods: ['rods-current-proposed', 'rods-gear-path', 'rods-crates', 'rods-legacy-crate', 'rods-upkeep'],
 	world: ['world-current-proposed', 'world-permit-table', 'world-time-to-afford', 'world-ms-ladder', 'world-value-per-fish', 'world-value-per-hour'],
-	bait: ['bait-current', 'bait-proposed', 'bait-xp-sizing'],
-	quests: ['quests-fixes', 'quests-kinds', 'quests-bands', 'quests-story'],
-	streak: ['streak-current-proposed', 'streak-ladder'],
-	buffs: ['buffs-bugs', 'buffs-current-proposed', 'buffs-income-share'],
-	aquarium: ['aquarium-current-proposed', 'aquarium-licenses', 'aquarium-integrated', 'aquarium-display', 'aquarium-fixes'],
-	founder: ['founder-headline', 'founder-profile', 'founder-visible', 'founder-time', 'founder-public-pace', 'founder-gate', 'founder-day30', 'founder-f1-surfaces', 'founder-fix-first'],
+	bait: ['bait-current', 'bait-proposed', 'bait-xp-sizing', 'bait-volume'],
+	quests: ['quests-fixes', 'quests-kinds', 'quests-bands', 'quests-story', 'quests-credit-timing'],
+	streak: ['streak-current-proposed', 'streak-ladder', 'streak-founder-reveal'],
+	buffs: ['buffs-bugs', 'buffs-current-proposed', 'buffs-income-share', 'buffs-dc-share', 'buffs-cash-share-checks'],
+	aquarium: ['aquarium-current-proposed', 'aquarium-licenses', 'aquarium-integrated', 'aquarium-display', 'aquarium-legacy-tanks', 'aquarium-fixes'],
+	founder: ['founder-headline', 'founder-profile', 'founder-visible', 'founder-time', 'founder-public-pace', 'founder-gate', 'founder-day30', 'founder-f1-surfaces', 'founder-detection', 'founder-one-reply', 'founder-stealth', 'founder-fix-first'],
 };
 
 function markdownTables() {

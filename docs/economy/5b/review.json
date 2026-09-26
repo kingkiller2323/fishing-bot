@@ -1,0 +1,366 @@
+{
+ "reviewedCommit": "16edf3c",
+ "method": "five read-only reviewers (compliance, exploits, migrations, Founder subtlety, independent numbers) and one independent skeptic per dimension that tried to refute every finding",
+ "findings": [
+  {
+   "id": "EXP-1",
+   "dimension": "exploits",
+   "title": "Live shop dupe: a purchase in a second open shop menu is paid from a stale balance, so k menus buy k lots for the price of one. The proposed crates and bait are bought through the same path.",
+   "severity": "major",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "src/components/buttons/buy-other.js:96,149,260-262; src/components/buttons/buy-bait.js:84,223; src/class/User.js:18-20 (whole-document save), 62-65 (addMoney read-modify-write)",
+   "resolution": "Live shop dupe documented as rods C5 (fix-first, §15.0 L2), with a regression test specified. Hotfix awaiting approval."
+  },
+  {
+   "id": "EXP-2",
+   "dimension": "exploits",
+   "title": "The rods migration relies on a 'bootstrap upsert' that does not exist. The Fishing Crate row would stay at $750 with no level gate while opening as the $4,900 T1 crate, creating a money loop.",
+   "severity": "major",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "docs/economy/5b/rods.md:504 and :497 (catalog change via src/bootstrap/data/gacha.js); src/bootstrap/seed.js:1-6 and runStep (insert-missing only); box definitions resolved by name in src/engine/gachaBoxes.js / gacha.js:132",
+   "resolution": "rods.md §13 now specifies a catalogRevision-guarded catalog sync plus a startup assertion (rods-catalog-sync). §18 makes it a rule for every catalog change."
+  },
+  {
+   "id": "EXP-3",
+   "dimension": "exploits",
+   "title": "Pre-migration arbitrage: Fishing Crates bought now at $750 open after the migration as $4,900 T1 crates worth 1.45x their cost in salvage. Carried-over stock and balances have no decision.",
+   "severity": "major",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "P-RODS-FISHING-CRATE (PHASE5B_REPORT.md:969; rods.md:280 'Owned Fishing Crates open under the new definition (strictly better...)'); src/bootstrap/data/gacha.js:4-9 (shopItem true, price 750, no level requirement)",
+   "resolution": "Arbitrage sized (rods-legacy-crate, §6.2a). P-RODS-FISHING-CRATE rewritten with three options. Delisting before the plan is shared is L5, awaiting approval."
+  },
+  {
+   "id": "EXP-4",
+   "dimension": "exploits",
+   "title": "The live impact of B3 is misstated. Activated buffs apply indefinitely on the 'Fish again' button path, so 'no buff has ever had an effect' is false.",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "docs/economy/5b/buffs.md:41, :77, :556, and the P-BUFFS-LEGACY rationale (buffs.md:50); PHASE5B_REPORT.md:537 ('~0 in practice (B1)'); src/commands/slash/Fish/fish.js:168,196-201; src/events/Guild/interactionCreate.js:26; src/engine/modifiers.js:116-126; src/components/buttons/sell-one-fish.js (cash",
+   "resolution": "Same as MIG-1, with the verifier's scope (\"Fish again\", Sell, \"Open another\" until the next slash command)."
+  },
+  {
+   "id": "EXP-5",
+   "dimension": "exploits",
+   "title": "Unlimited free /build tanks before A6 ships are grandfathered and upsized to the new tank size, which bypasses the display-tank aspirational sink.",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "docs/economy/5b/aquarium.md:578 (effective capacity = max(stored size, license tankSize)), :595-596 (every existing Habitat grandfathered), legacy table :613-618; src/commands/slash/Pet/build.js (no count limit, cooldown 10_000)",
+   "resolution": "Legacy-tank exposure tabled (aquarium-legacy-tanks); ordering rule A6 before or with the licence migration, plus cutoff options, in P-AQUARIUM-LEGACY-LICENSES."
+  },
+  {
+   "id": "EXP-6",
+   "dimension": "exploits",
+   "title": "The '/dev founder' profile override is outside P-FOUNDER-DEV-GRANTS: it can give any account (a developer's alt included) the Founder profile, and switching the real Founder 'off' makes its catches competitive-eligible.",
+   "severity": "minor",
+   "verdict": "partly",
+   "finalSeverity": "info",
+   "where": "src/engine/balance.js:172-182 (resolveProfile: override wins); src/engine/dev.js founder(); src/commands/slash/Admin/dev.js:42-44; test/founder-dev.test.js:158-161",
+   "resolution": "As FND-7."
+  },
+  {
+   "id": "C1",
+   "dimension": "compliance",
+   "title": "Live exploit understated: an expired buff keeps applying on the 'Fish again' and 'Sell' button paths, so 'no buff has ever had an effect' is false",
+   "severity": "major",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "docs/economy/5b/buffs.md:41,50,77,556; PHASE5B_REPORT.md:537 ('~0 in practice (B1)'); src/events/Guild/interactionCreate.js:26,224-229; src/engine/cast.js:189; src/commands/slash/Fish/fish.js:196-203; src/components/buttons/sell-one-fish.js:63-65",
+   "resolution": "Same as MIG-1: live exploit documented. Minimal B3 hotfix awaiting approval (§15.0 L1)."
+  },
+  {
+   "id": "C2",
+   "dimension": "compliance",
+   "title": "Fix-first ordering reopens exploit #5: B1+B2 are to ship 'first, on today's numbers' while Double Cash still pays at sale",
+   "severity": "major",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "PHASE5B_REPORT.md:845-847 and 1080 (§18 step 1); registry P-BUFFS-FIX-DURATION ('ships first'); buffs.md:59 vs buffs.md:559; src/components/buttons/sell-one-fish.js:63-65, src/class/Fish.js:27-28, src/class/User.js:182-183",
+   "resolution": "Ordering rule recorded: B3 alone now; B1 + B2 only in the same deploy as P-DOUBLE-CASH (P-BUFFS-HOTFIX, buffs rollout table, §15)."
+  },
+  {
+   "id": "C3",
+   "dimension": "compliance",
+   "title": "Decision 7 not met: the 'fix-first' list embeds unapproved balance numbers, and a live exploit (#4 rod level bypass) is left out of it",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "PHASE5B_REPORT.md:847 ('Each is a small correctness change that uses today's numbers'), 859 (Q2), 862 (Q5), 863-864 (Q6/Q7), 912 (A1), 917 (A6), 932 (C2/C3), 206 (level requirement); PHASE5_REPORT.md:190-191",
+   "resolution": "Fix-first split into urgent live problems, correctness fixes on today's numbers, and closures needing a proposed value (\"Ships on\" columns in rods, quests, buffs and aquarium). Exploits #3/#4/#5 are tied to their release decisions."
+  },
+  {
+   "id": "C4",
+   "dimension": "compliance",
+   "title": "New Founder public tell: below Lv 20 a normal player can only land 1 fish, but the Founder lands 2-5 fish on 90% of casts",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "PHASE5B_REPORT.md:726 (Founder Old Rod 10/25/30/25/10%), 959 (P-RODS-CRAFT minLevel 20), 1035 (P-FOUNDER-VISIBLE), 670 (§14 prose), 769 (public Lv 20 at 0.93 h); founder.md:47, 746; fish.js:77-80",
+   "resolution": "New Founder check visibleCountFeasibleForNormal (fails, reported). P-FOUNDER-VISIBLE wording corrected, with a cap alternative; the stealth option covers it."
+  },
+  {
+   "id": "C5",
+   "dimension": "compliance",
+   "title": "Founder box reveals are public but rolled with private gacha stats and pity; P-STREAK-FOUNDER calls this 'private' and the tell lists omit /open",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "PHASE5B_REPORT.md:1009 (P-STREAK-FOUNDER), 826-838 (§14.6 surfaces), 893-900 (§15.4 open tells); src/commands/slash/Economy/open.js:20-22,47; src/engine/gacha.js:141-159; src/engine/balance.js:70-78; founder.md:205-211",
+   "resolution": "/open reveals added to the Founder surfaces, fix-first F2d and streak-founder-reveal; P-STREAK-FOUNDER reworded with options."
+  },
+  {
+   "id": "C6",
+   "dimension": "compliance",
+   "title": "The value model and XP-per-rarity rule change every fish's value and XP but have no registry entry, and their numbers never appear in the report",
+   "severity": "major",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "scripts/economy/5b/framework.js:44-54,74-76; decisions.js (only P-MS-VALUE); src/engine/cast.js:259-263; PHASE5_REPORT.md:276-277; docs/economy/5b/rods.md:377; PHASE5B_REPORT.md:307",
+   "resolution": "P-VALUE-MODEL and P-XP-RARITY registered with get/expected; tables in §6.4; rods.md no longer says \"as decided\"."
+  },
+  {
+   "id": "C7",
+   "dimension": "compliance",
+   "title": "No decision covers legacy wealth at release, and redefining owned Fishing Crates gives a +45% pre-release arbitrage",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "major",
+   "where": "PHASE5B_REPORT.md:969 (P-RODS-FISHING-CRATE 'owned crates open under the new definition'), 966 (P-RODS-LEGACY-RODS), 912 (today's best rod $1,421,638/h), 654 (regular income to L60 $9,235,371); src/bootstrap/data/gacha.js:8-9; src/components/buttons/buy-other.js:141,241",
+   "resolution": "P-LEGACY-WEALTH added; P-RODS-LEGACY-DURABILITY split out with numbers; owned crates as EXP-3."
+  },
+  {
+   "id": "C8",
+   "dimension": "compliance",
+   "title": "Decision 2: Spinner bait pushes endgame rods past the approved 1.8 mean in Lake/Pond; biome gating does not bound it as bait.md claims",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "docs/economy/5b/bait.md:117; PHASE5B_REPORT.md:405 (Spinner: Lake, Pond, Lv 20, +10% extra-fish), 960 (P-RODS-MEAN-FISH 'ceiling 1.8')",
+   "resolution": "Spinner by rod tier tabled (bait-volume, §8.4); P-BAIT-SPINNER-TIERS registered; the bait.md claim corrected."
+  },
+  {
+   "id": "C9",
+   "dimension": "compliance",
+   "title": "R4 wording: founder.md calls proposed Founder targets 'approved' and uses that to argue for accepting the failing day-30 check",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "docs/economy/5b/founder.md:48-49 (P-FOUNDER-XP why), 68-69, 428",
+   "resolution": "\"Approved\" wording for proposed Founder targets removed."
+  },
+  {
+   "id": "C10",
+   "dimension": "compliance",
+   "title": "Report prose is incomplete: dangling references, §16 placeholder, failing buffs checks and the decision 8 comparison left out of the report",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "PHASE5B_REPORT.md:56 ('decision D3 below'), 216 ('decision 13'), 939 ('REVIEW'), 944, 1081 ('Founder F1–F5'); buffs.md:599-603",
+   "resolution": "Report prose fixed: section 0 and P-SAVINGS replace \"D3\"; the review, open-checks and decision-8 tables are in the report; the §17 verify claim covers entries with a model value only."
+  },
+  {
+   "id": "C11",
+   "dimension": "compliance",
+   "title": "Decision 1 'steeper after L20': the quartic also raises XP before L20, a trade-off the report does not surface",
+   "severity": "minor",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "PHASE5B_REPORT.md:67-68 (×1.05 at L10, ×1.21 at L20), 49 ('first 20 levels feel the same'); decisions.js A-CURVE (alternatives '—'); PHASE5_REPORT.md:273 (P1 'Unchanged to Lv 20')",
+   "resolution": "A-CURVE records the piecewise alternative; §2 explains the pre-20 rise."
+  },
+  {
+   "id": "FND-1",
+   "dimension": "founder",
+   "title": "'Private Luck' (P-FOUNDER-LUCK / target M5) compensates through a stat visible on every card and makes the per-hour Legendary+ tell larger than today's at every tier",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "docs/economy/5b/founder.md:51 (P-FOUNDER-LUCK), :327 (profile row 'Private.'), :368-376 (founder-luck table); scripts/economy/5b/decisions.js:22 (A-FOUNDER-VISIBLE); docs/economy/PHASE5B_REPORT.md:670",
+   "resolution": "Luck relabelled as a stat with a public effect; its overshoot and base gains are tabled; the no-luck option is sized."
+  },
+  {
+   "id": "FND-2",
+   "dimension": "founder",
+   "title": "The report's 'normal-looking' and 'plausibly lucky' claims are false: rarity mix, count and cadence identify the Founder within about 3-10 casts, and the final report drops the residual-tells list",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "major",
+   "where": "docs/economy/PHASE5B_REPORT.md:58, :670, :889; docs/economy/5b/founder.md:34, :360, :383, :452, :714-719",
+   "resolution": "Plausibility claims replaced by measured detection figures (founder-detection, founder-one-reply, §14.7). P-FOUNDER-STEALTH registered, with the stealth profile solved as a sensitivity."
+  },
+  {
+   "id": "FND-3",
+   "dimension": "founder",
+   "title": "Unaddressed public surfaces: /stats, /collection and /inventory publish lifetime per-species counts, and rod durability exposes the Founder's 0.15 durability per fish",
+   "severity": "major",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "src/engine/cast.js:422-425; src/commands/slash/User/stats.js:36-42,62; src/commands/slash/User/collection.js:26-38,59; src/commands/slash/User/inventory.js:38-56,68,155; src/commands/slash/Info/info.js:49-53; src/buttonPagination.js:9-10; docs/economy/5b/founder.md:394-398,716,731",
+   "resolution": "/stats, /collection, the /inventory fish list and rod durability added as open public tells (F2b, F2c, P-FOUNDER-SURFACES, §15.0 L4)."
+  },
+  {
+   "id": "FND-4",
+   "dimension": "founder",
+   "title": "Box reveals are public and show the kept Founder gacha luck; the streak design's 'nothing public differs' is incorrect",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "src/commands/slash/Economy/open.js:13-19,47; src/engine/balance.js:70,76-78; docs/economy/5b/streak.md:51 (P-STREAK-FOUNDER), :484-491; docs/economy/5b/founder.md:207-213; src/engine/presentation.js:67",
+   "resolution": "As C5."
+  },
+  {
+   "id": "FND-5",
+   "dimension": "founder",
+   "title": "/biome and /start-quest select collectors have no user filter: bystanders act on the invoker's account, which today is an active probe of the Founder's real level",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "src/commands/slash/Fish/biome.js:78,86,95,110-121; src/commands/slash/User/startQuest.js:62,70,76,125-126; src/commands/slash/User/equip.js:69; docs/economy/5b/world.md:591; docs/economy/5b/founder.md:665",
+   "resolution": "Live bug documented (founder F3, §15.0 L3); hotfix awaiting approval."
+  },
+  {
+   "id": "FND-6",
+   "dimension": "founder",
+   "title": "The existing Founder account's switch to the public gate is unmodelled, and it can put a BIOME_LOCKED failure on a public card",
+   "severity": "info",
+   "verdict": "confirmed",
+   "finalSeverity": "info",
+   "where": "docs/economy/5b/world.md:341, :593; docs/economy/5b/founder.md:55 ('lifecycles start new players, so the floor never binds in the model'), :592",
+   "resolution": "Founder currentBiome migration rule added (P-FOUNDER-MIGRATION); world.md cross-referenced."
+  },
+  {
+   "id": "FND-7",
+   "dimension": "founder",
+   "title": "The /dev founder override is a second path to the Founder profile and leaves a permanent publicXp gap, so 'identical for normal players' is not strictly true",
+   "severity": "info",
+   "verdict": "confirmed",
+   "finalSeverity": "info",
+   "where": "src/engine/balance.js:176-182; src/engine/dev.js:114-126; src/commands/slash/User/profile.js:32; docs/economy/5b/founder.md:665",
+   "resolution": "P-FOUNDER-DEV-OVERRIDE registered (fix-first F5, optional hardening)."
+  },
+  {
+   "id": "MIG-1",
+   "dimension": "migrations",
+   "title": "Double XP and Double Cash work in production today through button play and never run out. The report says 'no buff has ever had an effect' (the basis for P-BUFFS-FIX-DURATION, P-BUFFS-LEGACY and buffs migration 1).",
+   "severity": "blocker",
+   "verdict": "confirmed",
+   "finalSeverity": "blocker",
+   "where": "src/engine/cast.js:189; src/events/Guild/interactionCreate.js:26 and :224-229; src/commands/slash/Fish/fish.js:148,196-201; src/components/buttons/sell-one-fish.js:63-70; src/class/User.js:534-541; scripts/economy/5b/buffs.js:1126,1213; docs/economy/5b/buffs.md:41,50,556; docs/economy/PHASE5B_REPORT",
+   "resolution": "Live exploit, acknowledged everywhere: buffs.md, P-BUFFS-FIX-DURATION and P-BUFFS-LEGACY corrected. B3 hotfix proposed (L1, P-BUFFS-HOTFIX), awaiting approval."
+  },
+  {
+   "id": "MIG-2",
+   "dimension": "migrations",
+   "title": "Curve change: the live level read and write sites bypass the proposed no-demotion floors. The first cast after the change overwrites the stored level with the lower new-curve level. P-CURVE-EXISTING does not state that it depends on P-FOUNDER-PUBLIC-LEVEL for every player.",
+   "severity": "major",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "src/engine/cast.js:321-322 (levelAfter = levelForXp(...)), :327-328 (publicBefore/After = levelForXp(...)), :427 ($set level); src/class/User.js:242-244 (getLevel = levelForXp(xp)); src/engine/dev.js:61 (level: levelForXp(newXp)); docs/economy/5b/founder.md:658,660,665-666,677; scripts/economy/5b/de",
+   "resolution": "P-CURVE-EXISTING and P-FOUNDER-PUBLIC-LEVEL: the stored floor covers every player, and every level read/write site is listed (founder-level-sites)."
+  },
+  {
+   "id": "MIG-3",
+   "dimension": "migrations",
+   "title": "Shipped publicXp hotfix: when a cast hits a document that has no publicXp, the $inc creates the field and the migration's $exists guard then skips that document forever. Casts from the old instance during a deploy overlap are also lost from publicXp. Neither case heals itself.",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "src/engine/cast.js:421 ($inc publicXp); src/engine/publicLevel.js:62-72 (read xp, then guarded $set); src/engine/publicLevel.js:37-40 (fallback to xp only while the field is absent)",
+   "resolution": "Documented as founder F4 (update-pipeline $ifNull write plus a one-time reconcile), awaiting approval."
+  },
+  {
+   "id": "MIG-4",
+   "dimension": "migrations",
+   "title": "Casts and box opens left pending by pre-5B code are replayed by the 5B engine after the 5B migrations have run. No module requires the new code to accept the old journal shape, and a throw during recovery stops the bot from starting.",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "src/bootstrap/index.js:239-246 (runMigrations, then recoverPendingCasts, then recoverPendingOpens; no try/catch); src/engine/cast.js:484-490; the migration sections of the eight module docs",
+   "resolution": "§18 rule: the 5B writeCast/applyGachaResult accept pre-5B journal shapes, with recovery isolated per journal."
+  },
+  {
+   "id": "MIG-5",
+   "dimension": "migrations",
+   "title": "bait.md says a legacy bait stack owned below its shop level 'waits until it is usable', but nothing enforces that: /equip's level check never blocks for any item, and the 5B touchpoints add no level check when bait is used.",
+   "severity": "minor",
+   "verdict": "partly",
+   "finalSeverity": "minor",
+   "where": "src/commands/slash/User/equip.js:67-74 (checkItemRequirements uses userData.level), :130 (userData = new User(...)), :177 and :268; src/class/User.js:13-16 (the wrapper has no level property); docs/economy/5b/bait.md:521,536; docs/economy/5b/rods.md:493; docs/economy/PHASE5B_REPORT.md:959 (P-RODS-CR",
+   "resolution": "Use-time level check added to the bait touchpoints; equip.js level bug is fix-first (§15.0 L6)."
+  },
+  {
+   "id": "NUM-1",
+   "dimension": "numbers",
+   "title": "§1 points to 'decision D3 below', which does not exist; the savings/cash-surplus question has no entry in the 126-entry decision registry",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "major",
+   "where": "docs/economy/PHASE5B_REPORT.md:56 (also §16 line 939 is the placeholder 'REVIEW'); scripts/economy/5b/decisions.js",
+   "resolution": "P-SAVINGS registered; the dangling reference removed."
+  },
+  {
+   "id": "NUM-2",
+   "dimension": "numbers",
+   "title": "§13 sink shares count salvage refunds and Lucky Draw assembly rebates (both reductions of crate cost) as income while counting crates gross, which understates the known savings surplus by 1.9-3.9 pp",
+   "severity": "minor",
+   "verdict": "partly",
+   "finalSeverity": "info",
+   "where": "scripts/economy/5b/summary.js sinksTable()/headlineTable(); scripts/economy/5b/integrate.js sinkSummary(); PHASE5B_REPORT.md §1 headline row 'Share of all income...' and §13",
+   "resolution": "Sink table gained a \"saved, net of crate rebates\" column."
+  },
+  {
+   "id": "NUM-3",
+   "dimension": "numbers",
+   "title": "Money bait is presented as an optional sink, but in the integrated run it raises absolute savings and speeds levels (a net source)",
+   "severity": "minor",
+   "verdict": "partly",
+   "finalSeverity": "info",
+   "where": "PHASE5B_REPORT.md:56 ('Bait and the aquarium are optional sinks') and §13 rows 'regular + bait: money baits' / 'regular + money baits + aquarium'",
+   "resolution": "§1 and §13 say money bait is a gross sink but a small net source."
+  },
+  {
+   "id": "NUM-4",
+   "dimension": "numbers",
+   "title": "The final report cites the minimum-daily player's XP per active hour only as 1.60x (day 365, regular at Lv 94, outside the model); at equal level it is 1.94-1.97x",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "PHASE5B_REPORT.md:40 (headline), :168 (§5.2), :189 (§5.3 table); decisions.js P-DAILY-FACTOR 'why' (not rendered in §17)",
+   "resolution": "Equal-level ratios now in the headline and §5.3 (telemetry alert on the equal-level ratio)."
+  },
+  {
+   "id": "NUM-5",
+   "dimension": "numbers",
+   "title": "R2 no-miss grinder saving ('at most 6.3%') is understated: quests credit daily, weekly and repeatable rewards only at day end",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "scripts/economy/5b/quests.js system() onDayEnd (~L1203-1218); PHASE5B_REPORT.md §5.2 no-miss grinder table and headline 'at most 6.3%'",
+   "resolution": "Completion-crediting sensitivity tabled (quests-credit-timing, §5.2); still under the quests limit."
+  },
+  {
+   "id": "NUM-6",
+   "dimension": "numbers",
+   "title": "Double rounding makes the same quantity print differently across approved tables (T3 P(3+) 11.5% vs 11.6%; regular upkeep 2.7% vs 2.6%)",
+   "severity": "minor",
+   "verdict": "confirmed",
+   "finalSeverity": "minor",
+   "where": "PHASE5B_REPORT.md:37 headline (T3 11.5%) vs :231 rods-gear-path and :729 founder-visible (11.6%); :654 §13 / headline upkeep (regular 2.7%) vs world-budget and rods-lifecycle (2.6%); rods.js round4() at ~L1256/L1275, founder.js round(p3plus,4) ~L1298",
+   "resolution": "Rounding fixed in rods and summary (shares from raw totals)."
+  },
+  {
+   "id": "NUM-7",
+   "dimension": "numbers",
+   "title": "§1 says the normal catch 'averages 1.2 to 1.8 fish per cast by tier', but a Common crafted rod (tier T1 under P-RODS-TIER) averages 1.1",
+   "severity": "info",
+   "verdict": "confirmed",
+   "finalSeverity": "info",
+   "where": "PHASE5B_REPORT.md:50; decisions P-RODS-MEAN-FISH / P-RODS-TIER; §6 rods-current-proposed row 'Fish per cast (crafted)'",
+   "resolution": "Wording now \"1.1 (Common crafted rod) to 1.8\"; rods headline row added."
+  }
+ ]
+}

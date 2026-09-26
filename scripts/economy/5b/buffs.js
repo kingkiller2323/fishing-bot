@@ -42,8 +42,11 @@
 //   luckyDrawValue(t)             proposed Lucky Draw on tier t's assembly: crates, $, stage hours
 //   valuePerBuff(level, archetype)
 //                                 one buff of each type at a stage: $ / XP and minutes of own play
-//   current()                     today's buffs: catalog, measured box odds, bugs (with fixes), stacking,
-//                                 Lucky Draw inertness
+//   current()                     today's buffs: catalog, measured box odds, bugs (with fixes and the deploy
+//                                 each ships in, PARAMS.rollout), stacking, Lucky Draw inertness
+//   liveBuffPaths()               the live buff readers and the slash-only expiry sweep, as src/ file:line
+//                                 read at report time (evidence for B2/B3; nothing runs the bot)
+//   LIVE_REPRO                    the recorded reproduction of B2 + B3 on the in-memory test database
 //   --- the system ---
 //   system(opts)                  the buffs SYSTEM (lifecycle.js hooks; integrate.js runs it). opts:
 //                                 sources (which buff sources it receives), trace (observational record)
@@ -63,6 +66,8 @@
 //   r2(), founderView(), checks()
 //   report()                      every number in docs/economy/5b/buffs.md (cached), with ...F.stamp()
 //   markdownTables()              the doc's generated tables ({ blockId: markdown })
+const fs = require('fs');
+const nodePath = require('path');
 const F = require('./framework');
 const I = require('./integrate');
 const streak = require('./streak');
@@ -96,6 +101,12 @@ const PARAMS = deepFreeze({
 	// stored value at catch (like every other sell modifier today), so the sale path never reads buffs.
 	// PROPOSED at framework level (decisions.js P-DOUBLE-CASH).
 	doubleCash: { timing: F.BUFFS.doubleCashTiming },
+	// Deploy order of the correctness fixes (bugs table "Ships"; P-BUFFS-HOTFIX, P-BUFFS-FIX-DURATION). B3 alone
+	// restores today's intended behaviour (the few-second window of B1) and can ship now. B1 + B2 turn every
+	// held unit into a real hour, so they ship only in the deploy that also stamps Double Cash at catch
+	// (P-DOUBLE-CASH) and removes cash buffs from every sale path; earlier, each held Double Cash would be an
+	// hour of sale-time hoarding. B4 and B5 need proposed values (P-BUFFS-QUEUE, the new catalog text).
+	rollout: { hotfix: ['B3'], withDoubleCash: ['B1', 'B2'], withBalanceRelease: ['B4', 'B5'], anyTime: ['B6'] },
 	catalog: {
 		'Double XP': { kind: 'xp', multiplier: F.BUFFS.multipliers.xp, duration: { type: 'wallclock', seconds: F.BUFFS.durationSeconds }, applies: 'XP of fish caught by casting (never quest XP, never box fish)' },
 		'Double Cash': { kind: 'cash', multiplier: F.BUFFS.multipliers.cash, duration: { type: 'wallclock', seconds: F.BUFFS.durationSeconds }, applies: 'value of fish caught by casting, stamped into the stored value (never quest cash, box fish or items)' },
@@ -332,6 +343,8 @@ const TODAY_LUCKY_STATS = (() => {
 	const bonus = (parseFloat(cat.capabilities[1]) || 1) - 1;
 	return { rareFind: bonus, trophyChance: bonus, luck: bonus };
 })();
+/** Today's buff window after activation: the catalog length (seconds) added as milliseconds (B1). */
+const TODAY_WINDOW_S = BUFF_CATALOG[0].length / 1000;
 const luckyDef = (def, mode) => (mode === 'slot'
 	? { ...def, id: `${def.id}+slot`, slots: def.slots + buffOf('Lucky Draw').bonusSlots }
 	: { ...def, id: `${def.id}+luck`, rarityTable: buildTable(def.rarityTable, TODAY_LUCKY_STATS) });
@@ -424,7 +437,80 @@ function valuePerBuff(level, archetype = F.REFERENCE_ARCHETYPE) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Today.
+// Today: the live buff code paths, read from src/ at report time (evidence only; nothing here runs the bot),
+// and the recorded reproduction of B2 + B3.
+const SRC = nodePath.join(__dirname, '../../../src');
+const srcLines = (rel) => {
+	try {
+		return fs.readFileSync(nodePath.join(SRC, rel), 'utf8').split('\n');
+	}
+	catch {
+		return [];
+	}
+};
+/** `src/<rel>:<line>` of the first line matching `re`, and the text of that line and the next two. */
+function srcAt(rel, re) {
+	const lines = srcLines(rel);
+	const i = lines.findIndex((l) => re.test(l));
+	return i < 0 ? { ref: `src/${rel} (not found)`, text: '' } : { ref: `src/${rel}:${i + 1}`, text: lines.slice(i, i + 3).join('\n') };
+}
+/** Every production reader of active buffs. `button`: reachable from a button chain that never sweeps. */
+const BUFF_READERS = [
+	{ path: 'engine/cast.js', reads: 'Double XP on every cast', button: '\'Fish again\' casts' },
+	{ path: 'components/buttons/sell-one-fish.js', reads: 'Double Cash on the catch-card sale', button: 'the catch-card Sell button' },
+	{ path: 'engine/gacha.js', reads: 'Lucky Draw on every open', button: '\'Open another\' opens' },
+	{ path: 'class/Fish.js', reads: 'Double Cash on /sell', button: null },
+];
+/**
+ * The live buff paths (B2, B3) as src/ file:line. `live` is true while some buff query has no expiry
+ * filter (the B3 hotfix is not in src/).
+ */
+function liveBuffPaths() {
+	const readers = BUFF_READERS.map((r) => {
+		const at = srcAt(r.path, /BuffData\.find\(/);
+		return { ...r, ref: at.ref, checksExpiry: /endTime|endsAt/.test(at.text) };
+	});
+	const IC = 'events/Guild/interactionCreate.js';
+	return {
+		commandOnly: srcAt(IC, /if \(!interaction\.isCommand\(\)\) return;/).ref,
+		sweep: srcAt(IC, /endTime\s*<=\s*Date\.now\(\)/).ref,
+		fishAgain: srcAt('commands/slash/Fish/fish.js', /this\.run\(client, collectionInteraction/).ref,
+		openAnother: srcAt('commands/slash/Economy/open.js', /module\.exports\.run\(client, i\b/).ref,
+		activation: srcAt('commands/slash/User/equip.js', /startBooster\(/).ref,
+		startBooster: srcAt('class/User.js', /endTime = Date\.now\(\) \+ buff\.length/).ref,
+		endBoosterFilter: srcAt('class/User.js', /b\.id !== buff\.id/).ref,
+		readers,
+		live: readers.some((r) => !r.checksExpiry),
+	};
+}
+/**
+ * B2 + B3 reproduced with a scratch node:test on the in-memory MongoDB of test/helpers (never production),
+ * code of commit 16edf3c. Recorded, not recomputed: rendering never starts a database. Steps: /equip's sweep,
+ * then startBooster for a Double XP, a Double Cash and a Lucky Draw (as /equip's select menu does); wait past
+ * endTime; castLine (the 'Fish again' path, no sweep); the sell-one-fish button on that cast; openLine (the
+ * 'Open another' path). Then a sweep, the same Double Cash re-activated, the /sell command's own sweep and
+ * Fish.sellByRarity at once (a /sell inside the window) on a fish stored at $1,000.
+ */
+const LIVE_REPRO = deepFreeze({
+	source: 'scratch node:test on the in-memory MongoDB of the test helpers (never production), code of commit 16edf3c',
+	activationWindowMs: 3603,
+	fishAgain: { msAfterEnd: 643, xpMultiplier: 2, xp: 36, xpBase: 18 },
+	sellButton: { stored: 30, paid: 60 },
+	openAnother: { buffApplied: 'Lucky Draw' },
+	afterUse: { count: 1, active: true },
+	slashSellInsideWindow: { stored: 1000, paid: 2000, countAfter: 1 },
+	reviewers: 'The adversarial review reproduced the same (Double XP x2 at 4.5 s and 7.5 s after activation; a re-activated Double Cash paid $62 for a $31 catch)',
+});
+/** Where each fix ships (PARAMS.rollout), as the bugs table prints it. */
+function shipsLabel(id, seconds, needs = null) {
+	const R = PARAMS.rollout;
+	if (R.hotfix.includes(id)) return `**Now, alone (hotfix candidate).** Restores today's intended ${seconds} s window (B1 unchanged); changes no unit, catalog row or stored value`;
+	if (R.withDoubleCash.includes(id)) return 'In the same deploy as the catch-time Double Cash stamp (`P-DOUBLE-CASH`), which removes cash buffs from every sale path; never before it';
+	if (R.withBalanceRelease.includes(id)) return `Balance release (needs a proposed value: ${needs})`;
+	if (R.anyTime.includes(id)) return 'Any time (dead code; no behaviour change)';
+	throw new Error(`buffs: bug ${id} has no deploy in PARAMS.rollout`);
+}
+
 function current() {
 	const catalog = BUFF_CATALOG.map((b) => ({ name: b.name, capabilities: b.capabilities, length: b.length, intendedSeconds: b.length, actualSecondsAfterActivation: b.length / 1000, description: b.description }));
 	const measured = Object.fromEntries(['Daily Box', 'Voter\'s Crate', 'Booster Pack'].map((box) => {
@@ -460,20 +546,36 @@ function current() {
 		}),
 	};
 	const len = BUFF_CATALOG[0].length;
+	const s = TODAY_WINDOW_S;
+	const P = liveBuffPaths();
+	const X = LIVE_REPRO;
+	const todayMult = (name) => parseFloat(BUFF_CATALOG.find((b) => b.name === name).capabilities[1]);
+	const buttonReaders = P.readers.filter((r) => r.button);
+	const slashReader = P.readers.find((r) => !r.button);
+	const bugs = [
+		{
+			id: 'B3',
+			title: P.live
+				? `**Live exploit.** Expiry is checked only before slash commands: an activated buff keeps working on ${buttonReaders.slice(0, -1).map((r) => r.button).join(', ')} and ${buttonReaders[buttonReaders.length - 1].button} until the player's next slash command, and (B2) the same unit can be activated again at will`
+				: 'Expiry only on slash commands (every buff query in src/ now filters on endTime: hotfix present)',
+			evidence: `${P.commandOnly} returns for every interaction that is not a command, so the expiry sweep (${P.sweep}) runs before slash commands only. Button chains reach the engine with no sweep: 'Fish again' (${P.fishAgain}), the catch-card Sell button and 'Open another' (${P.openAnother}). Every buff query trusts active: true: ${P.readers.map((r) => `${r.ref} (${r.reads})`).join('; ')}. /equip activates after its own sweep (${P.activation}). So /fish, then /equip a buff, then a click on the catch card starts a chain that keeps x${todayMult('Double XP')} XP and x${todayMult('Double Cash')} button sales for as long as the player keeps clicking. Reproduced (${X.source}): a 'Fish again' cast ${X.fishAgain.msAfterEnd} ms after endTime got XP x${X.fishAgain.xpMultiplier} (${X.fishAgain.xp} against ${X.fishAgain.xpBase}); the Sell button paid $${X.sellButton.paid} for a catch stored at $${X.sellButton.stored}; an 'Open another' open still applied the ${X.openAnother.buffApplied}; each stack afterwards: count ${X.afterUse.count}, active ${X.afterUse.active}. Also reproduced, on the slash path: after a sweep, the same Double Cash re-activated and a /sell inside the ${s} s window (${slashReader.ref}) paid $${X.slashSellInsideWindow.paid.toLocaleString('en-US')} for a fish stored at $${X.slashSellInsideWindow.stored.toLocaleString('en-US')}, unit count still ${X.slashSellInsideWindow.countAfter}. ${X.reviewers}. Past use in production is not measured (migrations, past use).`,
+			fix: `Hotfix: add endTime > now (endTime: { $gt: Date.now() }) to each buff query listed (${P.readers.map((r) => r.ref.replace(/^src\//, '')).join(', ')}); nothing else changes. It does not close the /sell-inside-the-window case (a slash path, ${s} s, reusable through B2): that closes with B1 + B2 and P-DOUBLE-CASH (alternatives in P-BUFFS-HOTFIX). Later every consumer uses effectsAt(state, now) (endsAt > now); the sweep stays as display cleanup.`,
+		},
+		{ id: 'B1', title: `Every buff lasts ${s} s (on slash commands; on button paths see B3)`, evidence: `User.startBooster (${P.startBooster}): endTime = Date.now() + buff.length; the catalog length ${len} is in seconds but is added as ms. Reproduced on the in-memory MongoDB of the test helpers (never production): endTime - start = ${X.activationWindowMs.toLocaleString('en-US')} ms.`, fix: 'endsAt = now + durationSeconds x 1000.' },
+		{ id: 'B2', title: 'A buff is never consumed', evidence: `startBooster never decrements count; endBooster filters inventory with b.id !== buff.id (${P.endBoosterFilter}; ObjectId.id is a Buffer, buff.id a string: always true), so nothing is removed. Reproduced: after expiry the stack still has count 1, is still in inventory, and /equip re-activates it; with B3 each re-activation is another button chain.`, fix: 'Activation atomically takes one unit ($inc count -1 guarded by count >= 1) with the activation record, in one transaction under the user lock; the stack leaves the inventory only at count 0. Ships WITH B1: fixing B1 alone would make every buff permanent.' },
+		{ id: 'B4', title: 'Inconsistent same-kind stacking', evidence: `modifiers.buffEffects adds every active buff (two Double XP = x${1 + stackXp}); the sale paths use the first cash buff; gacha.js sums Lucky Draws.`, fix: 'One rule for every kind: one active per kind, extra units queue (P-BUFFS-QUEUE).', needs: '`P-BUFFS-QUEUE`' },
+		{ id: 'B5', title: 'Descriptions over-promise', evidence: 'Double XP "from all activities" and Double Cash "income from all activities": quest XP/cash never take a buff (modifiers quest multiplier = profile x event).', fix: 'New catalog text (catalog table).', needs: 'the new catalog text, `P-BUFFS-SCOPE`' },
+		{ id: 'B6', title: 'Dead code', evidence: 'User.generateBoostedXP / generateBoostedCash have no callers (each reads buffs with .find).', fix: 'Remove both.' },
+	].map(({ needs, ...b }) => ({ ...b, ships: shipsLabel(b.id, s, needs) }));
 	return {
 		catalog,
 		measured,
 		buffsPer30dToday: { dailyBoxOnly: daily30, withTopggVotes: daily30 + votes30, eachType: (daily30 + votes30) / 3 },
 		stacking: { twoDoubleXpInEngine: `+${stackXp * 100}% (x${1 + stackXp})`, twoDoubleXpMultiplier: 1 + stackXp, cashAtSale: 'Fish.sellByRarity and sell-one-fish take the FIRST active cash buff only (.find)', gacha: 'gacha.js sums every active Lucky Draw' },
 		luckyToday,
-		bugs: [
-			{ id: 'B1', title: `Every buff lasts ${len / 1000} s`, evidence: `User.startBooster: endTime = Date.now() + buff.length; the catalog length ${len} is in seconds but is added as ms. Reproduced on the in-memory MongoDB of the test helpers (never production): endTime - start = ${(len + 1).toLocaleString('en-US')} ms.`, fix: 'endsAt = now + durationSeconds x 1000.' },
-			{ id: 'B2', title: 'A buff is never consumed', evidence: 'startBooster never decrements count; endBooster filters inventory with b.id !== buff.id (ObjectId.id is a Buffer, buff.id a string: always true), so nothing is removed. Reproduced: after expiry the stack still has count 1, is still in inventory, and /equip re-activates it.', fix: 'Activation atomically takes one unit ($inc count -1 guarded by count >= 1) with the activation record, in one transaction under the user lock; the stack leaves the inventory only at count 0. Ships WITH B1: fixing B1 alone would make every buff permanent.' },
-			{ id: 'B3', title: 'Expiry only on slash commands', evidence: 'interactionCreate sweeps expired buffs before slash commands only; buttons (sell-one-fish) never sweep, and cast.js / gacha.js / Fish.js trust active: true.', fix: 'Read-time expiry: every consumer uses effectsAt(state, now) (endsAt > now); the sweep stays as display cleanup.' },
-			{ id: 'B4', title: 'Inconsistent same-kind stacking', evidence: `modifiers.buffEffects adds every active buff (two Double XP = x${1 + stackXp}); the sale paths use the first cash buff; gacha.js sums Lucky Draws.`, fix: 'One rule for every kind: one active per kind, extra units queue (P-BUFFS-QUEUE).' },
-			{ id: 'B5', title: 'Descriptions over-promise', evidence: 'Double XP "from all activities" and Double Cash "income from all activities": quest XP/cash never take a buff (modifiers quest multiplier = profile x event).', fix: 'New catalog text (catalog table).' },
-			{ id: 'B6', title: 'Dead code', evidence: 'User.generateBoostedXP / generateBoostedCash have no callers (each reads buffs with .find).', fix: 'Remove both.' },
-		],
+		livePaths: P,
+		liveRepro: LIVE_REPRO,
+		bugs,
 	};
 }
 
@@ -1119,11 +1221,30 @@ function founderView() {
 // not repeat: P-DOUBLE-CASH (catch-time Double Cash), P-EVENTS (the event budget), P-LUCKY (pinned Lucky items).
 const DECISIONS = [
 	{
+		id: 'P-BUFFS-HOTFIX', status: 'proposed',
+		title: `Hotfix now, alone: read-time expiry (B3: endTime > now in every buff query). It ends the live button-path exploit and restores today's intended ${TODAY_WINDOW_S} s window; B1 and B2 stay until the P-DOUBLE-CASH deploy`,
+		modelled: 'PARAMS.rollout: B3 now; B1 + B2 in the P-DOUBLE-CASH deploy; B4 and B5 with the balance release; B6 any time (bugs table, "Ships")',
+		alternatives: [
+			`B3 + B2 now: one unit per activation while B1 still limits a buff to ${TODAY_WINDOW_S} s (a /sell inside the window then costs a unit, so each unit doubles at most one hoard; but until the balance release every activation spends a unit on ${TODAY_WINDOW_S} s of effect)`,
+			'B3 + no cash buff in any sale path now (closes the /sell window; Double Cash has no effect until P-DOUBLE-CASH ships)',
+			'no hotfix: wait for the balance release (the button-path exploit stays live)',
+		],
+		source: 'buffs design (adversarial review)',
+		why: `the exploit is live and reproduced (bugs table, B3). B3 alone changes no unit, catalog row or stored value. It leaves one gap: a /sell sent within ${TODAY_WINDOW_S} s of activation still doubles the whole hoard, and B2 lets the unit be activated again (reproduced; bugs table)`,
+		get: () => clone(PARAMS.rollout),
+		expected: { hotfix: ['B3'], withDoubleCash: ['B1', 'B2'], withBalanceRelease: ['B4', 'B5'], anyTime: ['B6'] },
+	},
+	{
 		id: 'P-BUFFS-FIX-DURATION', status: 'proposed',
-		title: 'Correctness fix (ships first): a buff lasts its catalog length in SECONDS and activation consumes exactly one unit (B1 + B2 together), with read-time expiry (B3)',
-		modelled: 'activate(): endsAt = now + durationSeconds x 1000; stock - 1 atomically; effectsAt(): endsAt > now',
-		alternatives: ['fix B1 alone (every buff becomes permanent: B2 never consumes it)', 'keep today (every buff expires after a few seconds and is never used up)'],
-		source: 'buffs design', why: 'today no buff has ever had an effect, and fixing only the duration would make each one permanent (bugs table)',
+		title: 'Correctness fix: a buff lasts its catalog length in SECONDS and activation consumes exactly one unit (B1 + B2 together), in the same deploy as the catch-time Double Cash stamp (P-DOUBLE-CASH) that removes cash buffs from every sale path; read-time expiry (B3) ships before it, alone (P-BUFFS-HOTFIX)',
+		modelled: 'activate(): endsAt = now + durationSeconds x 1000; stock - 1 atomically; effectsAt(): endsAt > now; shipped with PARAMS.rollout.withDoubleCash',
+		alternatives: [
+			'fix B1 alone (every buff becomes permanent: B2 never consumes it)',
+			'ship B1 + B2 before P-DOUBLE-CASH, while sales still apply cash buffs (every held Double Cash becomes an hour of sale-time hoarding; the uncapped hoarder at today\'s arrival rates is in the frequency table)',
+			`keep today (a buff lasts ${TODAY_WINDOW_S} s on slash commands and until the next slash command on button paths, and is never used up)`,
+		],
+		source: 'buffs design',
+		why: 'fixing only the duration would make each buff permanent (B2), and B1 + B2 while cash still pays at sale would open the hoarding that decision 8 closes (Decision 8 and frequency tables). The fix is not only a latent correction: today an activated buff keeps applying on button paths and the unit is reusable (bugs table, B2 and B3)',
 		get: () => {
 			const a = activate({ stock: { 'Double Cash': 1 }, active: {} }, 'Double Cash', 0);
 			return { endsAtMs: a.state.active.cash.endsAt, stockAfter: a.state.stock['Double Cash'], activeAfterWindow: effectsAt(a.state, a.state.active.cash.endsAt).cash };
@@ -1209,8 +1330,12 @@ const DECISIONS = [
 		id: 'P-BUFFS-LEGACY', status: 'proposed',
 		title: `Existing buffs keep their counts and map to the new kinds at read time (a held Lucky Draw becomes ${F.BUFFS.luckyDraw.opens} charges); no document is rewritten`,
 		modelled: 'legacyKind([\'gacha\', \'1.5\']) = Lucky Draw charges; stale activations cleared once (migration 1)',
-		alternatives: ['rewrite every BuffData capability array'],
-		source: 'buffs design', why: 'additive and idempotent; nobody loses a unit, since no buff ever had an effect (B1)',
+		alternatives: [
+			'rewrite every BuffData capability array',
+			'consume one unit from every stack that was ever activated (endTime set), as a stand-in for past use (rewrites counts, and also takes a unit from players who only had the few-second window)',
+			'size past use first from production (read-only: Cast journals list the buffs each cast read, GachaOpen journals list buff sources; button sales record no multiplier), then choose',
+		],
+		source: 'buffs design', why: 'additive and idempotent; nobody loses a unit, because B2 never consumed one. That does not mean units had no effect: on button paths an activated buff kept applying until the next slash command (B3; how often is not measured). Any XP and cash gained that way stays, like every carried balance (P-LEGACY-WEALTH), and each held unit, used or not, becomes one real hour after B1 + B2 (migrations, past use)',
 		get: () => ({ gacha: legacyKind(['gacha', '1.5']).duration, cash: legacyKind(['cash', '2.0']).name, xp: legacyKind(['xp', '2.0']).name }),
 		expected: { gacha: { type: 'charges', opens: 2 }, cash: 'Double Cash', xp: 'Double XP' },
 	},
@@ -1358,7 +1483,11 @@ function markdownTables() {
 	const cutK = R.luckyDraw.proposed.map((x) => x.cratesSaved / x.expectedCrates);
 	const regWin = Object.entries(r2r.windows);
 
+	const X = C.liveRepro;
 	out['buffs-headline'] = mdTable(['Figure', 'Value', 'Table'], [
+		['Live in production today (B2 + B3)', C.livePaths.live
+			? `an activated buff keeps applying on 'Fish again' casts, catch-card sales and 'Open another' until the player's next slash command, and the unit is never used up (reproduced on the in-memory test database: XP x${X.fishAgain.xpMultiplier} ${X.fishAgain.msAfterEnd} ms after expiry, $${X.sellButton.paid} paid for a $${X.sellButton.stored} catch); hotfix: B3 alone, now`
+			: 'every buff query in src/ filters on endTime (B3 hotfix present); B2 open', 'Bugs'],
 		['Buffs a regular player receives per 30 days (integrated)', `${fx(reg30.buffsPer30dTotal)}: ${BUFF_NAMES.map((n) => `${n} ${fx(reg30.buffsPer30d[n])}`).join(', ')}; today ${fx(C.buffsPer30dToday.dailyBoxOnly)} (${fx(C.buffsPer30dToday.withTopggVotes)} with the retiring Top.gg votes)`, 'Sources per 30 days'],
 		['Share of fishing income buffs add, first 30 days (Double Cash + Lucky Draw)', ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].cash)} (${pct(s30[a].cashDoubleCashOnly)} + ${pct(s30[a].cashLuckyDrawOnly)})`).join(', '), 'Income share'],
 		['Share of XP from Double XP, first 30 days', range(ARCHETYPE_NAMES.map((a) => s30[a].xp), (x) => pct(x, 2)), 'Income share'],
@@ -1375,7 +1504,7 @@ function markdownTables() {
 		d.get ? yes(JSON.stringify(d.get()) === JSON.stringify(d.expected)) : 'n/a',
 	]))}\n\nStatus of every entry: \`${[...new Set(DECISIONS.map((d) => d.status))].join(', ')}\`. Only the user approves. \`decisions.js\` joins these to the Phase 5B registry, next to the framework-level entries this design relies on and does not repeat: \`P-DOUBLE-CASH\` (catch-time Double Cash), \`P-EVENTS\` (the event budget) and \`P-LUCKY\`. \`check-shared.js\` verifies each record against the model.`;
 
-	out['buffs-bugs'] = mdTable(['#', 'Bug', 'Evidence', 'Fix'], C.bugs.map((b) => [`**${b.id}**`, b.title, b.evidence, b.fix]));
+	out['buffs-bugs'] = mdTable(['#', 'Bug', 'Evidence (src/ lines read at render time)', 'Fix', 'Ships'], C.bugs.map((b) => [`**${b.id}**`, b.title, b.evidence, b.fix, b.ships]));
 
 	const m = C.measured;
 	const perOpen = R.sources.perOpen;
@@ -1384,16 +1513,16 @@ function markdownTables() {
 		['Double Cash timing', 'At **sale**: the sale paths multiply the sale by the first active cash buff, so a hoard sold under it pays the multiplier', `At **catch**: the x${P.catalog['Double Cash'].multiplier} is stamped into \`value\` and \`valueBase\` of each fish caught by a cast during the buff; a sale always pays the stored value (P-DOUBLE-CASH)`],
 		['Double Cash scope', 'Every fish sale', 'Fish caught by casting; not quest cash, box fish or items'],
 		['Double XP scope', 'Catch XP (the description says "all activities")', 'Catch XP only, as today; quest XP never takes a buff; the description is fixed'],
-		['Duration', `\`length: ${C.catalog[0].length}\`, effectively **${C.catalog[0].actualSecondsAfterActivation} s** (B1)`, `${F.BUFFS.durationSeconds.toLocaleString('en-US')} s of real time for Double XP and Double Cash; Lucky Draw: **${P.catalog['Lucky Draw'].duration.opens} charges** (box opens)`],
-		['Consumption', 'Never consumed (B2)', 'One unit per activation, atomically'],
-		['Expiry', 'Swept before slash commands only (B3)', 'Read-time `endsAt > now` in cast, sale and gacha'],
+		['Duration', `\`length: ${C.catalog[0].length}\` added as ms: **${C.catalog[0].actualSecondsAfterActivation} s** on slash commands (B1); on button paths until the player's next slash command (B3)`, `${F.BUFFS.durationSeconds.toLocaleString('en-US')} s of real time for Double XP and Double Cash; Lucky Draw: **${P.catalog['Lucky Draw'].duration.opens} charges** (box opens)`],
+		['Consumption', 'Never consumed: the same unit can be activated again at will (B2)', 'One unit per activation, atomically'],
+		['Expiry', 'Swept before slash commands only; \'Fish again\', the catch-card Sell button and \'Open another\' never check it (B3)', 'Read-time `endsAt > now` in cast, sale and gacha (the B3 hotfix ships first, alone)'],
 		['Same kind', `XP additive (two Double XP = x${C.stacking.twoDoubleXpMultiplier}); cash: first buff only; gacha additive`, `Queue: a second activation extends the timer or adds charges; the multiplier stays x${P.catalog['Double Cash'].multiplier}; at most ${P.stacking.maxQueued} banked per kind`],
 		['With events', 'buff x event', `**Additive**: 1 + (buff - 1) + (event - 1) = x${temporaryMultiplier(2, 2)} for a x2 buff in a x2 event`],
 		['With gear / aquarium / profile', 'Multiply', 'Multiply (unchanged): raw x (1 + sellBonus) x temporary x profile'],
 		['Lucky Draw', `+${Math.round(100 * TODAY_LUCKY_STATS.rareFind)}% to every rare+ weight for 1 h; inert on ${C.luckyToday.tierCrates.filter((x) => x.inert).length} tier crates`, `+${P.catalog['Lucky Draw'].bonusSlots} bonus slot on each of the next ${P.catalog['Lucky Draw'].duration.opens} opens (any box except the Booster Pack)`],
 		['Sources', `Daily Box ${pct(m['Daily Box'].buffShareOfSlots, 2)} of slots, Voter's Crate ${pct(m['Voter\'s Crate'].buffShareOfSlots, 2)}, Booster Pack ${pct(m['Booster Pack'].buffShareOfSlots, 0)}`, `Streak Crate / Chest (${pct(perOpen['Streak Crate']['Double Cash'], 2)} / ${pct(perOpen['Streak Chest']['Double Cash'], 2)} per type per open), Daily Box unchanged, events (P-EVENTS: ${BUFF_NAMES.map((n) => `${P.sources.events.perThirtyDays[n]} ${n}`).join(', ')} per 30 days), Booster Pack unvalued, no shop`],
 		['Buffs per 30 days (regular player)', `${fx(C.buffsPer30dToday.dailyBoxOnly)} (Daily Box); ${fx(C.buffsPer30dToday.withTopggVotes)} with Top.gg votes (being retired)`, `**${fx(reg30.buffsPer30dTotal)}** (${fx(noEv.regular.buffsPer30dTotal)} without events)`],
-		['Share of fishing income from buffs (30 d)', '~0 in practice (B1); with B1 fixed, a sale-time hoarder could double most of their income', `${ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].cash)}`).join(', ')}; XP ${range(ARCHETYPE_NAMES.map((a) => s30[a].xp), (x) => pct(x))}`],
+		['Share of fishing income from buffs (30 d)', `Not measured in production: an activated buff applies to every button cast and button sale until the next slash command and is reusable (B2, B3). If B1 + B2 shipped while cash still pays at sale, the uncapped hoarder over ${HORIZON_DAYS} days at today's arrival rates (proposed economy): ${range(ARCHETYPE_NAMES.map((a) => R.frequency[FREQUENCY_SETS[0][0]][a].saleTimeHoarderUncapped), (x) => pct(x))} of fishing income (${FREQUENCY_SETS[0][0]}), ${range(ARCHETYPE_NAMES.map((a) => R.frequency[FREQUENCY_SETS[1][0]][a].saleTimeHoarderUncapped), (x) => pct(x))} (${FREQUENCY_SETS[1][0]}); frequency table`, `${ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].cash)}`).join(', ')}; XP ${range(ARCHETYPE_NAMES.map((a) => s30[a].xp), (x) => pct(x))}`],
 		['Public presentation', 'The sale message shows base x cash buff', 'Catch card: base values, which include the buff, plus one line with the time left; the sale message shows the sum of `valueBase`'],
 	]);
 
@@ -1451,6 +1580,16 @@ function markdownTables() {
 			const p = s30[a];
 			return [label(a), fx(w.buffsPer30dTotal), pct(w.cash, 2), pct(w.xp, 2), fx(p.buffsPer30dTotal), pct(p.cash, 2), pct(p.xp, 2), SOURCES.map((s) => pct(p.bySource[s]?.cashShare || 0, 2)).join(' / ')];
 		}));
+
+	const failingShare = R.checks.list.filter((c) => c.id.startsWith('cash-share-') && !c.pass).map((c) => `\`${c.id}\``);
+	out['buffs-cash-share-checks'] = `${mdTable(['Player', 'Target (first 30 days)', '**Buffs of fishing income (the check)**', 'Double Cash only', 'Lucky Draw only', 'Buffs of all cash income', 'Buffs of fishing income, without events', 'Check'],
+		ARCHETYPE_NAMES.map((a) => {
+			const t = P.targets.cashShareMax30d[a];
+			const x = s30[a];
+			const cell = (v) => `${pct(v, 2)}${v > t ? ' (over)' : ''}`;
+			const c = R.checks.list.find((k) => k.id === `cash-share-${a}`);
+			return [label(a), `at most ${pct(t, 0)}`, `**${cell(x.cash)}**`, cell(x.cashDoubleCashOnly), cell(x.cashLuckyDrawOnly), cell(x.cashOfAllIncome), cell(noEv[a].cash), `\`${c.id}\` ${c.pass ? 'passes' : '**fails**'}`];
+		}))}\n\n${failingShare.length ? `Failing: ${failingShare.join(', ')}.` : 'Every cash-share check passes.'} Each column divides the same buff value (or its Double Cash or Lucky Draw part) by the column's income and compares it with the same target (\`PARAMS.targets.cashShareMax30d\`); "(over)" marks a cell above it. No parameter was tuned to pass; the options are in the buffs design (Risks and open issues).`;
 
 	const lt = C.luckyToday;
 	out['buffs-lucky-today'] = `${mdTable(['Box (Lake-stage fish)', 'P(rare+) per slot: today -> with Lucky Draw', 'Liquid value per open'], lt.boxes.map((b) => [b.box, `${pct(b.rarePlusPerSlot)} -> ${pct(b.rarePlusPerSlotLucky)}`, `${usd(b.liquid)} -> ${usd(b.liquidLucky)} (+${usd(b.liquidGain)})`]))}\n\n${mdTable(['Tier crate (rods design)', 'Expected crates per assembly', 'With **every** open lucky (today)', 'Saved'], lt.tierCrates.map((t) => [`T${t.tier} ${t.crate}`, fx(t.expectedCrates, 3), fx(t.expectedCratesAllOpensLucky, 3), t.inert ? '**0 (inert)**' : fx(t.cratesSaved, 3)]))}`;

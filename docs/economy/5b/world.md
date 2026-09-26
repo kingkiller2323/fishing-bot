@@ -338,7 +338,7 @@ Hours of play to each milestone on the reference loop with permits, the largest 
 
 **Level used:** "already qualifies" means today's rule, `max(stored, 100·L² curve)`. The 5B curve never lowers a level (level = max(stored, curve)), so grandfathering by today's level is the most generous correct basis, whether it runs before or after the curve change.
 
-**Founder:** grandfathered by stored (real) level. Access still requires the gate level (the public level), so a grandfathered permit can't bypass the level gate or create a public tell.
+**Founder:** grandfathered by stored (real) level. Access still requires the gate level (the public level), so a grandfathered permit can't bypass the level gate. The Founder account's `currentBiome` is moved to its highest allowed biome at the gate change (`P-FOUNDER-MIGRATION`, founder.md §13), so its next `/fish` never shows `BIOME_LOCKED` publicly.
 
 ---
 
@@ -590,7 +590,7 @@ The time per level rises gently, with no wall at either end of the stage. The ji
 | `src/class/User.js` | `create()` sets `permits: []` explicitly. Add `getPermits()` and `hasPermit(biome)`. |
 | `src/commands/slash/Fish/biome.js` (the level check) | Replace the level-only check with `canFish(getGateLevel(), permits, biome)`. Option descriptions show "Owned", "Permit $X" or "Requires Lv N". For a biome with the level but no permit, show an ephemeral "Buy permit ($X)" button. |
 | `src/components/buttons/buy-permit.js` (new) | Under `withUserLock`: `updateOne({ userId, 'inventory.money': { $gte: price }, 'permits.biome': { $ne: biome } }, { $inc: { 'inventory.money': -price }, $push: { permits: { biome, source: 'purchased', acquiredAt, pricePaid: price } } })`. One atomic guarded write: a double click charges once, and insufficient funds change nothing. Then switch the biome. |
-| `src/engine/cast.js` (before any roll) | Defense in depth: if `currentBiome` isn't accessible, return a `BIOME_LOCKED` failure before any roll, with no durability, bait, pity or pond effect. Normally unreachable: `/biome` is the only writer, and the migration grandfathers the current biome. |
+| `src/engine/cast.js` (before any roll) | Defense in depth: if `currentBiome` isn't accessible, return a `BIOME_LOCKED` failure before any roll, with no durability, bait, pity or pond effect. Normally unreachable: `/biome` is the only writer, and the migration grandfathers the current biome. One known exception: the existing Founder account at the gate change (its `currentBiome` can sit above its public gate level). `P-FOUNDER-MIGRATION` moves it to the highest allowed biome first, so the guard never shows on a public card. |
 | `src/commands/slash/Fish/fish.js` (the level-up field) | The level-up field adds "Lake unlocked · permit $X · /biome" when the new level opens a biome (the public level for the Founder). |
 | `src/bootstrap/migrations.js` | `migrateBiomePermits()` (§10), called from `runMigrations`. |
 | Streak (`'highestUnlocked'` pool) and quests (`bandFor`) | Use `accessibleBiomes()` instead of level-only, so a reward never names a biome the player can't enter. |

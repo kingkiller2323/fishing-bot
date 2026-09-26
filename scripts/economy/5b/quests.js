@@ -81,6 +81,9 @@
 //   decomposition()         R2 in the quest view: XP by source (quest kinds split) at the target levels
 //   adversarial()           R2: minimum-daily player vs engaged players; no-miss grinder with vs without quests
 //   factorSensitivity()     the daily/weekly reward factor (P-DAILY-FACTOR) at 1 / 0.75 / 0.5 (rewardScale)
+//   creditTimingSensitivity()
+//                           day-end crediting (the model) vs crediting on completion (system({ creditAt:
+//                           'completion' })): milestone hours and hours saved, every engaged archetype
 //   guardrails()            the R2 guardrail checks (pass/fail)
 //   report()                every key number of docs/economy/5b/quests.md, computed, with ...F.stamp()
 //   markdownTables()        the generated tables of docs/economy/5b/quests.md (render-docs.js)
@@ -534,14 +537,20 @@ const BOX_SOURCE = 'questBoxes';
 const BOX_VALUES = ['liquid', 'cashEquivalent', 'none'];
 // rewardScale: SENSITIVITY ONLY (the P-DAILY-FACTOR alternatives; r2.js guardrailSensitivity); the
 // proposed design is 1 for every kind.
-const SYSTEM_DEFAULTS = Object.freeze({ boxValue: 'liquid', weekdayOfDay0: 0, rewardScale: Object.freeze({ daily: 1, weekly: 1, repeatable: 1, story: 1 }) });
+// creditAt: WHEN daily, weekly and repeatable rewards reach the ledger. 'dayEnd' (the model the tables use)
+// credits them after the day's session; 'completion' (SENSITIVITY ONLY: creditTimingSensitivity()) credits
+// them during the session as the day's fish complete them, as the design does (lazy issue on the first
+// cast, reward on completion). Both credit the same expected totals per day.
+const CREDIT_AT = ['dayEnd', 'completion'];
+const SYSTEM_DEFAULTS = Object.freeze({ boxValue: 'liquid', weekdayOfDay0: 0, creditAt: 'dayEnd', rewardScale: Object.freeze({ daily: 1, weekly: 1, repeatable: 1, story: 1 }) });
 /** The P-DAILY-FACTOR values factorSensitivity() runs (the proposal and its alternatives, as r2.js). */
 const FACTOR_SENSITIVITY = [1, 0.75, 0.5];
 
 // The retired private loop (quests.lifecycle() stepping time itself, with its replicationCheck() against
 // curve.json and validateSystem()) is gone. This is the RECORD of system()'s parity with it, the output
 // of validateSystem() at framework 5b.4 (digest d9e4938f85074918) on the code of commit a83b5f0 (the
-// only later change, e9556b4's rewardScale option, defaults to 1 and leaves it unchanged). Not a live check.
+// only later changes, e9556b4's rewardScale option and the creditAt sensitivity option, default to 1 and
+// 'dayEnd' and leave it unchanged). Not a live check.
 const RETIRED_LOOP_PARITY = deepFreeze({
 	source: 'quests.validateSystem() at framework 5b.4, code of commit a83b5f0',
 	method: 'system() on the shared core with the old loop\'s gear rule (F.PURCHASE.saveHours of stage income, quest cash counting) and a milestone probe, vs the old loop (questModel \'proposed\'), for casual, regular, active, grinder (to Lv 60) and the minimum-daily player (365 days); hours compared step-exact',
@@ -813,7 +822,9 @@ function build(gearPathInput) {
 			const cfg = PARAMS.repeatable;
 			const terms = cfg.templates.map((def) => termsOf('repeatable', def, band));
 			const fishPer = sum(terms.map((x) => x.expectedFish)) / terms.length;
-			const byFish = fishPerDay / fishPer;
+			// opts.wholeRepeatables: only completed repeatables so far (in-session crediting); the day-end
+			// rule counts a partly caught one as an expected fraction.
+			const byFish = opts.wholeRepeatables ? Math.floor(fishPerDay / fishPer + 1e-9) : fishPerDay / fishPer;
 			const byCooldown = cfg.templates.length * (1 + Math.floor(hoursPerDay / cfg.cooldownHours));
 			const completions = Math.min(cfg.dailyCap, byFish, byCooldown);
 			res.repeatable = {
@@ -1103,6 +1114,7 @@ function build(gearPathInput) {
 	function system(opts = {}) {
 		const cfg = { ...SYSTEM_DEFAULTS, ...opts, parts: { daily: true, weekly: true, repeatable: true, story: true, ...(opts.parts || {}) }, rewardScale: { ...SYSTEM_DEFAULTS.rewardScale, ...(opts.rewardScale || {}) } };
 		if (!BOX_VALUES.includes(cfg.boxValue)) throw new Error(`Unknown boxValue ${cfg.boxValue}`);
+		if (!CREDIT_AT.includes(cfg.creditAt)) throw new Error(`Unknown creditAt ${cfg.creditAt}`);
 		const own = (state) => state.sys[SYSTEM_NAME];
 		/** Quest multipliers of the run's profile (read lazily: the founder system may init after this one). */
 		function multipliers(state) {
@@ -1132,11 +1144,33 @@ function build(gearPathInput) {
 			if (reward.cash) ctx.addCash(kind, reward.cash * k * m.questCash);
 			grantBoxes(state, ctx, kind, reward.boxes);
 		}
+		/** Credits the part of `target` not yet in `done` (expected rewards only grow with fish); updates `done`. */
+		function creditUpTo(state, ctx, kind, target, done) {
+			const d = { xp: Math.max(0, target.xp - done.xp), cash: Math.max(0, target.cash - done.cash), boxes: Math.max(0, target.boxes - done.boxes) };
+			credit(state, ctx, kind, d);
+			done.xp += d.xp;
+			done.cash += d.cash;
+			done.boxes += d.boxes;
+		}
+		/** The day's daily and repeatable income after `fish` fish and `hours` of play (the day-end rule). */
+		function dayIncome(state, ctx, fish, hours, { inSession = false } = {}) {
+			const s = own(state);
+			const md = ctx.arch.session === 'minimumDaily';
+			const q = questIncome(s.today.level, fish, hours, {
+				parts: { daily: cfg.parts.daily, weekly: false, repeatable: cfg.parts.repeatable },
+				assumeDailyComplete: md,
+				daysPerWeek: ctx.arch.daysPerWeek ?? 7,
+				wholeRepeatables: inSession,
+			});
+			// The minimum-daily player's daily completes when the day's fish reach its requirement.
+			const daily = md && inSession && !(fish + 1e-9 >= s.today.need) ? { xp: 0, cash: 0, boxes: 0 } : q.breakdown.daily;
+			return { daily, repeatable: q.breakdown.repeatable };
+		}
 		return {
 			name: SYSTEM_NAME,
 			init(state) {
 				state.sys[SYSTEM_NAME] = {
-					options: { boxValue: cfg.boxValue, parts: { ...cfg.parts }, rewardScale: { ...cfg.rewardScale } },
+					options: { boxValue: cfg.boxValue, creditAt: cfg.creditAt, parts: { ...cfg.parts }, rewardScale: { ...cfg.rewardScale } },
 					profile: null, mult: null, today: null, week: null,
 					weeks: { issued: 0, completions: 0 },
 					story: cfg.parts.story ? storyEvents().map((e) => ({ key: e.key, level: e.level, prerequisites: [...e.prerequisites], scopeBiome: e.scopeBiome, expectedFish: e.expectedFish, xp: e.xp, cash: e.cash, boxes: e.boxes, fish: 0, done: false, doneAt: null })) : [],
@@ -1148,7 +1182,7 @@ function build(gearPathInput) {
 				const s = own(state);
 				const level = ctx.gateLevel();
 				const band = bandFor(level);
-				s.today = { level, band: band.id, need: cfg.parts.daily ? dailyFishNeeded(level) : 0 };
+				s.today = { level, band: band.id, need: cfg.parts.daily ? dailyFishNeeded(level) : 0, credited: { daily: { xp: 0, cash: 0, boxes: 0 }, repeatable: { xp: 0, cash: 0, boxes: 0 } } };
 				if (!cfg.parts.weekly) return;
 				const index = Math.floor((state.day + cfg.weekdayOfDay0) / 7);
 				if (s.week && s.week.index !== index) {
@@ -1162,6 +1196,19 @@ function build(gearPathInput) {
 			},
 			onCasts(state, ctx, { fish }) {
 				const s = own(state);
+				if (cfg.creditAt === 'completion' && fish > 0) {
+					// In-session crediting (sensitivity): the core adds this step's fish to fishToday before
+					// onCasts and advances the clock after it.
+					const e = dayIncome(state, ctx, state.fishToday, (state.minutesToday + ctx.stepH * 60) / 60, { inSession: true });
+					creditUpTo(state, ctx, 'daily', e.daily, s.today.credited.daily);
+					creditUpTo(state, ctx, 'repeatable', e.repeatable, s.today.credited.repeatable);
+					if (s.week) {
+						s.week.fish += fish;
+						const w = weeklyExpectation(bandById(s.week.band), s.week.fish);
+						creditUpTo(state, ctx, 'weekly', w, s.week.credited);
+						s.week.credited.pComplete = w.pComplete;
+					}
+				}
 				if (!s.story.length || !(fish > 0)) return;
 				const L = state.stepStartLevel;
 				for (const st of s.story) {
@@ -1183,6 +1230,14 @@ function build(gearPathInput) {
 			},
 			onDayEnd(state, ctx) {
 				const s = own(state);
+				if (cfg.creditAt === 'completion') {
+					// Top up to the day-end expectation (same daily totals as 'dayEnd'); the weekly was
+					// credited on each step's fish.
+					const e = dayIncome(state, ctx, state.fishToday, state.minutesToday / 60);
+					creditUpTo(state, ctx, 'daily', e.daily, s.today.credited.daily);
+					creditUpTo(state, ctx, 'repeatable', e.repeatable, s.today.credited.repeatable);
+					return;
+				}
 				const q = questIncome(s.today.level, state.fishToday, state.minutesToday / 60, {
 					parts: { daily: cfg.parts.daily, weekly: false, repeatable: cfg.parts.repeatable },
 					assumeDailyComplete: ctx.arch.session === 'minimumDaily',
@@ -1238,12 +1293,13 @@ function build(gearPathInput) {
 	 */
 	function integratedRun(archetype, o = {}) {
 		const quests = o.quests !== false;
-		const key = JSON.stringify([archetype, quests, o.rewardScale || null]);
+		const key = JSON.stringify([archetype, quests, o.rewardScale || null, o.creditAt || null, o.exclude || null]);
+		const sysOpts = { ...(o.rewardScale ? { rewardScale: o.rewardScale } : {}), ...(o.creditAt ? { creditAt: o.creditAt } : {}) };
 		if (!runCache.has(key)) {
 			runCache.set(key, I.run({
 				archetype,
-				exclude: quests ? [] : [SYSTEM_NAME],
-				systemOpts: o.rewardScale ? { [SYSTEM_NAME]: { rewardScale: o.rewardScale } } : {},
+				exclude: [...(quests ? [] : [SYSTEM_NAME]), ...(o.exclude || [])],
+				systemOpts: Object.keys(sysOpts).length ? { [SYSTEM_NAME]: sysOpts } : {},
 				stopAtLevel: null,
 				days: PARAMS.minimumDaily.maxDays,
 				checkpoints: PARAMS.checkpointsDays,
@@ -1389,6 +1445,49 @@ function build(gearPathInput) {
 	}
 
 	/**
+	 * NUM-5: WHEN quest rewards are credited. The model credits daily, weekly and repeatable rewards at day
+	 * end (after the session); the design pays them on completion, during the session. Crediting earlier
+	 * moves XP to earlier play-hours, which matters most to long sessions (the grinder reaches Lv 20 inside
+	 * its first day). This reruns the integrated loop with system({ creditAt: 'completion' }) (same expected
+	 * totals per day) and reports hours saved against (a) the loop without the quest system (this module's
+	 * guardrail) and (b) fishing alone, without quests, streak and buffs (the R2 report's no-miss grinder,
+	 * r2.js). Sensitivity only: every other table uses the day-end rule.
+	 */
+	function creditTimingSensitivity() {
+		const FISHING_ONLY = ['streak', 'buffs'];
+		const rows = {};
+		for (const name of ENGAGED) {
+			const dayEnd = integratedRun(name);
+			const completion = integratedRun(name, { creditAt: 'completion' });
+			const without = integratedRun(name, { quests: false });
+			const fishingOnly = integratedRun(name, { quests: false, exclude: FISHING_ONLY });
+			rows[name] = Object.fromEntries(TARGET_LEVELS.map((L) => {
+				const h = (run) => run.milestones[L]?.hours ?? null;
+				const saved = (run, base) => (h(run) !== null && h(base) !== null ? pct(1 - h(run) / h(base)) : null);
+				return [L, {
+					withoutQuests: r2(h(without)), fishingOnly: r2(h(fishingOnly)), dayEnd: r2(h(dayEnd)), completion: r2(h(completion)),
+					savedVsWithoutQuests: { dayEnd: saved(dayEnd, without), completion: saved(completion, without) },
+					savedVsFishingOnly: { dayEnd: saved(dayEnd, fishingOnly), completion: saved(completion, fishingOnly) },
+				}];
+			}));
+		}
+		const maxOf = (name, k, mode) => Math.max(...Object.values(rows[name]).map((x) => x[k][mode]).filter((x) => x !== null));
+		const g = rows.grinder;
+		const at = (k, mode) => Number(Object.keys(g).find((L) => g[L][k][mode] === maxOf('grinder', k, mode)));
+		const regularCompletion = inWindow(integratedRun(REF, { creditAt: 'completion' }));
+		return {
+			rows,
+			grinder: {
+				vsWithoutQuests: { dayEnd: maxOf('grinder', 'savedVsWithoutQuests', 'dayEnd'), completion: maxOf('grinder', 'savedVsWithoutQuests', 'completion'), atCompletion: at('savedVsWithoutQuests', 'completion') },
+				vsFishingOnly: { dayEnd: maxOf('grinder', 'savedVsFishingOnly', 'dayEnd'), completion: maxOf('grinder', 'savedVsFishingOnly', 'completion'), atCompletion: at('savedVsFishingOnly', 'completion') },
+				limitPct: pct(PARAMS.guardrail.grinderHoursSavedMax),
+			},
+			regularWindowsCompletion: regularCompletion,
+			regularInWindowsCompletion: Object.values(regularCompletion).every((w) => w.ok),
+		};
+	}
+
+	/**
 	 * P-DAILY-FACTOR alternatives (decisions.js): daily and weekly rewards (XP and cash) scaled by k through
 	 * system()'s rewardScale, the same sensitivity as r2.js guardrailSensitivity. Analysis only.
 	 */
@@ -1470,6 +1569,7 @@ function build(gearPathInput) {
 			adversarial: adversarial(),
 			guardrails: guardrails(),
 			factorSensitivity: factorSensitivity(),
+			creditTiming: creditTimingSensitivity(),
 			integration: {
 				system: SYSTEM_NAME,
 				model: I.REFERENCE_NOTE,
@@ -1490,7 +1590,7 @@ function build(gearPathInput) {
 	return {
 		bands, bandFor, stageRates, perFish, templateTerms: (kind, def, band) => termsOf(kind, def, band),
 		catalog, storyEvents, questIncome, catchUp, repeatability, currentCatalog, fixes, founder, report,
-		system, lifecycle, decomposition, adversarial, factorSensitivity, guardrails,
+		system, lifecycle, decomposition, adversarial, factorSensitivity, creditTimingSensitivity, guardrails,
 		pityRule, stageFish,
 	};
 }
@@ -1706,6 +1806,7 @@ function markdownTables() {
 	const windowText = (L) => `${F.TARGET_WINDOWS[L][0]}–${F.TARGET_WINDOWS[L][1]} h`;
 	const G = R.guardrails;
 	const ADV = R.adversarial;
+	const CT = R.creditTiming;
 	const BANDS = DEFAULT.bands();
 	const cc = Object.fromEntries(R.currentCatalog.map((c) => [c.title, c]));
 	const casualSession = F.ARCHETYPES.casual.minutesPerDay;
@@ -1717,7 +1818,7 @@ function markdownTables() {
 		['Regular player, hours to L20 / L30 / L40 / L50', `${TL.map((L) => fmtH(R.regularWindows[L].hours)).join(' / ')} (windows ${TL.map(windowText).join(', ')}): ${R.regularWindowsOk ? 'all in window' : '**a window is missed**'}`, '§6.4'],
 		['Same loop without the quest system', `${TL.map((L) => fmtH(R.regularWindowsWithoutQuests[L].hours)).join(' / ')}: ${withoutOk} of ${TL.length} in window`, '§6.4'],
 		['Minimum-daily player (R2)', `XP per active hour ${fmtRange(Object.values(md.xpPerActiveHourVsRegular).filter((x) => x !== null), (x) => x.toFixed(2))}× the regular player's; leads an engaged archetype at a calendar checkpoint: ${md.leadsAnEngagedArchetypeOnDays.length ? `days ${md.leadsAnEngagedArchetypeOnDays.join(', ')}` : 'never'}`, '§7.2'],
-		['No-miss grinder: play-hours saved by every quest type', `at most ${fmtPct(ADV.noMissGrinder.maxHoursSavedPct)} (limit ${fmtPct(G.grinderHoursSaved.limitPct, 0)})`, '§7.3'],
+		['No-miss grinder: play-hours saved by every quest type', `at most ${fmtPct(ADV.noMissGrinder.maxHoursSavedPct)} (limit ${fmtPct(G.grinderHoursSaved.limitPct, 0)}); ${fmtPct(R.creditTiming.grinder.vsWithoutQuests.completion)} if rewards are credited on completion, as designed (sensitivity)`, '§7.3'],
 		['Casual play-hours ÷ regular, L20–L50', `${fmtRange(Object.values(G.casualHoursShareOfRegular.byLevel), (x) => x.toFixed(3))} with quests (policy ${G.casualHoursShareOfRegular.band.join('–')}); ${fmtRange(Object.values(G.casualHoursShareOfRegular.withoutQuests), (x) => x.toFixed(3))} without`, '§7.1'],
 		['Daily/weekly XP ÷ XP of the fishing they require', `${G.dailyXpRatio.min.ratio.toFixed(3)}–${G.dailyXpRatio.max.ratio.toFixed(3)} (limit ${G.dailyXpRatio.limit})`, '§4'],
 		[`Quest cash share of all income to L${TOP}`, ENG.map((a) => `${capName(a)} ${fmtPct(R.lifecycles[a].incomeAtMaxLevel.questCashSharePct)}`).join(', '), '§6.3'],
@@ -1735,7 +1836,19 @@ function markdownTables() {
 	const mk = cc['Find the Lucky Magikarp'];
 	const lfx = R.fixes.luckyFisher;
 	const mkx = R.fixes.magikarp;
-	T['quests-fixes'] = mdTable(['#', 'Bug', 'Evidence', 'Fix'], [
+	const today = 'today\'s numbers (a correctness change)';
+	const needs = (...ids) => `**needs proposed values:** ${ids.map((id) => `\`${id}\``).join(', ')}`;
+	const shipsOn = {
+		Q1: `${today}: a catalog target fix (the target set is \`P-QUESTS-TARGETS\`); rewards unchanged`,
+		Q2: `${needs('P-QUESTS-REPEATABLE')} (cooldown ${PARAMS.repeatable.cooldownHours} h, ${PARAMS.repeatable.dailyCap} per day); story once-only is a rule of \`P-QUESTS-KINDS\` (no value)`,
+		Q3: today,
+		Q4: `${today}: prerequisites read from the user's quest documents; the retired-title filter comes with \`P-QUESTS-RETIRE\``,
+		Q5: `expiry: ${today}. Requirement sizing: ${needs('P-QUESTS-DAILY')}`,
+		Q6: `items never progress a quest: ${today}. Count, pity and reward: ${needs('P-QUESTS-LUCKY-FISHER', 'P-QUESTS-PITY')}`,
+		Q7: needs('P-QUESTS-PITY'),
+		Q8: `${today}: the story level is the target biome's live unlock level (\`P-QUESTS-STORY\`)`,
+	};
+	const questFixRows = [
 		['Q1', `**"Catch 15 Trout" targets ${tr.missingFromCatalog.map((n) => `\`${n}\``).join(', ')}, which does not exist.**`, `\`catalogIntegrity().today\`; ${fmtShare(tr.perFishToday)} of River fish match, so ${fmtN(tr.fishFor15Today)} fish for 15`, `the **River trout family** (${tr.proposedTargets.length} species, trout table): ${fmtShare(tr.perFishProposed)} match, ${fmtN(tr.fishFor15Proposed)} fish`],
 		['Q2', '**Non-daily quests repeat without limit.** `/start-quest` only blocks the same title *while it is in progress* (`startQuest.js:110`).', `"Help the Village!" pays ${fmtUsd(vil.cash)} + ${fmtN(vil.xp)} XP for ${vil.target.split(' x ')[0]} fish: +${fmtPct(vilBand.today.cashBonusPct, 0)} of Ocean fishing cash and +${fmtPct(vilBand.today.xpBonusPct, 0)} XP (repeatability table)`, 'the kind model (§2): story quests once-only (`questLog`); repeatables with a cooldown and a daily cap'],
 		['Q3', '**`/start-quest` never enforces prerequisites.** `if (prereq > 0)` (`startQuest.js:91`) compares the prerequisite *array* with a number (always false), and uses `some` instead of `every`.', 'latent today (no non-daily quest has prerequisites); the proposed Lucky Fisher requires Magikarp', '`canStart()`: `prerequisites.every(k => questLog[k].completions > 0)`'],
@@ -1744,7 +1857,9 @@ function markdownTables() {
 		['Q6', '**Lucky Fisher is out of reach, counts items, and rewards an item that does not exist.**', `${lfx.today.count} Lucky catches, and Lucky ITEM catches progress it: ${fmtN(lf.fishNeeded)} fish at its Lv ${lf.level} gear, ${fmtN(lfx.today.fishNeededAtPond)} at Pond; reward ${lf.rewardItems.join(', ')} is not in the catalog (the quest pays no item)`, `${lfx.proposed.count} Lucky **fish**, items never progress a quest, a luck-weighted pity (§5.2); reward cash, XP and ${storyByKey['story.lucky-fisher'].reward.boxes} Daily Boxes`],
 		['Q7', '**Magikarp has no pity.**', `1 per ${fmtN(mkx.oldRod.withoutPity)} Ocean fish on the Old Rod: ${fmtN(mk.minutes.regular)} minutes of regular play`, `a quest pity on a luck-weighted meter: expected ${fmtN(mkx.expectedFish.mean)} fish, sure at ${fmtN(mkx.pity.hard)} points (pity table)`],
 		['Q8', '**River quests are offered at Lv 0.**', `trout and carp target River fish; River unlocks at Lv ${F.BIOME_LEVEL.River}`, 'story level = the target biome\'s level (`F.BIOME_LEVEL`)'],
-	]);
+	];
+	T['quests-fixes'] = mdTable(['#', 'Bug', 'Evidence', 'Fix', 'Ships on'], questFixRows.map((r) => [...r, shipsOn[r[0]]])) +
+		'\n\n"Today\'s numbers" means the fix changes no balance value. A fix that needs a value ships once the proposed decision that sets it is approved.';
 	const carp = R.fixes.carp;
 	T['quests-trout'] = mdTable(['Target', 'Species that count', 'Not counted', 'Share of River fish', 'Expected fish for 15'], [
 		['"Catch 15 Trout" today', tr.todayTargets.join(', '), `${tr.missingFromCatalog.join(', ')} (not in the catalog)`, fmtShare(tr.perFishToday), fmtN(tr.fishFor15Today)],
@@ -1921,12 +2036,18 @@ function markdownTables() {
 		...TL.map((L) => [`L${L}`, fmtH(gr.hoursToLevel[L].withoutQuests), fmtH(gr.hoursToLevel[L].withAllQuests), fmtPct(gr.hoursToLevel[L].hoursSavedPct)]),
 		[`Quest share of the grinder's XP at L${LB}`, '', '', fmtPct(gr.questShareOfXpAtTopWindow)],
 	]);
+	const casualOverRegular = (mode) => TL.map((L) => CT.rows.casual[L][mode] / CT.rows[REF][L][mode]);
+	T['quests-credit-timing'] = mdTable(['Player', 'Level', 'Without quests (h)', 'Fishing only (h)', 'With quests: credited at day end (model)', 'credited on completion', 'Saved vs without quests: day end → completion', 'Saved vs fishing only: day end → completion'], ENG.flatMap((a) => TL.map((L, i) => {
+		const x = CT.rows[a][L];
+		return [i === 0 ? capName(a) : '', `L${L}`, fmtH(x.withoutQuests), fmtH(x.fishingOnly), fmtH(x.dayEnd), fmtH(x.completion), `${fmtPct(x.savedVsWithoutQuests.dayEnd)} → **${fmtPct(x.savedVsWithoutQuests.completion)}**`, `${fmtPct(x.savedVsFishingOnly.dayEnd)} → ${fmtPct(x.savedVsFishingOnly.completion)}`];
+	}))) + `\n\n\`creditTimingSensitivity()\`: the integrated reference loop with \`system({ creditAt: 'completion' })\`, which credits the daily, repeatables and weekly during the session as the day's fish complete them (the same expected totals per day, up to floating-point rounding). "Without quests" excludes the quest system (this module's guardrail, §7.4); "fishing only" also excludes the streak and buffs (the R2 report's no-miss grinder, \`r2.js\`). No-miss grinder, largest saving: ${fmtPct(CT.grinder.vsWithoutQuests.dayEnd)} → **${fmtPct(CT.grinder.vsWithoutQuests.completion)}** without quests, ${fmtPct(CT.grinder.vsFishingOnly.dayEnd)} → **${fmtPct(CT.grinder.vsFishingOnly.completion)}** against fishing only (L${CT.grinder.vsFishingOnly.atCompletion}); limit ${fmtPct(CT.grinder.limitPct, 0)}. Regular player on completion: ${TL.map((L) => `L${L} ${fmtH(CT.regularWindowsCompletion[L].hours)}`).join(', ')} (${CT.regularInWindowsCompletion ? 'every window met' : '**a window is missed**'}). Casual ÷ regular hours on completion: ${fmtRange(casualOverRegular('completion'), (x) => x.toFixed(3))}.`;
 	const yes = (b) => (b ? 'yes' : '**no**');
 	T['quests-guardrails'] = mdTable(['Check (`guardrails()`)', 'Value', 'Limit', 'Pass'], [
 		['Daily/weekly XP ÷ XP of the required fishing', `max ${G.dailyXpRatio.max.ratio.toFixed(3)} (${G.dailyXpRatio.max.band} \`${G.dailyXpRatio.max.key}\`)`, `≤ ${G.dailyXpRatio.limit}`, yes(G.dailyXpRatio.pass)],
 		['Casual play-hours ÷ regular\'s (L20–L50)', `${cs.min.toFixed(3)}–${cs.max.toFixed(3)}`, cs.band.join('–'), yes(cs.pass)],
 		['Minimum-daily leads an engaged archetype at a calendar checkpoint', G.minimumDailyNeverLeads.leadsOnDays.length ? `days ${G.minimumDailyNeverLeads.leadsOnDays.join(', ')}` : 'never', 'never', yes(G.minimumDailyNeverLeads.pass)],
 		['No-miss grinder: play-hours saved by quests', fmtPct(G.grinderHoursSaved.max), `≤ ${fmtPct(G.grinderHoursSaved.limitPct, 0)}`, yes(G.grinderHoursSaved.pass)],
+		['The same, rewards credited on completion (sensitivity, §7.3)', `${fmtPct(CT.grinder.vsWithoutQuests.completion)} (L${CT.grinder.vsWithoutQuests.atCompletion})`, `≤ ${fmtPct(CT.grinder.limitPct, 0)}`, yes(CT.grinder.vsWithoutQuests.completion <= CT.grinder.limitPct)],
 	]);
 	const FS = R.factorSensitivity;
 	const days = PARAMS.checkpointsDays.slice(-3);

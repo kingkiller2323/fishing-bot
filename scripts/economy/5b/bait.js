@@ -504,6 +504,75 @@ function createBaitModel(gearPath = null, overrides = null) {
 	}
 
 	/**
+	 * Volume baits (extra-fish chance) on EVERY rod tier in every biome they work in. P-BAIT-WHERE-IT-WORKS
+	 * gates by biome only, so a Tier 3-5 rod taken back to a mid-band biome gets the bait too. Mean fish per
+	 * cast with the bait is compared with (a) the highest rod mean of the tiers typical in the bait's biomes
+	 * (the band's rod range) and (b) the rods design's endgame ceiling (P-RODS-MEAN-FISH). The alternatives
+	 * of P-BAIT-SPINNER-TIERS are computed as a sensitivity (not proposals): clamp the rod + bait mean at the
+	 * ceiling, clamp it at the band's rod range, or apply the bait only on rods up to the band's top tier.
+	 * The XP and cash columns show why a high-tier rod would use it: XP per cast does not depend on the biome.
+	 */
+	function volumeCheck() {
+		const ceiling = require('./rods').PARAMS.multi.ceilingMean;
+		const meanOf = (chance) => F.fishDistribution(Math.min(1, chance));
+		const rows = [];
+		const summary = {};
+		for (const name of BAIT_NAMES.filter((n) => (BAITS[n].multiChance || 0) > 0)) {
+			const b = BAITS[name];
+			const bandTiers = [...new Set(b.biomes.map((bi) => SHARED.typicalTier[bi]).filter(Boolean))];
+			const topBandTier = SHARED.tierOrder.filter((t) => bandTiers.includes(t)).pop();
+			const bandTop = Math.max(...bandTiers.map((t) => meanOf(chanceOf(TIERS[t])).mean));
+			const price = priceOf(name);
+			const firstLevel = Math.min(...b.biomes.map((bi) => F.BIOME_LEVEL[bi]));
+			for (const tier of SHARED.tierOrder) {
+				// Where this rod usually fishes once the bait can be used: the highest biome open at the rod's
+				// level, and at least the bait's first biome.
+				const topBiome = F.biomeAt(Math.max(TIERS[tier].level, firstLevel));
+				const home = outcome(stageGear({ biome: topBiome, tier }), null);
+				for (const biome of b.biomes) {
+					const e = evaluate(name, { biome, tier });
+					const chance = chanceOf(TIERS[tier]);
+					const base = meanOf(chance);
+					const w = meanOf(chance + b.multiChance);
+					const clampAt = (limit) => Math.min(w.mean, Math.max(base.mean, limit));
+					rows.push({
+						bait: name, tier, level: TIERS[tier].level, biome,
+						meanWithout: r3(base.mean), meanWith: r3(w.mean), p3plusWith: r4(w.p3plus), p5With: r4(w.p5),
+						aboveBand: w.mean > bandTop + 1e-9, aboveCeiling: w.mean > ceiling + 1e-9,
+						xpPerCastWith: r2(e.baseXpPerCast + e.extraXpPerCast), topBiome, xpPerCastTopBiome: r2(home.xpPerCast),
+						netCashPerCastWith: r2(e.baseValuePerCast + e.extraValuePerCast - price), cashPerCastTopBiome: r2(home.valuePerCast),
+						alternatives: {
+							clampAtCeiling: r3(clampAt(ceiling)),
+							clampAtBand: r3(clampAt(bandTop)),
+							upToBandTier: r3(SHARED.tierOrder.indexOf(tier) <= SHARED.tierOrder.indexOf(topBandTier) ? w.mean : base.mean),
+						},
+					});
+				}
+			}
+			const mine = rows.filter((r) => r.bait === name);
+			summary[name] = {
+				biomes: [...b.biomes], bandTiers, topBandTier, bandTop: r3(bandTop), ceiling,
+				tiersAboveBand: [...new Set(mine.filter((r) => r.aboveBand).map((r) => r.tier))],
+				tiersAboveCeiling: [...new Set(mine.filter((r) => r.aboveCeiling).map((r) => r.tier))],
+				maxMeanWith: r3(Math.max(...mine.map((r) => r.meanWith))),
+				// Home-stage effect under each alternative (unchanged effect = unchanged price).
+				homeStageEffectKept: {
+					clampAtCeiling: b.homeStages.every((s) => clampKeeps(s, b.multiChance, ceiling)),
+					clampAtBand: b.homeStages.every((s) => clampKeeps(s, b.multiChance, bandTop)),
+					upToBandTier: b.homeStages.every((s) => SHARED.tierOrder.indexOf(STAGES[s].tier) <= SHARED.tierOrder.indexOf(topBandTier)),
+				},
+			};
+		}
+		/** True when a mean clamp at `limit` leaves the bait's effect at a home stage untouched. */
+		function clampKeeps(stage, multiChance, limit) {
+			const g = stageGear(stage);
+			return meanOf(g.multiChance + multiChance).mean <= Math.max(meanOf(g.multiChance).mean, limit) + 1e-9;
+		}
+		const pass = Object.values(summary).every((s) => !s.tiersAboveCeiling.length && !s.tiersAboveBand.length);
+		return { pass, ceiling, summary, rows };
+	}
+
+	/**
 	 * Evidence for the starter baits' biome lists: what strong access is worth to an Old Rod in each
 	 * biome, and the return it would have at the starter bait's price of that water type.
 	 */
@@ -678,6 +747,7 @@ function createBaitModel(gearPath = null, overrides = null) {
 			prices: prices(),
 			currentVsProposed: currentVsProposed(),
 			bandCheck: bandCheck(),
+			volumeCheck: volumeCheck(),
 			matrix: baitMatrix(),
 			strongAccess: strongAccessByBiome(),
 			stageRates: stageRates(),
@@ -692,12 +762,31 @@ function createBaitModel(gearPath = null, overrides = null) {
 	return {
 		tiers: TIERS, gearSource, baits: BAITS,
 		stageGear, baitEffect, prices, priceOf, evaluate, baitOption,
-		baitMatrix, bandCheck, strongAccessByBiome, stageRates, consumptionModel, chaseMetrics, boosterPackOdds, gachaBaitValue,
+		baitMatrix, bandCheck, volumeCheck, strongAccessByBiome, stageRates, consumptionModel, chaseMetrics, boosterPackOdds, gachaBaitValue,
 		currentVsProposed, stageOptions, report: modelReport,
 	};
 }
 
 const DEFAULT = createBaitModel();
+
+/**
+ * Bait held below its shop level (legacy stacks, P-BAIT-LEGACY-STACKS; box grants, P-STREAK-BAIT-PACK). A
+ * player below a biome's level cannot fish there, so a bait whose every biome opens at or after its shop
+ * level waits through biome access alone. A bait with a biome that opens earlier is usable below its shop
+ * level unless the cast checks the level (cast.js baitApplies). Today nothing checks it: /equip's level
+ * check never blocks (equip.js:67-74 reads userData.level, which the User wrapper does not have), and an
+ * owned stack carries the cloned catalog requirements.level of its purchase.
+ */
+function legacyLevelCheck(model = DEFAULT) {
+	const p = model.prices();
+	const rows = BAIT_NAMES.map((name) => {
+		const b = model.baits[name];
+		const shop = p[name].levelRequirement;
+		const early = b.biomes.filter((bi) => F.BIOME_LEVEL[bi] < shop);
+		return { bait: name, shopLevel: shop, biomes: [...b.biomes], lowestBiomeLevel: Math.min(...b.biomes.map((bi) => F.BIOME_LEVEL[bi])), usableBelowShopLevelIn: early, enforcedByBiomeAccess: early.length === 0 };
+	});
+	return { rows, needUseTimeCheck: rows.filter((r) => !r.enforcedByBiomeAccess).map((r) => r.bait) };
+}
 
 // ---------------------------------------------------------------------------------------------
 // SYSTEM: bait on the shared lifecycle core (lifecycle.js). The core steps time and accrues every cast into
@@ -1058,9 +1147,9 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-BAIT-ROSTER', status: 'proposed',
-		title: 'Ten baits, one clear role each: two starter baits, five mid-band specialists, two late combination baits and one universal luck bait; Spinner (the only volume bait) is mid-band only',
+		title: 'Ten baits, one clear role each: two starter baits, five mid-band specialists, two late combination baits and one universal luck bait; Spinner (the only volume bait) works only in the mid-band biomes, on any rod tier (P-BAIT-SPINNER-TIERS)',
 		modelled: BAIT_NAMES.map((n) => `${n}: ${PARAMS.baits[n].role}`).join('; '),
-		alternatives: ['today\'s roster (stacked capabilities, water-type biome lists, XP multipliers everywhere)', 'Spinner in the late band too (pushes Tier 3-5 casts past the approved fish-per-cast range)'],
+		alternatives: ['today\'s roster (stacked capabilities, water-type biome lists, XP multipliers everywhere)', 'Spinner in the late band too (Coast, Swamp: Tier 3-5 rods would get it at their own stage)'],
 		source: 'bait design', why: 'the player chooses by goal (collection, trophies, Legendary hunting, jackpots, XP); each band gets one specialist per role (Roster)',
 		get: () => Object.fromEntries(BAIT_NAMES.map((n) => {
 			const b = PARAMS.baits[n];
@@ -1152,10 +1241,24 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-BAIT-LEGACY-STACKS', status: 'proposed',
-		title: 'Owned bait stacks keep their count (one unit = one cast under the new rules); no refunds; behaviour read by name from the new definitions',
-		modelled: 'migration rule (not a PARAMS value)',
-		alternatives: ['refund the difference between the old and the new price', 'convert stacks by value'],
-		source: 'bait design', why: 'no player document is rewritten; legacy units work better than before within the new biome lists (Migrations)',
+		title: 'Owned bait stacks keep their count (one unit = one cast under the new rules); no refunds; behaviour read by name from the new definitions; a stack held below its bait\'s shop level works only once the player reaches that level',
+		modelled: `migration rule (not a PARAMS value). The wait is enforced by biome access for every bait whose biomes open at or after its shop level; ${legacyLevelCheck().needUseTimeCheck.join(', ')} (Lv ${legacyLevelCheck().needUseTimeCheck.map((n) => DEFAULT.prices()[n].levelRequirement).join(', ')}) also works in earlier biomes and needs a use-time level check (cast.js baitApplies reads BAIT_DEFS[name].levelRequirement against the gate level, never the owned copy)`,
+		alternatives: ['refund the difference between the old and the new price', 'convert stacks by value', `no use-time level check: legacy ${legacyLevelCheck().needUseTimeCheck.join(', ')} stacks below the shop level work in ${legacyLevelCheck().rows.filter((r) => !r.enforcedByBiomeAccess).map((r) => r.usableBelowShopLevelIn.join(', ')).join('; ')} at release (Legacy stacks below the shop level)`],
+		source: 'bait design', why: 'no player document is rewritten; legacy units work better than before within the new biome lists (Migrations). Today no level check on bait use or /equip blocks anything (fix-first: equip.js)',
+	},
+	{
+		id: 'P-BAIT-SPINNER-TIERS', status: 'proposed',
+		title: 'Spinner\'s extra-fish chance applies on every rod tier in its biomes (biome gating only): higher-tier rods taken back to Lake or Pond go above the mid band\'s rod range, and the top tiers above the endgame fish-per-cast ceiling',
+		modelled: `Spinner +${pctOf(PARAMS.baits.Spinner.multiChance)} extra-fish chance in ${PARAMS.baits.Spinner.biomes.join(', ')} on any rod; no tier gate and no mean clamp (Spinner by rod tier)`,
+		alternatives: [
+			'accept: an optional, paid overshoot; XP per cast does not depend on the biome, so a top-tier rod with Spinner in Pond earns more XP per cast than at its own stage, at a lower cash rate (Spinner by rod tier)',
+			'clamp the rod + bait mean at the endgame ceiling of P-RODS-MEAN-FISH (Spinner\'s home-stage effect and price unchanged; a rod already at the ceiling gets nothing from it)',
+			'clamp the rod + bait mean at the mid band\'s rod range (also cuts Spinner\'s home-stage effect: its price would have to be re-derived)',
+			'Spinner only on rods up to the mid band\'s top tier (T2): home-stage effect and price unchanged',
+		],
+		source: 'bait design (adversarial review)', why: 'the roster keeps Spinner out of the late biomes so the endgame rods stay inside the approved fish-per-cast range, but the biome list does not stop a higher-tier rod from using it in Lake or Pond; the user decides whether the overshoot is acceptable (Spinner by rod tier; Pricing checks)',
+		get: () => ({ biomes: PARAMS.baits.Spinner.biomes, multiChance: PARAMS.baits.Spinner.multiChance }),
+		expected: { biomes: ['Lake', 'Pond'], multiChance: 0.1 },
 	},
 ];
 
@@ -1187,7 +1290,7 @@ let reportMemo = null;
 function report(opts = {}) {
 	if (!opts.gearPath && reportMemo) return reportMemo;
 	const model = opts.gearPath ? createBaitModel(opts.gearPath) : DEFAULT;
-	const out = { ...model.report(), lifecycle: lifecycleSensitivity(), system: systemReport(), decisions: decisionRows() };
+	const out = { ...model.report(), legacyLevel: legacyLevelCheck(model), lifecycle: lifecycleSensitivity(), system: systemReport(), decisions: decisionRows() };
 	if (!opts.gearPath) reportMemo = out;
 	return out;
 }
@@ -1234,6 +1337,8 @@ function markdownTables() {
 	const ref = F.REFERENCE_ARCHETYPE;
 	const reg = L.archetypes[ref];
 	const bc = R.bandCheck;
+	const vc = R.volumeCheck;
+	const vs = vc.summary.Spinner;
 	const T = {};
 	const byName = Object.fromEntries(R.currentVsProposed.map((x) => [x.bait, x]));
 	const xpNames = BAIT_NAMES.filter((n) => PARAMS.baits[n].pricing === 'xp');
@@ -1255,6 +1360,8 @@ function markdownTables() {
 		['Money baits: cash return per $1 at their home stages', `${range(moneyReturns, (x) => num(x, 2))} (target ${P.returnTarget}, accepted ${P.moneyReturnBand.join('–')})`, 'Home stages'],
 		['XP baits: net $ per extra XP against the stage\'s own rate', `${range(xpRatios, (x) => `${num(x, 2)}×`)} (target K = ${P.xpPriceK})`, 'Home stages'],
 		['Pricing checks', `${bc.pass ? 'all pass' : `${bc.issues.length} issue(s)`}`, 'Pricing checks'],
+		['Spinner on any rod tier in Lake and Pond', `mean fish per cast up to ${num(vs.maxMeanWith, 3)}; above the mid band's rod range (${num(vs.bandTop, 2)}) on ${vs.tiersAboveBand.map(tierName).join(', ') || 'no tier'}; above the endgame ceiling (${num(vs.ceiling, 2)}) on ${vs.tiersAboveCeiling.map(tierName).join(', ') || 'no tier'} (\`P-BAIT-SPINNER-TIERS\`)`, 'Spinner by rod tier'],
+		['Bait held below its shop level (legacy stacks, box grants)', `waits through biome access, except ${R.legacyLevel.needUseTimeCheck.join(', ') || 'none'}: needs a use-time level check (\`P-BAIT-LEGACY-STACKS\`)`, 'Legacy stacks below the shop level'],
 		['Money bait always on, regular player (integrated)', `net ${spct(reg.cash.netEffectShareOfIncome)} of income; milestones at most ${pct(cashTop.speedup)} sooner`, 'Regular player; Income and XP sources'],
 		['XP bait always on, regular player (integrated)', `L50 ${hrs(reg.none.hoursToLevel[50])} → ${hrs(reg.xp.hoursToLevel[50])}; largest speed-up ${pct(check.maxSpeedup)} at L${check.at} (cap ${pct(check.limit, 0)}: ${check.pass ? 'pass' : '**fail**'}); net ${spct(reg.xp.netEffectShareOfIncome)} of income`, 'Regular player'],
 		['Approved windows with always-on XP bait (regular player)', issue.regularXpBelowWindow.length ? `**under the lower edge at ${issue.regularXpBelowWindow.map((w) => `L${w.level}`).join(', ')}**` : 'every window met', 'Regular player; XP-bait sizing'],
@@ -1314,11 +1421,25 @@ function markdownTables() {
 		['Money baits: net gain, share of the cast', `≤ ${pct(P.netShareMax, 0)}`, `≤ ${pct(Math.max(...netShares))}`, lim(Math.max(...netShares) <= P.netShareMax)],
 		['XP baits: utility return at every home stage', P.xpUtilityBand.join('–'), range(xpUtility, (x) => num(x, 2)), lim(xpUtility.every((x) => x >= P.xpUtilityBand[0] && x <= P.xpUtilityBand[1]))],
 		['XP baits: net $ per extra XP against the stage rate', `centre K = ${P.xpPriceK}`, range(xpRatios, (x) => `${num(x, 2)}×`), 'reported'],
+		['Volume bait (Spinner): mean fish per cast on every rod tier in its biomes', `≤ the mid band's rod range (${num(vs.bandTop, 2)}) and ≤ the endgame ceiling (${num(vs.ceiling, 2)})`, `up to ${num(vs.maxMeanWith, 3)}; above the range on ${vs.tiersAboveBand.map(tierName).join(', ') || 'none'}; above the ceiling on ${vs.tiersAboveCeiling.map(tierName).join(', ') || 'none'}`, vc.pass ? 'pass' : '**flag for the user** (`P-BAIT-SPINNER-TIERS`)'],
 		['No money bait above the band at a typical stage outside its home', `≤ ${P.moneyReturnBand[1]}`, bc.issues.filter((s) => s.includes('not home')).length ? bc.issues.filter((s) => s.includes('not home')).join('; ') : 'none above', lim(!bc.issues.some((s) => s.includes('not home')))],
 		['Always-on XP bait speed-up, regular player (integrated, from L20)', `≤ ${pct(check.limit, 0)}`, `${pct(check.maxSpeedup)} (L${check.at})`, lim(check.pass)],
 		['Always-on XP bait, regular player: approved windows (integrated)', 'inside every window', issue.regularXpBelowWindow.length ? issue.regularXpBelowWindow.map((w) => `L${w.level} ${hrs(w.hours)} (${hrs(w.shortBy)} under)`).join('; ') : 'inside', issue.regularXpBelowWindow.length ? '**flag for the user** (`P-BAIT-XP-SIZING`)' : 'pass'],
 		['Always-on XP bait speed-up, every archetype (integrated; the cap is defined on the regular player)', `≤ ${pct(check.limit, 0)} (informative)`, Object.entries(L.byArchetype).map(([a, x]) => `${a} ${pct(x.xp.speedup)}`).join(', '), issue.archetypesOverSpeedupCap.length ? `over the cap: ${issue.archetypesOverSpeedupCap.join(', ')}` : 'all under'],
 	]);
+
+	// ----- Spinner by rod tier -----
+	const flag = (b) => (b ? '**yes**' : 'no');
+	T['bait-volume'] = mdTable(['Rod (from Lv)', 'Biome', 'Mean fish/cast: rod → with Spinner', 'With Spinner: P(3+) / P(5)', `Above the mid band's rod range (${num(vs.bandTop, 2)})`, `Above the endgame ceiling (${num(vs.ceiling, 2)})`, 'XP/cast: with Spinner here → rod\'s usual biome, no bait', '$/cast after bait → rod\'s usual biome, no bait', 'Alternative: clamp at the ceiling', 'Alternative: clamp at the mid band\'s range', `Alternative: Spinner only up to ${tierName(vs.topBandTier)}`], vc.rows.filter((r) => r.bait === 'Spinner').map((r) => [
+		`${tierName(r.tier)} (Lv ${r.level})`, r.biome, `${num(r.meanWithout, 2)} → ${num(r.meanWith, 3)}`, `${pct(r.p3plusWith)} / ${pct(r.p5With, 2)}`, flag(r.aboveBand), flag(r.aboveCeiling),
+		`${num(r.xpPerCastWith, 2)} → ${num(r.xpPerCastTopBiome, 2)} (${r.topBiome})`, `${usd(r.netCashPerCastWith)} → ${usd(r.cashPerCastTopBiome)}`,
+		num(r.alternatives.clampAtCeiling, 3), num(r.alternatives.clampAtBand, 3), num(r.alternatives.upToBandTier, 3),
+	])) + `\n\n\`volumeCheck()\`: framework multi-catch chain on the rod's chance + Spinner's ${pct(PARAMS.baits.Spinner.multiChance, 0)}. The mid band's rod range is the highest mean of the rods typical in ${vs.biomes.join(' and ')} (${vs.bandTiers.map(tierName).join(', ')}); the ceiling is \`rods.PARAMS.multi.ceilingMean\` (\`P-RODS-MEAN-FISH\`). "Rod's usual biome" is the highest biome open at the rod's level (at least ${vs.biomes[0]}). Alternatives are a sensitivity for \`P-BAIT-SPINNER-TIERS\`, not proposals. Spinner's effect at its home stages (and so its price) is ${vs.homeStageEffectKept.clampAtCeiling ? 'unchanged' : '**changed**'} by the ceiling clamp, ${vs.homeStageEffectKept.clampAtBand ? 'unchanged' : '**changed**'} by the mid-band clamp and ${vs.homeStageEffectKept.upToBandTier ? 'unchanged' : '**changed**'} by the tier limit.`;
+
+	// ----- Bait held below its shop level -----
+	T['bait-legacy-level'] = mdTable(['Bait', 'Shop level', 'Works in (biome level)', 'Usable below the shop level in', 'The wait is enforced by'], R.legacyLevel.rows.map((r) => [
+		r.bait, `Lv ${r.shopLevel}`, r.biomes.map((b) => `${b} (${F.BIOME_LEVEL[b]})`).join(', '), r.usableBelowShopLevelIn.join(', ') || '—', r.enforcedByBiomeAccess ? 'biome access' : '**a use-time level check** (cast.js `baitApplies`); nothing today',
+	])) + '\n\n`legacyLevelCheck()`. A player below a biome\'s level cannot fish there (level-gated biome access), and bait is used only where it works (`P-BAIT-WHERE-IT-WORKS`).';
 
 	// ----- Magnet, Strong Magnet, Magic Lure -----
 	T['bait-chase'] = mdTable(['Bait', 'Stage', 'Price/cast', 'Casts per Legendary+ (no bait → bait)', 'Casts per Lucky fish (no bait → bait)', 'Net $ per extra Legendary+', 'In minutes of income', 'Net $ per extra Lucky fish'], R.chase.rows.map((c) => [
@@ -1396,7 +1517,7 @@ module.exports = {
 	currentBaits,
 	...Object.fromEntries(Object.entries(DEFAULT).filter(([k]) => k !== 'report')),
 	SYSTEM_NAME, SPEND_ITEM, POLICIES, system, RETIRED_LOOP_PARITY,
-	lifecycle, lifecycleSensitivity, xpSizing,
+	lifecycle, lifecycleSensitivity, xpSizing, legacyLevelCheck,
 	report, markdownTables,
 };
 

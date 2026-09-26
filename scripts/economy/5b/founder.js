@@ -42,8 +42,19 @@
 //   today()                      TODAY's Founder power per stage and as ratios to TODAY's Normal (measured)
 //   solve()                      the private values from the targets (cached); M2 on integrated lifecycles
 //   gacha(), founderCrates(t)    Founder vs Normal box luck; exact crates-to-assemble for tier t
-//   publicLevelStatus()          F1: what shipped (commit 14e27f1) and what stays proposed, read from src/
+//   publicLevelStatus()          F1 and every other public surface: what shipped (commit 14e27f1), what stays
+//                                proposed and which public tells are open, with file:line read from src/
+//   levelSites(), curveFloor()   the level read/write sites that need max(stored, curve) at the curve change, and
+//                                what today's levels become on the new curve without a stored floor (MIG-2)
 //   publicXpDefinition()         the model's public XP against the shipped definition (integrated ledgers)
+//   detection(), oneReply()      PUBLIC TELLS: cards until an observer's likelihood ratio Founder : Normal reaches
+//                                1000:1 (printed rarities, card colour, fish count, all; cadence threshold), for
+//                                the proposed profile, without luck, today's live Founder and the stealth profile;
+//                                and what one /stats, durability or /open reply shows (exact, no randomness)
+//   STEALTH, stealthProfileWith() the stealth SENSITIVITY profile (P-FOUNDER-STEALTH option b)
+//   solveMultipliers(make, opts) the sell and XP multipliers for a trial profile family against the same targets
+//                                (M1-M4; M2 on integrated lifecycles); solve() uses it for the proposal
+//   sensitivities()              no-luck and stealth multipliers, M5/M6 status, pace (never the proposal)
 //   RETIRED_LOOP_PARITY          the recorded parity of system() with the retired private loop (a83b5f0)
 //   report(), markdownTables()
 const fs = require('node:fs');
@@ -81,8 +92,9 @@ const PARAMS = deepFreeze({
 	visible: {
 		// Founder bonus fish per cast, added to the rod's NORMAL multi-catch roll (framework chain).
 		// Kept at today's per-cast distribution, so the Old Rod looks exactly as it does today. The total is
-		// capped at the normal maximum (F.MULTI.maxFish), so every Founder catch card is one a normal player
-		// can also get; only the frequency differs.
+		// capped at the normal maximum (F.MULTI.maxFish), which removes today's tens-of-fish cards. It does NOT
+		// make every card one a normal player can land: on the Old Rod a normal player lands exactly one fish
+		// (check visibleCountFeasibleForNormal), and the kept rarity table shows on every card (detection()).
 		bonusFish: { ...TODAY.bonusDraws },
 	},
 	targets: {
@@ -115,9 +127,11 @@ const PARAMS = deepFreeze({
 		// STAT_CAPS).
 		rule: 'stochastic',
 	},
-	plausibility: {
-		// Private luck restores Legendary+ per hour, but the share of PUBLIC catch cards that show a
-		// Legendary or Lucky fish must stay at or below this (the card shows rarity).
+	cardShareCap: {
+		// Luck is not displayed, but it raises the rarity every public card prints. The share of public catch
+		// cards that show a Legendary or Lucky fish must stay at or below this cap. It is a cap on the solver,
+		// NOT a plausibility bound: Normal's share is under 1% at every tier, and the cap never binds
+		// (detection() measures how quickly the actual share identifies the Founder).
 		maxLegendaryCardShare: 1 / 3,
 	},
 	// Lucky items (Booster Pack, Gold Rod Piece) come from a Lucky draw 20% of the time today, so the
@@ -126,13 +140,14 @@ const PARAMS = deepFreeze({
 	// Lucky fish.
 	luckyItems: 'normal-base',
 	publicLevel: {
-		// SHIPPED (14e27f1): the publicXp field. PROPOSED: a stored publicLevel (no-demotion floor at the
-		// curve change, like level).
+		// SHIPPED (14e27f1): the publicXp field. PROPOSED: a stored publicLevel for EVERY account (no-demotion
+		// floor at the curve change, like level; every level read and write site goes through max(stored, curve)).
 		xpField: 'publicXp',
 		levelField: 'publicLevel',
 		// Recommended (framework P-FOUNDER-GATE): every gameplay level gate (biomes, permits, rod level cap,
-		// shop, quests, level-scaled rewards) reads the PUBLIC level, so a public card never shows a catch
-		// the public level could not have made. 'real' is the alternative (and what is live today).
+		// shop, quests, level-scaled rewards) reads the PUBLIC level, so a public card never shows a biome or
+		// rod tier above the public level (its count and rarities still differ: detection()). 'real' is the
+		// alternative (and what is live today).
 		gate: 'public',
 		// /dev xp add|set applies to both xp and publicXp (shipped rule).
 		devGrantDefaultScope: 'both',
@@ -196,6 +211,38 @@ function profileWith({ luck = 0, xp = 1, sell = 1, durabilityEfficiency = TODAY.
 		limits: { maxDraws: F.MULTI.maxFish, maxPerDraw: 1 },
 		pity: TODAY.pity,
 		gacha: TODAY.gacha,
+		luckyItems: PARAMS.luckyItems,
+		levelGate: PARAMS.publicLevel.gate,
+	};
+}
+
+// SENSITIVITY ONLY (decision P-FOUNDER-STEALTH, option b; never the proposal): a Founder whose every public
+// output is a normal player's at the same public level and gear. Normal rarity table, no bonus fish (the
+// normal chain, so one fish on the Old Rod), normal cadence and durability (no fishing speed, no
+// durability efficiency), no luck, no pity, normal box odds; every advantage is private: the XP and sell
+// multipliers (solved by solveMultipliers() against the same targets) and today's quest multipliers.
+// Nothing here is hand-set: the visible parts are PROFILES.normal's.
+const STEALTH = deepFreeze({
+	rarityTable: { ...PROFILES.normal.rarityTable },
+	stats: { ...PROFILES.normal.stats },
+	bonusFish: { 0: 1 },
+	pity: PROFILES.normal.pity,
+	gacha: PROFILES.normal.gacha,
+});
+
+/** The stealth sensitivity profile (STEALTH) with trial private multipliers. */
+function stealthProfileWith({ xp = 1, sell = 1 } = {}) {
+	return {
+		name: 'founder',
+		variant: 'stealth',
+		competitiveEligible: false,
+		rarityTable: { ...STEALTH.rarityTable },
+		stats: { ...STEALTH.stats },
+		bonusDraws: { ...STEALTH.bonusFish },
+		multipliers: { xp, sell, questXp: TODAY.multipliers.questXp, questCash: TODAY.multipliers.questCash },
+		limits: { maxDraws: F.MULTI.maxFish, maxPerDraw: 1 },
+		pity: STEALTH.pity,
+		gacha: STEALTH.gacha,
 		luckyItems: PARAMS.luckyItems,
 		levelGate: PARAMS.publicLevel.gate,
 	};
@@ -336,7 +383,7 @@ function founderOutcome(stage, { profile = null, overheadS = stage?.overheadS ??
 	const p = profile || founderProfile();
 	const tier = gear(stage?.tier ?? stage);
 	const biome = stage?.biome || F.biomeAt(tier.level);
-	const key = `${JSON.stringify([p.stats, p.multipliers, p.bonusDraws, p.limits])}|${tierKey(tier)}|${biome}|${overheadS}`;
+	const key = `${JSON.stringify([p.rarityTable, p.stats, p.multipliers, p.bonusDraws, p.limits, p.pity])}|${tierKey(tier)}|${biome}|${overheadS}`;
 	if (founderCache.has(key)) return founderCache.get(key);
 	const c = founderCast({ biome, qualities: tier.qualities, stats: tier.stats, chain: F.fishDistribution(normalChance(tier)).dist }, p);
 	const { stats, per, visible, pity } = c;
@@ -396,20 +443,26 @@ function todayRates(rod, biome, profile, overheadS = F.DESIGN_OVERHEAD_S) {
 	};
 }
 
+/** Qualities and rarity stats of today's measured rod (legacy crafted-rod stats through resolveModifiers). */
+function todayRodInputs(rod) {
+	let qualities = ['weak'];
+	let stats = {};
+	const names = MEASURED_ROD_PARTS[rod];
+	if (names) {
+		const list = names.map((n) => rods.CATALOG.find((p) => p.name === n));
+		const m = resolveModifiers({ profile: { name: 'normal', ...PROFILES.normal }, rod: { name: rod, type: 'customrod', capabilities: rods.legacyCombine(list) }, rodParts: list });
+		qualities = m.qualities;
+		stats = { rareFind: m.stats.rareFind, luck: m.stats.luck, trophyChance: m.stats.trophyChance };
+	}
+	return { qualities, stats };
+}
+
 /** Today's NORMAL Legendary+ per fish, exact (legacy crafted-rod stats through resolveModifiers). */
 const todayNormalCache = new Map();
 function todayNormalLegendaryPlusPerFish(rod, biome) {
 	const key = `${rod}|${biome}`;
 	if (!todayNormalCache.has(key)) {
-		let qualities = ['weak'];
-		let stats = {};
-		const names = MEASURED_ROD_PARTS[rod];
-		if (names) {
-			const list = names.map((n) => rods.CATALOG.find((p) => p.name === n));
-			const m = resolveModifiers({ profile: { name: 'normal', ...PROFILES.normal }, rod: { name: rod, type: 'customrod', capabilities: rods.legacyCombine(list) }, rodParts: list });
-			qualities = m.qualities;
-			stats = { rareFind: m.stats.rareFind, luck: m.stats.luck, trophyChance: m.stats.trophyChance };
-		}
+		const { qualities, stats } = todayRodInputs(rod);
 		todayNormalCache.set(key, lplus(F.castOutcome({ biome, qualities, stats, multiChance: 0 }).rarity));
 	}
 	return todayNormalCache.get(key);
@@ -907,14 +960,15 @@ function solve() {
 	const durabilityEfficiency = round(Math.min(effCap, niceUp(maxOf(Object.values(effNeed)), PARAMS.rounding.efficiencyStep)), 4);
 	const withEff = (x) => profileWith({ durabilityEfficiency, ...x });
 
-	// 1. Private luck: Legendary+ per hour ratio to Normal at equal gear (home biome) >= today's.
+	// 1. Luck (not displayed, but it raises the rarity every public card prints): Legendary+ per hour ratio to
+	//    Normal at equal gear (home biome) >= today's.
 	const luckTarget = Object.fromEntries(tiers.map((t) => [t, targetOf(t, (r) => r.legendaryPlusPerHour.ratio)]));
 	const luckRatio = (t, luck) => founderOutcome({ tier: t }, { profile: withEff({ luck }) }).ratio.legendaryPlus;
 	const luckNeed = Object.fromEntries(tiers.map((t) => [t, luckRatio(t, 0) >= luckTarget[t] * margin ? 0 : bisect((x) => luckRatio(t, x) >= luckTarget[t] * margin, 0, 20)]));
 	let luck = niceUp(maxOf(Object.values(luckNeed)), PARAMS.rounding.luckStep);
-	// Plausibility cap: at most maxLegendaryCardShare of public cards show a Legendary+ at any tier.
+	// Card-share cap (not a plausibility bound): at most maxLegendaryCardShare of public cards show a Legendary+.
 	const cardShare = (x) => maxOf(tiers.map((t) => founderOutcome({ tier: t }, { profile: withEff({ luck: x }) }).legendaryCardShare));
-	const cap = PARAMS.plausibility.maxLegendaryCardShare;
+	const cap = PARAMS.cardShareCap.maxLegendaryCardShare;
 	let luckCapped = false;
 	if (cardShare(luck) > cap) {
 		luck = Math.floor(bisect((x) => cardShare(x) > cap, 0, luck) / PARAMS.rounding.luckStep) * PARAMS.rounding.luckStep;
@@ -922,9 +976,48 @@ function solve() {
 	}
 	luck = round(luck, 4);
 
-	// 2. Sell: (a) $/h ratio to Normal at equal gear, every tier x biome >= today's ratio (same biome);
-	//    (b) time to afford the tier set bought at today's purchase milestones <= today's.
-	const base = withEff({ luck });
+	// 2-3. Sell and XP (solveMultipliers(): M3/M4, then M1/M2 on integrated lifecycles).
+	const make = ({ xp = 1, sell = 1 } = {}) => withEff({ luck, sell, xp });
+	const m = solveMultipliers(make, {
+		crateCost: (t) => founderCrates(t).founder.expectedCost,
+		// While M2 runs, quests, streak and buffs read the profile solved so far (xp bound after the solve).
+		provisional: (sell) => provisionalProfile(make({ sell })),
+	});
+
+	solveMemo = {
+		durabilityEfficiency, effNeed, lifeTarget, luck, luckCapped, luckNeed, luckTarget, sell: m.sell, xp: m.xp,
+		// What each value would be from one target family alone (the doc's "without M4" / "without M2").
+		sellFromCashRatioOnly: m.sellFromCashRatioOnly, xpFromRatioOnly: m.xpFromRatioOnly,
+		binding: { durability: Object.entries(effNeed).sort((a, b) => b[1] - a[1])[0], luck: Object.entries(luckNeed).sort((a, b) => b[1] - a[1])[0], ...m.binding },
+		cashNeed: m.cashNeed, xpRatioNeed: m.xpRatioNeed, afford: m.afford, timeNeed: m.timeNeed,
+		timeModel: m.timeModel,
+	};
+	return solveMemo;
+}
+
+/**
+ * The private sell and XP multipliers for a trial profile family, against the same targets as solve():
+ *   sell = the larger of M3 ($/h ratio at equal gear, every tier x biome >= today's x margin) and M4 (time to
+ *          afford the tier sets bought at today's purchase milestones <= today's, with crateCost(t));
+ *   xp   = the larger of M1 (XP/h ratio at equal gear) and M2 (hours of play to every real-level milestone <=
+ *          today's Founder, every archetype, both gate options, on INTEGRATED lifecycles: integrate.run with the
+ *          reference loop and the founder system casting with make({ sell, xp: trial }), until the real level
+ *          reaches the maximum level); both rounded up (niceMultiplier).
+ * @param make ({ xp, sell }) => a Founder cast profile (everything but the two multipliers fixed)
+ * @param opts { crateCost: (tier) => expected cost of the tier set, provisional: (sell) => the profile other
+ *   systems read while M2 runs (solve() only; a sensitivity runs after solve(), so they read the proposed one) }
+ */
+function solveMultipliers(make, { crateCost, provisional = null }) {
+	const path = F.gearPath();
+	const margin = PARAMS.targets.margin;
+	const T = today();
+	const tiers = path.map((t) => t.tier);
+	const targetOf = (t, pick) => maxOf(PARAMS.targets.todayRodOfTier[t].map((rod) => pick(T.byRod[rod])));
+	if (!provisional && !solveMemo) throw new Error(`${SYSTEM_NAME}: a sensitivity solve needs the proposed profile solved first (quests, streak and buffs read it)`);
+
+	// Sell: (a) $/h ratio to Normal at equal gear, every tier x biome >= today's ratio (same biome);
+	//       (b) time to afford the tier set bought at today's purchase milestones <= today's.
+	const base = make({});
 	const cashNeed = [];
 	const xpRatioNeed = [];
 	for (const t of tiers) {
@@ -946,7 +1039,7 @@ function solve() {
 		const biome = F.biomeAt(st.level);
 		const todayIncome = todayRates(prev.founderMeasured || prev.measured, biome, 'founder').cashPerHour;
 		const todayHours = todayCost / todayIncome;
-		const newCost = founderCrates(Number(t)).founder.expectedCost;
+		const newCost = crateCost(Number(t));
 		const newBaseIncome = founderOutcome({ tier: path[Number(t) - 1], biome: F.biomeAt(tier.level) }, { profile: base }).hourly.valueBase;
 		afford.push({ tier: Number(t), todayStage: stage, todayCost, todayIncomePerHour: todayIncome, todayMinutes: todayHours * 60, newCost, newBaseIncomePerHour: newBaseIncome, need: (newCost / (newBaseIncome * todayHours)) * margin });
 	}
@@ -954,20 +1047,17 @@ function solve() {
 	const bindingAfford = [...afford].sort((a, b) => b.need - a.need)[0];
 	const sell = niceMultiplier(Math.max(bindingCash.need, bindingAfford.need));
 
-	// 3. XP: (a) XP/h ratio to Normal at equal gear >= today's (every tier x biome);
-	//    (b) hours of play to every real-level milestone <= today's Founder, every archetype, both gate
-	//    options, on the INTEGRATED model: integrate.run with the reference loop and the founder system
-	//    casting with the trial profile, until the real level reaches the maximum level.
+	// XP: (a) XP/h ratio to Normal at equal gear >= today's (every tier x biome); (b) M2 on integrated lifecycles.
 	const bindingXpRatio = [...xpRatioNeed].sort((a, b) => b.need - a.need)[0];
 	const timeNeed = [];
-	solving = provisionalProfile(withEff({ luck, sell }));
+	if (provisional) solving = provisional(sell);
 	try {
 		for (const a of Object.keys(F.ARCHETYPES)) {
 			const target = T.lifecycles[a]?.founderHours;
 			if (!target) continue;
 			for (const gating of PARAMS.targets.gatingModes) {
-				const ok = (m) => {
-					const hours = LC.milestoneHours(runIntegrated(a, { profile: withEff({ luck, sell, xp: m }), gate: gating, horizon: 'real', cache: false }));
+				const ok = (x) => {
+					const hours = LC.milestoneHours(runIntegrated(a, { profile: make({ sell, xp: x }), gate: gating, horizon: 'real', cache: false }));
 					return F.LIFECYCLE.milestones.every((L) => target[L] == null || (hours[L] != null && hours[L] <= target[L]));
 				};
 				const raw = smallestPassing(ok);
@@ -976,20 +1066,17 @@ function solve() {
 		}
 	}
 	finally {
-		solving = null;
+		if (provisional) solving = null;
 	}
 	const bindingTime = [...timeNeed].sort((a, b) => b.need - a.need)[0];
 	const xp = niceMultiplier(Math.max(bindingXpRatio.need, bindingTime.need));
-
-	solveMemo = {
-		durabilityEfficiency, effNeed, lifeTarget, luck, luckCapped, luckNeed, luckTarget, sell, xp,
-		// What each value would be from one target family alone (the doc's "without M4" / "without M2").
+	return {
+		sell, xp,
 		sellFromCashRatioOnly: niceMultiplier(bindingCash.need), xpFromRatioOnly: niceMultiplier(bindingXpRatio.need),
-		binding: { durability: Object.entries(effNeed).sort((a, b) => b[1] - a[1])[0], luck: Object.entries(luckNeed).sort((a, b) => b[1] - a[1])[0], cash: bindingCash, afford: bindingAfford, xpRatio: bindingXpRatio, xpTime: bindingTime },
+		binding: { cash: bindingCash, afford: bindingAfford, xpRatio: bindingXpRatio, xpTime: bindingTime },
 		cashNeed, xpRatioNeed, afford, timeNeed,
 		timeModel: `integrate.run (${INTEGRATE().REFERENCE.join(', ')} + founder), until the real level reaches the maximum level`,
 	};
-	return solveMemo;
 }
 
 /** The proposed Founder profile (for balance.js PROFILES.founder at implementation). */
@@ -1003,6 +1090,8 @@ function founderProfile() {
 // Public level (F1). SHIPPED in production as a standalone correctness/privacy hotfix (commit 14e27f1 on main,
 // cherry-picked here as 70a0eb7): src/engine/publicLevel.js. What stays proposed is listed in DECISIONS.
 const F1_COMMITS = deepFreeze({ main: '14e27f1', branch: '70a0eb7', breakdown: 'a2ab9a8' });
+// Production scale of the shipped publicXp migration (its production run, as recorded in decisions.js).
+const F1_PRODUCTION = deepFreeze({ accountsInitialised: 2 });
 const SRC = nodePath.join(__dirname, '../../../src');
 const srcText = (rel) => {
 	try {
@@ -1013,11 +1102,29 @@ const srcText = (rel) => {
 	}
 };
 const GATE_FILES = ['commands/slash/Fish/biome.js', 'commands/slash/User/startQuest.js', 'class/Quest.js', 'components/buttons/buy-rod.js', 'components/buttons/buy-bait.js', 'components/buttons/buy-other.js'];
+/** 1-based line of the first line of src/<rel> matching re, or null (file:line evidence read at render time). */
+function srcLine(rel, re) {
+	const i = srcText(rel).split('\n').findIndex((l) => re.test(l));
+	return i < 0 ? null : i + 1;
+}
+/** "src/<rel>:<line>" for the first line matching re (or a visible "not found"). */
+const srcRef = (rel, re) => {
+	const n = srcLine(rel, re);
+	return n ? `src/${rel}:${n}` : `src/${rel} (**pattern not found**)`;
+};
+// A select-menu collector created without a user filter (any member's click reaches it).
+const UNFILTERED_COLLECTOR = /createMessageComponentCollector\(\{(?![^}]*filter)[^}]*\}\)/;
+const PUBLIC_DEFER = /await interaction\.deferReply\(\);/;
+/** The /biome select collector's lifetime as text (read from src/ at render time). */
+function collectorSeconds() {
+	const m = srcText('commands/slash/Fish/biome.js').match(/ComponentType\.StringSelect, time: (\d+)/);
+	return m ? `${Number(m[1]) / 1000} s` : 'lifetime';
+}
 
 /**
- * F1 status read from src/ at report time (evidence, so the doc cannot claim a surface is fixed when the
- * code says otherwise): each surface, the level or amount it shows, and whether that is shipped, proposed
- * or an open public tell.
+ * Public surfaces and their status, read from src/ at report time (evidence, so the doc cannot claim a surface
+ * is fixed when the code says otherwise): each surface, the level, amount or outcome it shows, whether that is
+ * shipped, proposed or an open public tell, and where (file:line).
  */
 function publicLevelStatus() {
 	const fish = srcText('commands/slash/Fish/fish.js');
@@ -1030,7 +1137,14 @@ function publicLevelStatus() {
 	const dev = srcText('engine/dev.js');
 	const migrations = srcText('bootstrap/migrations.js');
 	const schema = srcText('schemas/UserSchema.js');
+	const stats = srcText('commands/slash/User/stats.js');
+	const collection = srcText('commands/slash/User/collection.js');
+	const info = srcText('commands/slash/Info/info.js');
+	const open = srcText('commands/slash/Economy/open.js');
+	const gachaSrc = srcText('engine/gacha.js');
+	const publicLevelSrc = srcText('engine/publicLevel.js');
 	const publicDefer = /deferReply\(\)/.test(pagination);
+	const paginated = (text) => /buttonPagination\(interaction/.test(text) && publicDefer;
 	const evidence = {
 		castWritesPublicXp: /publicXp:\s*publicXpOfResult\(result\)/.test(cast),
 		castPublicLevel: /public:\s*\{\s*xpBefore/.test(cast),
@@ -1047,8 +1161,21 @@ function publicLevelStatus() {
 		inventoryFinalValue: /Inventory value/.test(inventory) && /f\.value \* f\.count/.test(srcText('class/User.js')),
 		balanceCommandPublic: /deferReply\(\)/.test(balance) && /getMoney\(\)/.test(balance),
 		gatesReadRealLevel: GATE_FILES.filter((f) => /getLevel\(\)/.test(srcText(f)) && !/getPublicLevel|getGateLevel/.test(srcText(f))),
+		// Public tells beyond the level and money lines (adversarial review FND-2/3/4, C4, C5).
+		fishCardRarityAndColour: /· \$\{f\.rarity\}/.test(fish) && /const catchColor/.test(fish) && PUBLIC_DEFER.test(fish),
+		statsPerSpeciesPublic: /stats\.fishStats\.forEach/.test(stats) && paginated(stats),
+		collectionPerSpeciesPublic: /\*\*Caught:\*\*/.test(collection) && paginated(collection),
+		inventoryFishListPublic: /Fish\.getCount\(/.test(inventory) && paginated(inventory),
+		castCountsSpecies: /stats\.fishStats\.\$\{/.test(cast),
+		durabilityPublic: /equippedRod\?\.durability/.test(inventory) && /rod\.durability\}\/\$\{rod\.maxDurability\}/.test(info) && /interaction\.reply\(\{ embeds: \[embed\] \}\)/.test(info),
+		openRevealPublic: PUBLIC_DEFER.test(open) && /function slotLine/.test(open) && /profile\.gacha\?\.stats/.test(gachaSrc) && /profile\.gacha\?\.pity/.test(gachaSrc),
+		// Live bugs and edge cases (FND-5, MIG-3, EXP-6/FND-7).
+		unfilteredSelectCollectors: ['commands/slash/Fish/biome.js', 'commands/slash/User/startQuest.js'].filter((f) => UNFILTERED_COLLECTOR.test(srcText(f))),
+		publicXpIncCreatesField: /publicXp:\s*publicXpOfResult\(result\)/.test(cast) && /publicXp: \{ \$exists: false \} \}, \{ \$set/.test(publicLevelSrc),
+		devProfileOverride: /if \(override && PROFILES\[override\]\) name = override;/.test(srcText('engine/balance.js')) && /const FOUNDER_MODES/.test(dev),
 	};
 	const shipped = (ok) => (ok ? `shipped (${F1_COMMITS.main})` : '**not found in src/**');
+	const tell = (ok, decision) => (ok ? `**open public tell** (${decision})` : 'closed');
 	const surfaces = [
 		{ surface: '`/fish` catch card: "⭐ Level up!"', shows: 'public level (`result.level.public`)', status: shipped(evidence.fishCardPublicLevelUp && evidence.castPublicLevel), where: 'src/commands/slash/Fish/fish.js, src/engine/cast.js' },
 		{ surface: '`/profile` (public reply)', shows: 'public level and progress', status: shipped(evidence.profilePublicLevel), where: 'src/commands/slash/User/profile.js, User.getPublicLevel()' },
@@ -1059,9 +1186,34 @@ function publicLevelStatus() {
 		{ surface: '`/inventory` "Balance" and "Inventory value" (public reply)', shows: evidence.inventoryRealBalance || evidence.inventoryFinalValue ? 'real money and final (private-multiplied) fish values' : 'no real-money line found', status: evidence.inventoryRealBalance || evidence.inventoryFinalValue ? '**open public tell** (`P-FOUNDER-WALLET`)' : 'closed', where: 'src/commands/slash/User/inventory.js, User.getInventoryValue()' },
 		{ surface: '`/balance` (public reply)', shows: evidence.balanceCommandPublic ? 'real money' : 'no public money reply found', status: evidence.balanceCommandPublic ? '**open public tell** (`P-FOUNDER-WALLET`)' : 'closed', where: 'src/commands/slash/Economy/balance.js' },
 		{ surface: '`/profile` title when the Founder views its own profile (public reply)', shows: evidence.profileFounderBadgeInPublicReply ? '"👑 Founder"' : 'no badge', status: evidence.profileFounderBadgeInPublicReply ? '**open public tell (F0, fix first)**' : 'closed', where: 'src/commands/slash/User/profile.js title, src/buttonPagination.js deferReply()' },
+		{ surface: '`/fish` catch card: fish, rarity, colour, count, cadence (public reply)', shows: 'each fish\'s rarity (kept Founder table plus Luck), the colour of the best one, the fish count (Old Rod bonus fish), the time between cards (kept fishing speed)', status: tell(evidence.fishCardRarityAndColour, '`P-FOUNDER-STEALTH`; Detection'), where: [srcRef('commands/slash/Fish/fish.js', /· \$\{f\.rarity\}/), srcRef('commands/slash/Fish/fish.js', /const catchColor/), srcRef('commands/slash/Fish/fish.js', PUBLIC_DEFER)].join(', ') },
+		{ surface: '`/stats` (public reply)', shows: 'lifetime count of every species (each species has one rarity) and fish caught per rod', status: tell(evidence.statsPerSpeciesPublic && evidence.castCountsSpecies, '`P-FOUNDER-SURFACES`; One reply'), where: [srcRef('commands/slash/User/stats.js', /stats\.fishStats\.forEach/), srcRef('commands/slash/User/stats.js', /Fish Caught: /), srcRef('engine/cast.js', /stats\.fishStats\.\$\{/), srcRef('buttonPagination.js', PUBLIC_DEFER)].join(', ') },
+		{ surface: '`/collection` (public reply)', shows: '"Caught: N" for every species', status: tell(evidence.collectionPerSpeciesPublic && evidence.castCountsSpecies, '`P-FOUNDER-SURFACES`; One reply'), where: srcRef('commands/slash/User/collection.js', /\*\*Caught:\*\*/) },
+		{ surface: '`/inventory` fish list (public reply)', shows: 'held fish per species under per-rarity headings', status: tell(evidence.inventoryFishListPublic, '`P-FOUNDER-SURFACES`; One reply'), where: srcRef('commands/slash/User/inventory.js', /Fish\.getCount\(/) },
+		{ surface: 'Rod durability: `/inventory` rod line and `/info rod` (public replies)', shows: 'durability / max durability and repairs left; every normal rod loses exactly 1 per fish', status: tell(evidence.durabilityPublic, '`P-FOUNDER-SURFACES`; One reply'), where: [srcRef('commands/slash/User/inventory.js', /equippedRod\?\.durability/), srcRef('commands/slash/Info/info.js', /rod\.durability\}\/\$\{rod\.maxDurability\}/), srcRef('commands/slash/Info/info.js', /interaction\.reply\(\{ embeds: \[embed\] \}\)/), srcRef('engine/modifiers.js', /durabilityCostPerFish:/)].join(', ') },
+		{ surface: '`/open` box reveal (public reply)', shows: 'every slot\'s rarity, rolled with the Founder gacha stats and gacha pity', status: tell(evidence.openRevealPublic, '`P-FOUNDER-SURFACES`; One reply'), where: [srcRef('commands/slash/Economy/open.js', PUBLIC_DEFER), srcRef('commands/slash/Economy/open.js', /function slotLine/), srcRef('engine/gacha.js', /profile\.gacha\?\.stats/), srcRef('engine/gacha.js', /profile\.gacha\?\.pity/)].join(', ') },
 		{ surface: 'Any future level leaderboard', shows: 'public level, competitive (Normal-profile) accounts only', status: 'proposed (`P-FOUNDER-SURFACES`)', where: 'none yet' },
 	];
 	return { commits: F1_COMMITS, evidence, surfaces, storedPublicLevel: evidence.schemaPublicLevel };
+}
+
+// The level read and write sites that must go through max(stored, curve) at the curve change (framework
+// P-CURVE-EXISTING, P-FOUNDER-PUBLIC-LEVEL; adversarial review MIG-2). Line numbers are read from src/ at render time.
+const LEVEL_SITES = [
+	{ site: 'cast.js: level before the cast', file: 'engine/cast.js', re: /const levelBefore = user\.level/, today: 'the stored `level`', change: 'max(stored level, curve(xp))' },
+	{ site: 'cast.js: level after the cast', file: 'engine/cast.js', re: /const levelAfter = levelForXp\(/, today: '`levelForXp(xp + gain)` (100·L²)', change: 'max(stored level, curve(xp + gain))' },
+	{ site: 'cast.js: public level before', file: 'engine/cast.js', re: /const publicBefore = levelForXp\(/, today: '`levelForXp(publicXp)`', change: 'max(stored publicLevel, curve(publicXp))' },
+	{ site: 'cast.js: public level after (the card\'s "Level up!")', file: 'engine/cast.js', re: /const publicAfter = levelForXp\(/, today: '`levelForXp(publicXp + gain)`', change: 'max(stored publicLevel, curve(publicXp + gain)); a level-up only above the floor' },
+	{ site: 'cast.js: level write in the commit', file: 'engine/cast.js', re: /^\s*level: result\.level\.after,/, today: '`$set level` = the cast\'s level after', change: 'writes the max (never lower); also writes `publicLevel` the same way' },
+	{ site: 'User.getLevel()', file: 'class/User.js', re: /return levelForXp\(await this\.getXP\(\)\)/, today: 'derived from `xp` (100·L²)', change: 'max(stored level, curve(xp))' },
+	{ site: 'User.getXPToNextLevel()', file: 'class/User.js', re: /level \*\* 2 \* 100/, today: 'hard-coded 100·L²', change: 'the new curve, from the displayed level' },
+	{ site: 'publicLevel.js: public level (getPublicLevel)', file: 'engine/publicLevel.js', re: /const publicLevelOf = /, today: '`levelForXp(min(publicXp, xp))`, derived on read', change: 'max(stored publicLevel, curve(min(publicXp, xp)))' },
+	{ site: 'publicLevel.js: publicProgressOf', file: 'engine/publicLevel.js', re: /function publicProgressOf/, today: 'hard-coded 100·L²', change: 'the new curve, from the displayed public level' },
+	{ site: 'dev.js: /dev xp add | set', file: 'engine/dev.js', re: /level: levelForXp\(newXp\)/, today: '`level = levelForXp(newXp)`', change: '`add`: max(stored, curve); `set`: may demote, explicitly and audited' },
+	{ site: 'balance.js: the curve', file: 'engine/balance.js', re: /^function levelForXp/, today: 'floor(0.1·√xp) (100·L²)', change: 'the new curve; the freeze anchors on max(stored level, today\'s levelForXp(xp)), since every gate and display today derives the level from XP' },
+];
+function levelSites() {
+	return LEVEL_SITES.map((x) => ({ site: x.site, where: srcRef(x.file, x.re), found: srcLine(x.file, x.re) !== null, today: x.today, change: x.change }));
 }
 
 // The public XP definition, shipped vs model (component by component).
@@ -1117,6 +1269,340 @@ function publicXpDefinition() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Public tells: what an observer can see (adversarial review FND-1/2/3/4, C4, C5). An observer who knows both
+// profiles compares what the Founder's public replies show with what a normal player on the SAME rod (no bait)
+// would show, and multiplies the likelihood ratio Founder : Normal. castsToProof() is the number of cards (or
+// box opens) until that ratio reaches DETECTION.target, with the Founder producing the observations: an exact
+// dynamic programme over the log-ratio (no randomness). Founder pity is left out of both the observations and
+// the observer's model (pity only adds Legendary+), so every figure is conservative: a real Founder is
+// identified at least this fast.
+const DETECTION = deepFreeze({ target: 1000, gridNats: 0.005, floorNats: -60, maxObservations: 5000 });
+
+/** Grid index of a log-ratio (Infinity stays Infinity: an observation a normal player can never produce). */
+const gridOf = (llr) => (llr === Infinity ? Infinity : Math.round(llr / DETECTION.gridNats));
+/** Adds p at grid index k of a Map. */
+const addAt = (m, k, p) => m.set(k, (m.get(k) || 0) + p);
+/** Convolution of two grid distributions (Map index -> p). */
+function convolve(a, b) {
+	const out = new Map();
+	for (const [ka, pa] of a) for (const [kb, pb] of b) addAt(out, ka === Infinity || kb === Infinity ? Infinity : ka + kb, pa * pb);
+	return out;
+}
+
+/**
+ * Observations until the likelihood ratio reaches DETECTION.target: { median, p90, never }. `increments` is the
+ * per-observation distribution of the log-ratio as a grid Map (index -> probability under the Founder); never =
+ * the Founder's observations have exactly a normal player's distribution.
+ */
+function castsToProof(increments) {
+	const live = [...increments].filter(([, p]) => p > 0);
+	if (live.every(([k]) => k === 0)) return { median: null, p90: null, never: true };
+	const top = Math.ceil(Math.log(DETECTION.target) / DETECTION.gridNats - 1e-9);
+	const lo = Math.floor(DETECTION.floorNats / DETECTION.gridNats);
+	const size = top - lo;
+	const steps = live.filter(([k]) => k !== Infinity);
+	let cur = new Float64Array(size);
+	cur[-lo] = 1;
+	const out = { median: null, p90: null, never: false };
+	for (let c = 1; c <= DETECTION.maxObservations && out.p90 === null; c++) {
+		const next = new Float64Array(size);
+		for (let i = 0; i < size; i++) {
+			const q = cur[i];
+			if (q < 1e-300) continue;
+			for (const [k, p] of steps) if (i + k < size) next[Math.max(0, i + k)] += q * p;
+		}
+		cur = next;
+		let alive = 0;
+		for (let i = 0; i < size; i++) alive += cur[i];
+		if (out.median === null && 1 - alive >= 0.5 - 1e-9) out.median = c;
+		if (1 - alive >= 0.9 - 1e-9) out.p90 = c;
+	}
+	return out;
+}
+
+/**
+ * What one catch card tells the observer, Founder vs Normal on the same rod. pF / pN: per-draw rarity
+ * probabilities (no pity); drawsF / drawsN: P(d draw lines on the card); fishPerDrawF / N: fish per draw line
+ * (1 under the proposal; today's crafted rods put 2-5 fish of one species on a line). The card prints every
+ * line's rarity and fish count and takes the colour of the best rarity.
+ * Returns the per-draw KL divergence (nats) and castsToProof() for: the printed rarities alone, the card colour
+ * alone (7 colours), the Legendary+ colours alone (Legendary+ card or not), the fish count alone, and everything
+ * on the card (count plus rarities); plus the Legendary+ card share of each.
+ */
+function cardEvidence({ pF, pN, drawsF, drawsN, fishPerDrawF = 1, fishPerDrawN = 1 }) {
+	const perDraw = new Map();
+	for (const r of RARITIES) if (pF[r] > 0) addAt(perDraw, gridOf(pN[r] > 0 ? Math.log(pF[r] / pN[r]) : Infinity), pF[r]);
+	const kl = RARITIES.reduce((s, r) => s + (pF[r] > 0 ? pF[r] * Math.log(pF[r] / pN[r]) : 0), 0);
+	const fishF = new Map();
+	const fishN = new Map();
+	drawsF.forEach((p, d) => p > 0 && addAt(fishF, d * fishPerDrawF, p));
+	drawsN.forEach((p, d) => p > 0 && addAt(fishN, d * fishPerDrawN, p));
+	const countLlr = (fish) => (fishN.get(fish) > 0 ? Math.log(fishF.get(fish) / fishN.get(fish)) : Infinity);
+	const rarity = new Map();
+	const all = new Map();
+	const count = new Map();
+	let power = new Map([[0, 1]]);
+	for (let d = 1; d < drawsF.length; d++) {
+		power = convolve(power, perDraw);
+		if (!(drawsF[d] > 0)) continue;
+		const c = gridOf(countLlr(d * fishPerDrawF));
+		addAt(count, c, drawsF[d]);
+		for (const [k, p] of power) {
+			addAt(rarity, k, p * drawsF[d]);
+			addAt(all, c === Infinity || k === Infinity ? Infinity : c + k, p * drawsF[d]);
+		}
+	}
+	// Card colour = the best rarity among the card's draw lines: P(best <= r | d) = CDF(r)^d.
+	const cdf = (p) => {
+		let acc = 0;
+		return RARITIES.map((r) => (acc += p[r] || 0));
+	};
+	const best = (c, draws) => RARITIES.map((r, i) => draws.reduce((s, q, d) => s + (d > 0 && q > 0 ? q * (c[i] ** d - (i ? c[i - 1] ** d : 0)) : 0), 0));
+	const bF = best(cdf(pF), drawsF);
+	const bN = best(cdf(pN), drawsN);
+	const colour = new Map();
+	bF.forEach((p, i) => p > 0 && addAt(colour, gridOf(bN[i] > 0 ? Math.log(p / bN[i]) : Infinity), p));
+	const top = RARITIES.map((r, i) => (lplus({ [r]: 1 }) > 0 ? i : -1)).filter((i) => i >= 0);
+	const shareF = sum(top.map((i) => bF[i]));
+	const shareN = sum(top.map((i) => bN[i]));
+	const legendaryColour = new Map();
+	addAt(legendaryColour, gridOf(Math.log(shareF / shareN)), shareF);
+	addAt(legendaryColour, gridOf(Math.log((1 - shareF) / (1 - shareN))), 1 - shareF);
+	return {
+		klPerDraw: kl, legendaryCardShare: { founder: shareF, normal: shareN },
+		rarity: castsToProof(rarity), colour: castsToProof(colour), legendaryColour: castsToProof(legendaryColour),
+		count: castsToProof(count), all: castsToProof(all),
+	};
+}
+
+/** Card evidence for a (trial) Founder profile at a gear-path tier (home biome), against Normal on the same tier. */
+function tierEvidence(t, profile) {
+	const fo = founderOutcome({ tier: t }, { profile });
+	const no = normalOutcome({ tier: t });
+	return {
+		tier: t, biome: fo.biome,
+		...cardEvidence({ pF: fo.perDraw.rarity, pN: no.outcome.rarity, drawsF: fo.visible.dist, drawsN: F.fishDistribution(normalChance(gear(t))).dist }),
+		cooldownMs: { founder: fo.cooldownMs, normal: fo.normal.cooldownMs },
+	};
+}
+
+/** Today's live rods: draws per cast and fish per draw, Normal and Founder (engine rules, checked against measurements.json). */
+function todayCardShape(rod) {
+	const sc = MEASURED.results.find((r) => r.key.endsWith(`|${rod}|-|normal`));
+	const caps = (sc?.rod?.capabilities || ['weak', '1']).map(String);
+	const rodDraws = Number(caps.find((c) => /^\d+$/.test(c)) || 1);
+	const rodCount = Number((caps.find((c) => /^\d+ count$/.test(c)) || '1 count').split(' ')[0]);
+	const drawsN = new Array(TODAY.limits.maxDraws + 1).fill(0);
+	drawsN[Math.min(PROFILES.normal.limits.maxDraws, rodDraws)] = 1;
+	const drawsF = new Array(TODAY.limits.maxDraws + 1).fill(0);
+	for (const [b, p] of Object.entries(TODAY.bonusDraws)) drawsF[Math.min(TODAY.limits.maxDraws, rodDraws + Number(b))] += p;
+	const shape = { drawsN, drawsF, fishPerDrawN: Math.min(PROFILES.normal.limits.maxPerDraw, rodCount), fishPerDrawF: Math.min(TODAY.limits.maxPerDraw, rodCount) };
+	// The engine rule must reproduce the measured fish per cast (1,000 casts per scenario).
+	for (const profile of ['normal', 'founder']) {
+		const rows = MEASURED.results.filter((r) => r.key.endsWith(`|${rod}|-|${profile}`));
+		const measured = sum(rows.map((r) => r.units)) / sum(rows.map((r) => r.casts));
+		const draws = profile === 'normal' ? shape.drawsN : shape.drawsF;
+		const model = draws.reduce((s, p, d) => s + p * d, 0) * (profile === 'normal' ? shape.fishPerDrawN : shape.fishPerDrawF);
+		if (Math.abs(model - measured) > 0.05 * measured) throw new Error(`${SYSTEM_NAME}: today's ${profile} card on ${rod}: model ${model} fish per cast, measured ${measured}`);
+	}
+	return shape;
+}
+
+// Today's rod -> the gear-path tier whose comparison it heads (its home biome is used for today's rows).
+const TODAY_ROD_TIER = Object.fromEntries(TODAY_RODS.map((rod) => [rod, Math.min(...Object.entries(PARAMS.targets.todayRodOfTier).filter(([, list]) => list[0] === rod).map(([t]) => Number(t)))]));
+
+/** The fastest cooldown any normal reel the rods design allows can reach (its strongest reel stat x best variant). */
+function normalCooldownFloorMs() {
+	const reel = rods.PARAMS.slots.reel.fishingSpeed;
+	const variantMax = Math.max(1, ...Object.values(rods.PARAMS.variants).map((v) => v.fishingSpeed ?? 1));
+	const speed = Math.min(STAT_CAPS.fishingSpeed ? STAT_CAPS.fishingSpeed.max : 1, maxOf(Object.values(reel)) * variantMax);
+	return Math.max(F.COOLDOWN.minMs, Math.round(F.COOLDOWN.fishMs * (1 - speed)));
+}
+
+let detectionMemo = null;
+/**
+ * Detection for the proposed profile at every gear-path tier, the same profile without luck (P-FOUNDER-LUCK's
+ * alternative), the stealth sensitivity (P-FOUNDER-STEALTH option b) and today's live Founder on today's rods;
+ * plus the cadence threshold (the click delay under which one interval between two cards is proof).
+ */
+function detection() {
+	if (detectionMemo) return detectionMemo;
+	const s = solve();
+	const path = F.gearPath();
+	const prof = founderProfile();
+	const floorMs = normalCooldownFloorMs();
+	const cadence = (founderMs, sameRodMs, anyMs) => ({ founderMs, sameRodMs, anyNormalMs: anyMs, delaySameRodS: (sameRodMs - founderMs) / 1000, delayAnyS: (anyMs - founderMs) / 1000 });
+	const proposed = path.map((t) => {
+		const e = tierEvidence(t.tier, prof);
+		return { ...e, cadence: cadence(e.cooldownMs.founder, e.cooldownMs.normal, floorMs) };
+	});
+	const noLuck = path.map((t) => tierEvidence(t.tier, profileWith({ xp: s.xp, sell: s.sell, durabilityEfficiency: s.durabilityEfficiency })));
+	const stealth = path.map((t) => tierEvidence(t.tier, stealthProfileWith({ xp: s.xp, sell: s.sell })));
+	const measuredNormalFloorMs = minOf(MEASURED.results.filter((r) => r.profile === 'normal').map((r) => r.cooldownMs));
+	const todayRows = TODAY_RODS.map((rod) => {
+		const t = TODAY_ROD_TIER[rod];
+		const biome = F.biomeAt(path[t].level);
+		const { qualities, stats } = todayRodInputs(rod);
+		const pN = F.castOutcome({ biome, qualities, stats, multiChance: 0 }).rarity;
+		const pF = F.castOutcome({ biome, qualities, stats, multiChance: 0, table: TODAY.rarityTable }).rarity;
+		const shape = todayCardShape(rod);
+		const T = today();
+		return { rod, biome, ...cardEvidence({ pF, pN, ...shape }), cadence: cadence(T.byRod[rod].cooldownMs.founder, T.byRod[rod].cooldownMs.normal, measuredNormalFloorMs), shape };
+	});
+	detectionMemo = { target: DETECTION.target, proposed, noLuck, stealth, today: todayRows, normalCooldownFloorMs: floorMs, measuredNormalFloorMs, stealthNever: stealth.every((x) => x.rarity.never && x.colour.never && x.count.never && x.all.never) };
+	return detectionMemo;
+}
+/** Normal's Legendary+ card share across the gear path, as text (the card-share cap is set against it). */
+const cardShareRangeText = () => range(F.gearPath().map((t) => normalOutcome({ tier: t.tier }).legendaryCardShare), (x) => pct(x, 1));
+
+/** P(a cast's durability charge equals its fish count), i.e. P(the cast looks like a normal rod's), under `rule`. */
+function chargeEqualsCount(dist, eff, rule) {
+	return dist.reduce((s, q, n) => {
+		if (!(n > 0 && q > 0)) return s;
+		const x = n * (1 - eff);
+		if (rule === 'stochastic') {
+			const lo = Math.floor(x + 1e-12);
+			const frac = x - lo;
+			return s + q * ((lo === n ? 1 - frac : 0) + (lo + 1 === n ? frac : 0));
+		}
+		return s + q * (Math.max(1, Math.ceil(x - 1e-9)) === n ? 1 : 0);
+	}, 0);
+}
+/** Casts until the durability lost differs from the fish caught on the rod (geometric: median, p90). */
+const castsUntilMismatch = (q) => (q <= 0 ? { median: 1, p90: 1, never: false } : q >= 1 ? { median: null, p90: null, never: true } : { median: Math.max(1, Math.ceil(Math.log(0.5) / Math.log(q) - 1e-9)), p90: Math.max(1, Math.ceil(Math.log(0.1) / Math.log(q) - 1e-9)), never: false });
+/** Opens until a box reveal proves the Founder (Legendary+ shown or not; steady-state rates, opens treated as independent). */
+function opensToProof(pF, pN) {
+	const m = new Map();
+	addAt(m, gridOf(Math.log(pF / pN)), pF);
+	addAt(m, gridOf(Math.log((1 - pF) / (1 - pN))), 1 - pF);
+	return castsToProof(m);
+}
+
+let oneReplyMemo = null;
+/**
+ * Tells one public reply can prove (FND-3, FND-4, C5): the lifetime species counts of /stats, /collection and
+ * the /inventory fish list (the rarity histogram of every fish caught), rod durability against the fish caught on
+ * the rod (/inventory, /info rod, /stats per-rod count), and /open reveals. Proposed profile and today's.
+ */
+function oneReply() {
+	if (oneReplyMemo) return oneReplyMemo;
+	const s = solve();
+	const prof = founderProfile();
+	const D = detection();
+	const ref = F.REFERENCE_ARCHETYPE;
+	const path = F.gearPath();
+	// Species counts: the regular Founder at public Lv 10 (public gate), on the Old Rod at the design cadence.
+	const lc = lifecycle(ref, { profile: prof, gating: PARAMS.publicLevel.gate });
+	const L10 = F.LIFECYCLE.milestones[0];
+	const hours = lc.public[L10]?.hours ?? null;
+	const old = founderOutcome({ tier: 0 }, { profile: prof });
+	const oldToday = founderOutcome({ tier: 0 }, { profile: profileWith({ xp: TODAY.multipliers.xp, sell: TODAY.multipliers.sell }) });
+	const n0 = normalOutcome({ tier: 0 });
+	if (hours === null) throw new Error(`${SYSTEM_NAME}: the ${ref} Founder never reaches public Lv ${L10}`);
+	const fish = hours * old.hourly.fish;
+	const speciesRow = (fo, klPerDraw) => ({ legendaryPlusFounder: fish * fo.perDraw.legendaryPlus, legendaryPlusNormal: fish * lplus(n0.outcome.rarity), log10Ratio: (fish * klPerDraw) / Math.LN10, fishFor1000: Math.log(DETECTION.target) / klPerDraw });
+	const species = {
+		archetype: ref, publicLevel: L10, hours, fish, biome: old.biome,
+		proposed: speciesRow(old, D.proposed[0].klPerDraw), today: speciesRow(oldToday, D.today[0].klPerDraw),
+		castsProposed: D.proposed[0].rarity, castsToday: D.today[0].rarity,
+	};
+	// Durability: every normal rod loses exactly 1 per fish (efficiency 0), so before its first break
+	// max - durability = fish caught on it (/stats prints fish caught per rod). The Old Rod is unbreakable
+	// under the rods design (no proposed row).
+	const upkeepRod = (t) => rods.craftRod(rods.referenceSet(t));
+	const durability = {
+		rule: F.RULES.durability,
+		proposed: path.filter((t) => t.tier > 0).map((t) => {
+			const fo = founderOutcome({ tier: t.tier }, { profile: prof });
+			const q = chargeEqualsCount(fo.visible.dist, fo.stats.durabilityEfficiency || 0, F.RULES.durability);
+			const maxDurability = upkeepRod(t.tier).maxDurability;
+			return { tier: t.tier, perFish: { normal: 1, founder: fo.perCast.durability / fo.perCast.fish }, sameAsNormalPerCast: q, casts: castsUntilMismatch(q), fishPerRodLife: { normal: maxDurability, founder: maxDurability / (fo.perCast.durability / fo.perCast.fish) } };
+		}),
+		today: TODAY_RODS.map((rod) => {
+			const shape = D.today.find((x) => x.rod === rod).shape;
+			const fishDist = [];
+			shape.drawsF.forEach((p, d) => {
+				if (p > 0) fishDist[d * shape.fishPerDrawF] = (fishDist[d * shape.fishPerDrawF] || 0) + p;
+			});
+			const dist = Array.from({ length: fishDist.length }, (_, i) => fishDist[i] || 0);
+			const q = chargeEqualsCount(dist, TODAY.stats.durabilityEfficiency, 'ceil');
+			const T = today();
+			return { rod, perFish: { normal: T.byRod[rod].durabilityPerFish.normal, founder: T.byRod[rod].durabilityPerFish.founder }, sameAsNormalPerCast: q, casts: castsUntilMismatch(q) };
+		}),
+		stealthNever: path.filter((t) => t.tier > 0).every((t) => {
+			const fo = founderOutcome({ tier: t.tier }, { profile: stealthProfileWith({ xp: s.xp, sell: s.sell }) });
+			return chargeEqualsCount(fo.visible.dist, fo.stats.durabilityEfficiency || 0, F.RULES.durability) >= 1 - 1e-12;
+		}),
+	};
+	// Box reveals: today's boxes (P(open holds a Legendary+), Founder with its kept gacha stats and pity).
+	const G = gacha();
+	const boxes = Object.entries(G.boxes).map(([name, b]) => ({ box: name, normal: b.normalPerOpen, founder: b.founderWithPity, opens: opensToProof(b.founderWithPity, b.normalPerOpen) }));
+	oneReplyMemo = { species, durability, boxes };
+	return oneReplyMemo;
+}
+
+let sensitivityMemo = null;
+/**
+ * SENSITIVITIES for the user's decisions (never the proposal; the proposed values stay solve()'s): the private
+ * multipliers solveMultipliers() needs, against the same targets, for
+ *   noLuck   the proposed profile with luck 0 (P-FOUNDER-LUCK's alternative; durability efficiency kept);
+ *   stealth  STEALTH (P-FOUNDER-STEALTH option b): every public output a normal player's.
+ * Each on integrated lifecycles (integrate.run inside solveMultipliers; the other systems read the proposed
+ * profile, as in solve()). Also what each variant leaves: M5 (Legendary+ per hour) and M6 (rod life) against
+ * today's, which only visible stats can move, and the regular player's real and public pace.
+ */
+function sensitivities() {
+	if (sensitivityMemo) return sensitivityMemo;
+	const s = solve();
+	const path = F.gearPath();
+	const ref = F.REFERENCE_ARCHETYPE;
+	const gate = PARAMS.publicLevel.gate;
+	const families = {
+		proposed: { make: ({ xp = 1, sell = 1 } = {}) => profileWith({ luck: s.luck, durabilityEfficiency: s.durabilityEfficiency, xp, sell }), solved: s },
+		noLuck: { make: ({ xp = 1, sell = 1 } = {}) => profileWith({ luck: 0, durabilityEfficiency: s.durabilityEfficiency, xp, sell }), crateCost: (t) => founderCrates(t).founder.expectedCost },
+		stealth: { make: ({ xp = 1, sell = 1 } = {}) => stealthProfileWith({ xp, sell }), crateCost: (t) => founderCrates(t).normal.expectedCost },
+	};
+	const normalRun = lifecycle(ref);
+	const out = {};
+	for (const [name, fam] of Object.entries(families)) {
+		const m = fam.solved || solveMultipliers(fam.make, { crateCost: fam.crateCost });
+		const profile = fam.make({ xp: m.xp, sell: m.sell });
+		const m5 = path.map((t) => founderOutcome({ tier: t.tier }, { profile }).ratio.legendaryPlus / s.luckTarget[t.tier]);
+		const m6 = path.filter((t) => t.tier > 0).map((t) => {
+			const fo = founderOutcome({ tier: t.tier }, { profile });
+			return ((fo.normal.durabilityPerCast * fo.normal.casts) / (fo.perCast.durability * fo.hourly.casts)) / s.lifeTarget[t.tier];
+		});
+		const run = lifecycle(ref, { profile, gating: gate });
+		const L50 = 50;
+		const fo1 = founderOutcome({ tier: 1 }, { profile });
+		out[name] = {
+			xp: m.xp, sell: m.sell,
+			binding: { sell: m.binding.afford.need >= m.binding.cash.need ? `M4: T${m.binding.afford.tier}, ×${round(m.binding.afford.need, 2)}` : `M3: T${m.binding.cash.tier} ${m.binding.cash.biome}, ×${round(m.binding.cash.need, 2)}`, xp: m.binding.xpTime.need >= m.binding.xpRatio.need ? `M2: ${m.binding.xpTime.archetype}, ${m.binding.xpTime.gating} gate, ×${round(m.binding.xpTime.need, 2)}` : `M1: T${m.binding.xpRatio.tier} ${m.binding.xpRatio.biome}, ×${round(m.binding.xpRatio.need, 2)}` },
+			sellFromCashRatioOnly: m.sellFromCashRatioOnly, xpFromRatioOnly: m.xpFromRatioOnly,
+			luck: profile.stats.luck || 0, durabilityEfficiency: profile.stats.durabilityEfficiency || 0, fishingSpeed: profile.stats.fishingSpeed || 0,
+			m5: { minOverTarget: minOf(m5), met: m5.every((x) => x >= 1 - 1e-9), worstTier: path[m5.indexOf(minOf(m5))].tier },
+			m6: { minOverTarget: minOf(m6), met: m6.every((x) => x >= 1 - 1e-9) },
+			cashRatioT1: fo1.ratio.cash, cashBaseRatioT1: fo1.ratio.cashBase,
+			regular: { realL50: run.real[L50]?.hours ?? null, publicL50: run.public[L50]?.hours ?? null, normalL50: normalRun.real[L50]?.hours ?? null, upgrades: run.upgrades, level: L50 },
+		};
+	}
+	out.normalUpgrades = normalRun.upgrades;
+	sensitivityMemo = out;
+	return sensitivityMemo;
+}
+
+/** MIG-2: today's levels on the new curve if the stored floor were missing (the level a cast or a gate would read). */
+function curveFloor() {
+	const biomes = Object.keys(F.BIOME_LEVEL).filter((b) => F.LIVE_BIOMES.includes(b));
+	return F.LIFECYCLE.milestones.map((L) => {
+		const xp = F.xpForLevel(L, { ...F.CURVE, quartic: 0 });
+		if (levelForXpToday(xp) !== L) throw new Error(`${SYSTEM_NAME}: today's curve is not 100·L² (balance.js levelForXp)`);
+		const newLevel = F.levelForXp(xp);
+		return { level: L, xp, newLevel, lost: biomes.filter((b) => F.BIOME_LEVEL[b] > newLevel && F.BIOME_LEVEL[b] <= L) };
+	});
+}
+
+// ---------------------------------------------------------------------------------------------
 // PROPOSED decisions (status 'proposed' only: only the user approves). get() reads what the model runs;
 // decisions.verify() checks it against `expected`. The framework-level entries this design relies on live in
 // decisions.js: P-FOUNDER-GATE (which level gates gameplay), P-DURABILITY (stochastic durability rule,
@@ -1129,19 +1615,67 @@ const solvedRow = (id) => {
 	return {
 		xp: `×${s.xp}: the binding need rounded up to a ×${PARAMS.rounding.largeStep} step. Binding: M2 time to level on the integrated model (${b.xpTime.archetype}, ${b.xpTime.gating} gate: ×${round(b.xpTime.raw, 2)} × margin ${m} = ×${round(b.xpTime.need, 2)}); M1 (XP/h ratio at equal gear) alone needs ×${round(b.xpRatio.need, 2)}`,
 		sell: `×${s.sell}: the binding need rounded up to a ×${PARAMS.rounding.largeStep} step. Binding: M4 time to afford (T${b.afford.tier}, margin ${m} included: ×${round(b.afford.need, 2)}); M3 ($/h ratio at equal gear) alone needs ×${round(b.cash.need, 2)}`,
-		luck: `+${s.luck} Luck: the binding need rounded up to a ${PARAMS.rounding.luckStep} step. Binding: M5 (Legendary+ per hour ratio at equal gear ≥ today's × margin ${m}) at T${b.luck[0]}: +${round(b.luck[1], 3)}${s.luckCapped ? '; capped by plausibility' : ''}. Cap: at most ${round(PARAMS.plausibility.maxLegendaryCardShare * 100, 1)}% of public cards show a Legendary+`,
+		luck: `+${s.luck} Luck: the binding need rounded up to a ${PARAMS.rounding.luckStep} step. Binding: M5 (Legendary+ per hour ratio at equal gear ≥ today's × margin ${m}) at T${b.luck[0]}: +${round(b.luck[1], 3)}${s.luckCapped ? '; capped by the card-share cap' : ''}. Card-share cap: at most ${round(PARAMS.cardShareCap.maxLegendaryCardShare * 100, 1)}% of public cards show a Legendary+ (never binds; Normal's share is ${cardShareRangeText()}, so the cap is not a plausibility bound)`,
 		durabilityEfficiency: `${s.durabilityEfficiency}: the binding need rounded up to a ${PARAMS.rounding.efficiencyStep} step. Binding: M6 (rod life in hours, Founder ÷ Normal ≥ today's × margin ${m}) at T${b.durability[0]}: ${round(b.durability[1], 3)}; never below today's, never above STAT_CAPS; needs P-DURABILITY`,
 	}[id];
 };
+/**
+ * Measured public-tell figures as text for the decision records and the headline (every number generated
+ * from detection(), oneReply() and sensitivities(); nothing typed by hand).
+ */
+function tellText() {
+	const D = detection();
+	const O = oneReply();
+	const casts = (rows, key) => `${range(rows.map((x) => x[key].median), int)} (p90 ${range(rows.map((x) => x[key].p90), int)})`;
+	const fo0 = founderOutcome({ tier: 0 }, { profile: founderProfile() });
+	const s = solve();
+	const path = F.gearPath();
+	const noLuck = profileWith({ xp: s.xp, sell: s.sell, durabilityEfficiency: s.durabilityEfficiency });
+	return {
+		rarity: casts(D.proposed, 'rarity'),
+		colour: casts(D.proposed, 'colour'),
+		legendaryColour: casts(D.proposed, 'legendaryColour'),
+		legendaryColourNoLuck: casts(D.noLuck, 'legendaryColour'),
+		rarityNoLuck: casts(D.noLuck, 'rarity'),
+		all: casts(D.proposed, 'all'),
+		oldRodCount: casts([D.proposed[0]], 'count'),
+		oldRodMulti: pct(1 - fo0.visible.pOne, 0),
+		cadence: range(D.proposed.map((x) => x.cadence.delayAnyS), (x) => `${num(x, 2)} s`),
+		statsFish: int(O.species.proposed.fishFor1000),
+		durabilityPerFish: range(O.durability.proposed.map((x) => x.perFish.founder), (x) => num(x, 2)),
+		// Card shares with pity, as in the Luck table (detection() leaves pity out).
+		share: range(path.map((t) => founderOutcome({ tier: t.tier }, { profile: founderProfile() }).legendaryCardShare), (x) => pct(x, 1)),
+		shareNoLuck: range(path.map((t) => founderOutcome({ tier: t.tier }, { profile: noLuck }).legendaryCardShare), (x) => pct(x, 1)),
+		shareNormal: range(path.map((t) => normalOutcome({ tier: t.tier }).legendaryCardShare), (x) => pct(x, 1)),
+		boxOpens: range(O.boxes.map((x) => x.opens.median), int),
+	};
+}
+
+/** What the proposed luck adds per tier (home biome): base $/h and base XP/h over the same profile without luck. */
+function luckGains() {
+	const s = solve();
+	const prof = founderProfile();
+	const nl = profileWith({ xp: s.xp, sell: s.sell, durabilityEfficiency: s.durabilityEfficiency });
+	return F.gearPath().map((t) => {
+		const fo = founderOutcome({ tier: t.tier }, { profile: prof });
+		const fn = founderOutcome({ tier: t.tier }, { profile: nl });
+		return { tier: t.tier, cashBaseGain: fo.hourly.valueBase / fn.hourly.valueBase - 1, xpBaseGain: fo.hourly.xpBase / fn.hourly.xpBase - 1, legendaryPlusRatio: fo.ratio.legendaryPlus };
+	});
+}
+
 const DECISIONS = [
 	{
 		id: 'P-FOUNDER-VISIBLE', status: 'proposed',
-		title: 'Founder visible catch: today\'s bonus-fish distribution added to the rod\'s normal multi-catch roll, the total capped at the normal maximum; one fish per draw',
+		title: 'Founder visible catch: today\'s bonus-fish distribution added to the rod\'s normal multi-catch roll, the total capped at the normal maximum; one fish per draw. The cap limits the count; it does not make the cards look normal',
 		get modelled() {
 			return `bonus fish ${Object.entries(PARAMS.visible.bonusFish).map(([n, p]) => `${n}: ${p}`).join(', ')}; limits maxDraws ${F.MULTI.maxFish} (= F.MULTI.maxFish), maxPerDraw 1 (today ${TODAY.limits.maxDraws} / ${TODAY.limits.maxPerDraw})`;
 		},
-		alternatives: ['today\'s limits (tens of fish on one card: a public tell)', 'a smaller bonus (fewer visible fish; more private compensation)', 'no cap (casts a normal player can never land)'],
-		source: 'founder design', why: 'every Founder card is one a normal player can also land (approved direction A-FOUNDER-VISIBLE); the Old Rod card is today\'s (Visible catch)',
+		alternatives: ['today\'s limits (tens of fish on one card: a public tell)', 'a smaller bonus (fewer visible fish; more private compensation)', 'no cap (casts a normal player can never land)', 'cap the visible count at what a normal player can land at the Founder\'s public level and gear: one fish on the Old Rod, i.e. below public Lv 20 under the public gate (not sized on its own; the stealth option of P-FOUNDER-STEALTH is the full version: Stealth)'],
+		source: 'founder design; adversarial review C4',
+		get why() {
+			const t = tellText();
+			return `the cap removes today's tens-of-fish cards (approved direction A-FOUNDER-VISIBLE, "~4 on strong casts"); the Old Rod card is today's. It does not make every card one a normal player can land: on the Old Rod a normal player lands exactly one fish, while ${t.oldRodMulti} of Founder Old Rod cards show 2–${F.MULTI.maxFish} (Visible catch; check visibleCountFeasibleForNormal), and the kept rarity table shows on every card (Detection)`;
+		},
 		get: () => {
 			const p = founderProfile();
 			return { bonusFish: PARAMS.visible.bonusFish, maxDraws: p.limits.maxDraws, maxPerDraw: p.limits.maxPerDraw };
@@ -1155,7 +1689,7 @@ const DECISIONS = [
 			return `margin ×${PARAMS.targets.margin}; tier map ${Object.entries(PARAMS.targets.todayRodOfTier).map(([t, r]) => `${t === '0' ? 'Old Rod' : `T${t}`} = ${r.join(' / ')}`).join('; ')}; gates ${PARAMS.targets.gatingModes.join(' and ')}; rounding ×${PARAMS.rounding.smallStep} below ×${PARAMS.rounding.largeFrom}, ×${PARAMS.rounding.largeStep} above, luck and efficiency ${PARAMS.rounding.luckStep}`;
 		},
 		alternatives: ['no margin (exactly today\'s values)', 'ratio targets only (drops M2 time-to-level and M4 time-to-afford: much smaller multipliers, a slower Founder than today)'],
-		source: 'founder design', why: 'the approved direction keeps the Founder\'s effective power "absurd"; the steeper curve and the repriced gear are compensated like the lost visible volume (Targets)',
+		source: 'founder design', why: 'the approved direction (A-FOUNDER-VISIBLE: private multipliers preserve effective power) keeps the Founder\'s effective power "absurd"; M1-M6 are this design\'s proposed reading of it. The steeper curve and the repriced gear are compensated like the lost visible volume (Targets)',
 		get: () => ({ margin: PARAMS.targets.margin, todayRodOfTier: PARAMS.targets.todayRodOfTier, todayPurchaseOfTier: PARAMS.targets.todayPurchaseOfTier, gatingModes: PARAMS.targets.gatingModes, rounding: PARAMS.rounding }),
 		expected: {
 			margin: 1.1,
@@ -1172,7 +1706,7 @@ const DECISIONS = [
 			return solvedRow('xp');
 		},
 		alternatives: ['today\'s ×5 (a regular Founder reaches Lv 50 hours later than today: Counterfactual)', 'the M1 ratio-only value (drops the time-to-level target)'],
-		source: 'founder design (solve())', why: 'the steeper curve and the capped visible volume both slow the Founder; the approved time-to-level target absorbs both (Targets; Hours to each level)',
+		source: 'founder design (solve())', why: 'the steeper curve and the capped visible volume both slow the Founder; the proposed time-to-level target M2 (P-FOUNDER-TARGETS, under the approved direction of decision 5) absorbs both (Targets; Hours to each level)',
 		get: () => founderProfile().multipliers.xp, expected: 45,
 	},
 	{
@@ -1182,18 +1716,32 @@ const DECISIONS = [
 			return solvedRow('sell');
 		},
 		alternatives: ['today\'s ×10', 'the M3 ratio-only value (drops the time-to-afford target: repriced gear takes the Founder longer to buy than today)'],
-		source: 'founder design (solve())', why: 'gear was repriced upwards like the curve was steepened; the Founder is compensated for both (Targets; Time to afford)',
+		source: 'founder design (solve())', why: 'gear was repriced upwards like the curve was steepened; the proposed targets (P-FOUNDER-TARGETS) compensate the Founder for both (Targets; Time to afford)',
 		get: () => founderProfile().multipliers.sell, expected: 55,
 	},
 	{
 		id: 'P-FOUNDER-LUCK', status: 'proposed',
-		title: 'Private Luck on the Founder profile (solved), capped so at most a set share of public cards show a Legendary+',
+		title: 'Founder Luck (solved). Not displayed, but a stat with a public effect: it raises the rarity every catch card prints and the card\'s colour. A Legendary+ card-share cap applies and never binds',
 		get modelled() {
 			return solvedRow('luck');
 		},
-		alternatives: ['no private luck (Legendary+ per hour below today\'s ratio at some tiers: Private luck)'],
-		source: 'founder design D2 (solve())', why: 'restores Legendary+ per hour at equal gear to today\'s ratio at every tier while fewer fish are visible; the card-share cap keeps it plausibly lucky (Private luck)',
-		get: () => ({ luck: founderProfile().stats.luck ?? 0, maxLegendaryCardShare: PARAMS.plausibility.maxLegendaryCardShare }),
+		get alternatives() {
+			const t = tellText();
+			const n = sensitivities().noLuck;
+			return [
+				`luck 0: M5 (Legendary+ per hour at equal gear ≥ today's) fails, the lowest tier at ${pct(n.m5.minOverTarget, 0)} of today's ratio (Luck); the card tell barely shrinks (printed rarities ${t.rarityNoLuck} casts instead of ${t.rarity}; Legendary+ colour ${t.legendaryColourNoLuck} instead of ${t.legendaryColour}: Detection); sell re-solves to ×${n.sell} (${n.binding.sell}) and XP to ×${n.xp} (${n.binding.xp}) (Stealth)`,
+				'deliver the same value through the sell and XP multipliers instead: that works for money and XP, not for M5, which is collection pace (Legendary species caught per hour); choosing luck 0 means deciding that collection pace is not "power"',
+			];
+		},
+		source: 'founder design D2 (solve()); adversarial review FND-1',
+		get why() {
+			const s = solve();
+			const g = luckGains();
+			const t = tellText();
+			const t1 = g.find((x) => x.tier === 1);
+			return `M5 binds at T${s.binding.luck[0]}, and one global value overshoots every lower tier (T1: ${times(t1.legendaryPlusRatio, 0)} against today's ${times(s.luckTarget[1], 0)}: Luck). Luck adds ${range(g.map((x) => x.cashBaseGain), (x) => pct(x, 0))} to base $/h and ${range(g.map((x) => x.xpBaseGain), (x) => pct(x, 0))} to base XP/h, but what it targets, Legendary+ per hour, is public (cards, /stats, /collection): the Legendary+ card share rises from ${t.shareNoLuck} to ${t.share}, against Normal's ${t.shareNormal} (Luck; Detection)`;
+		},
+		get: () => ({ luck: founderProfile().stats.luck ?? 0, maxLegendaryCardShare: PARAMS.cardShareCap.maxLegendaryCardShare }),
 		expected: { luck: 0.6, maxLegendaryCardShare: 1 / 3 },
 	},
 	{
@@ -1202,16 +1750,23 @@ const DECISIONS = [
 		get modelled() {
 			return solvedRow('durabilityEfficiency');
 		},
-		alternatives: ['today\'s efficiency under today\'s max(1, ceil) rule (Founder rods wear out faster per hour than a normal player\'s: Durability)'],
-		source: 'founder design D5 (solve())', why: 'the Founder casts faster, so under today\'s rule its rods would last fewer hours than Normal\'s; this keeps rod life at or above today\'s ratio (Durability)',
+		alternatives: ['today\'s efficiency under today\'s max(1, ceil) rule (Founder rods wear out faster per hour than a normal player\'s: Durability)', 'efficiency 0: durability looks like a normal rod\'s and the repair cost is paid through the sell multiplier (the stealth option of P-FOUNDER-STEALTH; M6 then fails: Stealth)'],
+		source: 'founder design D5 (solve()); adversarial review FND-3',
+		get why() {
+			return `the Founder casts faster, so under today's rule its rods would last fewer hours than Normal's; this keeps rod life at or above today's ratio (Durability). Durability is public (/inventory, /info rod): every normal rod loses exactly 1 per fish, the Founder ${tellText().durabilityPerFish} per fish, so one reply next to the rod's fish count (/stats) proves the profile (One reply)`;
+		},
 		get: () => founderProfile().stats.durabilityEfficiency, expected: 0.85,
 	},
 	{
 		id: 'P-FOUNDER-KEPT', status: 'proposed',
-		title: 'Kept from today\'s profile: rarity table, fishing speed, pity, gacha stats and gacha pity; still non-competitive',
+		title: 'Kept from today\'s profile: rarity table, fishing speed, pity, gacha stats and gacha pity; still non-competitive. These are the Founder\'s main public tells',
 		modelled: 'read from src/engine/balance.js PROFILES.founder, never copied',
-		alternatives: ['reduce speed or table (would need larger private multipliers)', 'raise them (visible, a tell)'],
-		source: 'founder design', why: 'per-fish rarity and cadence are part of today\'s Founder feel; the quests, streak and buffs designs assume them (Current → proposed)',
+		alternatives: ['the normal rarity table, cadence, pity and box odds with the advantage paid privately: removes the rarity, colour, cadence and /open tells; its private multipliers are the stealth option of P-FOUNDER-STEALTH (Stealth)', 'raise them (visible, a tell)'],
+		source: 'founder design; adversarial review FND-2',
+		get why() {
+			const t = tellText();
+			return `per-fish rarity and cadence are part of today's Founder feel, and the quests, streak and buffs designs assume them. The cost is visibility: from the printed rarities alone an observer reaches 1000:1 after a median of ${t.rarity} casts, from the card colour ${t.colour}; one interval between two cards is proof when the Founder clicks within ${t.cadence} of its cooldown; box reveals show the kept gacha edge (Detection; One reply)`;
+		},
 		get: () => {
 			const p = founderProfile();
 			return { rarityTable: same(p.rarityTable, TODAY.rarityTable), fishingSpeed: p.stats.fishingSpeed === TODAY.stats.fishingSpeed, pity: same(p.pity, TODAY.pity), gachaStats: same(p.gacha.stats, TODAY.gacha.stats), gachaPity: same(p.gacha.pity, TODAY.gacha.pity), competitiveEligible: p.competitiveEligible };
@@ -1235,24 +1790,32 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-FOUNDER-PUBLIC-LEVEL', status: 'proposed',
-		title: 'Public level fields: keep the shipped publicXp (base rewards only) as the Phase 5B rule; at the curve change the public level follows the real level\'s rule (framework P-CURVE-EXISTING), so under its no-demotion freeze a stored publicLevel floor is added',
-		modelled: 'publicXp: shipped (14e27f1): base catch XP (gear, bait, buffs, events) + base quest XP, never a profile bonus. publicLevel: proposed stored field written at the curve change; public level = max(stored publicLevel, curve(publicXp)). The core tracks exactly that rule (lifecycles start new players, so the floor never binds in the model)',
-		alternatives: ['derive the public level on read only (as shipped): under the freeze, a member\'s public level would drop at the curve change while the real level does not (public levels demoted, and real and public levels diverge for normal players)', 'under P-CURVE-EXISTING\'s rescale alternative: rescale publicXp with xp and keep deriving on read (no new field)'],
-		source: 'founder design F1 (approved direction A-PUBLIC-LEVEL); framework P-CURVE-EXISTING', why: 'the steeper curve maps today\'s XP to lower levels and levels never drop; the public level needs the same protection as the real level (Public level)',
+		title: 'Public level fields: keep the shipped publicXp (base rewards only); at the curve change EVERY player\'s public level gets a stored no-demotion floor (publicLevel), like level under framework P-CURVE-EXISTING, and every level read and write goes through max(stored, curve)',
+		modelled: 'publicXp: shipped (14e27f1): base catch XP (gear, bait, buffs, events) + base quest XP, never a profile bonus. Shipped public level: derived on read with today\'s 100·L² curve (publicLevel.js publicLevelOf); there is no stored public level. Proposed: publicLevel written for every account at the curve change (today\'s-curve level of publicXp; the level floor itself anchors on max(stored level, today\'s curve(xp))); from then on public level = max(stored publicLevel, curve(publicXp)). Every level read and write site goes through max(stored, curve): cast.js level before and after, public level before and after, the level write; User.getLevel and getXPToNextLevel; publicLevelOf and publicProgressOf; dev.js xp (Level sites, file:line). The core tracks exactly that rule (lifecycles start new players, so the floor never binds in the model)',
+		get alternatives() {
+			const c = curveFloor().find((x) => x.lost.length > 1) || curveFloor()[curveFloor().length - 1];
+			return [`derive the public level on read only (as shipped): at the curve change every member's public level drops while the real level does not (public levels demoted; real and public levels diverge for normal players), and with P-FOUNDER-GATE = public every member's gate level drops with it (Curve floor: today's Lv ${c.level} lands at Lv ${c.newLevel} and loses ${c.lost.join(' and ')})`, 'under P-CURVE-EXISTING\'s rescale alternative: rescale publicXp with xp and keep deriving on read (no new field)'];
+		},
+		source: 'founder design F1 (approved direction A-PUBLIC-LEVEL); framework P-CURVE-EXISTING; adversarial review MIG-2',
+		why: 'the steeper curve maps today\'s XP to lower levels and levels never drop. The floor is not a Founder field: without it the first cast after the change writes the lower new-curve level for every member, and P-FOUNDER-GATE is "identical for normal players" only with it (Public level; Level sites; Curve floor)',
 		get: () => ({ xpField: PARAMS.publicLevel.xpField, levelField: PARAMS.publicLevel.levelField }),
 		expected: { xpField: 'publicXp', levelField: 'publicLevel' },
 	},
 	{
 		id: 'P-FOUNDER-SURFACES', status: 'proposed',
-		title: 'Which surfaces show which level: every public surface the public level; /fishing-stats (ephemeral) both; future level leaderboards the public level of competitive accounts only',
-		modelled: 'shipped (14e27f1): /fish level-ups, /profile, /inventory level line, /fishing-stats; proposed: any future level leaderboard',
-		alternatives: ['show the real level on the owner\'s own public replies (a tell)'],
-		source: 'founder design F1', why: 'a public card never reveals a private bonus; the owner sees both levels privately (Public level)',
+		title: 'Public surfaces: every public surface shows the public level; /fishing-stats (ephemeral) both levels; future level leaderboards the public level of competitive accounts only. The catch card, /stats, /collection, the /inventory fish list, rod durability (/inventory, /info rod) and /open reveals stay public and show the Founder\'s kept rarity table, luck, durability efficiency and gacha luck',
+		modelled: 'shipped (14e27f1): /fish level-ups, /profile, /inventory level line, /fishing-stats. Open public tells that no fix addresses: the catch card (rarity, colour, count, cadence), /stats and /collection (lifetime count per species), the /inventory fish list, rod durability, /open reveals (Public level surfaces, file:line; Fix first F2-F2d). Proposed: any future level leaderboard',
+		alternatives: ['make /stats, /collection, /inventory, /info rod and /open replies ephemeral for everyone (like P-FOUNDER-WALLET): closes the one-reply tells, not the catch-card tells', 'accept them explicitly (P-FOUNDER-STEALTH option a)', 'the stealth profile (P-FOUNDER-STEALTH option b) makes every one of them a normal player\'s', 'show the real level on the owner\'s own public replies (a tell)'],
+		source: 'founder design F1; adversarial review FND-3, FND-4, C5',
+		get why() {
+			const t = tellText();
+			return `a public card never shows a private bonus, and the owner sees both levels privately. The per-species counts, durability and box reveals are not bonuses but outcomes of the kept visible stats, and they are public: one /stats or /collection reply after about ${t.statsFish} fish is 1000:1, and box reveals reach it after a median of ${t.boxOpens} opens of today's boxes (One reply)`;
+		},
 	},
 	{
 		id: 'P-FOUNDER-WALLET', status: 'proposed',
 		title: 'Wallet privacy: /balance and the money lines of /inventory become ephemeral for every player; inventory value uses the stored public value (valueBase)',
-		modelled: 'not a model value: a presentation rule (the Founder\'s money is private-multiplied)',
+		modelled: 'not a model value: a presentation rule (the Founder\'s money is private-multiplied). If /inventory is split rather than made ephemeral, its level line, fish list and rod line stay public; the fish list and rod line are open tells of their own (P-FOUNDER-SURFACES)',
 		alternatives: ['a public money field for the Founder (like publicXp)', 'hide money for the Founder only (itself a tell)', 'accept the tell'],
 		source: 'founder design D4', why: 'the /inventory Balance and Inventory value lines and /balance show the Founder\'s real, private-multiplied money in public replies today (Fix first)',
 	},
@@ -1261,15 +1824,46 @@ const DECISIONS = [
 		title: 'Developer XP grants move xp and publicXp together (publicXp never above xp), both audited',
 		modelled: 'default scope \'both\' (shipped 14e27f1: set applies the same value, add the same delta, publicXp clamped to [0, xp], audit stores both)',
 		alternatives: ['a scope option real | public for one-field corrections (design stage; not shipped)'],
-		source: 'founder design F1', why: 'an admin correction never makes a normal player\'s public level diverge from their level',
+		source: 'founder design F1', why: 'an admin correction never makes a normal player\'s public level diverge from their level (the /dev founder override can: P-FOUNDER-DEV-OVERRIDE)',
 		get: () => PARAMS.publicLevel.devGrantDefaultScope, expected: 'both',
 	},
 	{
+		id: 'P-FOUNDER-DEV-OVERRIDE', status: 'proposed',
+		title: 'The /dev founder override (shipped, developer-only, audited) stays a test tool, recorded as a second path to the Founder profile; optional hardening listed',
+		modelled: 'not a model value. Shipped (Phase 3): resolveProfile lets devOverrides.profile win over FOUNDER_IDS (balance.js), and /dev founder on | off | test | default sets it on any account, audited (dev.js); FOUNDER_IDS itself is never changed (Fix first F5)',
+		alternatives: ['force competitiveEligible false for every FOUNDER_IDS account whatever its override (today switching a real Founder "off" makes its catches competitive-eligible while it holds gear and wealth earned as the Founder)', 'allow "on" only for FOUNDER_IDS accounts, or map an override on any other account to the test profile', 'getGateLevel() returns the public level only when resolveProfile(...).name === "founder" and the real level otherwise, so an override\'s publicXp gap never lowers a normal account\'s gates; or record that it does'],
+		source: 'adversarial review EXP-6, FND-7',
+		why: 'while an account is overridden to the Founder profile its casts add xp at the profile multiplier and publicXp at base; after "default" the gap stays (publicXpOf = min(publicXp, xp)), so that account\'s public level stays below its real level for good. That contradicts "publicXp = xp for normal profiles" and, under P-FOUNDER-GATE, lowers its gates. Developers can already grant money, XP and items, so this is a corner case of an audited tool, not a new grant capability',
+	},
+	{
 		id: 'P-FOUNDER-MIGRATION', status: 'proposed',
-		title: 'Migrations stay additive and idempotent: publicXp as shipped; at the curve change a stored publicLevel where missing (with P-CURVE-EXISTING\'s freeze); existing Founder fish keep their stored value',
-		modelled: 'publicXp: shipped (14e27f1: accounts without it get xp minus every profile bonus in their applied cast journals, three result shapes; members get publicXp = xp). Proposed: publicLevel = today\'s-curve level of publicXp, written only where missing, before the new curve applies; new catches use the new sell multiplier, stored fish values are never rewritten; PROFILES.founder is code (a BALANCE_VERSION bump), not player data',
-		alternatives: ['recompute stored Founder fish values at the new multiplier (rewrites player documents)'],
-		source: 'founder design', why: 'no player document is rewritten; running any step twice is a no-op (Migrations)',
+		title: 'Migrations stay additive and idempotent: publicXp as shipped (plus a small follow-up fix); at the curve change a stored publicLevel for every account (with P-CURVE-EXISTING\'s freeze); at the gate change the existing Founder\'s current biome is moved inside its gate level; existing Founder fish keep their stored value',
+		modelled: 'publicXp: shipped (14e27f1: accounts without it get xp minus every profile bonus in their applied cast journals, three result shapes; members get publicXp = xp); two edge cases do not heal (Fix first F4). Proposed: publicLevel = today\'s-curve level of publicXp, written for every account where missing, before the new curve applies. At the gate change (P-FOUNDER-GATE): every FOUNDER_IDS account whose currentBiome is above the highest biome its gate (public) level allows is moved to that biome, guarded and idempotent, before the new gate applies; otherwise its next /fish fails the gate (the world design\'s BIOME_LOCKED guard) on the public "No catch" card. New catches use the new sell multiplier, stored fish values are never rewritten; PROFILES.founder is code (a BALANCE_VERSION bump), not player data',
+		alternatives: ['recompute stored Founder fish values at the new multiplier (rewrites player documents)', 'leave the Founder\'s current biome as it is (its first /fish after the gate change shows the failure publicly)'],
+		source: 'founder design; adversarial review FND-6, MIG-3',
+		why: 'no player document is rewritten beyond guarded, idempotent steps; running any step twice is a no-op. The lifecycles start new accounts, so the existing Founder account\'s switch to the public gate (and the one-time drop of its rod stats to the level cap of its public level) is not modelled (Migrations)',
+	},
+	{
+		id: 'P-FOUNDER-STEALTH', status: 'proposed',
+		title: 'How visible the Founder is: (a) accept the catch-card, count, cadence, durability, /stats and /open tells as the price of "not power" (the current proposal), or (b) a stealth profile whose every public output is a normal player\'s at the same public level and gear, with all compensation private',
+		get modelled() {
+			const t = tellText();
+			const st = sensitivities().stealth;
+			return `(a) is what the model runs (the other P-FOUNDER-* entries): an observer reaches 1000:1 after a median of ${t.rarity} casts from the printed rarities and ${t.all} from everything on the card (Detection). (b) is a sensitivity only, solved on the same targets with integrated lifecycles: XP ×${st.xp} (${st.binding.xp}), sell ×${st.sell} (${st.binding.sell}), quest multipliers kept (Stealth)`;
+		},
+		get alternatives() {
+			const st = sensitivities().stealth;
+			return [
+				`(b) stealth: normal rarity table, normal visible count (one fish on the Old Rod, so below public Lv 20), normal cadence and durability, luck 0, no pity, normal box odds; XP ×${st.xp}, sell ×${st.sell}. M5 (Legendary+ per hour) and M6 (rod life) cannot be met privately; the public level and world access advance at a normal player's pace (regular: public Lv ${st.regular.level} after ${num(st.regular.publicL50, 2)} h against ${num(st.regular.normalL50, 2)} h); no card, durability, /stats or /open tell remains (Detection; One reply); what remains is account-level: money where it is still shown (P-FOUNDER-WALLET), how soon gear is bought, and absence from competitive boards (Stealth)`,
+				'(a) with the one-reply surfaces made ephemeral (P-FOUNDER-SURFACES): the catch-card tells remain',
+				'(a) with luck 0 (P-FOUNDER-LUCK): the printed-rarity tell is almost unchanged (Detection)',
+			];
+		},
+		source: 'founder design; adversarial review FND-1, FND-2, FND-3, FND-4, C4, C5',
+		get why() {
+			const t = tellText();
+			return `decision 5 accepted "not power" without a stated cost in visibility. With the kept rarity table, Luck and cadence the Founder is identifiable within a few cards, one /stats or /collection reply is conclusive, and ${t.oldRodMulti} of its Old Rod cards are impossible for a normal player (Detection; One reply). Hiding it completely means a Founder that looks normal everywhere and is ahead only privately (Stealth)`;
+		},
 	},
 ];
 
@@ -1289,7 +1883,7 @@ function report() {
 	const archetypes = Object.keys(F.ARCHETYPES);
 	const gates = PARAMS.targets.gatingModes;
 
-	// Visible distribution and plausibility per tier (home biome).
+	// Visible distribution and Legendary+ card share per tier (home biome).
 	const visible = path.map((t) => {
 		const fo = founderOutcome({ tier: t.tier }, { profile: prof });
 		const nd = F.fishDistribution(normalChance(t));
@@ -1329,8 +1923,8 @@ function report() {
 				fishPerHour: round(fo.ratio.fish * fo.ratio.casts, 2),
 				casts: round(fo.ratio.casts, 2),
 			},
-			// Decision P-FOUNDER-LUCK alternative: the same profile without the private luck.
-			noLuck: { legendaryPlusRatio: round(nl.ratio.legendaryPlus, 1), vsToday: round(nl.ratio.legendaryPlus / s.luckTarget[t.tier], 3), legendaryCardShare: round(nl.legendaryCardShare, 4), perFish: round(nl.pity.perFish, 4) },
+			// Decision P-FOUNDER-LUCK alternative: the same profile without luck (and what luck adds to base $/h and XP/h).
+			noLuck: { legendaryPlusRatio: round(nl.ratio.legendaryPlus, 1), vsToday: round(nl.ratio.legendaryPlus / s.luckTarget[t.tier], 3), legendaryCardShare: round(nl.legendaryCardShare, 4), perFish: round(nl.pity.perFish, 4), cashBaseGain: round(fo.hourly.valueBase / nl.hourly.valueBase - 1, 4), xpBaseGain: round(fo.hourly.xpBase / nl.hourly.xpBase - 1, 4) },
 			legendaryPlusPerFish: round(fo.pity.perFish, 4),
 		};
 	});
@@ -1483,10 +2077,12 @@ function report() {
 		cashRatioPreserved: power.every((p) => p.ratio.cash.minOverTarget >= 1),
 		timeToLevelPreserved: timeCheck,
 		affordPreserved: affordTable.every((r) => r.minutes.todayFounder === null || r.minutes.founder <= r.minutes.todayFounder),
-		legendaryPlusRatioPreserved: s.luckCapped ? 'capped by plausibility' : power.every((p) => p.ratio.legendaryPlus.new >= p.ratio.legendaryPlus.today),
+		legendaryPlusRatioPreserved: s.luckCapped ? 'capped by the card-share cap' : power.every((p) => p.ratio.legendaryPlus.new >= p.ratio.legendaryPlus.today),
 		visibleWithinNormalMax: visible.every((v) => v.founder.dist.length === F.MULTI.maxFish),
+		// Adversarial review C4: every count the Founder shows must be one a normal player can land on the same rod.
+		visibleCountFeasibleForNormal: visible.every((v) => v.founder.dist.every((p, i) => !(p > 0) || v.normal.dist[i] > 0)),
 		visibleMeanAtMostFour: visible.every((v) => v.founder.mean <= 4),
-		legendaryCardShareWithinCap: visible.every((v) => v.founder.legendaryCardShare <= PARAMS.plausibility.maxLegendaryCardShare + 1e-9),
+		legendaryCardShareWithinCap: visible.every((v) => v.founder.legendaryCardShare <= PARAMS.cardShareCap.maxLegendaryCardShare + 1e-9),
 		normalCrateChainMatchesRods: Object.values(G.crates).every((c) => c.normal.matchesRods),
 		rodLifePreserved: upkeep.every((u) => u.lifeRatio.proposed >= u.lifeRatio.todayTarget),
 		day30XpAndMoneyRatioPreserved: Object.values(day30).every((d) => !d.today || (d.xpVsToday.ratio >= 1 && d.moneyRatioToNormal.new >= d.moneyRatioToNormal.today)),
@@ -1494,7 +2090,7 @@ function report() {
 		publicXpMatchesShippedDefinition: definition.matchesShipped,
 		noPublicTellUnderPublicGate: archetypes.every((a) => founderLc.public[a].tell.hours === 0),
 	};
-	checks.pass = Object.values(checks).every((v) => v === true || v === 'capped by plausibility');
+	checks.pass = Object.values(checks).every((v) => v === true || v === 'capped by the card-share cap');
 
 	reportMemo = {
 		...F.stamp(),
@@ -1559,7 +2155,11 @@ function report() {
 			day30,
 			day30Money,
 		},
-		publicLevel: { status, definition },
+		publicLevel: { status, definition, levelSites: levelSites(), curveFloor: curveFloor() },
+		// Public tells and the visibility sensitivities (P-FOUNDER-STEALTH, P-FOUNDER-LUCK, P-FOUNDER-SURFACES).
+		detection: detection(),
+		oneReply: oneReply(),
+		sensitivities: sensitivities(),
 		integration: { system: systemDescription(), retiredLoopParity: RETIRED_LOOP_PARITY },
 		earlierSolves: EARLIER_SOLVES,
 		pityModelCheck: { todayFounderOldRodMeasuredPerFish: round(oldToday, 4), modelWithPity: round(oldModel, 4), modelNoPity: round(oldModelNoPity, 4) },
@@ -1604,9 +2204,9 @@ const compact = (x) => {
 };
 const usd = (x) => `${x < 0 ? '−' : ''}$${compact(Math.abs(x))}`;
 const range = (xs, fmt) => {
-	const lo = Math.min(...xs);
-	const hi = Math.max(...xs);
-	return lo === hi ? fmt(lo) : `${fmt(lo)}–${fmt(hi)}`;
+	const lo = fmt(Math.min(...xs));
+	const hi = fmt(Math.max(...xs));
+	return lo === hi ? lo : `${lo}–${hi}`;
 };
 const tierName = (t) => (Number(t) === 0 ? 'Old Rod' : `T${t}`);
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -1630,10 +2230,13 @@ function markdownTables() {
 	const lastTier = R.power[R.power.length - 1];
 	const firstTier = R.power[0];
 	const time = (a, lv) => L.time[a][lv];
-	const failing = Object.entries(R.checks).filter(([k, v]) => k !== 'pass' && v !== true && v !== 'capped by plausibility').map(([k]) => k);
+	const failing = Object.entries(R.checks).filter(([k, v]) => k !== 'pass' && v !== true && v !== 'capped by the card-share cap').map(([k]) => k);
 	const openTells = P1.status.surfaces.filter((x) => /open public tell/.test(x.status));
 
 	// ----- Summary -----
+	const TT = tellText();
+	const SE = R.sensitivities;
+	const ev = P1.status.evidence;
 	T['founder-headline'] = mdTable(['Figure', 'Value', 'Table'], [
 		['Visible fish per cast (Founder)', `${range(R.visible.map((v) => v.founder.mean), (x) => num(x, 2))} from the Old Rod to T${lastTier.tier}, every cast 1–${F.MULTI.maxFish} fish (today up to ${int(TODAY.limits.maxDraws * TODAY.limits.maxPerDraw)})`, 'Visible catch'],
 		['Proposed private profile (solved at 5b.4)', `XP ×${S.xp}, sell ×${S.sell}, Luck +${S.luck}, durability efficiency ${S.durabilityEfficiency}; quests ×${prof.multipliers.questXp} / ×${prof.multipliers.questCash} kept`, 'Current → proposed; Targets'],
@@ -1643,7 +2246,10 @@ function markdownTables() {
 		['Regular Founder, hours to public Lv 50 (public gate)', `${hrs(time(ref, 50).founderPublic.public)}, against ${hrs(time(ref, 50).newNormal)} for a normal regular player`, 'Hours to each level; Public pace'],
 		['Public tell (fishing above the public level)', `none under the public gate; under the real gate ${range(archetypes.map((a) => L.tellWindowRealGating[a].hours), hrs)} of play`, 'Level gate'],
 		['F1 public level', `shipped (${F1_COMMITS.main}) for the /fish level-up, /profile, the /inventory level line and /fishing-stats; the model's public XP ${P1.definition.matchesShipped ? 'matches' : '**differs from**'} the shipped definition`, 'Public level'],
-		['Open public tells (fix first)', openTells.length ? openTells.map((x) => x.surface.replace(/`/g, '')).join('; ') : 'none', 'Fix first'],
+		['Open public tells', openTells.length ? openTells.map((x) => x.surface.replace(/`/g, '').replace(/ \(public repl(y|ies)\)$/, '')).join('; ') : 'none', 'Fix first; Public level'],
+		['Detection (proposed profile, same rod as a normal player)', `1000:1 likelihood after a median of ${TT.rarity} casts from the printed rarities, ${TT.colour} from the card colour, ${TT.oldRodCount} from an Old Rod fish count; one /stats or /collection reply after about ${TT.statsFish} fish`, 'Detection; One reply'],
+		['Stealth alternative (sensitivity, `P-FOUNDER-STEALTH` b)', `XP ×${SE.stealth.xp}, sell ×${SE.stealth.sell}; no card, durability, /stats or /open tell; M5 and M6 not met; regular public Lv ${SE.stealth.regular.level} after ${hrs(SE.stealth.regular.publicL50)} (Normal ${hrs(SE.stealth.regular.normalL50)})`, 'Stealth'],
+		['Live production bug (fix first)', ev.unfilteredSelectCollectors.length ? `${ev.unfilteredSelectCollectors.map((x) => `/${x.split('/').pop().replace('.js', '').replace('startQuest', 'start-quest')}`).join(' and ')}: any member's click acts on the invoker's account (F3)` : 'none found', 'Fix first'],
 		['Design checks', failing.length ? `**${failing.length} fail:** ${failing.join(', ')}` : `all ${Object.keys(R.checks).length - 1} pass`, 'Checks'],
 		['Retired private loop', `system() matched it exactly: ${PR.exactMilestones}/${PR.milestonesCompared} milestones step-exact (${PR.commit})`, 'Retired-loop parity'],
 	]);
@@ -1655,14 +2261,23 @@ function markdownTables() {
 	]))}\n\nStatus of every entry: \`${[...new Set(DECISIONS.map((d) => d.status))].join(', ')}\`. Only the user approves; \`decisions.js\` joins these to the Phase 5B registry, alongside the framework entries this design relies on (\`P-FOUNDER-GATE\`, \`P-DURABILITY\`, \`P-LUCKY\`), and \`check-shared.js\` verifies each record against the model.`;
 
 	// ----- Fix first -----
-	const ev = P1.status.evidence;
 	const li = R.luckyItems;
+	const OR = R.oneReply;
+	const DT = R.detection;
+	const src = (rel, re) => srcRef(rel, re).replace(/^src\/(?:[^/]+\/)*([^/]+)$/, '$1');
 	T['founder-fix-first'] = mdTable(['#', 'Public tell', 'Evidence (src/, read at render time)', 'Status', 'Fix'], [
 		['F0', 'The Founder badge: `/profile` puts "👑 Founder" in the title when the Founder views its own profile, and the reply is public (`buttonPagination` defers without an ephemeral flag)', ev.profileFounderBadgeInPublicReply ? 'profile.js title; buttonPagination.js `deferReply()`' : 'not found', ev.profileFounderBadgeInPublicReply ? '**open**' : 'closed', 'Remove the badge from the public embed (`/fishing-stats` already shows it privately); regression test: the public `/profile` embed never contains the profile name'],
 		['F0b', `Lucky items: today's Founder catches ${num(li.founderTodayPerHour.boosterPacksOldRod, 1)} Booster Packs per hour on the Old Rod and ${num(li.founderTodayPerHour.boosterPacksRareRod, 1)} on a Rare-parts rod (normal players: an Easter egg)`, 'measurements.json Founder scenarios; cast.js `drawTemplates`', li.frameworkRule === 'pinned' ? 'proposed (framework `P-LUCKY`, modelled)' : '**not modelled**', 'Pin the item branch to the normal base table for every profile (Lucky items)'],
 		['F1', 'Level: public level-ups, `/profile` and `/inventory` levels came from the real (private-multiplied) level', [ev.castWritesPublicXp && 'cast.js writes publicXp', ev.fishCardPublicLevelUp && 'fish.js reads result.level.public', ev.migration && 'migrations.js migratePublicXp'].filter(Boolean).join('; ') || 'not found', ev.castWritesPublicXp && ev.fishCardPublicLevelUp && ev.profilePublicLevel && ev.inventoryPublicLevel ? `**shipped** (${F1_COMMITS.main}; ${F1_COMMITS.branch} on this branch)` : '**incomplete**', 'Done for these surfaces (Public level)'],
 		['F1b', 'Money: `/inventory` "Balance" and "Inventory value" and `/balance` show the Founder\'s real money and final (private-multiplied) fish values in public replies', [ev.inventoryRealBalance && 'inventory.js Balance line', ev.inventoryFinalValue && 'User.getInventoryValue sums stored final values', ev.balanceCommandPublic && 'balance.js public reply'].filter(Boolean).join('; ') || 'not found', ev.inventoryRealBalance || ev.inventoryFinalValue || ev.balanceCommandPublic ? '**open**' : 'closed', '`P-FOUNDER-WALLET`: money lines ephemeral for everyone; inventory value from `valueBase`'],
 		['F1c', 'Gates: biome access, quest start, shop and rod-part level checks read the real level, so a Founder fishes above its public level (Level gate)', ev.gatesReadRealLevel.length ? ev.gatesReadRealLevel.map((f) => f.split('/').pop()).join(', ') : 'none found', ev.gatesReadRealLevel.length ? '**open** (live today)' : 'closed', 'Framework `P-FOUNDER-GATE`: gates read the public level'],
+		['F2', `Catch cards: every card prints each fish's rarity (kept Founder table plus Luck) and takes the colour of the best one; on the Old Rod a normal player lands one fish, the Founder 2–${F.MULTI.maxFish} on ${TT.oldRodMulti} of casts; cards can come faster than any normal reel allows (kept fishing speed)`, [src('commands/slash/Fish/fish.js', /· \$\{f\.rarity\}/), src('commands/slash/Fish/fish.js', /const catchColor/), src('commands/slash/Fish/fish.js', PUBLIC_DEFER)].join(', '), ev.fishCardRarityAndColour ? '**open** (live today; kept by the proposal)' : 'closed', `\`P-FOUNDER-STEALTH\`: accept (a) or the stealth profile (b). 1000:1 after a median of ${TT.rarity} casts from the rarities (Detection)`],
+		['F2b', 'Species counts: `/stats` and `/collection` publish the lifetime count of every species, the `/inventory` fish list the held count; each species has one rarity, so one reply is the rarity histogram of every fish caught', [src('commands/slash/User/stats.js', /stats\.fishStats\.forEach/), src('commands/slash/User/collection.js', /\*\*Caught:\*\*/), src('commands/slash/User/inventory.js', /Fish\.getCount\(/), src('engine/cast.js', /stats\.fishStats\.\$\{/), src('buttonPagination.js', PUBLIC_DEFER)].join(', '), ev.statsPerSpeciesPublic || ev.collectionPerSpeciesPublic || ev.inventoryFishListPublic ? '**open** (live today)' : 'closed', `\`P-FOUNDER-SURFACES\`: make these replies ephemeral for everyone, or accept (\`P-FOUNDER-STEALTH\`). One reply is 1000:1 after about ${TT.statsFish} fish (One reply)`],
+		['F2c', `Rod durability: every normal rod loses exactly 1 per fish, so before its first break max − durability = fish caught on it (\`/stats\` prints that per rod); the Founder loses ${TT.durabilityPerFish} per fish (today ${range(OR.durability.today.map((x) => x.perFish.founder), (x) => num(x, 2))})`, [src('commands/slash/User/inventory.js', /equippedRod\?\.durability/), src('commands/slash/Info/info.js', /rod\.durability\}\/\$\{rod\.maxDurability\}/), src('commands/slash/Info/info.js', /interaction\.reply\(\{ embeds: \[embed\] \}\)/), src('engine/modifiers.js', /durabilityCostPerFish:/)].join(', '), ev.durabilityPublic ? '**open** (live today)' : 'closed', '`P-FOUNDER-SURFACES` (ephemeral rod lines), or efficiency 0 (`P-FOUNDER-STEALTH` b; M6 then fails). One reply'],
+		['F2d', `Box reveals: \`/open\` is public and rolls with the Founder gacha stats and pity (a Legendary+ in ${pct(OR.boxes.find((b) => b.box === 'Daily Box').founder, 1)} of Daily Box opens against ${pct(OR.boxes.find((b) => b.box === 'Daily Box').normal, 2)}); the new Streak Crate is opened the same way`, [src('commands/slash/Economy/open.js', PUBLIC_DEFER), src('commands/slash/Economy/open.js', /function slotLine/), src('engine/gacha.js', /profile\.gacha\?\.stats/)].join(', '), ev.openRevealPublic ? '**open** (live today)' : 'closed', 'Roll Founder reveals on the normal table and pay the edge privately (`P-FOUNDER-STEALTH` b), make `/open` ephemeral, or accept. One reply'],
+		['F3', `Live bug: the \`/biome\` and \`/start-quest\` select collectors have no user filter, so any member who clicks the invoker's menu within its ${collectorSeconds()} switches the invoker's biome or starts a quest on the invoker's account (announced publicly with the clicker's name); while gates read the real level, a bystander also learns whether the Founder's real level reaches a biome's level`, [src('commands/slash/Fish/biome.js', UNFILTERED_COLLECTOR), src('commands/slash/Fish/biome.js', /setCurrentBiome\(/), src('commands/slash/User/startQuest.js', UNFILTERED_COLLECTOR), src('commands/slash/User/startQuest.js', /startQuest\(originalQuest\)/)].join(', '), ev.unfilteredSelectCollectors.length ? '**open** (live bug: fix first)' : 'closed', `Add \`filter: (i) => i.user.id === user.id\` to both collectors (or answer other clickers ephemerally), with a regression test; the proposed permit purchase must re-check the gate level of the account it charges. Optional cleanup: ${src('commands/slash/User/equip.js', /userData\.level < requirements\.level/)} reads \`userData.level\`, which the User wrapper never sets, so that level check never runs (no live effect: every rod has level requirement 0)`],
+		['F4', 'Shipped `publicXp` hotfix, two edge cases that never heal: a cast on a document without `publicXp` creates the field through `$inc` from zero (a public level far below the real level) and the migration\'s `$exists` guard then skips it; casts served by the old instance during a deploy overlap are missing from `publicXp`', [src('engine/cast.js', /publicXp: publicXpOfResult\(result\)/), src('engine/publicLevel.js', /publicXp: \{ \$exists: false \} \}, \{ \$set/), src('engine/publicLevel.js', /Number\.isFinite\(user\?\.publicXp\)/)].join(', '), ev.publicXpIncCreatesField ? `open (edge case; production: ${F1_PRODUCTION.accountsInitialised} accounts initialised by the migration)` : 'closed', 'Small follow-up: in `writeCast`, write `publicXp` with an update pipeline, `publicXp = ($publicXp ?? $xp) + gain` (`$ifNull`), so a document without the field starts from its own `xp` at write time (a `publicXp: { $exists: false }` filter clause on the cast commit would drop the whole commit when it fails, so it only works as a separate update). Reconcile once: every account whose applied journals carry no profile bonus gets `publicXp = xp`; a Founder account is recomputed from its journals (guarded, audited). Before the curve change, a read-only production check that `publicXp = xp` for every non-Founder account. Correct the `publicLevel.js` comment on committed pending journals'],
+		['F5', 'The `/dev founder` override: a developer-only, audited second path to the Founder profile; switching a real Founder "off" makes its catches competitive-eligible; an override leaves a lasting `publicXp` gap on a normal account', [src('engine/balance.js', /if \(override && PROFILES\[override\]\) name = override;/), src('engine/dev.js', /const FOUNDER_MODES/), src('commands/slash/User/profile.js', /const isFounder/)].join(', '), ev.devProfileOverride ? 'live (developer-only, audited; needs a developer action)' : 'closed', '`P-FOUNDER-DEV-OVERRIDE`: optional hardening'],
 	]);
 
 	// ----- Public level (F1) -----
@@ -1695,7 +2310,7 @@ function markdownTables() {
 		['M2', 'Absolute time to level (integrated)', `Hours of play to real Lv ${F.LIFECYCLE.milestones.join('/')} on the new curve, \`integrate.run\` with every reference system; ≤ today's Founder hours for all ${archetypes.length} archetypes and both gate options`, `${tn(B.xpTime)} (raw ${times(B.xpTime.raw, 2)})`, times(B.xpTime.need, 2), `**XP ×${S.xp}**`],
 		['M3', '$ ratio at equal gear', 'Founder final $/h ÷ Normal $/h, same tier and biome; ≥ today\'s ratio in every case', `${tierName(B.cashRatio.tier)} ${B.cashRatio.biome} (today ${times(B.cashRatio.today)}; Founder base ${times(B.cashRatio.baseRatio, 2)})`, times(B.cashRatio.need, 2), '—'],
 		['M4', 'Absolute time to afford', 'Minutes of Founder play to buy the tier set at the two purchases that exist today (T1 ↔ the Lv 20 rod, T2 ↔ the Lv 30 rod), rods crate prices and the Founder\'s crate luck; ≤ today\'s', `${tierName(B.afford.tier)}: today ${num(B.afford.todaySeconds, 1)} s (${usd(B.afford.todayCost)} at ${usd(B.afford.todayIncomePerHour)}/h; now ${usd(B.afford.newCost)})`, times(B.afford.need, 2), `**sell ×${S.sell}**`],
-		['M5', 'Legendary+ per hour ratio at equal gear', `Legendary+/h ÷ Normal, home biome, with Founder pity; ≥ today's ratio; at most ${pct(PARAMS.plausibility.maxLegendaryCardShare, 1)} of public cards may show a Legendary+`, `${tierName(B.luck.tier)} (today ${times(S.luckTarget[B.luck.tier])})`, `Luck +${num(B.luck.need, 3)}`, `**Luck +${S.luck}**${S.luckCapped ? ' (capped)' : ''}`],
+		['M5', 'Legendary+ per hour ratio at equal gear', `Legendary+/h ÷ Normal, home biome, with Founder pity; ≥ today's ratio; card-share cap: at most ${pct(PARAMS.cardShareCap.maxLegendaryCardShare, 1)} of public cards may show a Legendary+ (never binds; Normal's share is ${cardShareRangeText()}, so this is not a plausibility bound)`, `${tierName(B.luck.tier)} (today ${times(S.luckTarget[B.luck.tier])})`, `Luck +${num(B.luck.need, 3)}`, `**Luck +${S.luck}**${S.luckCapped ? ' (capped)' : ''}`],
 		['M6', 'Rod life', `Hours of play a crafted rod lasts, Founder ÷ Normal, same rod, home biome; ≥ today's (${range(Object.values(S.lifeTarget), (x) => times(x, 2))}); never below today's ${TODAY.stats.durabilityEfficiency}, never above the ${STAT_CAPS.durabilityEfficiency.max} cap`, tierName(B.durability.tier), num(B.durability.need, 3), `**Efficiency ${S.durabilityEfficiency}**`],
 	]) + `\n\nEvery target is met at today's value × ${PARAMS.targets.margin} and rounded up. From one family alone: sell would be ×${S.sellFromCashRatioOnly} (M3 without M4) and XP ×${S.xpFromRatioOnly} (M1 without M2).`;
 	T['founder-time-need'] = mdTable(['Archetype', ...gates.map((g) => `${cap(g)} gate: raw → × margin`)], archetypes.map((a) => [cap(a), ...gates.map((g) => {
@@ -1711,7 +2326,7 @@ function markdownTables() {
 	};
 	const fmtValue = { xp: (x) => `×${x}`, sell: (x) => `×${x}`, luck: (x) => `+${x}`, durabilityEfficiency: (x) => `${x}` };
 	T['founder-resolve'] = mdTable(['Value', ...R.earlierSolves.map((e) => e.label), '5b.4 integrated (proposed)'], Object.keys(fmtValue).map((k) => [
-		{ xp: 'XP multiplier', sell: 'Sell multiplier', luck: 'Private Luck', durabilityEfficiency: 'Durability efficiency' }[k],
+		{ xp: 'XP multiplier', sell: 'Sell multiplier', luck: 'Luck (not displayed; public effect)', durabilityEfficiency: 'Durability efficiency' }[k],
 		...R.earlierSolves.map((e) => `${fmtValue[k](e[k])} (${e.binding[k]})`),
 		`**${fmtValue[k](S[k])}** (${bindingNow[k]})`,
 	])) + `\n\nBinding case and its need (margin included) in brackets. Earlier columns are records (${R.earlierSolves.map((e) => e.source).join('; ')}).`;
@@ -1721,17 +2336,17 @@ function markdownTables() {
 	const rt = (t) => RARITIES.map((r) => num(t[r], 0)).join(' / ');
 	T['founder-profile'] = mdTable(['Field', `Today (balance ${R.balanceVersionToday})`, 'Proposed', 'Rationale'], [
 		['`competitiveEligible`', 'false', '**false**', 'Standing constraint: Founder catches stay out of every competitive board.'],
-		['`rarityTable`', rt(tp.rarityTable), `**unchanged** (${rt(prof.rarityTable)})`, 'The per-fish rarity advantage is kept exactly (`P-FOUNDER-KEPT`).'],
-		['`stats.fishingSpeed`', num(tp.stats.fishingSpeed, 2), `**${num(prof.stats.fishingSpeed, 2)} (kept)**`, `Cooldown ${num(firstTier.cooldownMs.founder / 1000, 2)} s on the Old Rod, ${num(lastTier.cooldownMs.founder / 1000, 2)} s from the top tiers (engine floor): ${range(R.power.map((p) => p.castsPerHour.founder), int)} casts/h against Normal's ${range(R.power.map((p) => p.castsPerHour.normal), int)}.`],
-		['`stats.durabilityEfficiency`', num(tp.stats.durabilityEfficiency, 2), `**${num(prof.stats.durabilityEfficiency, 2)}** (M6)`, 'Needs the stochastic durability rule (framework `P-DURABILITY`).'],
-		['`stats.luck`', tp.stats.luck ? num(tp.stats.luck, 2) : '—', `**+${num(prof.stats.luck, 2)}** (M5)`, `Private. Legendary/Lucky per fish (with pity) from ${range(R.power.map((p) => p.noLuck.perFish), (x) => pct(x, 1))} to ${range(R.power.map((p) => p.legendaryPlusPerFish), (x) => pct(x, 1))}.`],
+		['`rarityTable`', rt(tp.rarityTable), `**unchanged** (${rt(prof.rarityTable)})`, 'The per-fish rarity advantage is kept exactly (`P-FOUNDER-KEPT`). Every card prints it (Detection).'],
+		['`stats.fishingSpeed`', num(tp.stats.fishingSpeed, 2), `**${num(prof.stats.fishingSpeed, 2)} (kept)**`, `Cooldown ${num(firstTier.cooldownMs.founder / 1000, 2)} s on the Old Rod, ${num(lastTier.cooldownMs.founder / 1000, 2)} s from the top tiers (engine floor): ${range(R.power.map((p) => p.castsPerHour.founder), int)} casts/h against Normal's ${range(R.power.map((p) => p.castsPerHour.normal), int)}. Visible: below ${num(R.detection.normalCooldownFloorMs / 1000, 2)} s no normal reel can follow (Detection, cadence).`],
+		['`stats.durabilityEfficiency`', num(tp.stats.durabilityEfficiency, 2), `**${num(prof.stats.durabilityEfficiency, 2)}** (M6)`, 'Needs the stochastic durability rule (framework `P-DURABILITY`). Visible: durability per fish is public, and every normal rod loses exactly 1 (One reply).'],
+		['`stats.luck`', tp.stats.luck ? num(tp.stats.luck, 2) : '—', `**+${num(prof.stats.luck, 2)}** (M5)`, `Not displayed, but its effect is public: every card prints each fish's rarity and takes the colour of the best one. Legendary/Lucky per fish (with pity) from ${range(R.power.map((p) => p.noLuck.perFish), (x) => pct(x, 1))} to ${range(R.power.map((p) => p.legendaryPlusPerFish), (x) => pct(x, 1))}; cards with a Legendary+ from ${TT.shareNoLuck} to ${TT.share}, Normal ${TT.shareNormal} (Luck; Detection).`],
 		['`bonusDraws`', Object.entries(tp.bonusDraws).map(([n, p]) => `${n}: ${p}`).join(', '), '**unchanged**, now added to the rod\'s normal chain roll', `The Old Rod card is today's (mean ${num(R.visible[0].founder.mean, 2)} fish).`],
-		['`limits`', `maxDraws ${tp.limits.maxDraws}, maxPerDraw ${tp.limits.maxPerDraw}`, `**maxDraws ${prof.limits.maxDraws} (= \`F.MULTI.maxFish\`), maxPerDraw ${prof.limits.maxPerDraw}**`, 'No cast a normal player could not also land (`P-FOUNDER-VISIBLE`).'],
+		['`limits`', `maxDraws ${tp.limits.maxDraws}, maxPerDraw ${tp.limits.maxPerDraw}`, `**maxDraws ${prof.limits.maxDraws} (= \`F.MULTI.maxFish\`), maxPerDraw ${prof.limits.maxPerDraw}**`, 'No card above the normal maximum (`P-FOUNDER-VISIBLE`). On the Old Rod a normal player lands one fish, so most Founder Old Rod cards are still impossible for a normal player (Visible catch).'],
 		['`multipliers.xp`', `×${tp.multipliers.xp}`, `**×${prof.multipliers.xp}** (M2)`, 'Private; public output shows base.'],
 		['`multipliers.sell`', `×${tp.multipliers.sell}`, `**×${prof.multipliers.sell}** (M4)`, 'Private, baked into each fish\'s stored `value`; `valueBase` stays the public amount.'],
 		['`multipliers.questXp` / `questCash`', `×${tp.multipliers.questXp} / ×${tp.multipliers.questCash}`, `**×${prof.multipliers.questXp} / ×${prof.multipliers.questCash} (kept)**`, 'The quests design reads them (`P-FOUNDER-QUEST-MULT`).'],
 		['`pity`', `Legendary+ ${pityText(td.pity.legendaryPlus)}; Lucky ${pityText(td.pity.lucky)}`, '**unchanged**', 'Worth more now: with a few draws per cast the counters actually build up.'],
-		['`gacha.stats` / `gacha.pity`', `${statText(td.gachaStats)} / ${pityText(td.gachaPity.legendaryPlus)}`, '**unchanged**', 'Gacha on the new crates.'],
+		['`gacha.stats` / `gacha.pity`', `${statText(td.gachaStats)} / ${pityText(td.gachaPity.legendaryPlus)}`, '**unchanged**', 'Gacha on the new crates. Visible on every public `/open` reveal (One reply).'],
 		['Lucky items', `${pct(LUCKY_ITEM_SHARE, 0)} of Lucky draws (${pct(R.luckyItems.itemPerDraw.founderBaseUnpinned, 2)} per Founder draw)`, `**pinned to the normal base table** (${pct(R.luckyItems.itemPerDraw.pinnedNormalBase, 5)} per draw)`, 'F0b; framework `P-LUCKY`.'],
 		['Level shown in public', 'public level (shipped)', '**public level**', `Shipped in ${F1_COMMITS.main} (Public level).`],
 		['Level that gates gameplay', 'real level', `**${PARAMS.publicLevel.gate} level**`, 'Framework `P-FOUNDER-GATE` (Level gate).'],
@@ -1740,10 +2355,10 @@ function markdownTables() {
 		`${tierName(v.tier)} (${v.biome})`, v.normal.dist.map((p) => num(p * 100, 1)).join(' / ') + '%', `${num(v.normal.mean, 2)} / ${pct(v.normal.p3plus)} / ${pct(v.normal.p5)}`,
 		v.founder.dist.map((p) => num(p * 100, 1)).join(' / ') + '%', `**${num(v.founder.mean, 2)}** / ${pct(v.founder.p3plus, 0)} / ${pct(v.founder.p5, 0)}`, `${pct(v.normal.legendaryCardShare)} / ${pct(v.founder.legendaryCardShare)}`, num(v.todayFounderFishPerCast, 1),
 	]));
-	T['founder-luck'] = mdTable(['Tier', 'Legendary+/h ratio today', 'New, no private luck', `New, +${S.luck} luck`, `Cards with a Legendary+: no luck / +${S.luck}`, 'No luck vs today'], R.power.map((p) => {
+	T['founder-luck'] = mdTable(['Tier', 'Legendary+/h ratio today', 'New, no luck', `New, +${S.luck} luck`, 'New with luck ÷ today', 'No luck vs today', `Public cards with a Legendary+: Normal / no luck / +${S.luck}`, 'Luck adds: base $/h / base XP/h'], R.power.map((p) => {
 		const v = R.visible.find((x) => x.tier === p.tier);
-		return [tierName(p.tier), times(p.ratio.legendaryPlus.today, 0), times(p.noLuck.legendaryPlusRatio, 0), times(p.ratio.legendaryPlus.new, 0), `${pct(p.noLuck.legendaryCardShare)} / ${pct(v.founder.legendaryCardShare)}`, pct(p.noLuck.vsToday, 0)];
-	})) + `\n\nPity adds a little on top (Legendary+ per hour with and without pity at ${tierName(lastTier.tier)}: ${num(lastTier.home.legendaryPlusPerHour.founder, 1)} and ${num(lastTier.home.legendaryPlusPerHour.founderNoPity, 1)}).`;
+		return [tierName(p.tier), times(p.ratio.legendaryPlus.today, 0), times(p.noLuck.legendaryPlusRatio, 0), times(p.ratio.legendaryPlus.new, 0), pct(p.ratio.legendaryPlus.new / p.ratio.legendaryPlus.today, 0), pct(p.noLuck.vsToday, 0), `${pct(v.normal.legendaryCardShare)} / ${pct(p.noLuck.legendaryCardShare)} / ${pct(v.founder.legendaryCardShare)}`, `+${pct(p.noLuck.cashBaseGain, 1)} / +${pct(p.noLuck.xpBaseGain, 1)}`];
+	})) + `\n\nPity adds a little on top (Legendary+ per hour with and without pity at ${tierName(lastTier.tier)}: ${num(lastTier.home.legendaryPlusPerHour.founder, 1)} and ${num(lastTier.home.legendaryPlusPerHour.founderNoPity, 1)}). Luck is not displayed, but every public card prints the rarities it raises; the card shares here include pity.`;
 	T['founder-durability'] = mdTable(['Tier', 'Durability', 'Normal life', `Founder life, today's rule and ${TODAY.stats.durabilityEfficiency}`, `Founder life, proposed rule and ${S.durabilityEfficiency}`, 'Life ratio F/N: today\'s target / proposed', 'Durability per fish N / F', 'Upkeep share of income N / F'], R.upkeep.map((u) => [
 		tierName(u.tier), int(u.maxDurability), hrs(u.lifeHours.normal), `${hrs(u.lifeHours.founderTodayRuleTodayEff)} (${times(u.lifeRatio.todayRuleTodayEff, 2)})`, hrs(u.lifeHours.founderProposed), `${times(u.lifeRatio.todayTarget, 2)} / **${times(u.lifeRatio.proposed, 2)}**`, `${num(u.durabilityPerFish.normal, 2)} / ${num(u.durabilityPerFish.founder, 2)}`, `${pct(u.upkeepShare.normal)} / ${pct(u.upkeepShare.founder, 4)}`,
 	])) + '\n\nThe Old Rod is unbreakable (rods design): no row.';
@@ -1818,6 +2433,50 @@ function markdownTables() {
 		['Largest relative difference', `${PR.maxRelativeDifference} (tolerance ${PR.tolerance})`],
 	]);
 
+	// ----- Public tells: detection, one reply, stealth sensitivity -----
+	const obs = (x) => (x.never ? 'never' : `${int(x.median)} / ${int(x.p90)}`);
+	const cad = (c) => `${num(c.delaySameRodS, 2)} s / ${num(c.delayAnyS, 2)} s`;
+	const todayRodName = (rod) => rodRow[rod] || rod;
+	T['founder-detection'] = mdTable(['Founder, rod (biome)', 'KL per fish (nats)', 'Printed rarities', 'Card colour', 'Legendary+ colour only', 'Fish count', 'Everything on the card', 'Cadence: one interval is proof if the Founder clicks within (same rod / any normal reel)'], [
+		...DT.proposed.map((x) => [`Proposed, ${tierName(x.tier)} (${x.biome})`, num(x.klPerDraw, 3), obs(x.rarity), obs(x.colour), obs(x.legendaryColour), obs(x.count), `**${obs(x.all)}**`, cad(x.cadence)]),
+		...DT.noLuck.map((x) => [`Proposed without luck, ${tierName(x.tier)}`, num(x.klPerDraw, 3), obs(x.rarity), obs(x.colour), obs(x.legendaryColour), obs(x.count), obs(x.all), 'as proposed']),
+		...DT.today.map((x) => [`Today, ${todayRodName(x.rod)}, ${x.biome}`, num(x.klPerDraw, 3), obs(x.rarity), obs(x.colour), obs(x.legendaryColour), obs(x.count), `**${obs(x.all)}**`, cad(x.cadence)]),
+		['Stealth (`P-FOUNDER-STEALTH` b), every tier', range(DT.stealth.map((x) => x.klPerDraw), (v) => num(v, 3)), ...['rarity', 'colour', 'legendaryColour', 'count', 'all'].map((k) => (DT.stealth.every((x) => x[k].never) ? 'never' : range(DT.stealth.map((x) => x[k].median), int))), 'never (normal cadence)'],
+	]) + `\n\nCards (median / p90) until the likelihood ratio Founder : Normal reaches ${DT.target}:1 for an observer who knows both profiles and compares the Founder with a normal player on the same rod (no bait), with the Founder producing the cards. Exact dynamic programme over the log-ratio. Founder pity is left out (it only adds Legendary+), so every figure is conservative. "Printed rarities": the rarity on every line of the card; "card colour": the colour of the best rarity (${RARITIES.length} colours); "fish count": the number of fish; "everything": count and rarities together. Today's crafted rods put several fish of one species on each line, so their rarity evidence is per line; a normal player's count on today's rods is fixed per rod, so any other count is proof. Cadence: the Founder's cooldown against the same rod's normal cooldown and the fastest cooldown any normal reel in the rods design allows (${num(DT.normalCooldownFloorMs / 1000, 2)} s; today's fastest measured normal cooldown ${num(DT.measuredNormalFloorMs / 1000, 2)} s). At the design's ${F.DESIGN_OVERHEAD_S} s click delay no single interval is that short; Discord shows message times to the minute, so this needs live watching or message IDs.`;
+
+	const sp = OR.species;
+	const dur = OR.durability;
+	const box = (name) => OR.boxes.find((b) => b.box === name);
+	T['founder-one-reply'] = mdTable(['Public surface', 'What one reply shows', 'Proposed Founder', 'Normal player, same rod', 'Today\'s Founder', 'What it takes to reach 1000:1'], [
+		['`/stats`, `/collection`, `/inventory` fish list', 'lifetime (or held) count per species; each species has one rarity, so the rarity histogram of every fish caught', `${cap(sp.archetype)} Founder at public Lv ${sp.publicLevel} (public gate: ${hrs(sp.hours)} on the Old Rod, ${int(sp.fish)} fish): ${num(sp.proposed.legendaryPlusFounder, 1)} Legendary+`, `${num(sp.proposed.legendaryPlusNormal, 2)} Legendary+ in the same ${int(sp.fish)} fish`, `${num(sp.today.legendaryPlusFounder, 1)} Legendary+ in the same fish`, `about ${int(sp.proposed.fishFor1000)} fish (today ${int(sp.today.fishFor1000)}): one reply after a median of ${int(sp.castsProposed.median)} casts (p90 ${int(sp.castsProposed.p90)}); after those ${int(sp.fish)} fish the expected ratio is 10^${int(sp.proposed.log10Ratio)} (today 10^${int(sp.today.log10Ratio)})`],
+		['Rod durability (`/inventory`, `/info rod`) with fish caught per rod (`/stats`)', 'durability lost against fish caught on that rod', `${range(dur.proposed.map((x) => x.perFish.founder), (v) => num(v, 2))} per fish (T1–T${dur.proposed[dur.proposed.length - 1].tier}; the Old Rod is unbreakable); a rod lasts ${range(dur.proposed.map((x) => x.fishPerRodLife.founder), int)} fish`, `exactly 1 per fish; a rod lasts ${range(dur.proposed.map((x) => x.fishPerRodLife.normal), int)} fish`, `${range(dur.today.map((x) => x.perFish.founder), (v) => num(v, 2))} per fish`, `a cast charges its full fish count with probability ${range(dur.proposed.map((x) => x.sameAsNormalPerCast), (v) => pct(v, 1))} (today ${range(dur.today.map((x) => x.sameAsNormalPerCast), (v) => pct(v, 0))}), so the loss differs after ${range(dur.proposed.map((x) => x.casts.median), int)} cast (p90 ${range(dur.proposed.map((x) => x.casts.p90), int)})`],
+		...['Daily Box', 'Voter\'s Crate'].map((name) => [`\`/open\` ${name}`, 'each slot\'s rarity (Legendary+ marked)', `a Legendary+ in ${pct(box(name).founder, 1)} of opens (kept gacha stats and pity)`, pct(box(name).normal, 2), 'the same (kept)', `${obs(box(name).opens)} opens (median / p90)`]),
+	]) + `\n\nDurability: every normal rod loses exactly one point per fish (no normal source has durability efficiency), so before its first break a normal rod's max − durability equals the fish caught on it, which \`/stats\` prints per rod. Box opens: steady-state rates with pity, opens treated as independent; the new Streak Crate is opened with \`/open\` too (the streak design's Founder table has its rates). Stealth (\`P-FOUNDER-STEALTH\` b): ${DT.stealthNever && dur.stealthNever ? 'none of these differs from a normal player' : '**some of these still differ from a normal player**'}.`;
+
+	const V = ['proposed', 'noLuck', 'stealth'];
+	const vs = (fn) => V.map((k) => fn(SE[k], k));
+	const tierHours = (u) => numericKeys(u).map((k) => num(u[k], 2)).join(' / ');
+	const detRange = (rows, key) => (rows.every((x) => x[key].never) ? 'never' : `${range(rows.map((x) => x[key].median), int)} (p90 ${range(rows.map((x) => x[key].p90), int)})`);
+	const detOf = { proposed: DT.proposed, noLuck: DT.noLuck, stealth: DT.stealth };
+	T['founder-stealth'] = mdTable(['', 'Proposed (a)', 'Proposed without luck', 'Stealth (b): sensitivity only'], [
+		['Visible profile', `Founder rarity table, Luck +${S.luck}, fishing speed ${num(prof.stats.fishingSpeed, 2)}, durability efficiency ${S.durabilityEfficiency}, pity, Founder box odds; Old Rod bonus fish`, 'the same with Luck 0', 'a normal player\'s: rarity table, fish count (one fish on the Old Rod), cadence, durability, box odds; no luck, no pity'],
+		['XP multiplier (binding need)', ...vs((x) => `**×${x.xp}** (${x.binding.xp})`)],
+		['Sell multiplier (binding need)', ...vs((x) => `**×${x.sell}** (${x.binding.sell})`)],
+		['From one target family alone: sell (M3) / XP (M1)', ...vs((x) => `×${x.sellFromCashRatioOnly} / ×${x.xpFromRatioOnly}`)],
+		['Quest multipliers', ...vs(() => `×${TODAY.multipliers.questXp} / ×${TODAY.multipliers.questCash} (kept)`)],
+		['M5: Legendary+ per hour ≥ today\'s ratio (lowest tier ÷ today)', ...vs((x) => `${x.m5.met ? 'met' : '**not met**'} (${pct(x.m5.minOverTarget, x.m5.minOverTarget < 0.1 ? 1 : 0)}, ${tierName(x.m5.worstTier)})`)],
+		['M6: rod life ≥ today\'s ratio (lowest tier ÷ today)', ...vs((x) => `${x.m6.met ? 'met' : '**not met**'} (${pct(x.m6.minOverTarget, 0)})`)],
+		['$/h at T1, Founder ÷ Normal: final (public base)', ...vs((x) => `${times(x.cashRatioT1, 0)} (${times(x.cashBaseRatioT1, 1)})`)],
+		[`${cap(ref)}, public gate: hours to real Lv ${SE.proposed.regular.level} / public Lv ${SE.proposed.regular.level} (Normal: Lv ${SE.proposed.regular.level})`, ...vs((x) => `${hrs(x.regular.realL50)} / ${hrs(x.regular.publicL50)} (${hrs(x.regular.normalL50)})`)],
+		[`${cap(ref)}, public gate: tier purchases T1–T${lastTier.tier} (hours)`, ...vs((x) => tierHours(x.regular.upgrades))],
+		['Cards to 1000:1, over the tiers: printed rarities / everything on the card', ...V.map((k) => `${detRange(detOf[k], 'rarity')} / ${detRange(detOf[k], 'all')}`)],
+		['One-reply tells (`/stats`, durability, `/open`)', 'yes (One reply)', 'yes (One reply)', DT.stealthNever && dur.stealthNever ? 'none' : '**some remain**'],
+		['What stays public', 'every tell in Detection and One reply; money until `P-FOUNDER-WALLET`; absence from competitive boards', 'the same', 'account-level only: money where it is still shown (`P-FOUNDER-WALLET`), how soon gear is bought (the row above), absence from competitive boards'],
+	]) + `\n\nSensitivities, not proposals: the proposed values stay the solved ones. \`solveMultipliers()\` runs the same targets (M1–M4, today's value × ${PARAMS.targets.margin}, rounded up) on integrated lifecycles (\`integrate.run\`); the other systems (quests, streak, buffs, rod crates) read the proposed profile, as in the main solve. M5 and M6 are reported, not solved: only visible stats move them. A normal ${ref} player buys the tiers at ${tierHours(SE.normalUpgrades)} h.`;
+
+	T['founder-curve-floor'] = mdTable(['Level today (100·L²)', 'XP', 'Level on the new curve without a stored floor', 'Live biomes it would lose'], R.publicLevel.curveFloor.map((x) => [x.level, int(x.xp), x.newLevel, x.lost.length ? x.lost.join(', ') : 'none'])) + '\n\nWhat a site that reads the new curve without the stored floor would return for an existing player (framework `P-CURVE-EXISTING`, `P-FOUNDER-PUBLIC-LEVEL`). The public level has the same problem: the shipped public level is derived on read, so without a stored `publicLevel` every member\'s public level drops like this, and with `P-FOUNDER-GATE` = public so does every member\'s gate level.';
+	T['founder-level-sites'] = mdTable(['Level read or write site', 'Where (read at render time)', 'Today', 'At the curve change'], R.publicLevel.levelSites.map((x) => [x.site, x.found ? x.where : `**${x.where}**`, x.today, x.change])) + '\n\nEvery site must go through max(stored, curve) at the curve change, for the level and for the public level of every player; a single site on the bare curve demotes (Curve floor). The gates that read these levels are in Level gate (`getLevel()` → `getGateLevel()`).';
+
 	// ----- Checks -----
 	const CHECK_TEXT = {
 		xpRatioPreserved: 'M1: XP ratio at equal gear ≥ today\'s in every tier × biome',
@@ -1825,15 +2484,16 @@ function markdownTables() {
 		timeToLevelPreserved: 'M2: real-level hours ≤ today\'s Founder, every archetype, both gates (integrated)',
 		affordPreserved: 'M4: minutes to afford ≤ today\'s',
 		legendaryPlusRatioPreserved: 'M5: Legendary+ per hour ratio ≥ today\'s at every tier',
-		visibleWithinNormalMax: `Every visible cast is 1–${F.MULTI.maxFish} fish`,
+		visibleWithinNormalMax: `Every visible cast is 1–${F.MULTI.maxFish} fish (the normal maximum; not a feasibility check, see the next line)`,
+		visibleCountFeasibleForNormal: 'Every visible count is one a normal player on the same rod can land (on the Old Rod a normal player lands one fish; adversarial review C4)',
 		visibleMeanAtMostFour: 'Visible mean at most 4 at every tier (approved "~4 on strong casts")',
-		legendaryCardShareWithinCap: `Public cards with a Legendary+ ≤ ${pct(PARAMS.plausibility.maxLegendaryCardShare)}`,
+		legendaryCardShareWithinCap: `Public cards with a Legendary+ ≤ ${pct(PARAMS.cardShareCap.maxLegendaryCardShare)} (a solver cap, not a plausibility bound: Detection)`,
 		normalCrateChainMatchesRods: 'The Normal crate chain reproduces rods.cratesDistribution() exactly',
 		rodLifePreserved: 'M6: rod life ratio ≥ today\'s at every crafted tier',
 		day30XpAndMoneyRatioPreserved: 'Day 30 (integrated): real XP ≥ today\'s Founder and money ÷ Normal ≥ today\'s, every archetype',
 		competitiveEligibleFalse: 'Founder stays non-competitive',
 		publicXpMatchesShippedDefinition: 'The model\'s public XP matches the shipped definition (Public level)',
-		noPublicTellUnderPublicGate: 'Under the public gate the Founder never fishes above its public level (integrated)',
+		noPublicTellUnderPublicGate: 'Under the public gate the Founder never fishes a biome or tier above its public level (integrated; the level-gate tell only, not the card tells in Detection)',
 	};
 	T['founder-checks'] = mdTable(['Check', 'Result'], Object.entries(R.checks).filter(([k]) => k !== 'pass').map(([k, v]) => [CHECK_TEXT[k] || k, v === true ? 'pass' : v === false ? '**fail**' : String(v)]))
 		+ `\n\nPity model: today's measured Founder Old Rod Legendary+ per fish ${pct(R.pityModelCheck.todayFounderOldRodMeasuredPerFish, 2)}; the model predicts ${pct(R.pityModelCheck.modelWithPity, 2)} with pity (${pct(R.pityModelCheck.modelNoPity, 2)} without).`;
@@ -1844,7 +2504,8 @@ module.exports = {
 	PARAMS, DECISIONS, SYSTEM_NAME, RETIRED_LOOP_PARITY,
 	founderProfile, profileWith, founderOutcome, normalOutcome, visibleDistribution, visibleFromChain, pityLegendaryPlus,
 	founderCastOutcome, system, systemDescription,
-	lifecycle, today, solve, gacha, founderCrates, publicLevelStatus, publicXpDefinition,
+	lifecycle, today, solve, gacha, founderCrates, publicLevelStatus, publicXpDefinition, levelSites,
+	STEALTH, stealthProfileWith, solveMultipliers, castsToProof, cardEvidence, detection, oneReply, sensitivities, curveFloor,
 	report, markdownTables,
 };
 

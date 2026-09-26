@@ -18,6 +18,8 @@
 | Money baits: cash return per $1 at their home stages | 1.04–1.61 (target 1.3, accepted 1–1.7) | Home stages |
 | XP baits: net $ per extra XP against the stage's own rate | 0.68×–1.42× (target K = 1) | Home stages |
 | Pricing checks | all pass | Pricing checks |
+| Spinner on any rod tier in Lake and Pond | mean fish per cast up to 1.952; above the mid band's rod range (1.30) on T1, T2, T3, T4, T5; above the endgame ceiling (1.80) on T4, T5 (`P-BAIT-SPINNER-TIERS`) | Spinner by rod tier |
+| Bait held below its shop level (legacy stacks, box grants) | waits through biome access, except Strong Magnet: needs a use-time level check (`P-BAIT-LEGACY-STACKS`) | Legacy stacks below the shop level |
 | Money bait always on, regular player (integrated) | net +1.6% of income; milestones at most 1.6% sooner | Regular player; Income and XP sources |
 | XP bait always on, regular player (integrated) | L50 43.65 h → 39.57 h; largest speed-up 9.7% at L60 (cap 10%: pass); net −8.9% of income | Regular player |
 | Approved windows with always-on XP bait (regular player) | **under the lower edge at L30, L40, L50** | Regular player; XP-bait sizing |
@@ -36,7 +38,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `P-BAIT-PER-CAST` | Bait is consumed once per successful cast, not per fish, for every profile | 1 unit per cast; a Founder cast uses one too; a failed cast (no catch, broken rod) uses none | per fish (today: every fish of a multi-catch burns a unit; today's Founder about three per cast) | a fixed, knowable cost per cast; jackpots never cost more bait; no Founder tell in bait counts (Consumption) | yes |
 | `P-BAIT-WHERE-IT-WORKS` | Bait works only in its listed biomes: elsewhere no stats, no XP bonus, and no unit is used | onlyWhereItWorks true | today: the XP multiplier applies in every biome and units burn everywhere | biome lists are the balance lever: a fixed price against biome-scaled value would otherwise balloon returns up the ladder (Starter baits) | yes |
-| `P-BAIT-ROSTER` | Ten baits, one clear role each: two starter baits, five mid-band specialists, two late combination baits and one universal luck bait; Spinner (the only volume bait) is mid-band only | Shrimp: strong access (Ocean starter); Worm: strong access (River starter); Fly: rarity targeting (Rare/Ultra); Minnow: trophy targeting (Giant); Magnet: luck / collection (Legendary+Lucky); Spinner: multi-catch jackpots (+XP); Lure: XP; Bloodworm: rarity + trophy (late); Magic Lure: endgame all-rounder (XP + every rarity stat); Strong Magnet: luck / collection completion, any biome | today's roster (stacked capabilities, water-type biome lists, XP multipliers everywhere); Spinner in the late band too (pushes Tier 3-5 casts past the approved fish-per-cast range) | the player chooses by goal (collection, trophies, Legendary hunting, jackpots, XP); each band gets one specialist per role (Roster) | yes |
+| `P-BAIT-ROSTER` | Ten baits, one clear role each: two starter baits, five mid-band specialists, two late combination baits and one universal luck bait; Spinner (the only volume bait) works only in the mid-band biomes, on any rod tier (P-BAIT-SPINNER-TIERS) | Shrimp: strong access (Ocean starter); Worm: strong access (River starter); Fly: rarity targeting (Rare/Ultra); Minnow: trophy targeting (Giant); Magnet: luck / collection (Legendary+Lucky); Spinner: multi-catch jackpots (+XP); Lure: XP; Bloodworm: rarity + trophy (late); Magic Lure: endgame all-rounder (XP + every rarity stat); Strong Magnet: luck / collection completion, any biome | today's roster (stacked capabilities, water-type biome lists, XP multipliers everywhere); Spinner in the late band too (Coast, Swamp: Tier 3-5 rods would get it at their own stage) | the player chooses by goal (collection, trophies, Legendary hunting, jackpots, XP); each band gets one specialist per role (Roster) | yes |
 | `P-BAIT-STARTER-BIOME` | Strong-fish access comes only from the two starter baits, each in its own starter biome | Shrimp: Ocean; Worm: River | by water type (today: Shrimp in salt water, Worm in fresh water); strong access on more baits (today: most of the catalog) | from Lv 20 every crafted rod reaches strong fish; in later biomes strong access at a starter price would be a money-maker for players who never craft (Starter baits) | yes |
 | `P-BAIT-UNIVERSAL` | Strong Magnet is the one universal bait (collection completion): every live biome, priced at Swamp, no strong access; Mountain Stream gets its own bait band later | biomes Ocean, River, Lake, Pond, Coast, Swamp; priced at swamp-t4 | a Lake/Pond-priced luck bait everywhere (a money-maker in late biomes); keep legacy strong access (an Old Rod money-maker in Swamp) | priced at the most valuable stage it works in, it is a deliberate cash loss below Swamp and never a money-maker anywhere (Chase) | yes |
 | `P-BAIT-MONEY-RETURN` | Money baits are priced for a modest positive cash return at home, with the net gain capped as a share of the cast | return 1.3 per $1 at the geometric centre of the home stages; accepted 1-1.7 at every home stage; net gain at most 6% of the cast's value | a return of 1.0 (bait as a pure sink); a higher return (bait becomes mandatory) | bait pays back a little where it works, so it is worth buying, while skipping it costs little (Home stages; Pricing checks) | yes |
@@ -45,7 +47,8 @@
 | `P-BAIT-PACK` | Sold in packs of casts, pack prices rounded to whole dollars | 10 casts per pack; $1 steps below $100, $5 steps above | single units at a fractional price (money is an integer); larger packs | per-cast prices are a few dollars; integer pack prices keep them precise (Proposed prices) | yes |
 | `P-BAIT-SHOP-LEVEL` | Each bait is sold from the unlock level of its first biome; Strong Magnet with the late band | Shrimp Lv 0, Worm Lv 10, Fly Lv 20, Minnow Lv 20, Magnet Lv 20, Spinner Lv 20, Lure Lv 20, Bloodworm Lv 40, Magic Lure Lv 40, Strong Magnet Lv 40 | today's level requirements; Strong Magnet from Lv 0 (a universal bait for new players) | a bait is offered when the player can first use it; Strong Magnet is an endgame collection tool | yes |
 | `P-BAIT-OPTIONAL-SINK` | Bait spending is an optional sink, never mandatory upkeep | spend item optional.bait | upkeep (bait required to fish competitively) | no stage requires bait; money bait returns a small net gain and XP bait buys time (Income and XP sources) | yes |
-| `P-BAIT-LEGACY-STACKS` | Owned bait stacks keep their count (one unit = one cast under the new rules); no refunds; behaviour read by name from the new definitions | migration rule (not a PARAMS value) | refund the difference between the old and the new price; convert stacks by value | no player document is rewritten; legacy units work better than before within the new biome lists (Migrations) | n/a (not a PARAMS value) |
+| `P-BAIT-LEGACY-STACKS` | Owned bait stacks keep their count (one unit = one cast under the new rules); no refunds; behaviour read by name from the new definitions; a stack held below its bait's shop level works only once the player reaches that level | migration rule (not a PARAMS value). The wait is enforced by biome access for every bait whose biomes open at or after its shop level; Strong Magnet (Lv 40) also works in earlier biomes and needs a use-time level check (cast.js baitApplies reads BAIT_DEFS[name].levelRequirement against the gate level, never the owned copy) | refund the difference between the old and the new price; convert stacks by value; no use-time level check: legacy Strong Magnet stacks below the shop level work in Ocean, River, Lake, Pond at release (Legacy stacks below the shop level) | no player document is rewritten; legacy units work better than before within the new biome lists (Migrations). Today no level check on bait use or /equip blocks anything (fix-first: equip.js) | n/a (not a PARAMS value) |
+| `P-BAIT-SPINNER-TIERS` | Spinner's extra-fish chance applies on every rod tier in its biomes (biome gating only): higher-tier rods taken back to Lake or Pond go above the mid band's rod range, and the top tiers above the endgame fish-per-cast ceiling | Spinner +10% extra-fish chance in Lake, Pond on any rod; no tier gate and no mean clamp (Spinner by rod tier) | accept: an optional, paid overshoot; XP per cast does not depend on the biome, so a top-tier rod with Spinner in Pond earns more XP per cast than at its own stage, at a lower cash rate (Spinner by rod tier); clamp the rod + bait mean at the endgame ceiling of P-RODS-MEAN-FISH (Spinner's home-stage effect and price unchanged; a rod already at the ceiling gets nothing from it); clamp the rod + bait mean at the mid band's rod range (also cuts Spinner's home-stage effect: its price would have to be re-derived); Spinner only on rods up to the mid band's top tier (T2): home-stage effect and price unchanged | the roster keeps Spinner out of the late biomes so the endgame rods stay inside the approved fish-per-cast range, but the biome list does not stop a higher-tier rod from using it in Lake or Pond; the user decides whether the overshoot is acceptable (Spinner by rod tier; Pricing checks) | yes |
 
 Status of every entry: `proposed`. Only the user approves; `decisions.js` joins these to the Phase 5B registry (alongside the framework's `P-LUCKY`, `P-DOUBLE-CASH` and `P-EVENTS`, and the streak design's `P-STREAK-BAIT-PACK`, which this design relies on) and `check-shared.js` verifies each record against the model.
 
@@ -114,8 +117,31 @@ Why per cast:
 - **Starter:** strong access only. It is the one big lever an Old Rod has, and it stops mattering once the rod reaches strong fish.
 - **Mid:** one specialist per role. The player chooses by goal: collection, trophies, Legendary hunting, jackpots or XP.
 - **Late:** combination baits.
-- **Spinner is mid-band only.** It is the only volume bait. In the late band it would push casts past the approved fish-per-cast range of the endgame rods.
+- **Spinner works only in the mid-band biomes, but on any rod.** It is the only volume bait, and it is kept out of Coast and Swamp so the endgame rods do not get it at their own stage. The biome list does not bound it, though: `P-BAIT-WHERE-IT-WORKS` gates by biome only, so a higher-tier rod taken back to Lake or Pond gets the full extra-fish chance. With Spinner every crafted tier goes above the mid band's rod range, and the top tiers go above the endgame ceiling of `P-RODS-MEAN-FISH` (Spinner by rod tier). XP per cast does not depend on the biome, so a top-tier player earns more XP per cast in Pond with Spinner than in Swamp without bait, at a lower cash rate. Whether to accept this, clamp the mean or limit Spinner to the mid-band rods is `P-BAIT-SPINNER-TIERS` (§2); this design does not change Spinner.
 - **Mountain Stream** is in no bait's list. It gets its own band once its species ladder exists, priced by the same functions (`prices()`, `bandCheck()`). Adding it to a late bait would raise that bait's return by the Swamp → Mountain Stream value step. Its weather-bound species would suit a species/weather-targeting bait then; species targeting needs catalog tags and is not proposed now.
+
+### Spinner by rod tier
+
+<!-- generated:bait-volume -->
+| Rod (from Lv) | Biome | Mean fish/cast: rod → with Spinner | With Spinner: P(3+) / P(5) | Above the mid band's rod range (1.30) | Above the endgame ceiling (1.80) | XP/cast: with Spinner here → rod's usual biome, no bait | $/cast after bait → rod's usual biome, no bait | Alternative: clamp at the ceiling | Alternative: clamp at the mid band's range | Alternative: Spinner only up to T2 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Old Rod (Lv 0) | Lake | 1.00 → 1.152 | 3.5% / 0.43% | no | no | 21.48 → 18.65 (Lake) | $36.23 → $51.87 | 1.152 | 1.152 | 1.152 |
+| Old Rod (Lv 0) | Pond | 1.00 → 1.152 | 3.5% / 0.43% | no | no | 21.48 → 18.65 (Lake) | $69.32 → $51.87 | 1.152 | 1.152 | 1.152 |
+| T1 (Lv 20) | Lake | 1.20 → 1.352 | 8.1% / 0.99% | **yes** | no | 25.36 → 22.52 (Lake) | $63.34 → $77.10 | 1.352 | 1.300 | 1.352 |
+| T1 (Lv 20) | Pond | 1.20 → 1.352 | 8.1% / 0.99% | **yes** | no | 25.36 → 22.52 (Lake) | $96.15 → $77.10 | 1.352 | 1.300 | 1.352 |
+| T2 (Lv 30) | Lake | 1.30 → 1.452 | 10.4% / 1.28% | **yes** | no | 27.40 → 24.54 (Pond) | $73.83 → $120.07 | 1.452 | 1.300 | 1.452 |
+| T2 (Lv 30) | Pond | 1.30 → 1.452 | 10.4% / 1.28% | **yes** | no | 27.40 → 24.54 (Pond) | $110.56 → $120.07 | 1.452 | 1.300 | 1.452 |
+| T3 (Lv 40) | Lake | 1.50 → 1.652 | 15.0% / 1.84% | **yes** | no | 31.40 → 28.52 (Coast) | $92.92 → $203.14 | 1.652 | 1.500 | 1.500 |
+| T3 (Lv 40) | Pond | 1.50 → 1.652 | 15.0% / 1.84% | **yes** | no | 31.40 → 28.52 (Coast) | $136.78 → $203.14 | 1.652 | 1.500 | 1.500 |
+| T4 (Lv 50) | Lake | 1.65 → 1.802 | 18.5% / 2.27% | **yes** | **yes** | 34.56 → 31.66 (Swamp) | $110.72 → $330.51 | 1.800 | 1.650 | 1.650 |
+| T4 (Lv 50) | Pond | 1.65 → 1.802 | 18.5% / 2.27% | **yes** | **yes** | 34.56 → 31.66 (Swamp) | $161.19 → $330.51 | 1.800 | 1.650 | 1.650 |
+| T5 (Lv 60) | Lake | 1.80 → 1.952 | 22.0% / 2.69% | **yes** | **yes** | 37.44 → 34.53 (Swamp) | $121.89 → $360.55 | 1.800 | 1.800 | 1.800 |
+| T5 (Lv 60) | Pond | 1.80 → 1.952 | 22.0% / 2.69% | **yes** | **yes** | 37.44 → 34.53 (Swamp) | $176.56 → $360.55 | 1.800 | 1.800 | 1.800 |
+
+`volumeCheck()`: framework multi-catch chain on the rod's chance + Spinner's 10%. The mid band's rod range is the highest mean of the rods typical in Lake and Pond (T1, T2); the ceiling is `rods.PARAMS.multi.ceilingMean` (`P-RODS-MEAN-FISH`). "Rod's usual biome" is the highest biome open at the rod's level (at least Lake). Alternatives are a sensitivity for `P-BAIT-SPINNER-TIERS`, not proposals. Spinner's effect at its home stages (and so its price) is unchanged by the ceiling clamp, **changed** by the mid-band clamp and unchanged by the tier limit.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-volume -->
 
 ---
 
@@ -222,6 +248,7 @@ XP gets much dearer in cash up the ladder. That is why XP baits are band-restric
 | Money baits: net gain, share of the cast | ≤ 6% | ≤ 5.8% | pass |
 | XP baits: utility return at every home stage | 0.75–1.35 | 0.80–1.25 | pass |
 | XP baits: net $ per extra XP against the stage rate | centre K = 1 | 0.68×–1.42× | reported |
+| Volume bait (Spinner): mean fish per cast on every rod tier in its biomes | ≤ the mid band's rod range (1.30) and ≤ the endgame ceiling (1.80) | up to 1.952; above the range on T1, T2, T3, T4, T5; above the ceiling on T4, T5 | **flag for the user** (`P-BAIT-SPINNER-TIERS`) |
 | No money bait above the band at a typical stage outside its home | ≤ 1.7 | none above | pass |
 | Always-on XP bait speed-up, regular player (integrated, from L20) | ≤ 10% | 9.7% (L60) | pass |
 | Always-on XP bait, regular player: approved windows (integrated) | inside every window | L30 11.72 h (0.28 h under); L40 22.82 h (1.18 h under); L50 39.57 h (0.43 h under) | **flag for the user** (`P-BAIT-XP-SIZING`) |
@@ -233,6 +260,7 @@ XP gets much dearer in cash up the ladder. That is why XP baits are band-restric
 **How to read the results.**
 - **Money baits** (`P-BAIT-MONEY-RETURN`) return a modest positive amount at every home stage, and the net gain stays a small share of the cast.
 - **XP baits** (`P-BAIT-XP-PRICE`) cost about the stage's own rate per extra XP.
+- **Spinner on every rod tier** is flagged, not failed: it is a design question for you (`P-BAIT-SPINNER-TIERS`; Spinner by rod tier). The pricing checks above it are unaffected.
 - **Why the bands straddle the target.** Within a two-biome band, value per cast rises with the next biome and the next tier (Stage rates). A price set at the band centre therefore gives a return near 1.0 at the band's entry and near the top of the band at its end.
 
 ---
@@ -512,13 +540,13 @@ Until 5b.4 this module also had its own lifecycle loop. `system()` reproduced th
 | `src/engine/balance.js` `BAIT_STATS` | Replace with `BAIT_DEFS` keyed by name: `{ stats, multiChance, grantsStrong, biomes, packSize, packPrice, levelRequirement, role }`. Bump `BALANCE_VERSION`. |
 | `src/engine/modifiers.js` `baitStats()` | For catalog baits, read stats **and qualities** (`grantsStrong` → `['strong']`) from `BAIT_DEFS`, not from the owned copy's cloned `capabilities`/`multiplier`. Unknown baits keep the legacy converter. |
 | `src/engine/modifiers.js` (bait applied) | `baitApplied = baitApplies ? stats : {}`: drop "XP always applies". Bait `multiChance` adds to the rod's multi-catch chance (the shared stat, clamped to 1). |
-| `src/engine/cast.js` `baitApplies` | Biomes from `BAIT_DEFS[name].biomes` (fallback: the owned doc's `biomes` for unknown baits). |
+| `src/engine/cast.js` `baitApplies` | Biomes from `BAIT_DEFS[name].biomes` (fallback: the owned doc's `biomes` for unknown baits). **Also require the gate level (`P-FOUNDER-GATE`) ≥ `BAIT_DEFS[name].levelRequirement`**, read by name, never from the owned copy (whose cloned `requirements.level` is the catalog's at purchase time; the catalog sync touches only `user: null` rows). Below the level the bait is not applied and not consumed, and `fish.js` says so. This enforces `P-BAIT-LEGACY-STACKS` and `P-STREAK-BAIT-PACK` for Strong Magnet, the one bait that works in biomes below its shop level (Legacy stacks below the shop level). It also covers a stack that is already equipped, which never passes through `/equip` again. |
 | `src/engine/cast.js` `baitAfter` | `baitApplies ? count − 1 : count` (per cast, only where it works). Add `consumed` (0 or 1) to `result.bait`. Depletion handling stays as is. |
 | `src/engine/cast.js` `drawTemplates` | Only if `P-LUCKY` is approved: the item branch uses the pinned share instead of a flat one (framework `luckyItemShare()`). |
 | `src/commands/slash/Fish/fish.js` | Add warnings: "*X* has no effect in *biome* and was not used". Optionally: "*X* has no effect with your rod" (a starter bait on a strong rod). |
 | `src/components/buttons/buy-bait.js` | **Correctness bug, fix first:** `meetsItemRequirements` is `async` but not awaited, so the level check never blocks. Buying sells packs: `buyItem` adds `amount × packSize` units, and the buttons are labelled in casts. |
 | `src/class/Utils.js` (shop option text) | `$packPrice per <packSize> casts · Works in: …`. |
-| `src/commands/slash/User/equip.js` | When equipping, show where the bait works and flag "no effect here". |
+| `src/commands/slash/User/equip.js` | **Correctness bug, fix first (live today, rods and baits):** `checkItemRequirements` (`equip.js:67-74`) tests `userData.level < requirements.level`, but `userData` is the `User` wrapper (`equip.js:130`, `new User(...)`), which has no `level` property (`User.js:13-16`). `undefined < N` is false, so the check never blocks: any player can equip any owned rod or bait whatever its level requirement. Minimal hotfix: `const level = await userData.getLevel(); if (requirements.level && level < requirements.level) return false;` (read the gate level instead once `P-FOUNDER-GATE` is decided). For bait this alone is not enough (owned stacks carry the cloned `requirements.level`; equipped stacks never come back here), hence the use-time check in `cast.js`. After approval: when equipping, show where the bait works and flag "no effect here" or "usable from Lv N". |
 | `src/commands/slash/User/fishing-stats.js` | Private view: the bait's stats, whether it applies in the current biome, cost per cast. |
 | `src/bootstrap/data/bait.js` | New price (per pack), `packSize`, capabilities (`strong` only on Shrimp/Worm), biomes, descriptions and `requirements.level`, for fresh databases. |
 | `src/bootstrap/seed.js` `runStep` | Add a bait catalog-field sync (see Migrations). Today the seed never updates gameplay fields of existing catalog rows. |
@@ -533,7 +561,29 @@ Additive and idempotent. `P-BAIT-LEGACY-STACKS`.
 **No player data is rewritten.**
 - Existing `BaitData` stacks keep their `count`. Each unit becomes one cast under the new rules.
 - The engine reads bait behaviour by name from `BAIT_DEFS`, so cloned legacy fields on owned stacks are ignored.
-- No refunds are proposed. A player who owns expensive legacy stacks (for example Magic Lure) keeps the same number of casts of the new bait, within its biomes. A legacy stack owned below the bait's shop level waits until it is usable.
+- No refunds are proposed. A player who owns expensive legacy stacks (for example Magic Lure) keeps the same number of casts of the new bait, within its biomes.
+- **A legacy stack owned below the bait's shop level waits until the player reaches that level.** Nothing enforces that today. Today's catalog sets no bait level (every owned stack carries the schema default of `BaitSchema.requirements.level`), so any player may own any bait, and many legacy stacks will sit below the new shop levels. `/equip`'s level check never blocks for any item (§13, fix first), and `buy-bait`'s level check is not awaited. After release, biome access enforces the wait for every bait whose biomes all open at or after its shop level. Strong Magnet works in every live biome, so it needs the use-time level check in `cast.js` `baitApplies` (§13). Without that check, a low-level holder of a legacy Strong Magnet stack uses it in the early biomes at release (Legacy stacks below the shop level). The same applies to Strong Magnet packs granted by streak boxes (`P-STREAK-BAIT-PACK`).
+
+### Legacy stacks below the shop level
+
+<!-- generated:bait-legacy-level -->
+| Bait | Shop level | Works in (biome level) | Usable below the shop level in | The wait is enforced by |
+| --- | --- | --- | --- | --- |
+| Shrimp | Lv 0 | Ocean (0) | — | biome access |
+| Worm | Lv 10 | River (10) | — | biome access |
+| Fly | Lv 20 | Lake (20), Pond (30) | — | biome access |
+| Minnow | Lv 20 | Lake (20), Pond (30) | — | biome access |
+| Magnet | Lv 20 | Lake (20), Pond (30) | — | biome access |
+| Spinner | Lv 20 | Lake (20), Pond (30) | — | biome access |
+| Lure | Lv 20 | Lake (20), Pond (30) | — | biome access |
+| Bloodworm | Lv 40 | Coast (40), Swamp (50) | — | biome access |
+| Magic Lure | Lv 40 | Coast (40), Swamp (50) | — | biome access |
+| Strong Magnet | Lv 40 | Ocean (0), River (10), Lake (20), Pond (30), Coast (40), Swamp (50) | Ocean, River, Lake, Pond | **a use-time level check** (cast.js `baitApplies`); nothing today |
+
+`legacyLevelCheck()`. A player below a biome's level cannot fish there (level-gated biome access), and bait is used only where it works (`P-BAIT-WHERE-IT-WORKS`).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-legacy-level -->
 
 **Catalog rows only (`user: null`, the ten bait names).** Add one idempotent sync step:
 - It writes `price` (the pack price), `packSize`, `biomes`, `capabilities`, `description` and `requirements.level`.
@@ -552,16 +602,20 @@ Additive and idempotent. `P-BAIT-LEGACY-STACKS`.
 5. An unknown (non-catalog) bait still resolves through the legacy converter.
 6. Bait `multiChance` adds to the rod chance and is clamped.
 7. `buy-bait`: the level requirement blocks under-level buys (await fix). Buying N packs adds N × `packSize` units.
-8. The catalog sync is idempotent: running it twice gives an identical catalog, and `BaitData` is untouched.
-9. Depletion: the last unit clears `equippedBait` (existing path, per-cast count).
-10. Economy regression at the current framework version: `bait.bandCheck().pass`, `bait.lifecycleSensitivity().xpBaitSpeedupCheck.pass`, and `node scripts/economy/5b/check-shared.js` (decision records match the model, generated tables current).
-11. If `P-LUCKY` is approved: with bait or rod luck, the Lucky-item rate equals the base-table rate (seeded statistical test on `drawTemplates`).
+8. `/equip` (fix first): an under-level rod or bait is refused (the level read with `getLevel()`, not `userData.level`); an at-level one is accepted.
+9. Use-time level: a Strong Magnet stack held below its shop level is not applied and not consumed in Ocean, River, Lake or Pond, including a stack that was equipped before release; at the shop level it works everywhere. The level is read from `BAIT_DEFS` by name, so the owned copy's cloned `requirements.level` (the schema default today) changes nothing.
+10. The catalog sync is idempotent: running it twice gives an identical catalog, and `BaitData` is untouched.
+11. Depletion: the last unit clears `equippedBait` (existing path, per-cast count).
+12. Economy regression at the current framework version: `bait.bandCheck().pass`, `bait.lifecycleSensitivity().xpBaitSpeedupCheck.pass`, and `node scripts/economy/5b/check-shared.js` (decision records match the model, generated tables current). `bait.volumeCheck().pass` is expected to fail until `P-BAIT-SPINNER-TIERS` is decided; if a clamp or a tier limit is chosen, a test asserts it on the engine's resolved multi-catch chance.
+13. If `P-LUCKY` is approved: with bait or rod luck, the Lucky-item rate equals the base-table rate (seeded statistical test on `drawTemplates`).
 
 ---
 
 ## 16. Risks and open points
 
 - **XP-bait windows (`P-BAIT-XP-SIZING`).** Always-on XP bait takes the regular player under the lower edge of some approved windows (Regular player). Active and grinder players go past the speed-up cap (Every archetype). This needs your decision (§2).
+- **Spinner on higher-tier rods (`P-BAIT-SPINNER-TIERS`).** Biome gating does not stop a higher-tier rod from using Spinner in Lake or Pond. The top tiers go above the endgame fish-per-cast ceiling there and earn more XP per cast than at their own stage (Spinner by rod tier). This needs your decision (§2).
+- **Bait below its shop level.** After release, biome access enforces the wait for every bait except Strong Magnet, which needs the use-time level check (Legacy stacks below the shop level). Today the `/equip` level check is broken for every item (§13, fix first).
 - **Lake-entry returns are thin.** Mid-band money baits barely break even at Lake · T1 (Home stages). Their draw there is the role, not the cash; at Pond they pay back.
 - **Per-cast volume.** Casts are quick, so a pack is used up within minutes of play. The buy UI needs multi-pack amounts.
 - **Quests.** Luck baits make Lucky/Legendary goals much faster (Chase). The quests design prices its Lucky Fisher chase with these baits (`quests.js` reads `bait.js`).

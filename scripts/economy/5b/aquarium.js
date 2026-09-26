@@ -177,6 +177,11 @@ const CURRENT = deepFreeze({
 		finSize: { weights: { 'Long Fins': 10, 'Short Fins': 10 }, attraction: {}, multiplier: { 'Long Fins': 0.2 }, unlockAgeDays: 7 },
 	},
 	licenseSizes: 'licenses.js aquarium.size: tank capacity; no limit on the number of tanks',
+	// /build (src/commands/slash/Pet/build.js): needs any license of the water type and a unique name; no
+	// tank limit; command cooldown options.cooldown 10_000 ms. Habitat documents carry createdAt
+	// (HabitatSchema { timestamps: true }).
+	buildCooldownS: 10,
+	tankLimit: null,
 	driftPerHour: 1,
 	temperatureIdeal: { hunger: 25, mood: 0, stress: 0, health: 0 },
 	// HabitatSchema.temperature default.
@@ -415,6 +420,52 @@ function displayTanks() {
 		return [name, { hoursPerWater: r2(h), daysPerWater: r2(h / hoursPerDay(name)), hoursBoth: r2(2 * h), daysBoth: r2((2 * h) / hoursPerDay(name)) }];
 	}));
 	return { stage: { level: topLevel(), biome: top.biome, tier: top.tier, cashPerHour: Math.round(top.cashPerHour) }, tanks, totalPerWater, totalBoth: 2 * totalPerWater, byArchetype };
+}
+
+// ---------------------------------------------------------------------------------------------
+/**
+ * Legacy tanks built before A6 ships (EXP-5). /build has no tank limit today (CURRENT.tankLimit null, one
+ * tank per CURRENT.buildCooldownS), and P-AQUARIUM-LEGACY-LICENSES grandfathers every existing Habitat at
+ * max(stored size, the license's new tank size). Capacity at release of the tanks one minute of /build
+ * makes today, per water type, as proposed and under the two alternatives: upsize only up to the license's
+ * new tank count (extra legacy tanks keep their stored size), or grandfather only Habitats created before a
+ * cutoff (later ones count against the new limit). Display tanks (the aspirational sink) are the priced
+ * comparison. Capacity only: companion slots come from the license tier and pet sales are weekly-limited.
+ */
+function legacyTankExposure({ minutes = 1 } = {}) {
+	const built = Math.floor((minutes * 60) / CURRENT.buildCooldownS);
+	const dt = displayTanks();
+	const displayCapacity = PARAMS.display.perWaterType * PARAMS.display.tankSize;
+	const displayReplaced = (extra) => {
+		const n = Math.min(PARAMS.display.perWaterType, Math.floor(extra / PARAMS.display.tankSize));
+		return { tanks: n, price: dt.tanks.slice(0, n).reduce((a, t) => a + t.price, 0) };
+	};
+	const rows = TIERS.map((k) => {
+		const t = LT[k];
+		const cat = LICENSE_CATALOG.find((l) => l.name === licenseName(k, PARAMS.model.primaryWater));
+		const stored = cat.aquarium.size;
+		const read = Math.max(stored, t.tankSize);
+		const allowance = t.tanks * t.tankSize;
+		const capacity = {
+			proposed: built * read,
+			upsizeUpToTankCount: Math.min(built, t.tanks) * read + Math.max(0, built - t.tanks) * stored,
+			cutoffBeforeBuild: Math.min(built, t.tanks) * read,
+		};
+		const extra = Object.fromEntries(Object.entries(capacity).map(([o, c]) => [o, Math.max(0, c - allowance)]));
+		const tanksToMatchDisplay = Math.ceil(displayCapacity / read);
+		return {
+			tier: k, license: cat.name, tanks: t.tanks, tankSize: t.tankSize, allowance, storedSize: stored, readSize: read,
+			built, capacity, extra,
+			displayReplacedAsProposed: displayReplaced(extra.proposed),
+			displayReplacedUpsizeUpToTankCount: displayReplaced(extra.upsizeUpToTankCount),
+			tanksToMatchDisplay, secondsToMatchDisplay: tanksToMatchDisplay * CURRENT.buildCooldownS,
+			displayNeedsExpert: PARAMS.display.requires !== k,
+		};
+	});
+	// The rows are for the primary water type; do the other water type's licenses have the same stored sizes?
+	const sizesOf = (w) => TIERS.map((k) => LICENSE_CATALOG.find((l) => l.name === licenseName(k, w)).aquarium.size);
+	const sameForEveryWater = WATER_TYPES.every((w) => JSON.stringify(sizesOf(w)) === JSON.stringify(sizesOf(PARAMS.model.primaryWater)));
+	return { minutes, built, buildCooldownS: CURRENT.buildCooldownS, displayCapacityPerWater: displayCapacity, displayPricePerWater: dt.totalPerWater, water: PARAMS.model.primaryWater, sameForEveryWater, rows };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1120,10 +1171,15 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-AQUARIUM-LEGACY-LICENSES', status: 'proposed',
-		title: 'Legacy licenses keep their stored fields and extra tanks; capacity is the larger of the stored and the new tank size; companion slots are level-capped; no refunds',
+		title: 'Legacy licenses keep their stored fields and extra tanks; capacity is the larger of the stored and the new tank size; companion slots are level-capped; no refunds. Ordering: the /build tank limit (A6) ships before or with this read, or a cutoff applies',
 		modelled: `read-time LICENSE_DEFS by name; a legacy Expert gives ${companionSlots({ Freshwater: 'expert' }, LT.basic.level)} slots at Lv ${LT.basic.level} and ${companionSlots({ Freshwater: 'expert' }, LT.advanced.level)} at Lv ${LT.advanced.level}`,
-		alternatives: ['a partial credit to legacy buyers', 'no level cap (legacy Expert holders get full slots early)'],
-		source: 'aquarium design (user decision 13: non-destructive)', why: 'no player document is rewritten; legacy buyers get more capacity than they paid for today (Legacy licenses)',
+		alternatives: [
+			'a partial credit to legacy buyers',
+			'no level cap (legacy Expert holders get full slots early)',
+			'grandfather only Habitats created before a cutoff (HabitatSchema createdAt; e.g. the approval date): tanks built later count against the new limit (Legacy tanks)',
+			'upsize legacy tanks only up to the license\'s new tank count; extra legacy tanks keep their stored size (Legacy tanks)',
+		],
+		source: 'aquarium design (user decision 13: non-destructive)', why: 'no player document is rewritten; legacy buyers get more capacity than they paid for today (Legacy licenses). /build has no tank limit until A6 ships (A6 needs P-AQUARIUM-TANKS), so every tank built before then is grandfathered and upsized: a minute of /build matches the display-tank sink (Legacy tanks). Capacity only, no power; a cutoff closes this whatever the ship date',
 		get: () => ({ expertAtBasicGate: companionSlots({ Freshwater: 'expert' }, LT.basic.level), expertAtAdvancedGate: companionSlots({ Freshwater: 'expert' }, LT.advanced.level) }),
 		expected: { expertAtBasicGate: 2, expertAtAdvancedGate: 5 },
 	},
@@ -1136,7 +1192,7 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-AQUARIUM-FIX-PLAY-SELL', status: 'proposed',
-		title: 'Fix first (A1): close the /pet play → /pet sell money loop',
+		title: 'Fix first (A1): close the /pet play → /pet sell money loop (needs the proposed values of the four decisions it names; not a today\'s-numbers fix)',
 		modelled: 'care cooldowns (P-AQUARIUM-CARE-COOLDOWN), capped bond (P-AQUARIUM-BOND), sale value from species, never XP (P-AQUARIUM-PET-SALE), weekly limit (P-AQUARIUM-SALE-LIMIT), atomic sale (A8)',
 		alternatives: ['cooldowns only (the sale still pays xp × attraction)', 'remove pet sales'],
 		source: 'aquarium design', why: 'today one pet out-earns the best proposed fishing (Fixes)',
@@ -1148,7 +1204,7 @@ const DECISIONS = [
 		title: 'Fix first (A2, A3, A5): breeding compares rng.random() < rate, reads lastBred for the cooldown, and gives parents the success XP',
 		modelled: `thriving pair ${pctOf(breedingRate(0, 100).fixed)} per attempt (today ${pctOf(breedingRate(0, 100).today)})`,
 		alternatives: ['keep the percent comparison (breeding practically never succeeds)', 'a new success formula'],
-		source: 'aquarium design', why: 'restores the intended odds; the cooldown keeps them from becoming a farm (Breeding)',
+		source: 'aquarium design', why: 'restores the intended odds; the cooldown keeps them from becoming a farm (Breeding). A2 and A5 use today\'s numbers; A3\'s cooldown length is P-AQUARIUM-BREEDING\'s proposed value. A2 must not ship before A1 is closed (more pets while the play-sell loop is open) and ships with A3 (Fixes)',
 		get: () => {
 			const all = [breedingRate(0, 100), breedingRate(100, 0), breedingRate(50, 50)].map((b) => b.fixed);
 			return { thrivingPair: breedingRate(0, 100).fixed, range: [Math.min(...all), Math.max(...all)], cooldownDays: PARAMS.breeding.cooldownDays };
@@ -1288,6 +1344,7 @@ function report() {
 			};
 		}),
 		display: displayTanks(),
+		legacyTanks: legacyTankExposure(),
 		options: { atBasicGate: aquariumOptions(LT.basic.level), atExpertGateWithAdvanced: aquariumOptions(LT.expert.level, { owned: { Freshwater: 'advanced' } }) },
 		checks: checks(),
 		system: systemReport(),
@@ -1372,7 +1429,22 @@ function markdownTables() {
 	const atIdeal = tAt(P.temperature.idealC);
 	const vb = ps.vsBestProposedFishing;
 	const vm = ps.vsBestMeasuredToday;
-	T['aquarium-fixes'] = mdTable(['#', 'Bug', 'Evidence', 'Fix', 'Decision'], [
+	const today = 'today\'s numbers (a correctness change)';
+	const needs = (...ids) => `**needs proposed values:** ${ids.map((id) => `\`${id}\``).join(', ')}`;
+	const shipsOn = {
+		A1: `${needs('P-AQUARIUM-CARE-COOLDOWN', 'P-AQUARIUM-BOND', 'P-AQUARIUM-PET-SALE', 'P-AQUARIUM-SALE-LIMIT')} (and A8)`,
+		A2: `${today}. **Not before A1 is closed** and not without A3`,
+		A3: `the code fix is correctness; the cooldown length (${P.breeding.cooldownDays} days) is a proposed value: \`P-AQUARIUM-BREEDING\`. Ships with A2`,
+		A4: `${today}: checked against the stored size until \`P-AQUARIUM-TANKS\` ships, then against the effective capacity`,
+		A5: `${today}; the bond cap arrives with \`P-AQUARIUM-BOND\``,
+		A6: `${needs('P-AQUARIUM-TANKS')}. **Before or with** the legacy-license read (effective size), or the cutoff option of \`P-AQUARIUM-LEGACY-LICENSES\` (Legacy tanks)`,
+		A7: today,
+		A8: today,
+		A9: `${today}: ${P.temperature.idealC} °C is today's hunger ideal and ${P.temperature.adjustRangeC.join('…')} °C today's \`/aquarium adjust\` range; which ideal to keep is \`P-AQUARIUM-FIX-TEMPERATURE\``,
+		A10: today,
+		A11: today,
+	};
+	const fixRows = [
 		['**A1**', '**`/pet play` / `/pet feed` / `/aquarium feed` → `/pet sell`: unbounded money.** Each care action gives pet XP × the trait multiplier, limited only by the command cooldown. `Pet.sell` pays `xp × attraction`.',
 			`${int(ps.actionsPerHour)} actions/h at the ${ps.commandCooldownS} s cooldown, +${ps.xpPerAction} XP each. One pet: **${usd(ps.cashPerHourOnePet.low)}/h** (attraction ${ps.lowCase.attraction}, ×${num(ps.lowCase.multiplier, 1)}) to **${usd(ps.cashPerHourOnePet.high)}/h** (attraction ${ps.highCase.attraction}, ×${num(ps.highCase.multiplier, 1)}). One 3-pet tank with \`/pet\` + \`/aquarium feed\`: **${usd(ps.cashPerHourExpertTank)}/h**, ${num(vb.ratioTank, 1)}× the best proposed fishing income (${usd(vb.cashPerHour)}/h, ${vb.biome} · ${tierName(vb.tier)}) and ${num(vm.ratioTank, 1)}× today's best measured rod (${usd(vm.cashPerHour)}/h, ${cap(vm.biome)} · ${vm.rod}). Attraction needs a pet aged ${ps.attractionUnlockDays}+ days; ${pct(ex.traits.attraction.pZero)} of pets have attraction 0.`,
 			`Per-pet cooldowns (feed ${P.care.feedCooldownH} h, play ${P.care.playCooldownH} h). Bond XP only off cooldown, capped at ${P.companion.bond.maxXp}. Sale value from species, age and condition, **never XP** (at most ${num(petSaleValue({ speciesValue: 1, ageDays: 1e6, attraction: 1e6 }), 2)}× the species value). At most ${P.sale.maxPerWeek} sales per 7 days. Atomic sale (A8).`,
@@ -1383,7 +1455,7 @@ function markdownTables() {
 		['A3', 'Breeding has no cooldown: `lastBred` is written but never read.', 'Code reading. Once A2 is fixed, a pair could breed every command cooldown.', `${P.breeding.cooldownDays}-day cooldown per parent.`, '`P-AQUARIUM-FIX-BREEDING`, `P-AQUARIUM-BREEDING`'],
 		['A4', 'The breeding capacity check never blocks: `aquariumPets.length >= aquarium.getSize()` compares a number with a Promise (`pet.js:213`). The baby is never added to the tank\'s `fish` list (only `reconcileOwner` adds it later), so tanks exceed capacity.', 'Code reading.', '`await aquarium.getSize()` against the effective capacity; add the baby with `aquarium.addFish` in the same flow.', '`P-AQUARIUM-FIX-CAPACITY`'],
 		['A5', 'On a successful breed the parents get the **failure** XP: `updateBreeding()` is called without `true` (`Pet.js:716–717`).', 'Code reading.', '`updateBreeding(true)` (bond XP, capped).', '`P-AQUARIUM-FIX-BREEDING`'],
-		['A6', '**One license allows unlimited tanks.** `/build` checks only that some license exists, and each tank holds the license\'s size.', 'Code reading (`build.js`).', 'A license grants tanks × size per water type (Licenses). Existing extra tanks are grandfathered.', '`P-AQUARIUM-TANKS`'],
+		['A6', '**One license allows unlimited tanks.** `/build` checks only that some license exists, and each tank holds the license\'s size.', 'Code reading (`build.js`).', 'A license grants tanks × size per water type (Licenses). Existing extra tanks are grandfathered (as proposed; the cutoff and upsize-limit options are in Legacy tanks).', '`P-AQUARIUM-TANKS`, `P-AQUARIUM-LEGACY-LICENSES`'],
 		['A7', 'A license can be bought twice (`buy-other.js` has no ownership check); the second copy is wasted money.', 'Code reading.', 'The shop hides owned licenses and lower tiers of an owned water type.', '`P-AQUARIUM-FIX-DUPLICATE-LICENSE`'],
 		['A8', '`Pet.sell` credits money with a read-modify-write `user.save()` of the whole document (`Pet.js:497–501`): it can overwrite concurrent cast income (a lost update), and two sells can race.', 'Code reading.', 'Claim the pet atomically (`PetFish.updateOne({ _id, owner: userId }, { $set: { owner: \'\' } })`); pay with `$inc` only if the claim matched, under `withUserLock`.', '`P-AQUARIUM-FIX-SALE-RACE`'],
 		['A9', `**Temperature drift is unbounded and the ideal is inconsistent.** Drift is +${CURRENT.driftPerHour} °C/h with no limit (\`Aquarium.js:89\`). Hunger uses the deviation from ${CURRENT.temperatureIdeal.hunger} °C; mood, stress and health the deviation from ${CURRENT.temperatureIdeal.mood} °C. New tanks start at ${CURRENT.newTankC} °C (\`HabitatSchema\`).`,
@@ -1391,7 +1463,9 @@ function markdownTables() {
 			`One ideal of ${P.temperature.idealC} °C everywhere; the heater holds its setting; stored values read clamped to ${P.temperature.adjustRangeC.join('…')} °C; new tanks at ${P.temperature.newTankC} °C.`, '`P-AQUARIUM-FIX-TEMPERATURE`'],
 		['A10', '`calculateMultiplier` ignores `unlocked`, so locked traits already boost pet XP (`calculateAttraction` respects it).', 'Code reading.', 'Respect `unlocked`, as attraction does.', '—'],
 		['A11', 'Cosmetic: the second pet\'s underage message shows the first pet\'s name (`Pet.js:649`).', 'Code reading.', 'Use the second pet\'s name.', '—'],
-	]);
+	];
+	T['aquarium-fixes'] = mdTable(['#', 'Bug', 'Evidence', 'Fix', 'Decision', 'Ships on'], fixRows.map((r) => [...r, shipsOn[r[0].replace(/\*/g, '')]])) +
+		`\n\nOrder. A1 first: while it is open, every pet is a money source. A2 raises breeding success ${int(breedingRate(0, 100).fixed / breedingRate(0, 100).today)}× (thriving pair: ${pct(breedingRate(0, 100).today, 2)} → ${pct(breedingRate(0, 100).fixed, 0)}), so shipped before A1 it multiplies the pets that A1 turns into cash; it also needs A3's cooldown in the same deploy. A6 before or with the license read that upsizes legacy tanks (Legacy tanks). "Today's numbers" means the fix changes no balance value; a fix that needs a value names the proposed decision that sets it.`;
 
 	// ----- Current -> proposed -----
 	const cat = (k) => LICENSE_CATALOG.find((l) => l.name === licenseName(k, P.model.primaryWater));
@@ -1509,6 +1583,15 @@ function markdownTables() {
 	const levelsShown = [...new Set([0, ...TIERS.map((k) => LT[k].level)])];
 	T['aquarium-legacy'] = mdTable(['License', 'Paid today', 'Tank size: stored → effective', 'Tanks: today → proposed', 'New price', `Companion slots at Lv ${levelsShown.join(' / ')}`], R.legacy.map((l) => [l.name, usd(l.paidToday), `${l.storedSize} → ${l.effectiveTankSize}`, `${l.tanksToday} → ${l.tanksProposed} (extra tanks grandfathered)`, usd(l.newPrice), levelsShown.map((L) => l.companionSlotsAtLevel[L]).join(' / ')]));
 
+	// ----- Legacy tanks built before A6 -----
+	const lt = R.legacyTanks;
+	T['aquarium-legacy-tanks'] = mdTable(['License (one water type)', 'New allowance: tanks × size', 'Legacy tank: stored → read size', `Built in ${lt.minutes} min of /build today`, 'Capacity at release: as proposed (every tank at the read size)', 'Option: upsize only up to the license\'s tank count', 'Option: grandfather only Habitats created before a cutoff (these built after it)', 'Extra capacity as proposed: display tanks it replaces', 'Extra legacy tanks that match one water type\'s display capacity (build time)'], lt.rows.map((r) => [
+		r.license.replace(' Aquarium License', ''), `${r.tanks} × ${r.tankSize} = ${r.allowance}`, `${r.storedSize} → ${r.readSize}`, `${r.built} tanks`,
+		`**${r.capacity.proposed}** (+${r.extra.proposed})`, `${r.capacity.upsizeUpToTankCount} (+${r.extra.upsizeUpToTankCount})`, `${r.capacity.cutoffBeforeBuild} (+${r.extra.cutoffBeforeBuild})`,
+		`${r.displayReplacedAsProposed.tanks} of ${P.display.perWaterType} (${usd(r.displayReplacedAsProposed.price)})${r.displayNeedsExpert ? '; display tanks need Expert' : ''}`,
+		`${r.tanksToMatchDisplay} (${r.secondsToMatchDisplay} s)`,
+	])) + `\n\n\`legacyTankExposure()\`. Today \`/build\` needs only a license of the water type and a unique name: no tank limit, a ${lt.buildCooldownS} s cooldown (\`build.js:25\`). One water type's display tanks hold ${lt.displayCapacityPerWater} pets for ${usd(lt.displayPricePerWater)} (Display tanks). Capacity = pets the tanks can take after release. Capacity only: companion slots come from the license tier, and pet cash is limited per week (Pet income bound). ${lt.water} rows; ${lt.sameForEveryWater ? 'the other water type is identical (same stored sizes)' : '**the other water type differs**'}.`;
+
 	// ----- Checks -----
 	const fmtNum = (x) => (x === null ? '—' : num(x, Number.isInteger(x) ? 0 : 2));
 	const fmtVal = (v) => (typeof v === 'object' && v !== null ? Object.entries(v).map(([k, x]) => `${k} ${fmtNum(x)}`).join(', ') : typeof v === 'boolean' ? yes(v) : String(v));
@@ -1536,7 +1619,7 @@ module.exports = {
 	waterOf, stageAt, licensePrice, licenses, licenseByName,
 	bondFactor, perPetBonus, companionSlots, companionBonus, holdingsBonus,
 	thriving, effectiveTemperature, petSaleValue, speciesValue, breedingRate, petIncomeBound, availability,
-	aquariumOptions, displayTanks, currentExploit, currentLicenses, upkeepAlternatives,
+	aquariumOptions, displayTanks, legacyTankExposure, currentExploit, currentLicenses, upkeepAlternatives,
 	SYSTEM_NAME, SPEND, system, systemSummary, RETIRED_LOOP_PARITY,
 	lifecycle, integratedReport, checks, report, markdownTables,
 };
