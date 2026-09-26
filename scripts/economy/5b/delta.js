@@ -7,7 +7,7 @@ const F = require('./framework');
 
 const FROM = {
 	summary: ['summary-stamp', 'summary-headline', 'summary-progression', 'summary-r1', 'summary-sinks', 'summary-open-checks'],
-	rods: ['rods-hybrid', 'rods-delta', 'rods-standard', 'rods-custom-relation', 'rods-custom-builds', 'rods-level-rule', 'rods-lifecycle', 'rods-shop-mock', 'rods-legacy-crate'],
+	rods: ['rods-hybrid', 'rods-delta', 'rods-standard', 'rods-custom-relation', 'rods-lv10-sidegrade', 'rods-ladder-checks', 'rods-custom-builds', 'rods-level-rule', 'rods-lifecycle', 'rods-shop-mock', 'rods-legacy-crate'],
 	upgrades: ['upgrades-table', 'upgrades-value', 'upgrades-windows', 'upgrades-timing', 'upgrades-sinks', 'upgrades-affordability'],
 	world: ['world-time-to-afford'],
 	streak: ['streak-lifecycle'],

@@ -24,7 +24,7 @@
 //   boxContents(box, level, profile)
 //                                what the streak system books for one grant (counting rule: non-buff
 //                                contents; buffs counted, valued by the buffs system); 'founder' = the
-//                                PROPOSED Founder profile
+//                                Founder profile (founder.founderProfile(), opened by founder.founderBoxEV())
 //   streakValue(day, level), perClaimValue(level)
 //                                boxContents for the n-th streak day; its average over one ladder cycle
 //   stageRates(level, opts)      F.castOutcome/F.hourly at the player's highest biome and gear
@@ -253,9 +253,8 @@ const maskBelow = (t, min) => Object.fromEntries(RARITIES.map((r) => [r, rIdx(r)
 /** A profile name ('normal' | 'founder': today's balance.js PROFILES) or a profile object. */
 const profileOf = (profile) => (typeof profile === 'string' ? PROFILES[profile] : profile);
 const profileLabel = (profile) => (typeof profile === 'string' ? profile : profile.name || 'custom');
-let founderProfileCache = null;
-/** The PROPOSED Founder profile (founder.founderProfile(); pure, computed once; loaded lazily). */
-const proposedFounder = () => founderProfileCache || (founderProfileCache = require('./founder').founderProfile());
+/** The Founder profile (founder.founderProfile(): the stealth-hybrid, or the run's profile inside an integrated run; loaded lazily). */
+const proposedFounder = () => require('./founder').founderProfile();
 
 /**
  * Exact expected contents of one open. Mirrors gacha.openLine: base table restricted to rarities with
@@ -339,14 +338,17 @@ const contentsCache = new Map();
 /**
  * Non-buff contents of one open of `box` at `level` by `profile` ('normal' | 'founder'), as the streak
  * system books them: fish at sale value, parts at salvage, bait packs usable at `level` at their pack
- * price. 'founder' is the PROPOSED Founder profile (founder.founderProfile(): its gacha stats and sell
- * multiplier). Buffs are counted here but valued by the buffs system (counting rule).
+ * price. 'founder' is the Founder profile (founder.founderProfile(); founder.founderBoxEV(): its gacha stats on
+ * non-buff slots only under the hybrid, its sell multiplier). Buffs are counted here but valued by the buffs
+ * system (counting rule).
  */
 function boxContents(box, level, profile = 'normal') {
 	const usable = Object.values(bait.prices()).filter((q) => q.levelRequirement <= level).length;
-	const key = `${box}|${F.biomeAt(level)}|${usable}|${profile}`;
+	const FO = profile === 'founder' ? require('./founder') : null;
+	const prof = FO ? FO.founderProfile() : null;
+	const key = `${box}|${F.biomeAt(level)}|${usable}|${profile}${FO ? `|${FO.boxProfileKey(prof)}` : ''}`;
 	if (!contentsCache.has(key)) {
-		const ev = boxEV(box, { level, profile: profile === 'founder' ? proposedFounder() : 'normal' });
+		const ev = FO ? FO.founderBoxEV(box, { level, profile: prof }) : boxEV(box, { level, profile: 'normal' });
 		contentsCache.set(key, deepFreeze({
 			box, biome: ev.biome, profile,
 			fish: ev.fishValue, salvage: ev.salvage, baitUsable: ev.baitUsable, baitDeferred: ev.baitDeferred,
@@ -513,8 +515,8 @@ const GATE_EPS = 1e-9;
  *                emit('box', { name, count: 1, level, source: 'streak', streakDay, profile }) so the buffs
  *                system values its buffs (counting rule). No direct XP, no purchases, no spend.
  *   sessionDone  today's casts >= the play gate (the R2 minimum-daily player stops there at the earliest).
- * Profile: state.profile 'founder' (set by the founder system) values the box with the PROPOSED Founder
- * profile (gacha stats, sell multiplier); the gate is the same for every profile (casts, not fish).
+ * Profile: state.profile 'founder' (set by the founder system) values the box with the Founder profile
+ * (founder.founderProfile(): the run's; founder.founderBoxEV(): gacha stats, sell multiplier); the gate is the same for every profile (casts, not fish).
  * Successful casts: every modelled cast lands at least one draw; a cast whose every draw is an item
  * (P ~ itemPerDraw, under 0.1%) is counted as successful (the gate is met at most one step later).
  * @param {object} opts { credit: 'dayEnd' (default) | 'gate', baitValue: 'cash' (default: usable packs
@@ -1005,19 +1007,20 @@ function ruleExamples() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Founder: the PROPOSED Founder profile (founder.founderProfile()) on the same boxes. The sell multiplier
-// is private (it only changes what the contents sell for); the gacha stats change which rarities are
-// rolled, and /open shows every slot's rarity in a PUBLIC reply (src/commands/slash/Economy/open.js
-// deferReply() without flags, revealEmbed), so the rarity edge is visible on the reveal.
+// Founder: the Founder profile (founder.founderProfile(), the stealth-hybrid) on the same boxes, opened by
+// founder.founderBoxEV() (the hybrid's gacha luck on non-buff slots only). The sell multiplier is private (it
+// only changes what the contents sell for); the gacha stats change which rarities are rolled on non-buff slots.
+// The reveal table measures what an /open reply would show if it were public.
 function founderView() {
 	const prof = proposedFounder();
+	const fBox = (box, level) => require('./founder').founderBoxEV(box, { level, profile: prof });
 	const hi = (ev) => (ev.rarity.legendary || 0) + (ev.rarity.lucky || 0);
 	// P(an open shows at least one Legendary/Lucky slot): what the public reveal can show.
 	const pHi = (ev) => 1 - ev.slotTables.reduce((a, t) => a * (1 - ((t.legendary || 0) + (t.lucky || 0))), 1);
 	const revealLevel = F.gearPath()[1].level;
 	const reveal = (box) => {
 		const nv = pHi(boxEV(box, { level: revealLevel }));
-		const fv = pHi(boxEV(box, { level: revealLevel, profile: prof }));
+		const fv = pHi(fBox(box, revealLevel));
 		return { normal: nv, founder: fv, ratio: fv / nv };
 	};
 	const crateR = reveal(PARAMS.ladder.dailyBox);
@@ -1026,11 +1029,11 @@ function founderView() {
 	const cycle = (k) => 1 - (1 - crateR[k]) ** (cycleDays - 1) * (1 - chestR[k]);
 	const pity = prof.gacha?.pity?.legendaryPlus || null;
 	// Do the reveal odds depend on the stage? (the pools of some stages may lack a rarity)
-	const byStage = F.LIVE_BIOMES.map((b) => [PARAMS.ladder.dailyBox, PARAMS.ladder.milestoneBox].map((box) => [boxEV(box, { level: F.BIOME_LEVEL[b] }), boxEV(box, { level: F.BIOME_LEVEL[b], profile: prof })].map(pHi))).flat(2);
+	const byStage = F.LIVE_BIOMES.map((b) => [PARAMS.ladder.dailyBox, PARAMS.ladder.milestoneBox].map((box) => [boxEV(box, { level: F.BIOME_LEVEL[b] }), fBox(box, F.BIOME_LEVEL[b])].map(pHi))).flat(2);
 	const ref = [crateR.normal, crateR.founder, chestR.normal, chestR.founder];
 	const sameAtEveryStage = byStage.every((x, i) => Math.abs(x - ref[i % 4]) < 1e-9);
 	return {
-		profile: { source: 'founder.founderProfile()', sell: prof.multipliers.sell, gachaStats: { ...(prof.gacha?.stats || {}) }, todaySell: PROFILES.founder.multipliers.sell, gachaPity: pity ? { softStart: pity.softStart, hard: pity.hard } : null },
+		profile: { source: 'founder.founderProfile()', variant: prof.variant || null, buffSlots: prof.gacha?.buffSlots || 'luck', sell: prof.multipliers.sell, gachaStats: { ...(prof.gacha?.stats || {}) }, todaySell: PROFILES.founder.multipliers.sell, gachaPity: pity ? { softStart: pity.softStart, hard: pity.hard } : null },
 		reveal: {
 			level: revealLevel,
 			crate: crateR,
@@ -1042,9 +1045,9 @@ function founderView() {
 		stages: F.LIVE_BIOMES.map((b) => {
 			const L = F.BIOME_LEVEL[b];
 			const n = boxEV(PARAMS.ladder.dailyBox, { level: L });
-			const f = boxEV(PARAMS.ladder.dailyBox, { level: L, profile: prof });
+			const f = fBox(PARAMS.ladder.dailyBox, L);
 			const nc = boxEV(PARAMS.ladder.milestoneBox, { level: L });
-			const fc = boxEV(PARAMS.ladder.milestoneBox, { level: L, profile: prof });
+			const fc = fBox(PARAMS.ladder.milestoneBox, L);
 			return {
 				biome: b,
 				level: L,
@@ -1210,7 +1213,7 @@ const DECISIONS = [
 	{
 		id: 'P-STREAK-FOUNDER', status: 'proposed',
 		title: 'Founder: the same gate, boxes and public catch-card line. The sell multiplier on box contents is private; the Founder gacha stats (and gacha pity) roll the box, so the rarity edge shows on the public /open reveal',
-		modelled: 'boxContents(..., \'founder\') = the proposed founder.founderProfile() (gacha stats, sell multiplier); gate counts casts; /open stays a public reply rolled with the opener\'s gacha stats and pity (Founder reveal table)',
+		modelled: 'boxContents(..., \'founder\') = founder.founderBoxEV() with founder.founderProfile() (the stealth-hybrid: gacha stats on non-buff slots only, buffs at normal odds; sell multiplier); gate counts casts; /open stays a public reply rolled with the opener\'s gacha stats and pity (Founder reveal table)',
 		alternatives: [
 			'accept the visible rarity edge on /open, as with the kept catch-card rarity edge (P-FOUNDER-KEPT)',
 			'roll Founder box opens on the normal table and pay the Founder edge privately as extra value (the reveal then matches a normal player\'s odds)',
@@ -1401,7 +1404,7 @@ function markdownTables() {
 		['Regular player with the streak (reference loop)', `${Object.entries(r2r.noMissGrinder.regularHours).map(([L, h]) => `L${L} ${hrs(h)}`).join(', ')}; ${r2r.noMissGrinder.regularStillInWindows ? 'every approved window met' : 'a window is MISSED'}`, 'R2 grinder'],
 		['Today\'s vote rule on the new value model (casual, 30 days)', `${usd(tg.newValueModel.casual.topggRule30d)} = ${pct(tg.newValueModel.casual.topggShareOfFishing, 0)} of fishing income, against the streak's ${pct(tg.newValueModel.casual.streakShareOfFishing)}`, 'Top.gg'],
 		['Legendary/Lucky in streak boxes', `${pct(jp.crate.pAtLeastOne)} of crates, ${pct(jp.chest.pAtLeastOne)} of chests, ${pct(jp.pAtLeastOnePerWeek, 0)} of weeks`, 'Box contents'],
-		['Founder box value (proposed profile, private: sell multiplier)', `a crate is worth ${range(fv.stages.map((s) => s.crate.ratio), (x) => `${fx(x, 1)}×`)} a normal one`, 'Founder'],
+		['Founder box value (Founder profile, private: sell multiplier)', `a crate is worth ${range(fv.stages.map((s) => s.crate.ratio), (x) => `${fx(x, 1)}×`)} a normal one`, 'Founder'],
 		['Founder box reveal on /open (public: gacha stats)', `a Legendary/Lucky slot in ${pct(fv.reveal.crate.founder, 2)} of Founder crates against ${pct(fv.reveal.crate.normal, 2)} of normal ones; chests ${pct(fv.reveal.chest.founder, 2)} against ${pct(fv.reveal.chest.normal, 2)} (pity not modelled)`, 'Founder reveal'],
 		['Design checks', `${R.checks.list.filter((c) => c.pass).length} of ${R.checks.list.length} pass`, 'Checks'],
 	]);
@@ -1586,7 +1589,7 @@ function markdownTables() {
 	// Founder.
 	out['streak-founder'] = mdTable(['Stage', 'Crate: normal', 'Founder', 'ratio', 'Legendary+ per crate: normal', 'Founder', 'Chest: normal', 'Founder', 'ratio'], fv.stages.map((s) => [
 		`${s.biome} (Lv ${s.level})`, usd(s.crate.normal), usd(s.crate.founder), `${fx(s.crate.ratio, 1)}×`, fx(s.crate.normalLegendaryPlus, 3), fx(s.crate.founderLegendaryPlus, 3), usd(s.chest.normal), usd(s.chest.founder), `${fx(s.chest.ratio, 1)}×`,
-	])) + `\n\nLiquid value (fish + salvage). Founder: the proposed profile (\`${fv.profile.source}\`): gacha stats ${Object.entries(fv.profile.gachaStats).map(([k, v]) => `${k} +${pct(v, 0)}`).join(', ')}, sell ×${fv.profile.sell} (today's profile: ×${fv.profile.todaySell}). Founder pity is not modelled (it can only raise these).`;
+	])) + `\n\nLiquid value (fish + salvage). Founder: the Founder profile (\`${fv.profile.source}\`${fv.profile.variant ? `, ${fv.profile.variant}` : ''}): gacha stats ${Object.entries(fv.profile.gachaStats).map(([k, v]) => `${k} +${pct(v, 0)}`).join(', ')}${fv.profile.buffSlots === 'normal' ? ' on non-buff slots only (buffs at normal odds)' : ''}, sell ×${fv.profile.sell} (today's profile: ×${fv.profile.todaySell}). Founder pity is not modelled (it can only raise these).`;
 
 	// Founder: what the public /open reveal shows.
 	const rv = fv.reveal;

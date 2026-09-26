@@ -73,7 +73,7 @@ const I = require('./integrate');
 const streak = require('./streak');
 const rods = require('./rods');
 const { buildTable } = require('../../../src/engine/rarity');
-const { RARITIES, PROFILES } = require('../../../src/engine/balance');
+const { RARITIES } = require('../../../src/engine/balance');
 const { BOXES } = require('../../../src/engine/gachaBoxes');
 const { buffEffects: engineBuffEffects } = require('../../../src/engine/modifiers');
 const BUFF_CATALOG = require('../../../src/bootstrap/data/buffs');
@@ -309,11 +309,17 @@ const referenceCastsPerHour = () => 3600 / (F.COOLDOWN.fishMs / 1000 + F.DESIGN_
 // ---------------------------------------------------------------------------------------------
 // Box buff odds.
 const oddsCache = new Map();
-/** Expected buffs of each type in one open of `box` (a name or a definition) at `level`. */
+/**
+ * Expected buffs of each type in one open of `box` (a name or a definition) at `level`. profile 'founder': the
+ * Founder profile (founder.founderProfile(), opened by founder.founderBoxEV(): under the stealth-hybrid the
+ * Founder's gacha luck applies to non-buff slots only, so these are a normal player's odds).
+ */
 function boxBuffOdds(box, level = 0, { profile = 'normal' } = {}) {
-	const key = `${typeof box === 'string' ? box : box.id}|${F.biomeAt(level)}|${profile}`;
+	const FO = profile === 'founder' ? require('./founder') : null;
+	const prof = FO ? FO.founderProfile() : null;
+	const key = `${typeof box === 'string' ? box : box.id}|${F.biomeAt(level)}|${profile}${FO ? `|${FO.boxProfileKey(prof)}` : ''}`;
 	if (!oddsCache.has(key)) {
-		const ev = streak.boxEV(box, { level, profile });
+		const ev = FO ? FO.founderBoxEV(box, { level, profile: prof }) : streak.boxEV(box, { level, profile });
 		oddsCache.set(key, Object.fromEntries(BUFF_NAMES.map((n) => [n, ev.buffs[n] || 0])));
 	}
 	return oddsCache.get(key);
@@ -329,16 +335,19 @@ const boxRef = (name) => BOX_REFS[name] || name;
 const slotCache = new Map();
 /**
  * Liquid value (fish + part salvage) of one extra, non-guaranteed slot of `box` at `level`. profile
- * 'founder': the Founder gacha stats (streak.boxEV) and its fish sold at the PROPOSED Founder sell
- * multiplier (founder.founderProfile(), as streak.boxContents values a Founder's box).
+ * 'founder': the Founder profile (founder.founderProfile(); founder.founderBoxEV(): its gacha stats, on non-buff
+ * slots only under the stealth-hybrid, and its fish at its sell multiplier, as streak.boxContents values a
+ * Founder's box).
  */
 function bonusSlotValue(box, level = 0, { profile = 'normal' } = {}) {
 	const def = typeof box === 'string' ? streak.boxDefinitions()[box] || BOX_REFS[box] || null : box;
-	const key = `${def.id}|${level}|${profile}`;
+	const FO = profile === 'founder' ? require('./founder') : null;
+	const prof = FO ? FO.founderProfile() : null;
+	const key = `${def.id}|${level}|${profile}${FO ? `|${FO.boxProfileKey(prof)}` : ''}`;
 	if (!slotCache.has(key)) {
-		const ev = streak.boxEV({ ...def, id: `${def.id}+1`, slots: 1, guaranteedSlots: [] }, { level, profile });
-		const sell = profile === 'founder' ? require('./founder').founderProfile().multipliers.sell / PROFILES.founder.multipliers.sell : 1;
-		slotCache.set(key, profile === 'founder' ? ev.fishValue * sell + ev.salvage : ev.liquid);
+		const one = { ...def, id: `${def.id}+1`, slots: 1, guaranteedSlots: [] };
+		const ev = FO ? FO.founderBoxEV(one, { level, profile: prof }) : streak.boxEV(one, { level, profile });
+		slotCache.set(key, ev.liquid);
 	}
 	return slotCache.get(key);
 }
@@ -663,8 +672,9 @@ function coverage(a, m0, m1, W) {
  *                  bonusSlotValue('Streak Crate', level), cash 'luckyDraw'. TODAY_SOURCES in opts.sources
  *                  arrive here (comparison only).
  *   sessionDone    always true (buffs set no daily minimum).
- * Profile: state.profile 'founder' (the founder system's init) takes the Founder box odds (gacha luck) and
- * sells the Streak Crate bonus slot's fish at the Founder's sell multiplier. Buff XP is base (public) XP for
+ * Profile: state.profile 'founder' (the founder system's init) takes the Founder box odds (founder.founderBoxEV:
+ * a normal player's buff odds under the stealth-hybrid, whose gacha luck is on non-buff slots only) and sells
+ * the Streak Crate bonus slot's fish at the Founder's sell multiplier. Buff XP is base (public) XP for
  * everyone; the final XP and the cash follow the profile's step rates (the private multipliers apply after
  * the buff). The Lucky Draw assembly rebate uses the Normal crate chain.
  * @param {object} opts { sources: subset of SOURCES and TODAY_SOURCES keys (default SOURCES), trace: false |
@@ -1183,7 +1193,8 @@ function r2() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Founder (private): gacha luck raises buff odds per box; public XP counts buff XP like anyone's.
+// Founder: buff odds per box of the Founder profile (founder.founderProfile(); under the stealth-hybrid its gacha
+// luck applies to non-buff slots only, so the odds are a normal player's); public XP counts buff XP like anyone's.
 /** Continuous level for an XP amount on the framework curve (bisection on F.xpForLevel). */
 function levelExact(xp) {
 	let lo = 0;
@@ -1211,7 +1222,8 @@ function founderView() {
 	const fishingShare = r2().archetypes[F.REFERENCE_ARCHETYPE].decomposition[L50].shares.fishing;
 	const drift = ((founder['Double XP'] - normal['Double XP']) / 30) * fishingShare;
 	return {
-		profileGachaStats: PROFILES.founder.gacha?.stats || {},
+		profileGachaStats: require('./founder').founderProfile().gacha?.stats || {},
+		buffSlots: require('./founder').founderProfile().gacha?.buffSlots || 'luck',
 		level: L,
 		boxes,
 		boxesPer30d: { ...counts },
@@ -1219,7 +1231,7 @@ function founderView() {
 		fishingShareAtL50: fishingShare,
 		publicXpDriftShare: drift,
 		publicLevelDriftAtL50: levelExact(F.xpForLevel(L50) * (1 + drift)) - L50,
-		note: 'Buff effects are base (public) rewards for everyone; the private profile multiplies the final. Founder boxes hold more buffs (gacha luck), so a Founder\'s public XP can run ahead of an identical normal player by the drift share.',
+		note: 'Buff effects are base (public) rewards for everyone; the private profile multiplies the final. The Founder profile (stealth-hybrid) applies its gacha luck to non-buff slots only, so its boxes hold a normal player\'s buffs and the public XP drift is zero; with luck on buff slots too (today\'s rule) a Founder\'s public XP would run ahead of an identical normal player by the drift share.',
 	};
 }
 
@@ -1656,7 +1668,7 @@ function markdownTables() {
 
 	const fv = R.founder;
 	out['buffs-founder'] = mdTable(['Figure', 'Normal', 'Founder', 'Note'], [
-		...fv.boxes.map((b) => [`${b.box}: each buff type per open`, pct(b.normal['Double XP'], 2), pct(b.founder['Double XP'], 2), 'Founder gacha luck (buffs are Rare items)']),
+		...fv.boxes.map((b) => [`${b.box}: each buff type per open`, pct(b.normal['Double XP'], 2), pct(b.founder['Double XP'], 2), fv.buffSlots === 'normal' ? 'Founder gacha luck on non-buff slots only: buffs at normal odds' : 'Founder gacha luck (buffs are Rare items)']),
 		...BUFF_NAMES.map((n) => [`${n} per 30 days (regular play)`, fx(fv.buffsPer30d.normal[n]), fx(fv.buffsPer30d.founder[n]), n === 'Double XP' ? `x${fx(fv.buffsPer30d.ratio)}` : 'events grant the same to everyone']),
 		['Public XP drift (share of XP)', '0', pct(fv.publicXpDriftShare, 2), `extra Double XP units a day x fishing's share of XP at L50 (${pct(fv.fishingShareAtL50, 1)})`],
 		['Public level drift at L50', '0', fx(fv.publicLevelDriftAtL50), 'levels ahead of an identical normal player'],

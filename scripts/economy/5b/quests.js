@@ -512,14 +512,18 @@ const boxValueCache = new Map();
 /**
  * Non-buff contents of one Daily Box opened at `level` by `profile` ('normal' | 'founder').
  * liquid = fish sale value + salvage of rod parts (the cash a box yields); cashEquivalent adds the bait
- * packs usable at `level` at their pack price. `sellMult` (Founder: the proposed profile's sell
- * multiplier) rescales the box fish from today's profile sell multiplier, which boxEV applies.
+ * packs usable at `level` at their pack price. 'founder' = the Founder profile (founder.founderProfile(),
+ * opened by founder.founderBoxEV(): under the stealth-hybrid its gacha luck is on non-buff slots only).
+ * `sellMult` (Founder: the profile's sell multiplier) rescales the box fish from the sell multiplier the
+ * open applied (the profile's own for 'founder', today's balance.js profile's otherwise).
  */
 function dailyBoxValue(level, profile = 'normal', sellMult = null) {
-	const key = `${level}|${profile}|${sellMult}`;
+	const FO = profile === 'founder' ? require('./founder') : null;
+	const prof = FO ? FO.founderProfile() : null;
+	const key = `${level}|${profile}|${sellMult}${FO ? `|${FO.boxProfileKey(prof)}` : ''}`;
 	if (!boxValueCache.has(key)) {
-		const ev = require('./streak').boxEV(DAILY_BOX, { level, profile });
-		const fishValue = ev.fishValue * (sellMult == null ? 1 : sellMult / PROFILES[profile].multipliers.sell);
+		const ev = FO ? FO.founderBoxEV(DAILY_BOX, { level, profile: prof }) : require('./streak').boxEV(DAILY_BOX, { level, profile });
+		const fishValue = ev.fishValue * (sellMult == null ? 1 : sellMult / (prof || PROFILES[profile]).multipliers.sell);
 		boxValueCache.set(key, Object.freeze({
 			level, profile, fish: ev.fish, fishValue, parts: ev.parts, salvage: ev.salvage, baitUsable: ev.baitUsable, baitDeferred: ev.baitDeferred,
 			liquid: fishValue + ev.salvage, cashEquivalent: fishValue + ev.salvage + ev.baitUsable, buffs: Object.freeze({ ...ev.buffs }),
