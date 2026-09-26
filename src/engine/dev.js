@@ -9,6 +9,7 @@ const { Fish: FishTemplate, FishData } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
 const { DevAudit } = require('../schemas/DevAuditSchema');
 const { levelForXp, BALANCE_VERSION } = require('./balance');
+const { publicXpOf } = require('./publicLevel');
 const { grantItem } = require('./cast');
 const { Utils } = require('../class/Utils');
 
@@ -51,10 +52,14 @@ async function xp(actor, target, mode, amount) {
 	assertDeveloper(actor);
 	if (!Number.isFinite(amount)) throw new Error('Amount must be a number.');
 	const doc = await targetDoc(target);
-	const before = { xp: doc.xp || 0, level: doc.level || 1 };
+	const publicBefore = publicXpOf(doc);
+	const before = { xp: doc.xp || 0, level: doc.level || 1, publicXp: publicBefore };
 	const newXp = Math.max(0, mode === 'set' ? amount : before.xp + amount);
-	await UserModel.updateOne({ userId: String(target) }, { $set: { xp: newXp, level: levelForXp(newXp) } });
-	const after = { xp: newXp, level: levelForXp(newXp) };
+	// A developer XP change applies to the public XP too (set -> the same value, add -> the same delta),
+	// never leaving publicXp above xp.
+	const newPublic = Math.min(newXp, Math.max(0, mode === 'set' ? amount : publicBefore + amount));
+	await UserModel.updateOne({ userId: String(target) }, { $set: { xp: newXp, level: levelForXp(newXp), publicXp: newPublic } });
+	const after = { xp: newXp, level: levelForXp(newXp), publicXp: newPublic };
 	await audit(actor, target, `xp.${mode}`, before, after, { amount });
 	return { before, after };
 }

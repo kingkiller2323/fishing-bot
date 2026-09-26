@@ -2,6 +2,8 @@
 // never remove or rewrite existing progression.
 const { User: UserModel } = require('../schemas/UserSchema');
 const { FishData } = require('../schemas/FishSchema');
+const { Cast } = require('../schemas/CastSchema');
+const { migratePublicXp } = require('../engine/publicLevel');
 
 /**
  * autoLock.species: before Foundation V2, locking a species also locked future catches of it.
@@ -22,6 +24,8 @@ async function migrateAutoLockSpecies() {
 async function runMigrations(log) {
 	const autoLock = await migrateAutoLockSpecies();
 	if (autoLock.scanned > 0) log(`Migration autoLock.species: ${autoLock.scanned} player(s) initialised, ${autoLock.withRules} with species auto-lock.`, 'done');
+	const publicXp = await migratePublicXp({ UserModel, Cast });
+	if (publicXp.scanned > 0) log(`Migration publicXp: ${publicXp.scanned} player(s) initialised, ${publicXp.withBonus} with private profile bonuses excluded.`, 'done');
 }
 
-module.exports = { runMigrations, migrateAutoLockSpecies };
+module.exports = { runMigrations, migrateAutoLockSpecies, migratePublicXp };

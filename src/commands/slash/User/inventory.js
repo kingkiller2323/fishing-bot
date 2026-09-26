@@ -64,7 +64,7 @@ module.exports = {
 			const biome = await Biome.findOne({ name: userBiome });
 			const balance = `
 			**Balance:** $${inventory.money.toLocaleString()}\n`;
-			const level = `**Level ${await user.getLevel()}**. ${await user.getXPToNextLevel()} to next level.\n`;
+			const level = `**Level ${await user.getPublicLevel()}**. ${await user.getPublicXPToNextLevel()} to next level.\n`;
 			const rod = `**Currently using**: ${Icons.of(equippedRod)} ${equippedRod?.name || 'None'}\n${equippedRod?.durability || 0} / ${equippedRod?.maxDurability || 0}\n`;
 			const bait = `**With**: ${Icons.of(equippedBait)} ${equippedBait?.name || 'None'}\n`;
 			const biomeString = `**Current biome**: ${Icons.of(biome)} ${biome.name.charAt(0).toUpperCase() + biome.name.slice(1) || 'Ocean'}\n`;
