@@ -113,11 +113,23 @@ async function main() {
 	if (mongoose.connection.db.databaseName !== DB_NAME) throw new Error('connected to an unexpected database');
 	await mongoose.connection.db.dropDatabase();
 
+	// Exact production account shapes (pseudonymized copy in SNAPSHOT_DB, written by export-snapshot.js),
+	// loaded next to the synthetic accounts. Their Founder pseudonyms join FOUNDER_IDS before config loads.
+	let snapshot = null;
+	if (process.env.SNAPSHOT_DB) {
+		const sdb = mongoose.connection.client.db(process.env.SNAPSHOT_DB);
+		const manifest = await sdb.collection('snapshot_manifest').findOne({ _id: 'manifest' });
+		if (!manifest) throw new Error(`SNAPSHOT_DB ${process.env.SNAPSHOT_DB} has no manifest`);
+		snapshot = { db: sdb, manifest };
+		const founders = String(process.env.FOUNDER_IDS || '').split(',').map((x) => x.trim()).filter(Boolean);
+		process.env.FOUNDER_IDS = [...new Set([...founders, ...manifest.founders])].join(',');
+	}
+
 	// Required only after the connection: the engine reads config (FOUNDER_IDS, BALANCE_5B) at require time.
 	const config = require('../../src/config');
 	const balance = require('../../src/engine/balance');
 	const levels = require('../../src/engine/levels');
-	const { publicXpOf, checkPublicXp } = require('../../src/engine/publicLevel');
+	const { publicXpOf, publicLevelOf, checkPublicXp, journalProfileBonus, publicXpOfResult, journalCommitted } = require('../../src/engine/publicLevel');
 	const { bootstrap, seedStatic } = require('../../src/bootstrap');
 	const { castLine, applyCastResult } = require('../../src/engine/cast');
 	const { Aquarium } = require('../../src/class/Aquarium');
@@ -231,8 +243,56 @@ async function main() {
 	await legacy('stg-other', { xp: 3600, level: 6, publicXp: 3600 });
 	await useTestRod('stg-other', { capabilities: ['weak', '1'] });
 
+	// ---------- The exact production accounts (pseudonymized) ----------
+	const snapshotMarkers = [];
+	if (snapshot) {
+		for (const name of Object.keys(snapshot.manifest.counts)) {
+			const docs = await snapshot.db.collection(name).find({}).toArray();
+			if (name === 'migrations') snapshotMarkers.push(...docs.map((d) => d._id));
+			if (docs.length > 0) await mongoose.connection.db.collection(name).insertMany(docs);
+		}
+	}
+
 	const users = async () => Object.fromEntries((await UserModel.collection.find({}).toArray()).map((u) => [u.userId, u]));
 	const s0 = await users();
+
+	// Expected results for the exact accounts, derived from their own pre-migration data: the approved
+	// rules (publicXp = xp minus the private bonus of committed journals since the last audited xp set;
+	// levelFloor = max(stored level, today's curve(xp)); public floor from the repaired publicXp), then
+	// every pending journal whose update has not committed replays once on top.
+	const exact = {};
+	for (const a of snapshot?.manifest.accounts || []) {
+		const u = s0[a.userId];
+		const lastSet = (await DevAudit.collection.find({ target: a.userId, operation: 'xp.set' }).sort({ timestamp: -1 }).limit(1).toArray())[0];
+		let bonus = 0;
+		const replay = [];
+		for (const j of await Cast.collection.find({ userId: a.userId }).toArray()) {
+			if (j.status === 'pending' && !journalCommitted(j, u)) {
+				replay.push(j);
+				continue;
+			}
+			if (!journalCommitted(j, u)) continue;
+			const at = j.createdAt || (j.result?.createdAt ? new Date(j.result.createdAt) : null);
+			if (lastSet && at && at <= lastSet.timestamp) continue;
+			bonus += journalProfileBonus(j.result);
+		}
+		const xp0 = u.xp || 0;
+		const reconciled = bonus === 0 ? xp0 : Math.min(xp0, Math.max(0, xp0 - bonus));
+		const anchorReal = Math.max(Number.isFinite(u.level) ? u.level : 0, todays(xp0));
+		const anchorPublic = reconciled >= xp0 ? anchorReal : todays(reconciled);
+		const fin = (v) => (Number.isFinite(v) ? v : 0);
+		exact[a.userId] = {
+			role: a.role,
+			bonus,
+			xp: xp0 + replay.reduce((t, j) => t + fin(j.result?.xp?.total), 0),
+			publicXp: reconciled + replay.reduce((t, j) => t + publicXpOfResult(j.result), 0),
+			levelFloor: Math.max(anchorReal, ...replay.map((j) => fin(j.result?.level?.after))),
+			publicLevelFloor: Math.max(anchorPublic, ...replay.map((j) => fin(j.result?.level?.public?.after))),
+			replay: replay.map((j) => j._id),
+			pendingOpens: (await GachaOpen.collection.find({ userId: a.userId, status: 'pending' }).toArray()).map((j) => j._id),
+			publicLevelSeenBefore: todays(publicXpOf(u)),
+		};
+	}
 
 	// ---------- Pass 1 and pass 2: the real startup path ----------
 	const t1 = Date.now();
@@ -266,7 +326,7 @@ async function main() {
 		allowedBookkeeping: changes.filter(bookkeeping),
 	});
 	const markers = await mongoose.connection.db.collection('migrations').find({}).toArray();
-	check('idempotent.reconcile-marker-once', markers.length === 1 && markers[0]._id === 'publicXpReconcile-v1', { markers: markers.map((m) => ({ id: m._id, result: { scanned: m.result?.scanned, members: m.result?.members, membersChanged: m.result?.membersChanged, recomputed: m.result?.recomputed } })) });
+	check('idempotent.reconcile-marker-once', markers.filter((m) => m._id === 'publicXpReconcile-v1').length === 1 && markers.length === 1 + snapshotMarkers.filter((id) => id !== 'publicXpReconcile-v1').length, { markers: markers.map((m) => ({ id: m._id, result: { scanned: m.result?.scanned, members: m.result?.members, membersChanged: m.result?.membersChanged, recomputed: m.result?.recomputed } })) });
 
 	// ---------- publicXp and floors ----------
 	for (const [id, e] of Object.entries(expected)) {
@@ -276,6 +336,19 @@ async function main() {
 		const anchorPublic = publicXpOf(u) >= (u.xp || 0) ? anchorReal : todays(publicXpOf(u));
 		check(`floors.${id}`, u.levelFloor === e.levelFloor && u.publicLevelFloor === e.publicLevelFloor && u.levelFloor === anchorReal && u.publicLevelFloor === anchorPublic,
 			{ expected: [e.levelFloor, e.publicLevelFloor], rule: [anchorReal, anchorPublic], actual: [u.levelFloor, u.publicLevelFloor], storedLevel: s0[id].level ?? null, xp: u.xp, publicXp: u.publicXp });
+	}
+	for (const [id, e] of Object.entries(exact)) {
+		const u = s1[id];
+		const detail = { role: e.role, before: { xp: s0[id].xp, publicXp: s0[id].publicXp ?? null, level: s0[id].level ?? null }, after: { xp: u.xp, publicXp: u.publicXp, level: u.level, levelFloor: u.levelFloor, publicLevelFloor: u.publicLevelFloor }, expected: { xp: e.xp, publicXp: e.publicXp, levelFloor: e.levelFloor, publicLevelFloor: e.publicLevelFloor }, privateBonus: e.bonus };
+		check(`exact.publicXp.${id}`, u.xp === e.xp && u.publicXp === e.publicXp && u.publicXp <= u.xp, detail);
+		check(`exact.floors.${id}`, u.levelFloor === e.levelFloor && u.publicLevelFloor === e.publicLevelFloor, detail);
+		// The public level others see: before (curve of the stored publicXp) and after (floor or curve of the repaired publicXp).
+		check(`exact.public-level.${id}`, publicLevelOf(u) === Math.max(e.publicLevelFloor, todays(e.publicXp)) && publicLevelOf(s2[id]) === publicLevelOf(u),
+			{ seenBefore: e.publicLevelSeenBefore, after: publicLevelOf(u), realLevelAfter: levels.levelOf(u) });
+		const stillPending = [];
+		for (const jid of e.replay) if ((await Cast.collection.findOne({ _id: jid })).status !== 'applied') stillPending.push(String(jid));
+		for (const jid of e.pendingOpens) if ((await GachaOpen.collection.findOne({ _id: jid })).status !== 'applied') stillPending.push(String(jid));
+		check(`exact.journals.${id}`, stillPending.length === 0, { replayedCasts: e.replay.length, replayedOpens: e.pendingOpens.length, stillPending });
 	}
 	const pubCheck = await checkPublicXp({ UserModel, founders: config.users.founders });
 	check('publicXp.members-equal-xp', pubCheck.mismatched === 0, pubCheck);
@@ -287,6 +360,8 @@ async function main() {
 			const u = s[id];
 			const was = Number.isFinite(before.level) ? before.level : 0;
 			if ((u.level ?? 0) < was || levels.levelOf(u) < was) lowered.push({ id, pass, before: was, stored: u.level, effective: levels.levelOf(u) });
+			// The stored public level (its floor) never moves after pass one.
+			if (pass === 'pass2' && (u.publicLevelFloor < s1[id].publicLevelFloor || u.levelFloor < s1[id].levelFloor)) lowered.push({ id, pass, floors: [u.levelFloor, u.publicLevelFloor], pass1: [s1[id].levelFloor, s1[id].publicLevelFloor] });
 		}
 	}
 	check('levels.none-lowered', lowered.length === 0, { accounts: Object.keys(s0).length, lowered });
@@ -337,6 +412,7 @@ async function main() {
 		pass2Same: JSON.stringify(s1[id]) === JSON.stringify(s2[id]),
 	}]));
 	const failed = checks.filter((c) => !c.pass);
+	env.snapshot = snapshot ? { exportedAt: snapshot.manifest.exportedAt, accounts: snapshot.manifest.accounts, counts: snapshot.manifest.counts, pendingJournalUsers: snapshot.manifest.pendingJournalUsers } : null;
 	const report = { rehearsal: 'phase5b-stepA', env, passed: checks.length - failed.length, failed: failed.length, checks, accounts };
 	console.log('REPORT-BEGIN');
 	console.log(JSON.stringify(report, null, 2));

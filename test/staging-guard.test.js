@@ -28,3 +28,29 @@ test('the rehearsal refuses production-like targets before connecting', async ()
 		assert.match(out, message);
 	}
 });
+
+const EXPORT = path.join(__dirname, '..', 'scripts', 'staging', 'export-snapshot.js');
+function runExport(env) {
+	return new Promise((resolve) => {
+		const base = { ...process.env };
+		for (const k of ['SNAPSHOT_SOURCE_URI', 'SNAPSHOT_TARGET_URI', 'CLIENT_TOKEN']) delete base[k];
+		execFile(process.execPath, [EXPORT], { env: { ...base, ...env }, timeout: 20000 }, (err, stdout, stderr) => resolve({ code: err ? err.code : 0, out: `${stdout}${stderr}` }));
+	});
+}
+
+test('the snapshot export only ever writes to a staging fishing_snapshot database, and never prints a URI', async () => {
+	const src = 'mongodb+srv://user:secret@cluster0.abcde.mongodb.net/fishing';
+	const cases = [
+		[{ SNAPSHOT_TARGET_URI: 'mongodb://u:p@staging.proxy.rlwy.net:1234/fishing_snapshot' }, /SNAPSHOT_SOURCE_URI is not set/],
+		[{ SNAPSHOT_SOURCE_URI: src, SNAPSHOT_TARGET_URI: src }, /same|Atlas/],
+		[{ SNAPSHOT_SOURCE_URI: src, SNAPSHOT_TARGET_URI: 'mongodb://u:p@staging.proxy.rlwy.net:1234/fishing' }, /fishing_snapshot database/],
+		[{ SNAPSHOT_SOURCE_URI: src, SNAPSHOT_TARGET_URI: 'mongodb://u:p@staging.proxy.rlwy.net:1234/fishing_snapshot', CLIENT_TOKEN: 'x' }, /CLIENT_TOKEN is set/],
+	];
+	for (const [env, message] of cases) {
+		const { code, out } = await runExport(env);
+		assert.equal(code, 1, out);
+		assert.match(out, /Refusing to run/);
+		assert.match(out, message);
+		assert.doesNotMatch(out, /secret|u:p@/, 'no credentials in the output');
+	}
+});

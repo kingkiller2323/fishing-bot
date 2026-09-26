@@ -13,6 +13,8 @@ const { migrateLevelFloors } = require('../engine/levels');
 // One-time migrations record a marker document here ({ _id: name, appliedAt, result }).
 const MARKERS = 'migrations';
 const PUBLIC_XP_RECONCILE = 'publicXpReconcile-v1';
+// Boot logs never carry a full Discord ID: accounts are named by their last 4 digits.
+const maskId = (id) => `…${String(id).slice(-4)}`;
 
 /**
  * autoLock.species: before Foundation V2, locking a species also locked future catches of it.
@@ -74,16 +76,16 @@ async function runMigrations(log) {
 	if (!reconcile.skipped) {
 		const r = reconcile.result;
 		log(`Migration ${PUBLIC_XP_RECONCILE}: ${r.scanned} player(s) checked; ${r.members} member(s) (publicXp = xp, ${r.membersChanged} corrected); ${r.recomputed.length} account(s) with profile bonuses recomputed from their journals.`, 'done');
-		for (const f of r.recomputed.filter((x) => x.before !== x.after)) log(`Migration ${PUBLIC_XP_RECONCILE}: ${f.userId} publicXp ${f.before ?? 'missing'} -> ${f.after} (xp ${f.xp}, profile bonus ${f.bonus}).`, 'info');
+		for (const f of r.recomputed.filter((x) => x.before !== x.after)) log(`Migration ${PUBLIC_XP_RECONCILE}: ${maskId(f.userId)} publicXp ${f.before ?? 'missing'} -> ${f.after} (xp ${f.xp}, profile bonus ${f.bonus}).`, 'info');
 	}
 	// Level floors from TODAY's curve, after publicXp is final (the public floor anchors on it).
 	const floors = await migrateLevelFloors({ UserModel });
 	if (floors.scanned > 0) log(`Migration levelFloors: ${floors.scanned} player(s); ${floors.levelFloors} levelFloor and ${floors.publicLevelFloors} publicLevelFloor written from today's curve.`, 'done');
 	const check = await checkPublicXp({ UserModel, founders: config.users?.founders || [] });
-	if (check.mismatched > 0) log(`Check publicXp: ${check.mismatched} of ${check.members} member(s) have publicXp != xp (e.g. ${check.sample.join(', ')}).`, 'warn');
+	if (check.mismatched > 0) log(`Check publicXp: ${check.mismatched} of ${check.members} member(s) have publicXp != xp (e.g. ${check.sample.map(maskId).join(', ')}).`, 'warn');
 	else log(`Check publicXp: all ${check.members} member(s) have publicXp == xp.`, 'info');
 	const crate = await migrateDelistFishingCrate();
 	if (crate.delisted > 0) log(`Migration delistFishingCrate: ${crate.delisted} catalog row(s) removed from the shop (shopItem -> false); owned crates untouched.`, 'done');
 }
 
-module.exports = { runMigrations, runOnce, migrateAutoLockSpecies, migratePublicXp, migrateReconcilePublicXp, migrateLevelFloors, migrateDelistFishingCrate, PUBLIC_XP_RECONCILE };
+module.exports = { maskId, runMigrations, runOnce, migrateAutoLockSpecies, migratePublicXp, migrateReconcilePublicXp, migrateLevelFloors, migrateDelistFishingCrate, PUBLIC_XP_RECONCILE };
