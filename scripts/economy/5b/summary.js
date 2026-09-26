@@ -220,8 +220,8 @@ const REEMIT = {
 	quests: ['quests-fixes', 'quests-kinds', 'quests-bands', 'quests-story'],
 	streak: ['streak-current-proposed', 'streak-ladder'],
 	buffs: ['buffs-bugs', 'buffs-current-proposed', 'buffs-income-share'],
-	aquarium: [],
-	founder: [],
+	aquarium: ['aquarium-current-proposed', 'aquarium-licenses', 'aquarium-integrated', 'aquarium-display', 'aquarium-fixes'],
+	founder: ['founder-headline', 'founder-profile', 'founder-visible', 'founder-time', 'founder-public-pace', 'founder-gate', 'founder-day30', 'founder-f1-surfaces', 'founder-fix-first'],
 };
 
 function markdownTables() {

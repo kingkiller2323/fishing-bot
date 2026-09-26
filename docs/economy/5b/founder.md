@@ -1,572 +1,758 @@
 # Phase 5B · Founder compensation and public level
 
-**Status: proposal only.** Nothing here is live. No `src/` file, production value or player document changes until you approve.
+**Status: proposal only, except F1 on the public surfaces listed in §4.** F1 shipped to production as a standalone privacy hotfix (commit `14e27f1` on main, `70a0eb7` on this branch). Nothing else here is live. No other `src/` file, production value or player document changes until you approve.
 
-- **Framework:** 5b.2 (`CURVE.quartic` 0.0475, shared digest `26bbca823c8b2b8b`), on the provisional shared gear path (`F.GEAR_PATH_SOURCE = 'provisional'`).
-  - Every number below is computed at runtime by `scripts/economy/5b/founder.js`. Its inputs are:
-    - `framework.js`
-    - today's real-engine data: `measurements.json`, `simulation.json`, `gacha-ev.json`
-    - the finished rods design's crate and durability helpers
-  - Archetypes, targets, lifecycle, biome levels, gear path, curve and value model are imported, not copied.
-  - The Founder's private values (XP and sell multipliers, luck, durability efficiency) are **solved from explicit targets**, not hand-set. A framework bump regenerates them.
-  - `check-shared.js` passes for `founder.js`.
-- **Reproduce:**
-  - `node -e "require('./scripts/economy/5b/founder.js').report()"` returns the report object (about 1.5 s).
-  - `node scripts/economy/5b/founder.js` prints it as JSON.
-  - Each table below names the `report()` key or function that produces it.
-- **Validation:**
-  - With the Normal profile, `lifecycle()` reproduces `docs/economy/5b/curve.json` exactly (`report().checks.normalLifecycleMatchesCurveJson`).
-  - The crate chain reproduces `rods.cratesDistribution()` exactly (`normalCrateChainMatchesRods`).
-  - The pity model predicts today's measured Founder Old Rod Legendary+ rate: 5.72% against 5.83% measured (`report().pityModelCheck`).
-  - All 13 design checks pass (`report().checks.pass`).
-- **R3 preview:** re-solved on the designed rods path (a scratch run with `F.gearPath` pointed at the rods path), the values become:
-  - XP ×45 (unchanged), durability efficiency 0.85 (unchanged)
-  - sell ×55 (was ×50), luck +0.60 (was +0.95)
-
-  All design checks still pass, except the curve.json comparison, which regenerates at 5b.3.
+- **Framework 5b.4.** Every table below is **generated** by `node scripts/economy/5b/render-docs.js` from `scripts/economy/5b/founder.js` `markdownTables()`, and carries the framework version and shared digest it was computed at. Prose cites numbers only by pointing at a table. A framework change regenerates every table, including the solved private values; nothing is scaled by hand.
+- **One model.** Per-cast figures come from the framework's `castOutcome()` on the shared gear path (`F.gearPath()`, the rods design), with the Founder rarity table, its stats and its visible fish count (`founderCast()`). Every lifecycle figure (hours to a level, day 30, tier purchases, XP sources, the public tell) comes from `integrate.run()`: the reference core loop (rods, world, quests, streak, buffs) with `variant.founder` and a gate, against the same loop without it (Normal). The Founder profile is a **system on the shared lifecycle core** and has no time-stepping loop of its own.
+- **Solved, not picked.** The private XP and sell multipliers, luck and durability efficiency are the smallest values that meet explicit targets (§6). The time-to-level target is solved on the integrated model.
+- **Inputs.** Today's real-engine data (`measurements.json`, `simulation.json`, `gacha-ev.json`), the rods design's crate helpers, and today's Founder profile in `src/engine/balance.js`. Kept parts of that profile are read, never copied. The F1 status tables read `src/` at render time, so they cannot claim a surface is fixed when the code says otherwise.
+- **Reproduce.** `node scripts/economy/5b/founder.js` prints the full report as JSON.
+- **Decisions.** Every non-obvious choice is a **proposed** decision (§2), verified against the model by `check-shared.js`. Only you approve.
 
 ---
 
-## 0. Summary
+## 1. Summary
 
-1. **The Founder's visible catch stays plausible.**
-   - Founder bonus fish are added to the rod's normal multi-catch roll. The total is capped at the **normal maximum of 5**, so every Founder catch card is one a normal player can also get.
-   - Average fish per cast: **3.0** on the Old Rod (identical to today), rising to **3.5** at Tier 4 and **3.6** at Tier 5. Today's Founder shows up to 40.
-2. **The Founder's power stays absurd, through private modifiers.** The proposed profile:
-   - **XP ×45** (was ×5)
-   - **sell ×50** (was ×10)
-   - **private Luck +0.95** (new)
-   - **durability efficiency 0.85** (was 0.75), with a stochastic durability rounding rule
-   - fishing speed, rarity table, pity, gacha luck and quest ×5 are all kept
-3. **What "preserved" means is defined precisely (§3).** Every metric meets or beats today:
-   - XP/h and $/h as a ratio to Normal at equal gear
-   - hours to every level milestone
-   - minutes to afford gear
-   - Legendary+ per hour
-   - rod life
-   - day-30 XP and money relative to Normal
-4. **Resulting power (§6).**
-   - The Founder earns **200–301×** a normal player's XP/h at equal gear (today 12–23×) and **494–866×** their $/h (today 56–282×).
-   - It reaches real Lv 50 in **0.25 h** of play, against 0.48 h today (regular player).
-5. **Public level (F1).**
-   - A new `publicXp` counts only base rewards (without the profile bonus). `publicLevel` is derived from it.
-   - Public surfaces show the public level; `/fishing-stats` shows both levels.
-   - **Recommended:** gameplay gates read the public level. Otherwise the Founder would be fishing Swamp at public Lv 10 by 0.15–0.32 h of play, and would stay above its public level for 9–17 hours (§7.3).
-   - The migration is additive and idempotent: `publicXp = xp − Σ profile bonus` from the Cast journals.
-6. **A correctness fix comes first (F0).** `/profile` shows "👑 Founder" in a public (non-ephemeral) reply whenever the Founder views their own profile.
+<!-- generated:founder-headline -->
+| Figure | Value | Table |
+| --- | --- | --- |
+| Visible fish per cast (Founder) | 3.00–3.62 from the Old Rod to T5, every cast 1–5 fish (today up to 40) | Visible catch |
+| Proposed private profile (solved at 5b.4) | XP ×45, sell ×55, Luck +0.6, durability efficiency 0.85; quests ×5 / ×5 kept | Current → proposed; Targets |
+| XP/h at equal gear, Founder ÷ Normal | 202×–293× (today 12.4×–22.7×) | Per tier |
+| $/h at equal gear, Founder ÷ Normal | 553×–907× (today 56×–282×) | Per tier |
+| Regular Founder, hours to real Lv 50 (integrated) | 0.27 h (public gate) / 0.23 h (real gate); today 0.48 h | Hours to each level |
+| Regular Founder, hours to public Lv 50 (public gate) | 9.03 h, against 43.65 h for a normal regular player | Hours to each level; Public pace |
+| Public tell (fishing above the public level) | none under the public gate; under the real gate 9.70 h–17.30 h of play | Level gate |
+| F1 public level | shipped (14e27f1) for the /fish level-up, /profile, the /inventory level line and /fishing-stats; the model's public XP matches the shipped definition | Public level |
+| Open public tells (fix first) | /inventory "Balance" and "Inventory value" (public reply); /balance (public reply); /profile title when the Founder views its own profile (public reply) | Fix first |
+| Design checks | **1 fail:** day30XpAndMoneyRatioPreserved | Checks |
+| Retired private loop | system() matched it exactly: 144/144 milestones step-exact (a83b5f0) | Retired-loop parity |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-headline -->
+
+1. **The Founder's visible catch stays plausible.** Founder bonus fish are added to the rod's normal multi-catch roll, and the total is capped at the normal maximum (`F.MULTI.maxFish`). Every Founder catch card is one a normal player can also land; only the frequency differs.
+2. **The Founder's power stays absurd, through private modifiers.** The private XP and sell multipliers, private luck and durability efficiency are solved so every "preserved" metric meets or beats today (Targets). Speed, rarity table, pity, gacha luck and quest multipliers are kept.
+3. **The integrated re-solve confirms the values.** On the integrated model the XP multiplier is unchanged, with the binding case moving between archetypes. Sell and luck moved at the R3 gear-path cutover, not at integration (What moved).
+4. **F1 is shipped for the public level surfaces.** The model's public XP definition matches the shipped one. What remains is proposed: gameplay gates still read the real level (framework `P-FOUNDER-GATE`), and money lines still show the Founder's private-multiplied money in public replies (`P-FOUNDER-WALLET`, Fix first).
+5. **One design check fails on the integrated model:** the casual Founder's day-30 money relative to Normal, under the public gate (Day 30). It is reported for your decision, not tuned away (§2).
 
 ---
 
-## 1. Correctness fixes in this area (separate from tuning; ship first)
+## 2. Decisions for approval
 
-| # | Bug | Evidence | Fix |
-| --- | --- | --- | --- |
-| **F0** | **The Founder badge leaks in public.** `/profile` sets the title to "… · 👑 Founder" when the Founder views their own profile. The reply goes through `buttonPagination`, which calls `deferReply()` with no ephemeral flag, so everyone in the channel sees it. The code comment claims the badge is private. | `src/commands/slash/User/profile.js:32` (`isFounder`) and `:59` (title); `src/buttonPagination.js:10` (`deferReply()`). | Remove the badge from the public embed. `/fishing-stats` already shows "👑 Founder · non-competitive" ephemerally (`presentation.js`). Add a regression test: the public `/profile` embed never contains the profile name. |
-| F0b | **Lucky items are a Founder tell.** A Lucky draw is an item 20% of the time (`cast.js` `drawTemplates`). On the Founder's 1% Lucky table, that is 0.2% of draws. Today's Founder catches **2.2 Booster Packs per hour** on the Old Rod and **38.7** on a Rare-parts rod (`report().luckyItems.founderTodayPerHour`). For normal players a Booster Pack is a 1-in-100,000 Easter egg (decision 12). | `measurements.json` Founder scenarios. | Pin the Lucky-item branch to the **normal base table** for every profile and every luck source (§4.4). This extends bait's pinned-item rule to the Founder. |
+<!-- generated:founder-decisions -->
+| ID | Proposed decision | Modelled | Alternatives | Why | Record = model |
+| --- | --- | --- | --- | --- | --- |
+| `P-FOUNDER-VISIBLE` | Founder visible catch: today's bonus-fish distribution added to the rod's normal multi-catch roll, the total capped at the normal maximum; one fish per draw | bonus fish 0: 0.1, 1: 0.25, 2: 0.3, 3: 0.25, 4: 0.1; limits maxDraws 5 (= F.MULTI.maxFish), maxPerDraw 1 (today 8 / 5) | today's limits (tens of fish on one card: a public tell); a smaller bonus (fewer visible fish; more private compensation); no cap (casts a normal player can never land) | every Founder card is one a normal player can also land (approved direction A-FOUNDER-VISIBLE); the Old Rod card is today's (Visible catch) | yes |
+| `P-FOUNDER-TARGETS` | What "preserved" means: six targets (M1-M6) met at today's value x a margin on today's rods mapped to the new tiers, under both gate options; solved values rounded up | margin ×1.1; tier map Old Rod = Old Rod; T1 = Custom (Uncommon parts); T2 = Custom (Rare parts); T3 = Custom (Rare parts) / Custom (Legendary parts); T4 = Custom (Legendary parts); T5 = Custom (Legendary parts); gates public and real; rounding ×0.5 below ×10, ×5 above, luck and efficiency 0.05 | no margin (exactly today's values); ratio targets only (drops M2 time-to-level and M4 time-to-afford: much smaller multipliers, a slower Founder than today) | the approved direction keeps the Founder's effective power "absurd"; the steeper curve and the repriced gear are compensated like the lost visible volume (Targets) | yes |
+| `P-FOUNDER-XP` | Private XP multiplier (solved; public output shows base XP) | ×45: the binding need rounded up to a ×5 step. Binding: M2 time to level on the integrated model (grinder, public gate: ×38.53 × margin 1.1 = ×42.39); M1 (XP/h ratio at equal gear) alone needs ×4.77 | today's ×5 (a regular Founder reaches Lv 50 hours later than today: Counterfactual); the M1 ratio-only value (drops the time-to-level target) | the steeper curve and the capped visible volume both slow the Founder; the approved time-to-level target absorbs both (Targets; Hours to each level) | yes |
+| `P-FOUNDER-SELL` | Private sell multiplier (solved; baked into each fish's stored value; valueBase stays public) | ×55: the binding need rounded up to a ×5 step. Binding: M4 time to afford (T1, margin 1.1 included: ×50.86); M3 ($/h ratio at equal gear) alone needs ×23.48 | today's ×10; the M3 ratio-only value (drops the time-to-afford target: repriced gear takes the Founder longer to buy than today) | gear was repriced upwards like the curve was steepened; the Founder is compensated for both (Targets; Time to afford) | yes |
+| `P-FOUNDER-LUCK` | Private Luck on the Founder profile (solved), capped so at most a set share of public cards show a Legendary+ | +0.6 Luck: the binding need rounded up to a 0.05 step. Binding: M5 (Legendary+ per hour ratio at equal gear ≥ today's × margin 1.1) at T5: +0.57. Cap: at most 33.3% of public cards show a Legendary+ | no private luck (Legendary+ per hour below today's ratio at some tiers: Private luck) | restores Legendary+ per hour at equal gear to today's ratio at every tier while fewer fish are visible; the card-share cap keeps it plausibly lucky (Private luck) | yes |
+| `P-FOUNDER-DURABILITY-EFF` | Founder durability efficiency (solved), under the stochastic durability rule | 0.85: the binding need rounded up to a 0.05 step. Binding: M6 (rod life in hours, Founder ÷ Normal ≥ today's × margin 1.1) at T1: 0.843; never below today's, never above STAT_CAPS; needs P-DURABILITY | today's efficiency under today's max(1, ceil) rule (Founder rods wear out faster per hour than a normal player's: Durability) | the Founder casts faster, so under today's rule its rods would last fewer hours than Normal's; this keeps rod life at or above today's ratio (Durability) | yes |
+| `P-FOUNDER-KEPT` | Kept from today's profile: rarity table, fishing speed, pity, gacha stats and gacha pity; still non-competitive | read from src/engine/balance.js PROFILES.founder, never copied | reduce speed or table (would need larger private multipliers); raise them (visible, a tell) | per-fish rarity and cadence are part of today's Founder feel; the quests, streak and buffs designs assume them (Current → proposed) | yes |
+| `P-FOUNDER-QUEST-MULT` | Founder quest multipliers (questXp / questCash) kept at today's values | questXp ×5, questCash ×5 (today ×5 / ×5); base quest XP enters publicXp | scale them with the catch multipliers; drop them (quests pay the Founder like anyone) | the per-completion ratio is unchanged and quest completions are capped per day by the quests design; quest XP is a small share of Founder XP (XP sources) | yes |
+| `P-FOUNDER-PUBLIC-LEVEL` | Public level fields: keep the shipped publicXp (base rewards only) as the Phase 5B rule; at the curve change the public level follows the real level's rule (framework P-CURVE-EXISTING), so under its no-demotion freeze a stored publicLevel floor is added | publicXp: shipped (14e27f1): base catch XP (gear, bait, buffs, events) + base quest XP, never a profile bonus. publicLevel: proposed stored field written at the curve change; public level = max(stored publicLevel, curve(publicXp)). The core tracks exactly that rule (lifecycles start new players, so the floor never binds in the model) | derive the public level on read only (as shipped): under the freeze, a member's public level would drop at the curve change while the real level does not (public levels demoted, and real and public levels diverge for normal players); under P-CURVE-EXISTING's rescale alternative: rescale publicXp with xp and keep deriving on read (no new field) | the steeper curve maps today's XP to lower levels and levels never drop; the public level needs the same protection as the real level (Public level) | yes |
+| `P-FOUNDER-SURFACES` | Which surfaces show which level: every public surface the public level; /fishing-stats (ephemeral) both; future level leaderboards the public level of competitive accounts only | shipped (14e27f1): /fish level-ups, /profile, /inventory level line, /fishing-stats; proposed: any future level leaderboard | show the real level on the owner's own public replies (a tell) | a public card never reveals a private bonus; the owner sees both levels privately (Public level) | n/a (not a model value) |
+| `P-FOUNDER-WALLET` | Wallet privacy: /balance and the money lines of /inventory become ephemeral for every player; inventory value uses the stored public value (valueBase) | not a model value: a presentation rule (the Founder's money is private-multiplied) | a public money field for the Founder (like publicXp); hide money for the Founder only (itself a tell); accept the tell | the /inventory Balance and Inventory value lines and /balance show the Founder's real, private-multiplied money in public replies today (Fix first) | n/a (not a model value) |
+| `P-FOUNDER-DEV-GRANTS` | Developer XP grants move xp and publicXp together (publicXp never above xp), both audited | default scope 'both' (shipped 14e27f1: set applies the same value, add the same delta, publicXp clamped to [0, xp], audit stores both) | a scope option real \| public for one-field corrections (design stage; not shipped) | an admin correction never makes a normal player's public level diverge from their level | yes |
+| `P-FOUNDER-MIGRATION` | Migrations stay additive and idempotent: publicXp as shipped; at the curve change a stored publicLevel where missing (with P-CURVE-EXISTING's freeze); existing Founder fish keep their stored value | publicXp: shipped (14e27f1: accounts without it get xp minus every profile bonus in their applied cast journals, three result shapes; members get publicXp = xp). Proposed: publicLevel = today's-curve level of publicXp, written only where missing, before the new curve applies; new catches use the new sell multiplier, stored fish values are never rewritten; PROFILES.founder is code (a BALANCE_VERSION bump), not player data | recompute stored Founder fish values at the new multiplier (rewrites player documents) | no player document is rewritten; running any step twice is a no-op (Migrations) | n/a (not a model value) |
+
+Status of every entry: `proposed`. Only the user approves; `decisions.js` joins these to the Phase 5B registry, alongside the framework entries this design relies on (`P-FOUNDER-GATE`, `P-DURABILITY`, `P-LUCKY`), and `check-shared.js` verifies each record against the model.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-decisions -->
+
+**What the integrated numbers sharpen.**
+
+- **`P-FOUNDER-SELL` and the day-30 money check.** The sell multiplier is solved on the two approved money targets: M3, the $/h ratio at equal gear, and M4, the time to afford gear. Both pass. On the integrated model, most of a casual normal player's day-30 income comes from quests, boxes and the streak rather than fishing, while most of the Founder's comes from private-multiplied fishing (the fishing-share column under Day 30). The Founder receives quest cash at the kept quest multiplier, not at the sell multiplier. As a result, the casual Founder under the public gate ends day 30 with a smaller money lead over Normal than today's (Day 30). The choices:
+  - **Accept.** M3 and M4 are the approved targets, the Founder is still far richer than Normal, and every other archetype's lead grows.
+  - **Add a day-30 money target to the solver.** The sell multiplier it would need is in the sensitivity under Day 30.
+  - **Raise the Founder's quest cash multiplier** (`P-FOUNDER-QUEST-MULT`) instead, closing the gap through quests rather than fish. This option is not sized here.
+
+  No value was changed during the migration.
+- **The level gate (framework `P-FOUNDER-GATE`)** is still the real level in production, so the public tell in Level gate is live today (Fix first, F1c).
+- **Wallet privacy (`P-FOUNDER-WALLET`)** closes the last public money tell (Fix first, F1b).
 
 ---
 
-## 2. Founder power today (measured)
+## 3. Fix first: public tells
 
-Sources:
-- Per-rod rates: `report().today.byRod`, from `measurements.json`. Founder casts were persisted, so pity advanced as in production. Recomputed at 4 s overhead.
-- Normal Legendary+ rates: exact, from `F.castOutcome` with the legacy rod stats (`resolveModifiers`).
-- Lifecycles: `simulation.json`.
-
-| Today's rod (stage) | Fish/cast N → F | Cooldown N / F | Casts/h N / F | XP/h N → F | XP/h ratio | $/h F (6 biomes) | $/h ratio | Legendary+/h N → F (ratio) | Durability per fish (F) | Rod life F/N (hours) | Lucky items/h F (Booster Packs) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Old Rod (Lv 0) | 1 → 2.99 | 5.0 s / 2.0 s | 400 / 600 | 6,801 → 152,432 | 22.1–22.7× | $1.61M–6.90M | 75–282× | 0.83 → 104.7 (127×) | 0.368 | 0.61 | 4.8 (2.2) |
-| Uncommon parts (Lv 20) | 6 → 10.0 | 5.0 / 2.0 | 400 / 600 | 40,896 → 510,279 | 12.4–12.6× | $6.97M–26.7M | 56–137× | 4.9 → 313.6 (64×) | 0.275 | 1.45 | 13.8 (7.4) |
-| Rare parts (the Lv 30 rod) | 15 → 37.8 | 4.5 / 1.5 | 424 / 655 | 107,897 → 2,099,001 | 19.4–19.5× | $31.2M–110M | 87–240× | 15.4 → 1,317 (86×) | 0.253 | 1.02 | 62.7 (38.7) |
-| Legendary parts | 15 → 40 | 4.0 / 1.5 | 450 / 655 | 114,752 → 2,225,095 | 19.3–19.5× | $44.5M–173M | 99–220× | 23.6 → 1,693 (72×) | 0.250 | 1.03 | 64.9 (37.6) |
-
-**Lifecycle today** (`report().today.lifecycles`: hours of play to each level on today's curve, 100·L²):
-
-| Player | Founder L10 / 20 / 30 / 40 / 50 / 60 | Normal L50 | Day 30: Founder | Day 30: Normal |
+<!-- generated:founder-fix-first -->
+| # | Public tell | Evidence (src/, read at render time) | Status | Fix |
 | --- | --- | --- | --- | --- |
-| Casual | 0.07 / 0.28 / 0.43 / 0.52 / 0.64 / 0.79 h | not reached | Lv 215, 4.64M XP, $195M | Lv 18, $148k |
-| Regular | 0.05 / 0.23 / 0.33 / 0.40 / 0.48 / 0.57 h | 8.05 h | Lv 507, 25.8M XP, $1.15B | Lv 134, $15.1M |
-| Active | 0.03 / 0.20 / 0.28 / 0.33 / 0.40 / 0.48 h | 7.35 h | Lv 917, 84.2M XP, $3.80B | Lv 255, $60.0M |
-| Grinder | 0.03 / 0.17 / 0.23 / 0.28 / 0.33 / 0.38 h | 6.58 h | Lv 1,645, 271M XP, $12.3B | Lv 445, $186M |
+| F0 | The Founder badge: `/profile` puts "👑 Founder" in the title when the Founder views its own profile, and the reply is public (`buttonPagination` defers without an ephemeral flag) | profile.js title; buttonPagination.js `deferReply()` | **open** | Remove the badge from the public embed (`/fishing-stats` already shows it privately); regression test: the public `/profile` embed never contains the profile name |
+| F0b | Lucky items: today's Founder catches 2.2 Booster Packs per hour on the Old Rod and 38.7 on a Rare-parts rod (normal players: an Easter egg) | measurements.json Founder scenarios; cast.js `drawTemplates` | proposed (framework `P-LUCKY`, modelled) | Pin the item branch to the normal base table for every profile (Lucky items) |
+| F1 | Level: public level-ups, `/profile` and `/inventory` levels came from the real (private-multiplied) level | cast.js writes publicXp; fish.js reads result.level.public; migrations.js migratePublicXp | **shipped** (14e27f1; 70a0eb7 on this branch) | Done for these surfaces (Public level) |
+| F1b | Money: `/inventory` "Balance" and "Inventory value" and `/balance` show the Founder's real money and final (private-multiplied) fish values in public replies | inventory.js Balance line; User.getInventoryValue sums stored final values; balance.js public reply | **open** | `P-FOUNDER-WALLET`: money lines ephemeral for everyone; inventory value from `valueBase` |
+| F1c | Gates: biome access, quest start, shop and rod-part level checks read the real level, so a Founder fishes above its public level (Level gate) | biome.js, startQuest.js, Quest.js, buy-rod.js, buy-bait.js, buy-other.js | **open** (live today) | Framework `P-FOUNDER-GATE`: gates read the public level |
 
-**Pity** (kept):
-- Legendary+: boost from 10 casts without one, +2% per cast, capped at +40%, guaranteed at 25.
-- Lucky: boost from 30, +0.5% per cast, capped at +25%, guaranteed at 75.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-fix-first -->
 
-**Gacha luck today** (`report().gacha.boxes`, exact from the V2 tables). Founder stats are Rare Find +200%, Trophy +200%, Luck +400%. Box pity: boost from 4 opens, +4% per open, capped at +50%, guaranteed at 10.
+- **F0 (open).** The code comment in `profile.js` says the badge is private: it is shown only when the Founder views their own profile. But the reply goes through `buttonPagination`, which defers without an ephemeral flag, so everyone in the channel sees it. This is a correctness fix, and it does not depend on any tuning.
+- **F1 (shipped).** Public level-ups, `/profile` and the `/inventory` level line come from `publicXp` (§4).
+- **F1b (open).** `/inventory` shows "Balance" (the account's real money) and "Inventory value" (the sum of stored fish values, which carry the private sell multiplier) in a public reply, and `/balance` replies publicly too.
+- **F1c (open).** Gameplay gates read the real level, so today a Founder fishes above its public level (Level gate).
 
+---
+
+## 4. Public level (F1)
+
+### What shipped (`14e27f1`)
+
+- **`publicXp`** (UserSchema, no default) holds the base (competitive) XP the player was shown. It is written in the cast's existing atomic commit (`$inc` alongside `xp`, `cast.js` `writeCast`). New accounts start at 0.
+- **The public level is derived on read:** `levelForXp(min(publicXp, xp))` (`src/engine/publicLevel.js`). No public level is stored.
+- **Migration.** An additive, idempotent startup migration (`migratePublicXp`, called from `runMigrations`) gives every account without `publicXp` its `xp` minus every profile bonus recorded in its applied cast journals. It handles all three historical result shapes (`journalProfileBonus`). Members get `publicXp = xp` exactly. Pending journals from older code add their base XP when applied.
+- **Developer XP grants** move `publicXp` with `xp`: `set` applies the same value, `add` the same delta. `publicXp` is clamped to [0, `xp`], and the audit stores both.
+- **Tests:** `test/founder-public-level.test.js`.
+
+<!-- generated:founder-f1-surfaces -->
+| Surface | Shows | Status | Where |
+| --- | --- | --- | --- |
+| `/fish` catch card: "⭐ Level up!" | public level (`result.level.public`) | shipped (14e27f1) | src/commands/slash/Fish/fish.js, src/engine/cast.js |
+| `/profile` (public reply) | public level and progress | shipped (14e27f1) | src/commands/slash/User/profile.js, User.getPublicLevel() |
+| `/inventory` level line (public reply) | public level and progress | shipped (14e27f1) | src/commands/slash/User/inventory.js |
+| `/fishing-stats` (ephemeral) | real level and public level | shipped (14e27f1) | src/engine/presentation.js privateStatsFields, cast.fishingStats |
+| Catch card XP and quest lines | base rewards (`rewards.*.base`) | shipped (a2ab9a8) | src/engine/cast.js rewardBreakdown |
+| Gameplay gates: biomes, quests, shop, rod parts, permits | the REAL level (`getLevel()`) | proposed: the public level (framework `P-FOUNDER-GATE`) | src/commands/slash/Fish/biome.js, src/commands/slash/User/startQuest.js, src/class/Quest.js, src/components/buttons/buy-rod.js, src/components/buttons/buy-bait.js, src/components/buttons/buy-other.js |
+| `/inventory` "Balance" and "Inventory value" (public reply) | real money and final (private-multiplied) fish values | **open public tell** (`P-FOUNDER-WALLET`) | src/commands/slash/User/inventory.js, User.getInventoryValue() |
+| `/balance` (public reply) | real money | **open public tell** (`P-FOUNDER-WALLET`) | src/commands/slash/Economy/balance.js |
+| `/profile` title when the Founder views its own profile (public reply) | "👑 Founder" | **open public tell (F0, fix first)** | src/commands/slash/User/profile.js title, src/buttonPagination.js deferReply() |
+| Any future level leaderboard | public level, competitive (Normal-profile) accounts only | proposed (`P-FOUNDER-SURFACES`) | none yet |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-f1-surfaces -->
+
+### The public XP definition: shipped against the model
+
+<!-- generated:founder-f1-definition -->
+| Component | Shipped (src/engine/publicLevel.js, cast.js) | Model (integrated ledgers) |
+| --- | --- | --- |
+| Catch XP (per-fish roll x rarity weight), every visible fish including Founder bonus fish | in: `catchXpWithoutProfile` | in: `publicXp.fishing` (founder outcome `xpBasePerCast`) |
+| Gear and bait XP bonus | in: `xp.withoutProfile` (gear) | in: castOutcome `stats.xpBonus` |
+| Active buffs (Double XP) | in: `xp.withoutProfile` (buffs) | in: `publicXp.buff` (the buff bonus on base XP; `P-BUFFS-PUBLIC`) |
+| Event XP multiplier | in: `xp.withoutProfile` (event) | none modelled (`P-EVENTS`: no XP events) |
+| Quest XP, base (quest XP x event) | in: `reward.xp.base` | in: `publicXp.daily` / `weekly` / `repeatable` / `story` (quests system) |
+| Founder catch XP multiplier | excluded: `profileBonus` | excluded: `xp.fishing` = `publicXp.fishing` x profile xp |
+| Founder quest XP multiplier (`questXp`) | excluded: `profileBonus` | excluded: quest `xp` = `publicXp` x questXp |
+| Streak | no XP | no XP (`P-STREAK-NO-CASH-XP`) |
+| Developer XP grants | move `publicXp` with `xp`, clamped to [0, xp], audited | not modelled (no grants in a lifecycle) |
+| Public level | derived on read: `levelForXp(min(publicXp, xp))`; no stored field | core `publicLevel` = max(previous, curve(publicXp)): identical while XP only rises on a fixed curve |
+
+| XP source (regular Founder to public Lv 60, public gate) | Account XP | Public XP | Account ÷ public | Profile multiplier that applies | Match |
+| --- | --- | --- | --- | --- | --- |
+| fishing | 42,224,309 | 938,318 | 45.00× | 45× | yes |
+| story | 69,200 | 13,840 | 5.00× | 5× | yes |
+| daily | 115,000 | 23,000 | 5.00× | 5× | yes |
+| repeatable | 30,560 | 6,112 | 5.00× | 5× | yes |
+| buff | 2,191,235 | 48,694 | 45.00× | 45× | yes |
+| weekly | 61,917 | 12,383 | 5.00× | 5× | yes |
+
+Normal players (same run without the founder system): public XP equals XP for every source: yes. Remaining differences: Rounding: the engine floors XP per cast (integers); the model is continuous. Public level: the engine stores no public level (derived from publicXp on read); the core keeps publicLevel = max(previous, curve(publicXp)). They differ only when the curve changes (P-FOUNDER-PUBLIC-LEVEL). Gate 'real' (live today): quest rewards are scaled at the real level in both, and their base enters publicXp in both.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-f1-definition -->
+
+The definitions agree. For every XP source in the integrated ledgers, the Founder's account XP is its public XP times exactly the profile multiplier that applies to it, and for Normal the two are equal. The core books `publicXp` from the Founder outcome's base (the founder system), the quests system's base reward and the buffs system's bonus on base XP. The one structural difference is the stored public level (below).
+
+### What stays proposed
+
+- **Gates** read the public level (framework `P-FOUNDER-GATE`; Level gate).
+- **The public level at the curve change** (`P-FOUNDER-PUBLIC-LEVEL`). It follows whatever rule the real level gets (framework `P-CURVE-EXISTING`).
+  - Phase 5B's curve maps today's XP to lower levels. Under the proposed no-demotion freeze, the real level keeps its stored value: `level = max(stored level, curve(xp))`.
+  - The shipped public level is derived on read, so it would drop at the curve change while the real level does not. That demotes public levels, and a normal player's public and real levels would diverge.
+  - A stored `publicLevel` with the same rule fixes that. Under the rescale alternative, `publicXp` is rescaled with `xp` instead, and no field is needed.
+  - `publicProgressOf` also hard-codes today's curve, like `User.getXPToNextLevel`.
+- **Wallet privacy** (`P-FOUNDER-WALLET`) and **future level leaderboards** (`P-FOUNDER-SURFACES`).
+- **Dev grants:** the shipped rule moves both fields. A `scope` option for one-field corrections is only an alternative (`P-FOUNDER-DEV-GRANTS`).
+
+---
+
+## 5. Founder power today (measured)
+
+### Per rod
+
+<!-- generated:founder-today-rods -->
+| Today's rod | Fish/cast N → F | Cooldown N / F | Casts/h N / F | XP/h N → F (6-biome mean) | XP/h ratio | $/h F (6 biomes) | $/h ratio | Legendary+/h N → F (ratio) | Durability per fish (F) | Rod life F/N (hours) | Lucky items/h F (Booster Packs) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Old Rod (Lv 0) | 1 → 2.99 | 5.0 / 2.0 s | 400 / 600 | 6,801 → 152,432 | 22.1×–22.7× | $1.61M–$6.90M | 75×–282× | 0.83 → 104.7 (127×) | 0.368 | 0.61 | 4.8 (2.2) |
+| Uncommon parts (the Lv 20 rod) | 6 → 10.01 | 5.0 / 2.0 s | 400 / 600 | 40,896 → 510,279 | 12.4×–12.6× | $6.97M–$26.75M | 56×–137× | 4.90 → 313.6 (64×) | 0.275 | 1.45 | 13.8 (7.4) |
+| Rare parts (the Lv 30 rod) | 15 → 37.76 | 4.5 / 1.5 s | 424 / 655 | 107,897 → 2,099,001 | 19.4×–19.5× | $31.22M–$110.12M | 87×–240× | 15.37 → 1,316.7 (86×) | 0.253 | 1.02 | 62.7 (38.7) |
+| Legendary parts | 15 → 40.00 | 4.0 / 1.5 s | 450 / 655 | 114,752 → 2,225,095 | 19.3×–19.5× | $44.47M–$172.69M | 99×–220× | 23.59 → 1,693.1 (72×) | 0.250 | 1.03 | 64.9 (37.6) |
+
+Measured by the real engine (`measurements.json`; Founder casts persisted so pity advanced), recomputed at 4 s overhead. Normal Legendary+ rates are exact (`F.castOutcome` with the legacy rod stats).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-today-rods -->
+
+### Lifecycle today
+
+<!-- generated:founder-today-lifecycle -->
+| Player | Founder hours to Lv 10 / 20 / 30 / 40 / 50 / 60 | Normal Lv 50 | Day 30: Founder | Day 30: Normal |
+| --- | --- | --- | --- | --- |
+| Casual | 0.07 / 0.28 / 0.43 / 0.52 / 0.64 / 0.79 h | not reached | Lv 215, 4.64M XP, $195.08M | Lv 18, $147.8k |
+| Regular | 0.05 / 0.23 / 0.33 / 0.40 / 0.48 / 0.57 h | 8.05 h | Lv 507, 25.80M XP, $1.15B | Lv 134, $15.07M |
+| Active | 0.03 / 0.20 / 0.28 / 0.33 / 0.40 / 0.48 h | 7.35 h | Lv 917, 84.23M XP, $3.80B | Lv 255, $60.04M |
+| Grinder | 0.03 / 0.17 / 0.23 / 0.28 / 0.33 / 0.38 h | 6.58 h | Lv 1,645, 270.91M XP, $12.25B | Lv 445, $186.44M |
+
+Today's curve (100·L²), from `simulation.json`.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-today-lifecycle -->
+
+### Gacha luck today
+
+<!-- generated:founder-today-gacha -->
 | Box | P(open holds a Legendary+): Normal | Founder, no pity | Founder, with pity | Ratio | Opens per Legendary+ N → F |
 | --- | --- | --- | --- | --- | --- |
 | Fishing Crate | 0.62% | 2.74% | 14.7% | 23.7× | 161 → 6.8 |
 | Daily Box | 0.62% | 2.70% | 14.7% | 23.8× | 162 → 6.8 |
 | Voter's Crate | 1.02% | 4.11% | 15.4% | 15.1× | 98 → 6.5 |
 
-**What the new economy does to today's profile** (`report().unchangedProfileUnderNewRules`). Keep the Founder profile unchanged (×5 XP, ×10 sell, no luck) and apply the new rules:
-- Fish per cast drops from up to 40 to about 3.5.
-- The steeper curve needs 2.2× the XP for Lv 50.
+Exact from the V2 tables. Founder gacha stats: rareFind 2.00, trophyChance 2.00, luck 4.00; box pity from 4, +4.0% per open, capped at +50%, guaranteed at 10 (both kept).
 
-The regular Founder would reach Lv 50 after **1.93 h** of play (real gate) or 2.27 h (public gate), instead of 0.48 h. Legendary+ per hour would fall **2.9–12.3×** at T1–T5; the Old Rod is unchanged. The equal-gear XP ratio would still be 21–31×, because rarity-weighted XP favours the Founder table. The cash ratio would be 86–127×, below today's best biomes.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-today-gacha -->
+
+### Counterfactual: today's profile under the new rules
+
+Keep the Founder profile unchanged and apply the new rules: the visible volume drops to a few fish per cast, and the steeper curve needs more XP per level.
+
+<!-- generated:founder-unchanged -->
+| Tier | Fish/cast | XP ratio at equal gear | $ ratio at equal gear | Legendary+/h: today's Founder → unchanged profile | Drop |
+| --- | --- | --- | --- | --- | --- |
+| Old Rod | 3.00 | 30.8× | 130.2× | 104.7 → 103.0 | 1.0× |
+| T1 | 3.16 | 27.5× | 123.5× | 313.6 → 112.2 | 2.8× |
+| T2 | 3.23 | 26.4× | 113.9× | 1,316.7 → 118.6 | 11.1× |
+| T3 | 3.39 | 24.7× | 105.7× | 1,693.1 → 137.6 | 12.3× |
+| T4 | 3.50 | 22.9× | 95.8× | 1,693.1 → 147.0 | 11.5× |
+| T5 | 3.62 | 21.6× | 90.7× | 1,693.1 → 151.2 | 11.2× |
+
+Today's Founder profile (XP ×5, sell ×10, no luck, efficiency 0.75) under the new rules. Lv 50 needs 2.31× today's XP. On the integrated model the regular Founder would reach real Lv 50 after **1.75 h** of play (real gate) or 2.17 h (public gate), against 0.48 h today. (Its casts use today's profile; quests, boxes and buffs read the proposed one, which changes box and quest money, not the cast XP.)
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-unchanged -->
+
+The equal-gear XP ratio would still meet today's (XP ratio column against Per rod), because rarity-weighted XP favours the Founder table. But absolute time to level and Legendary+ per hour would fall well behind today's. That is why the private values are solved against absolute targets (§6), not against ratios alone.
 
 ---
 
-## 3. What "preserved" means (the targets the solver enforces)
+## 6. What "preserved" means (the targets the solver enforces)
 
-Every target is met at **today's value × 1.10** (`PARAMS.targets.margin`), and then rounded **up**. "Equal gear" maps today's measured rods onto the new tiers (`PARAMS.targets.todayRodOfTier`):
+"Equal gear" maps today's measured rods onto the new tiers (`PARAMS.targets.todayRodOfTier`):
 
-| New tier | Today's rod |
+<!-- generated:founder-tier-map -->
+| New tier | Today's rod it is compared with |
 | --- | --- |
-| Old Rod | Old Rod |
-| T1 | Uncommon parts |
-| T2 | Rare parts |
-| T3 | the higher of Rare and Legendary parts |
-| T4, T5 | Legendary parts |
+| Old Rod | Old Rod (Lv 0) |
+| T1 | Uncommon parts (the Lv 20 rod) |
+| T2 | Rare parts (the Lv 30 rod) |
+| T3 | Rare parts (the Lv 30 rod) and Legendary parts (the higher ratio) |
+| T4 | Legendary parts |
+| T5 | Legendary parts |
 
-| # | Metric | Definition | Binding case | Needed | Chosen |
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-tier-map -->
+
+### Targets
+
+<!-- generated:founder-targets -->
+| # | Metric | Definition | Binding case | Needed (× margin) | Chosen |
 | --- | --- | --- | --- | --- | --- |
-| M1 | **XP ratio at equal gear** | Founder final XP/h ÷ Normal XP/h, same tier, same biome, 4 s overhead. Must be ≥ today's ratio on the mapped rod, in **all 6 biomes × 6 tiers**. | T5 River (today 19.5×; Founder base 4.46×) | ×4.8 | — |
-| M2 | **Absolute time to level** | Hours of play to real Lv 10/20/30/40/50/60 on the **new** curve. Must be ≤ today's Founder hours on today's curve, for **all four archetypes** and **both gate options** (§7.3). | Casual, public gate (raw ×37.0) | **×40.7** | **XP ×45** |
-| M3 | **$ ratio at equal gear** | Founder final $/h ÷ Normal $/h, same tier and biome. Must be ≥ today's ratio, all 36 cases. | T5 Coast (today 219.9×; Founder base 10.1×) | ×23.9 | — |
-| M4 | **Absolute time to afford** | Minutes of Founder play to buy the tier set at the two purchases that exist today (T1 ↔ today's Lv 20 rod, T2 ↔ today's Lv 30 rod), with the rods crate prices and the Founder's crate luck. Must be ≤ today's. | T1: today 4.3 s ($8,250 at $6.90M/h) | **×48.4** | **sell ×50** |
-| M5 | **Legendary+ per hour ratio at equal gear** | Legendary+ per hour ÷ Normal, home biome, with Founder pity. Must be ≥ today's ratio. Capped by plausibility: at most 1/3 of public cards may show a Legendary+. | T5 (today 71.8×) | Luck +0.931 | **Luck +0.95** (not capped) |
-| M6 | **Rod life** | Hours of play a crafted rod lasts, Founder ÷ Normal, same rod, home biome. Must be ≥ today's (1.45× on the Lv 20 rod, 1.02–1.03× later). Never below today's 0.75, never above the 0.9 stat cap. | T1 | 0.846 | **Efficiency 0.85** |
+| M1 | XP ratio at equal gear | Founder final XP/h ÷ Normal XP/h, same tier and biome, 4 s overhead; ≥ today's ratio on the mapped rod in all 6 biomes × 6 tiers | T5 River (today 19.5×; Founder base 4.49×) | 4.77× | — |
+| M2 | Absolute time to level (integrated) | Hours of play to real Lv 10/20/30/40/50/60 on the new curve, `integrate.run` with every reference system; ≤ today's Founder hours for all 4 archetypes and both gate options | Grinder, public gate (raw 38.53×) | 42.39× | **XP ×45** |
+| M3 | $ ratio at equal gear | Founder final $/h ÷ Normal $/h, same tier and biome; ≥ today's ratio in every case | T5 Coast (today 219.9×; Founder base 10.30×) | 23.48× | — |
+| M4 | Absolute time to afford | Minutes of Founder play to buy the tier set at the two purchases that exist today (T1 ↔ the Lv 20 rod, T2 ↔ the Lv 30 rod), rods crate prices and the Founder's crate luck; ≤ today's | T1: today 4.3 s ($8,250 at $6.90M/h; now $18.9k) | 50.86× | **sell ×55** |
+| M5 | Legendary+ per hour ratio at equal gear | Legendary+/h ÷ Normal, home biome, with Founder pity; ≥ today's ratio; at most 33.3% of public cards may show a Legendary+ | T5 (today 71.8×) | Luck +0.570 | **Luck +0.6** |
+| M6 | Rod life | Hours of play a crafted rod lasts, Founder ÷ Normal, same rod, home biome; ≥ today's (1.02×–1.45×); never below today's 0.75, never above the 0.9 cap | T1 | 0.843 | **Efficiency 0.85** |
+
+Every target is met at today's value × 1.1 and rounded up. From one family alone: sell would be ×25 (M3 without M4) and XP ×5 (M1 without M2).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-targets -->
 
 Sources: `report().solved` (binding cases, `timeNeed` per archetype and gate, `afford`); the solver is `solve()`.
 
-- **Without M4,** the sell multiplier would be ×25 (M3 alone). M4 is the cash counterpart of M2: prices were deliberately raised (the T1 set costs $18,980 instead of $8,250), just as the curve was steepened, and the Founder is compensated for both.
-- **Why XP is ×45 when M1 needs only ×4.8:** the new curve plus the loss of 40-fish casts make absolute time-to-level (M2) the binding constraint. That lifts the equal-gear ratio to 200–301×, far above today's 12–23×.
+- **M2 runs on the integrated model.** For each archetype and gate, the solver bisects the XP multiplier on `integrate.run` lifecycles. These are the reference loop plus the founder system casting with the trial profile, run until the real level reaches the maximum level. While it runs, quests, streak and buffs read the profile solved so far (identical except the XP multiplier, which only the Founder's own casts use).
+- **M4 is the cash counterpart of M2.** Gear was deliberately repriced upwards, just as the curve was steepened, and the Founder is compensated for both. Without M4, the sell multiplier would be the M3-only value (note under Targets).
+- **Why XP is so large when M1 needs little:** the new curve plus the loss of large visible casts make absolute time to level (M2) the binding constraint.
+
+### M2 by archetype and gate
+
+<!-- generated:founder-time-need -->
+| Archetype | Public gate: raw → × margin | Real gate: raw → × margin |
+| --- | --- | --- |
+| Casual | 38.37× → 42.21× | 30.97× → 34.06× |
+| Regular | 37.40× → 41.14× | 29.86× → 32.85× |
+| Active | 37.85× → 41.63× | 29.79× → 32.77× |
+| Grinder | 38.53× → 42.39× | 29.70× → 32.67× |
+
+M2 per archetype and gate: the smallest XP multiplier whose integrated lifecycle (integrate.run (rods, world, quests, streak, buffs + founder), until the real level reaches the maximum level) reaches every real-level milestone no later than today's Founder.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-time-need -->
+
+### What moved
+
+<!-- generated:founder-resolve -->
+| Value | 5b.2 design stage (provisional gear path, retired loop) | 5b.4, retired loop (rods path) | 5b.4 integrated (proposed) |
+| --- | --- | --- | --- |
+| XP multiplier | ×45 (M2: casual, public gate, ×40.7) | ×45 (M2: casual, public gate, ×44.77) | **×45** (M2: grinder, public gate, ×42.39) |
+| Sell multiplier | ×50 (M4: T1, ×48.4) | ×55 (M4: T1, ×50.86) | **×55** (M4: T1, ×50.86) |
+| Private Luck | +0.95 (M5: T5, +0.931) | +0.6 (M5: T5, +0.570) | **+0.6** (M5: T5, +0.570) |
+| Durability efficiency | 0.85 (M6: T1, 0.846) | 0.85 (M6: T1, 0.843) | **0.85** (M6: T1, 0.843) |
+
+Binding case and its need (margin included) in brackets. Earlier columns are records (docs/economy/5b/founder.md at 991e09e; solve() of founder.js as of a83b5f0 (unchanged until this migration) on framework 5b.4).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-resolve -->
+
+- **Sell and luck** moved at the R3 gear-path cutover (5b.3), which is a per-cast change: the rods path's tiers differ from the provisional path's.
+- **XP** is unchanged on the integrated model, with its binding case moved to another archetype. The integrated lifecycle includes quests, the streak and buffs (Double XP counts for the Founder too), and the rods system buys tiers from the Founder's own cash. The old loop used a level-scaled placeholder daily and a saving-delay purchase rule instead.
 
 ---
 
-## 4. Current → Proposed (the Founder profile)
+## 7. Current → proposed (the Founder profile)
 
 `founderProfile()` returns this object in the `balance.js` `PROFILES` shape, plus the new fields.
 
+<!-- generated:founder-profile -->
 | Field | Today (balance 3.2.0) | Proposed | Rationale |
 | --- | --- | --- | --- |
-| `competitiveEligible` | false | **false** | Standing constraint. Founder catches stay out of every competitive board. |
-| `rarityTable` | 32 / 28 / 20 / 10 / 5 / 4 / 1 | **unchanged** | The per-fish rarity advantage is kept exactly. |
-| `stats.fishingSpeed` | 0.6 | **0.6 (kept)** | 2.0 s cooldown. With a T2 reel it is 1.75 s; from T3 on it hits the 1.5 s floor. That is 600–655 casts/h against Normal's 400–450. |
-| `stats.durabilityEfficiency` | 0.75 | **0.85** (M6) | Needs the stochastic rounding rule (§4.3). |
-| `stats.luck` | — | **+0.95** (M5) | Private. It raises Legendary/Lucky per fish (with pity) from 5.7–6.6% to 9.3–9.5%. |
-| `bonusDraws` | {0: .10, 1: .25, 2: .30, 3: .25, 4: .10} (avg +2) | **unchanged**, now added to the rod's normal chain roll | The Old Rod card is identical to today's (1–5 fish, average 3). |
-| `limits` | maxDraws 8, maxPerDraw 5 (up to 40 fish) | **maxDraws 5 (= `F.MULTI.maxFish`), maxPerDraw 1** | No 40-fish casts. Nothing a normal player could not also land. |
-| `multipliers.xp` | 5 | **45** (M2) | Private. Public output shows base. |
-| `multipliers.sell` | 10 | **50** (M4) | Private, and baked into each fish's stored `value`. `valueBase` stays the public amount. |
-| `multipliers.questXp` / `questCash` | 5 / 5 | **5 / 5 (kept)** | The per-completion ratio is unchanged, and quest completions are capped per day by the quests design. The quests designer also keeps ×5 (quests.md §10). |
-| `pity` | Legendary+ 10 / 2% / 40% / 25; Lucky 30 / 0.5% / 25% / 75 | **unchanged** | Now more valuable: with ~3.5 draws per cast instead of 40, the counters actually build up. |
-| `gacha.stats` / `gacha.pity` | RF +200%, Trophy +200%, Luck +400% / 4 / 4% / 50% / 10 | **unchanged** | See §6.5. |
-| Lucky items | 20% of Lucky draws (0.2% per Founder draw) | **Pinned to the normal base table** (0.00197% per draw) | F0b. |
-| Level shown in public | real `level` | **`publicLevel`** (§7) | Decision 6. |
+| `competitiveEligible` | false | **false** | Standing constraint: Founder catches stay out of every competitive board. |
+| `rarityTable` | 32 / 28 / 20 / 10 / 5 / 4 / 1 | **unchanged** (32 / 28 / 20 / 10 / 5 / 4 / 1) | The per-fish rarity advantage is kept exactly (`P-FOUNDER-KEPT`). |
+| `stats.fishingSpeed` | 0.60 | **0.60 (kept)** | Cooldown 2.00 s on the Old Rod, 1.50 s from the top tiers (engine floor): 600–655 casts/h against Normal's 400–436. |
+| `stats.durabilityEfficiency` | 0.75 | **0.85** (M6) | Needs the stochastic durability rule (framework `P-DURABILITY`). |
+| `stats.luck` | — | **+0.60** (M5) | Private. Legendary/Lucky per fish (with pity) from 5.7%–6.4% to 8.0%–8.3%. |
+| `bonusDraws` | 0: 0.1, 1: 0.25, 2: 0.3, 3: 0.25, 4: 0.1 | **unchanged**, now added to the rod's normal chain roll | The Old Rod card is today's (mean 3.00 fish). |
+| `limits` | maxDraws 8, maxPerDraw 5 | **maxDraws 5 (= `F.MULTI.maxFish`), maxPerDraw 1** | No cast a normal player could not also land (`P-FOUNDER-VISIBLE`). |
+| `multipliers.xp` | ×5 | **×45** (M2) | Private; public output shows base. |
+| `multipliers.sell` | ×10 | **×55** (M4) | Private, baked into each fish's stored `value`; `valueBase` stays the public amount. |
+| `multipliers.questXp` / `questCash` | ×5 / ×5 | **×5 / ×5 (kept)** | The quests design reads them (`P-FOUNDER-QUEST-MULT`). |
+| `pity` | Legendary+ from 10, +2.0% per cast, capped at +40%, guaranteed at 25; Lucky from 30, +0.5% per cast, capped at +25%, guaranteed at 75 | **unchanged** | Worth more now: with a few draws per cast the counters actually build up. |
+| `gacha.stats` / `gacha.pity` | rareFind 2.00, trophyChance 2.00, luck 4.00 / from 4, +4.0% per open, capped at +50%, guaranteed at 10 | **unchanged** | Gacha on the new crates. |
+| Lucky items | 20% of Lucky draws (0.20% per Founder draw) | **pinned to the normal base table** (0.00197% per draw) | F0b; framework `P-LUCKY`. |
+| Level shown in public | public level (shipped) | **public level** | Shipped in 14e27f1 (Public level). |
+| Level that gates gameplay | real level | **public level** | Framework `P-FOUNDER-GATE` (Level gate). |
 
-### 4.1 Visible catch distribution (`report().visible`, `visibleDistribution()`)
-The visible count is the normal chain roll (`F.fishDistribution(chance for the tier's mean)`) plus a Founder bonus drawn from `bonusDraws`, capped at 5.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-profile -->
 
-| Tier (home biome) | Normal P(1..5 fish) | Normal mean / P(3+) / P(5) | Founder P(1..5 fish) | Founder mean / P(3+) / P(5) | Legendary+ on the card: N / F | Today's Founder fish/cast |
+### 7.1 Visible catch
+
+The visible count is the normal chain roll (`F.fishDistribution` for the tier's mean) plus a Founder bonus drawn from `bonusDraws`, capped at the normal maximum.
+
+<!-- generated:founder-visible -->
+| Tier (home biome) | Normal P(1..5 fish) | Normal mean / P(3+) / P(5) | Founder P(1..5 fish) | Founder mean / P(3+) / P(5) | Legendary+ on the card N / F | Today's Founder fish/cast |
 | --- | --- | --- | --- | --- | --- | --- |
-| Old Rod (Ocean) | 100 / 0 / 0 / 0 / 0% | 1.00 / 0% / 0% | 10 / 25 / 30 / 25 / 10% | **3.00** / 65% / 10% | 0.2% / 25.4% | 2.99 |
-| T1 (Lake) | 90.1 / 6.4 / 2.3 / 0.8 / 0.4% | 1.15 / 3.5% / 0.4% | 9.0 / 23.2 / 28.9 / 25.1 / 13.9% | **3.12** / 68% / 14% | 0.3% / 25.9% | 10.0 |
-| T2 (Pond) | 80.2 / 12.9 / 4.5 / 1.6 / 0.9% | 1.30 / 6.9% / 0.9% | 8.0 / 21.3 / 27.7 / 25.2 / 17.7% | **3.23** / 71% / 18% | 0.3% / 26.4% | 37.8 |
-| T3 (Coast) | 67.0 / 21.5 / 7.5 / 2.6 / 1.4% | 1.50 / 11.6% / 1.4% | 6.7 / 18.9 / 26.2 / 25.3 / 22.9% | **3.39** / 74% / 23% | 0.4% / 28.0% | 37.8 |
-| T4 (Swamp) | 57.1 / 27.9 / 9.8 / 3.4 / 1.8% | 1.65 / 15.0% / 1.8% | 5.7 / 17.1 / 25.1 / 25.4 / 26.7% | **3.50** / 77% / 27% | 0.5% / 28.7% | 40 |
-| T5 (Swamp) | 47.2 / 34.3 / 12.0 / 4.2 / 2.3% | 1.80 / 18.5% / 2.3% | 4.7 / 15.2 / 23.9 / 25.5 / 30.6% | **3.62** / 80% / 31% | 0.6% / 29.5% | 40 |
+| Old Rod (Ocean) | 100.0 / 0.0 / 0.0 / 0.0 / 0.0% | 1.00 / 0.0% / 0.0% | 10.0 / 25.0 / 30.0 / 25.0 / 10.0% | **3.00** / 65% / 10% | 0.2% / 21.9% | 3.0 |
+| T1 (Lake) | 86.8 / 8.6 / 3.0 / 1.1 / 0.6% | 1.20 / 4.6% / 0.6% | 8.7 / 22.6 / 28.5 / 25.1 / 15.2% | **3.16** / 69% / 15% | 0.3% / 22.8% | 10.0 |
+| T2 (Pond) | 80.2 / 12.9 / 4.5 / 1.6 / 0.9% | 1.30 / 6.9% / 0.9% | 8.0 / 21.3 / 27.7 / 25.2 / 17.7% | **3.23** / 71% / 18% | 0.3% / 23.2% | 37.8 |
+| T3 (Coast) | 67.0 / 21.5 / 7.5 / 2.6 / 1.4% | 1.50 / 11.6% / 1.4% | 6.7 / 18.9 / 26.2 / 25.3 / 22.9% | **3.39** / 74% / 23% | 0.4% / 24.8% | 37.8 |
+| T4 (Swamp) | 57.1 / 27.9 / 9.8 / 3.4 / 1.8% | 1.65 / 15.0% / 1.8% | 5.7 / 17.1 / 25.1 / 25.4 / 26.7% | **3.50** / 77% / 27% | 0.5% / 25.7% | 40.0 |
+| T5 (Swamp) | 47.2 / 34.3 / 12.0 / 4.2 / 2.3% | 1.80 / 18.5% / 2.3% | 4.7 / 15.2 / 23.9 / 25.5 / 30.6% | **3.62** / 80% / 31% | 0.6% / 26.4% | 40.0 |
 
-- **Where the Founder sits among the targets:**
-  - The average stays under the approved "~4 on strong casts".
-  - Every cast is 1–5 fish.
-  - Gear still matters: 3.0 → 3.6 as the rod improves.
-- **The Founder still gets single-fish casts** (5–10%) and a spread of 2s, 3s and 4s. That is a lucky player, not a machine.
-- **Bait and streaks** consume and count per cast (bait.md B1, streak.md S2), so bonus fish never show up in bait counts or streak progress.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-visible -->
 
-### 4.2 Private luck (`report().power[*].ratio.legendaryPlus`, `report().power[*].noLuck`, `report().visible`)
+- **Where the Founder sits among the targets.** The average stays under the approved "~4 on strong casts", every cast is within the normal range, and gear still matters (the mean rises with the rod).
+- **The Founder still gets single-fish casts** and a spread of mid-size catches. That looks like a lucky player, not a machine.
+- **Bait and streaks** consume and count per cast (the bait design's `P-BAIT-PER-CAST`, the streak design's `P-STREAK-FOUNDER`), so bonus fish never show up in bait counts or streak progress.
+
+### 7.2 Private luck
+
 It restores Legendary+ per hour to today's ratio at every tier (M5).
 
-| Tier | Legendary+/h ratio today | New, no private luck | New, +0.95 luck | Cards with a Legendary+: no luck / +0.95 |
-| --- | --- | --- | --- | --- |
-| Old Rod | 127× | 125× | 207× | 15.8% / 25.4% |
-| T1 | 64× | 105× | 170× | 16.6% / 25.9% |
-| T2 | 86× | 92× | 145× | 17.4% / 26.4% |
-| T3 | 86× | 78× | 118× | 19.1% / 28.0% |
-| T4 | 72× | 65× | 96× | 20.4% / 28.7% |
-| T5 | 72× | 56× | 79× | 21.5% / 29.5% |
+<!-- generated:founder-luck -->
+| Tier | Legendary+/h ratio today | New, no private luck | New, +0.6 luck | Cards with a Legendary+: no luck / +0.6 | No luck vs today |
+| --- | --- | --- | --- | --- | --- |
+| Old Rod | 127× | 125× | 176× | 15.8% / 21.9% | 98% |
+| T1 | 64× | 103× | 142× | 16.8% / 22.8% | 160% |
+| T2 | 86× | 92× | 125× | 17.4% / 23.2% | 107% |
+| T3 | 86× | 78× | 103× | 19.1% / 24.8% | 91% |
+| T4 | 72× | 65× | 85× | 20.3% / 25.7% | 91% |
+| T5 | 72× | 62× | 80× | 20.9% / 26.4% | 86% |
 
-- **Without luck,** the Old Rod and T3–T5 would fall to 78–98% of today's ratio (`noLuck.vsToday`).
-- **With it,** about 1 public card in 4 shows a Legendary or Lucky fish. That is under the 1/3 plausibility cap (`PARAMS.plausibility`).
-- **Pity** adds about +2% on top (e.g. T4: 213 → 216 per hour; `report().power[*].home.legendaryPlusPerHour`).
+Pity adds a little on top (Legendary+ per hour with and without pity at T5: 196.2 and 192.4).
 
-### 4.3 Durability (`report().upkeep`)
-**The problem.**
-- The engine charges `max(1, ceil(n × (1 − eff)))` per cast. At 3–4 fish and an efficiency of 0.75, that is 1 per cast (2 on a 5-fish cast).
-- The Founder also casts about 1.5× as often per hour.
-- So under today's rule, **Founder rods would wear out faster per hour than a normal player's**: 0.67–0.95× the life, against 1.02–1.45× today.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-luck -->
 
-**Proposed rule:** charge `n × (1 − eff)` with **stochastic rounding and no minimum**.
-- It is identical for efficiency 0, which covers every normal rod in the rods design.
-- It needs one `rng` call per cast.
+- **Without luck,** several tiers fall below today's ratio (last column).
+- **With it,** the share of public cards that show a Legendary or Lucky fish rises, but stays under the plausibility cap (`PARAMS.plausibility`; cards column).
 
-| Tier | Durability | Normal life | Founder life, today's rule and 0.75 | Founder life, proposed rule and 0.85 | Ratio: today's target / proposed | Upkeep share: N / F |
-| --- | --- | --- | --- | --- | --- | --- |
-| T1 | 1,450 | 3.15 h | 2.12 h (0.67×) | 5.17 h | 1.45× / **1.64×** | 4.0% / 0.003% |
-| T2 | 2,150 | 4.02 h | 2.92 h (0.73×) | 7.08 h | 1.02× / **1.76×** | 4.1% / 0.003% |
-| T3 | 3,200 | 5.04 h | 3.98 h (0.79×) | 9.62 h | 1.03× / **1.91×** | 4.1% / 0.004% |
-| T4 | 4,300 | 5.97 h | 5.18 h (0.87×) | 12.50 h | 1.03× / **2.09×** | 4.2% / 0.004% |
-| T5 | 6,300 | 7.78 h | 7.37 h (0.95×) | 17.72 h | 1.03× / **2.28×** | 4.1% / 0.004% |
+### 7.3 Durability
 
-- **Durability per fish:** Normal 1.0. Founder 0.15 proposed, against 0.25–0.37 today.
-- **The Old Rod** is unbreakable (rods design), so it has no durability row.
+**The problem.** The engine charges `max(1, ceil(n × (1 − eff)))` per cast, so efficiency can never take a cast below one point. The Founder also casts faster. Under today's rule, **Founder rods would wear out faster per hour than a normal player's.**
 
-### 4.4 Lucky items (`report().luckyItems`)
-**Rule.** P(item | Lucky roll) = 0.2 × (normal base Lucky) ÷ (this cast's final Lucky). An item then drops at **0.00197% per draw** for everyone, whatever the profile, gear, bait or pity.
+**Proposed rule** (framework `P-DURABILITY`, from this design): charge `n × (1 − eff)` with stochastic rounding and no minimum. It is identical for efficiency 0, which covers every normal rod in the rods design, and it needs one `rng` call per cast.
 
-| | Founder, today's item rule (unpinned) | Founder, proposed (pinned) | Normal T5 |
+<!-- generated:founder-durability -->
+| Tier | Durability | Normal life | Founder life, today's rule and 0.75 | Founder life, proposed rule and 0.85 | Life ratio F/N: today's target / proposed | Durability per fish N / F | Upkeep share of income N / F |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| T1 | 1,450 | 2.97 h | 2.05 h (0.69×) | 4.98 h | 1.45× / **1.68×** | 1.00 / 0.15 | 4.0% / 0.0029% |
+| T2 | 2,150 | 4.02 h | 2.92 h (0.73×) | 7.08 h | 1.02× / **1.76×** | 1.00 / 0.15 | 4.0% / 0.0031% |
+| T3 | 3,200 | 5.04 h | 3.98 h (0.79×) | 9.62 h | 1.03× / **1.91×** | 1.00 / 0.15 | 3.9% / 0.0031% |
+| T4 | 4,300 | 5.97 h | 5.18 h (0.87×) | 12.50 h | 1.03× / **2.09×** | 1.00 / 0.15 | 4.0% / 0.0032% |
+| T5 | 6,300 | 8.02 h | 7.37 h (0.92×) | 17.72 h | 1.03× / **2.21×** | 1.00 / 0.15 | 4.0% / 0.0032% |
+
+The Old Rod is unbreakable (rods design): no row.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-durability -->
+
+### 7.4 Lucky items
+
+<!-- generated:founder-lucky-items -->
+|  | Founder, today's item rule (unpinned) | Founder, proposed (pinned) | Normal T5 |
 | --- | --- | --- | --- |
-| Lucky item frequency (T5, 4 s overhead) | 1 per **0.21 h** | 1 per **21.5 h** | 1 per 62.8 h |
+| Lucky item frequency (T5, 4 s overhead) | 1 per 0.21 h | 1 per 21.50 h | 1 per 64.70 h |
+| Draws per hour | 2,370 | 2,370 | 785 |
 
-- **Why this is plausible:** the Founder draws 2,370 fish an hour against Normal's 810, so it finds Easter eggs about 3× as often. That is visible luck, not a tell.
+Pinned: P(item | Lucky roll) = 0.2 × normal base Lucky ÷ this draw's Lucky, so an item drops at 0.00197% per draw for every profile, gear, bait or pity. The framework runs `pinned` (`P-LUCKY`).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-lucky-items -->
+
+- **Why this is plausible:** the Founder draws several times as many fish an hour as Normal, so it finds Easter eggs several times as often. That reads as visible luck, not a tell.
 - **Model:** `castOutcome` values Lucky items at $0, and pinning turns those draws into Lucky fish. Every Founder cash figure here is therefore a slight under-estimate (conservative).
 
 ---
 
-## 5. Why these numbers (rationale)
+## 8. Why these numbers (rationale)
 
-- **Visible volume is cosmetic; the account is not.**
-  - Value and XP per cast are linear in the fish count, so the lost volume moves one-for-one into the private sell and XP multipliers.
-  - The public card never shows a multiplier: it shows `rewards.*.base` (a2ab9a8).
-- **Solved, not picked.** Each private value is the smallest that meets every target in §3 with 10% headroom, rounded up:
-  - ×5 steps above 10
-  - 0.05 steps for luck and efficiency
-
-  At 5b.3 the solver re-runs on the final rod path, and nothing is scaled by hand.
-- **Kept values stay kept.**
-  - Rarity table, speed, bonus-draw distribution, pity, gacha stats, gacha pity and quest multipliers are read from `src/engine/balance.js` (`TODAY` in `founder.js`), not copied.
-  - The quests and streak designers already assume them.
-- **Why the XP multiplier is large:** the curve change makes Lv 50 2.2× the XP. On crafted rods, the volume change cuts fish per cast from 38–40 to 3.1–3.6 (§4.1). The approved "absolute time-to-level" target absorbs both, and the Founder is non-competitive.
+- **Visible volume is cosmetic; the account is not.** Value and XP per cast are linear in the fish count, so the lost volume moves one-for-one into the private sell and XP multipliers. The public card never shows a multiplier: it shows `rewards.*.base` (`a2ab9a8`).
+- **Solved, not picked.** Each private value is the smallest that meets every target in §6 with headroom (`PARAMS.targets.margin`), rounded up (`PARAMS.rounding`). A framework change re-runs the solver; nothing is scaled by hand.
+- **Kept values stay kept.** Rarity table, speed, bonus-draw distribution, pity, gacha stats, gacha pity and quest multipliers are read from `src/engine/balance.js` (`TODAY` in `founder.js`). The quests, streak and buffs designs already assume them.
+- **Why the XP multiplier is large.** On crafted rods, the curve change raises the XP per level and the volume change cuts fish per cast. The approved "absolute time to level" target absorbs both, and the Founder is non-competitive.
+- **Why the public gate.** A public card can then never show a catch the public level could not have made, and the real level becomes a private record, as decision 6 describes. The Founder still reaches the world several times faster than a normal player (Public pace).
 
 ---
 
-## 6. Modelled results (proposed profile)
+## 9. Modelled results (proposed profile)
 
-### 6.1 Per tier at the home biome (`report().power`, `founderOutcome()`)
-Base = what the public sees (the Founder's catch without the profile multipliers). Final = what the account receives.
+### 9.1 Per tier at the home biome
 
-| Tier (biome) | Cooldown N / F | Casts/h N / F | XP/h: Normal / Founder base / Founder final | $/h: Normal / Founder base / Founder final | XP ratio, 6 biomes (today) | $ ratio, 6 biomes (today) |
-| --- | --- | --- | --- | --- | --- | --- |
-| Old Rod (Ocean) | 5.0 / 2.0 s | 400 / 600 | 7,462 / 49,953 / **2.25M** | $8,548 / $138k / **$6.92M** | **301×** (22.1–22.7×) | **735–866×** (75–282×) |
-| T1 (Lake) | 5.0 / 2.0 s | 400 / 600 | 8,630 / 52,343 / **2.36M** | $29,500 / $463k / **$23.1M** | **273×** (12.4–12.6×) | **700–784×** (56–137×) |
-| T2 (Pond) | 4.75 / 1.75 s | 411 / 626 | 10,096 / 57,217 / **2.57M** | $48,425 / $661k / **$33.1M** | **255×** (19.4–19.5×) | **647–721×** (87–240×) |
-| T3 (Coast) | 4.5 / 1.5 s | 424 / 655 | 12,078 / 63,760 / **2.87M** | $82,706 / $1.02M / **$51.1M** | **238×** (19.4–19.5×) | **601–668×** (99–240×) |
-| T4 (Swamp) | 4.25 / 1.5 s | 436 / 655 | 13,813 / 66,884 / **3.01M** | $136,016 / $1.48M / **$73.9M** | **218×** (19.3–19.5×) | **543–601×** (99–220×) |
-| T5 (Swamp) | 4.0 / 1.5 s | 450 / 655 | 15,676 / 69,927 / **3.15M** | $157,859 / $1.56M / **$77.9M** | **201×** (19.3–19.5×) | **494–543×** (99–220×) |
+<!-- generated:founder-power -->
+| Tier (biome) | Cooldown N / F | Casts/h N / F | XP/h: Normal / Founder base / final | $/h: Normal / Founder base / final | XP ratio, 6 biomes (today) | $ ratio, 6 biomes (today) | Worst case vs target: XP / $ | Public (base) ratio XP / $ | Fish/h ratio |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Old Rod (Ocean) | 5.00 / 2.00 s | 400 / 600 | 7,462 / 48.5k / **2.18M** | $8,548 / $132.6k / **$7.29M** | **293×** (22.1×–22.7×) | **774×–907×** (75×–282×) | 12.9× / 3.2× | 6.50× / 15.51× | 4.50× |
+| T1 (Lake) | 4.85 / 1.85 s | 407 / 615 | 9,161 / 53.0k / **2.38M** | $31.4k / $459.2k / **$25.26M** | **260×** (12.4×–12.6×) | **725×–805×** (56×–137×) | 20.7× / 5.5× | 5.78× / 14.64× | 3.98× |
+| T2 (Pond) | 4.75 / 1.75 s | 411 / 626 | 10.1k / 55.8k / **2.51M** | $49.4k / $649.2k / **$35.70M** | **249×** (19.4×–19.5×) | **687×–760×** (87×–240×) | 12.7× / 2.9× | 5.53× / 13.14× | 3.78× |
+| T3 (Coast) | 4.50 / 1.50 s | 424 / 655 | 12.1k / 62.3k / **2.80M** | $86.0k / $1.03M / **$56.69M** | **232×** (19.4×–19.5×) | **642×–709×** (99×–240×) | 11.9× / 2.7× | 5.16× / 11.98× | 3.49× |
+| T4 (Swamp) | 4.25 / 1.50 s | 436 / 655 | 13.8k / 65.5k / **2.95M** | $144.2k / $1.53M / **$84.28M** | **214×** (19.3×–19.5×) | **584×–642×** (99×–220×) | 11.0× / 2.7× | 4.74× / 10.62× | 3.19× |
+| T5 (Swamp) | 4.25 / 1.50 s | 436 / 655 | 15.1k / 67.7k / **3.05M** | $157.3k / $1.58M / **$87.07M** | **202×** (19.3×–19.5×) | **553×–608×** (99×–220×) | 10.4× / 2.6× | 4.49× / 10.06× | 3.02× |
 
-- **Worst case against target over all 36 biome × tier cases** (`ratio.*.minOverTarget`): XP 10.3–21.7×, cash 2.3–5.3× above today's ratio.
-- **The public (base) ratio** is 4.5–6.7× Normal for XP and 9.9–16.2× for cash. That comes from the visible volume, the faster casting and luck: what "plausibly lucky" costs.
+Base = the Founder's catch without the profile multipliers (what the public sees); final = what the account receives. Worst case vs target: the smallest of the 36 biome × tier ratios over today's ratio.
 
-### 6.2 Hours to each level (`report().lifecycle.time`, `lifecycle()`)
-Real level = the account's true XP. Public level = base XP. "Public gate" / "real gate" is the §7.3 option.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-power -->
 
+The public (base) ratio comes from the visible volume, faster casting and luck: what "plausibly lucky" costs.
+
+### 9.2 Hours to each level
+
+Real level = the account's true XP. Public level = base XP. "Public gate" / "real gate" is the level that gates gameplay (§10).
+
+<!-- generated:founder-time -->
 | Player | Level | Today: Founder | New: Normal | New Founder, real level (public gate / real gate) | New Founder, public level (public gate / real gate) |
 | --- | --- | --- | --- | --- | --- |
-| Regular | 20 | 0.23 h | 5.62 h | 0.03 / 0.03 h | 0.93 / 0.73 h |
-| Regular | 30 | 0.33 h | 13.50 h | 0.07 / 0.07 h | 2.43 / 1.85 h |
-| Regular | 40 | 0.40 h | 25.52 h | 0.13 / 0.13 h | 5.00 / 3.95 h |
-| Regular | 50 | 0.48 h | 42.73 h | **0.25 / 0.22 h** | 8.95 / 7.55 h |
-| Regular | 60 | 0.57 h | 66.35 h | 0.45 / 0.37 h | 14.97 / 13.35 h |
-| Casual | 50 | 0.64 h | 32.30 h | 0.37 / 0.32 h | 11.32 / 9.92 h |
-| Casual | 60 | 0.79 h | 48.97 h | 0.65 / 0.53 h | 18.57 / 16.93 h |
-| Active | 50 | 0.40 h | 43.85 h | 0.22 / 0.18 h | 7.62 / 6.37 h |
-| Grinder | 50 | 0.33 h | 40.20 h | 0.17 / 0.15 h | 6.05 / 5.02 h |
+| Casual | 50 | 0.64 h | 38.52 h | 0.38 h / 0.35 h | 11.88 h / 9.63 h |
+| Casual | 60 | 0.79 h | 60.03 h | 0.68 h / 0.57 h | 20.00 h / 17.33 h |
+| Regular | 10 | 0.05 h | 1.18 h | 0.02 h / 0.02 h | 0.20 h / 0.18 h |
+| Regular | 20 | 0.23 h | 5.27 h | 0.03 h / 0.03 h | 0.93 h / 0.72 h |
+| Regular | 30 | 0.33 h | 12.58 h | 0.07 h / 0.07 h | 2.35 h / 1.77 h |
+| Regular | 40 | 0.40 h | 25.13 h | 0.13 h / 0.13 h | 4.93 h / 3.95 h |
+| Regular | 50 | 0.48 h | 43.65 h | **0.27 h / 0.23 h** | 9.03 h / 7.70 h |
+| Regular | 60 | 0.57 h | 69.77 h | 0.48 h / 0.38 h | 15.42 h / 13.87 h |
+| Active | 50 | 0.40 h | 44.02 h | 0.22 h / 0.20 h | 7.83 h / 6.70 h |
+| Active | 60 | 0.48 h | 71.07 h | 0.40 h / 0.32 h | 13.35 h / 12.10 h |
+| Grinder | 50 | 0.33 h | 40.23 h | 0.18 h / 0.15 h | 6.27 h / 5.42 h |
+| Grinder | 60 | 0.38 h | 64.98 h | 0.32 h / 0.25 h | 10.63 h / 9.73 h |
 
-- Every real-level milestone is at or under today's Founder time, for every archetype and both gates (`checks.timeToLevelPreserved`).
-- **Public-level pace** (`report().lifecycle.publicPace`, public gate):
+Hours of play, integrated model (integrate.run(): integrated core loop: rods (gear purchases, repairs) + world (permits) + quests + streak + buffs, no bait, no aquarium; the Founder adds founder.system({ gate }) (variant.founder) and runs until its public level reaches the maximum level). Every real-level milestone is at or under today's Founder time for every archetype and both gates: yes.
 
-  | Player | Faster than a normal player |
-  | --- | --- |
-  | Regular | 6.1× (Lv 10) → 4.4× (Lv 60) |
-  | Casual | 4.6× → 2.6× |
-  | Active | 6.9× → 5.4× |
-  | Grinder | 7.3–7.7× → 6.3× |
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-time -->
 
-  Observers see levels, not play hours.
+### 9.3 Public pace
 
-### 6.3 Day 30 (`report().lifecycle.day30`)
+<!-- generated:founder-public-pace -->
+| Player | Lv 10 | Lv 20 | Lv 30 | Lv 40 | Lv 50 | Lv 60 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Casual | 4.4× (0.28 h) | 4.1× (1.22 h) | 3.7× (3.13 h) | 3.5× (6.47 h) | 3.2× (11.88 h) | 3.0× (20.00 h) |
+| Regular | 5.9× (0.20 h) | 5.6× (0.93 h) | 5.4× (2.35 h) | 5.1× (4.93 h) | 4.8× (9.03 h) | 4.5× (15.42 h) |
+| Active | 6.7× (0.17 h) | 6.3× (0.80 h) | 6.1× (2.08 h) | 6.0× (4.25 h) | 5.6× (7.83 h) | 5.3× (13.35 h) |
+| Grinder | 7.4× (0.13 h) | 7.6× (0.63 h) | 6.8× (1.67 h) | 6.6× (3.48 h) | 6.4× (6.27 h) | 6.1× (10.63 h) |
 
-| Player | Today: Founder | New: Normal | New: Founder (public gate) | XP vs today's Founder | Money ÷ Normal: today → new |
+How much sooner the Founder reaches each PUBLIC level than a normal player of the same archetype reaches that level (public gate; the Founder's public hours in brackets). Observers see levels, not play hours.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-public-pace -->
+
+### 9.4 Day 30
+
+<!-- generated:founder-day30 -->
+| Player (hours) | Today: Founder | New: Normal | New: Founder (public gate) | New: Founder (real gate) | Real XP vs today's Founder | Money ÷ Normal: today → new |
+| --- | --- | --- | --- | --- | --- | --- |
+| Casual (6.27 h) | Lv 215, 4.64M XP, $195.08M | Lv 22, $105.0k | real Lv 115 / public Lv 39, 10.74M XP, $126.48M | real Lv 122 / public Lv 43, 13.32M XP, $376.76M | **2.32×** | 1,320× → **1,205×** |
+| Regular (22.50 h) | Lv 507, 25.80M XP, $1.15B | Lv 38, $838.6k | real Lv 186 / public Lv 67, 67.60M XP, $1.66B | real Lv 190 / public Lv 69, 72.40M XP, $2.12B | **2.62×** | 77× → **1,981×** |
+| Active (60.02 h) | Lv 917, 84.23M XP, $3.80B | Lv 56, $4.21M | real Lv 253 / public Lv 94, 224.55M XP, $6.19B | real Lv 255 / public Lv 95, 229.53M XP, $6.65B | **2.67×** | 63× → **1,470×** |
+| Grinder (150.00 h) | Lv 1,645, 270.91M XP, $12.25B | Lv 80, $23.75M | real Lv 340 / public Lv 128, 720.57M XP, $20.39B | real Lv 341 / public Lv 129, 725.83M XP, $20.86B | **2.66×** | 66× → **859×** |
+
+30 calendar days on the integrated model (money = cash left after every purchase). Real levels look lower than today's only because the curve is steeper; compare XP.
+
+**Below today's money ratio** (a sensitivity for the decision, not a proposal: the solved sell multiplier stays M4's):
+
+| Player | Gate | Founder money ÷ Normal: today → new | Fishing share of day-30 income: Normal / Founder | Sell to restore today's ratio | Sell for today's × 1.1 |
 | --- | --- | --- | --- | --- | --- |
-| Casual (6.25 h) | Lv 215, 4.64M XP, $195M | Lv 21, $68k | real Lv 117 / public Lv 39, 10.3M XP, $104M | **2.23×** | 1,320× → **1,532×** |
-| Regular (22.5 h) | Lv 507, 25.8M XP, $1.15B | Lv 37, $627k | real Lv 190 / public Lv 68, 65.8M XP, $1.36B | **2.55×** | 77× → **2,171×** |
-| Active (60 h) | Lv 917, 84.2M XP, $3.80B | Lv 56, $4.70M | real Lv 260 / public Lv 96, 226M XP, $5.31B | **2.68×** | 63× → **1,128×** |
-| Grinder (150 h) | Lv 1,645, 271M XP, $12.3B | Lv 82, $24.4M | real Lv 351 / public Lv 132, 736M XP, $17.9B | **2.72×** | 66× → **737×** |
+| Casual | public | 1,320× → **1,205×** | 37.9% / 89.9% | ×65 | ×70 |
 
-- **Real levels look lower than today's** only because the curve is steeper. The Founder holds 2.2–2.7× today's XP.
-- **The casual Founder's absolute dollars** ($104M against $195M) are not comparable across the repricing. Relative to Normal it is richer than today.
+Trial sell multipliers on the Founder's casts; quests, boxes and buffs keep the proposed profile's.
 
-### 6.4 Time to afford gear (`report().afford`)
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-day30 -->
+
+- **XP:** every archetype holds a multiple of today's day-30 XP.
+- **Money:** every archetype except the casual player under the public gate leads Normal by more than today. The one exception is the failing check in §2.
+
+### 9.5 Time to afford gear
+
 Rods crate prices; the Founder's crate count includes its gacha luck.
 
+<!-- generated:founder-afford -->
 | Tier set | Crate (price) | Crates N / F | Cost N / F | Normal: minutes of stage income | Founder: minutes | Today's Founder, same purchase |
 | --- | --- | --- | --- | --- | --- | --- |
-| T1 | Fishing Crate ($4,900) | 3.87 / 3.86 | $18,980 / $18,911 | 54.9 | **0.06** | 0.07 (Lv 20 rod) |
-| T2 | Pro Tackle ($21,000) | 3.77 / 3.04 | $79,148 / $63,873 | 116.8 | **0.13** | 0.40 (Lv 30 rod) |
-| T3 | Expert Tackle ($53,000) | 3.69 / 3.69 | $195,767 / $195,769 | 173.6 | 0.26 | — |
-| T4 | Master Tackle ($140,000) | 3.66 / 3.24 | $511,856 / $453,818 | 264.6 | 0.39 | — |
-| T5 | Gilded Tackle ($590,000) | 1.97 / 1.97 | $1,159,742 / $1,159,742 | 511.6 | 0.94 | — |
+| T1 | Fishing Crate ($4,900) | 3.87 / 3.86 | $19.0k / $18.9k | 54.9 | **0.06** | 0.07 |
+| T2 | Pro Tackle Crate ($21.0k) | 3.77 / 3.04 | $79.1k / $63.9k | 109.9 | **0.12** | 0.40 |
+| T3 | Expert Tackle Crate ($53.0k) | 3.69 / 3.69 | $195.8k / $195.8k | 170.2 | **0.24** | — |
+| T4 | Master Tackle Crate ($140.0k) | 3.66 / 3.24 | $511.9k / $453.8k | 254.3 | **0.35** | — |
+| T5 | Gilded Tackle Crate ($590.0k) | 1.97 / 1.97 | $1.16M / $1.16M | 482.5 | **0.83** | — |
 
-### 6.5 Gacha on the new crates (`report().gacha.crates`, `founderCrates()`)
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-afford -->
+
+### 9.6 Gacha on the new crates
+
 The Founder's crate chain is exact: `rods.openOutcomes` on the Founder table, with Founder pity where the box can award Legendary+.
 
-| Crate | Crates to assemble N → F | P90 N → F | Legendary+ per slot N → F |
-| --- | --- | --- | --- |
-| T1 Fishing | 3.87 → 3.86 | 6 → 6 | — |
-| T2 Pro | 3.77 → 3.04 (−19%) | 6 → 5 | — |
-| T3 Expert | 3.69 → 3.69 | 6 → 6 | 3.0% → 4.9% |
-| T4 Master | 3.66 → 3.24 (−11%) | 6 → 5 | 55% → 67% |
-| T5 Gilded | 1.97 → 1.97 | 4 → 4 | 100% → 100% |
+<!-- generated:founder-crates -->
+| Crate | Crates to assemble N → F | P90 N → F | Legendary+ per slot N → F | Founder pity |
+| --- | --- | --- | --- | --- |
+| T1 Fishing Crate | 3.87 → 3.86 | 6 → 6 | — | none |
+| T2 Pro Tackle Crate | 3.77 → 3.04 (−19%) | 6 → 5 | — | none |
+| T3 Expert Tackle Crate | 3.69 → 3.69 | 6 → 6 | 3.0% → 4.9% | legendaryPlus |
+| T4 Master Tackle Crate | 3.66 → 3.24 (−11%) | 6 → 5 | 55.0% → 67.1% | legendaryPlus |
+| T5 Gilded Tackle Crate | 1.97 → 1.97 | 4 → 4 | 100.0% → 100.0% | lucky |
 
-- **Why the gain is small on set assembly:** Founder gacha stats scale adjacent tiers together. Rare Find lifts Rare and Ultra alike; Luck lifts Legendary and Lucky alike. A crate whose need is "Ultra or better" (T3), or a Lucky piece against Legendary (T5), barely moves.
-- **Where the edge shows:** Legendary+ drops, and the ~24× box ratio on today's boxes (§2). The Streak Crate's Founder value (streak.md S12: 5.8–11.6× a normal crate at ×10 sell) scales with the new ×50 sell.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-crates -->
 
-### 6.6 XP sources (`report().lifecycle.decompositionRegular`; regular Founder at each public milestone, public gate)
+- **Why the gain is small on set assembly.** Founder gacha stats scale adjacent tiers together: Rare Find lifts Rare and Ultra alike, and Luck lifts Legendary and Lucky alike. A crate whose need is "Ultra or better", or a Lucky piece against Legendary, barely moves.
+- **Where the edge shows.** Legendary+ drops, and the box ratio on today's boxes (Gacha luck today). The Streak Crate's Founder value scales with the new sell multiplier (the streak design's `P-STREAK-FOUNDER`).
 
-| Public level | Real level | Account XP: fishing base / profile bonus / daily | Public XP: fishing / daily |
-| --- | --- | --- | --- |
-| 20 | 75 | 2.2% / 97.5% / 0.2% | 97.9% / 2.1% |
-| 40 | 122 | 2.2% / 97.4% / 0.4% | 96.3% / 3.7% |
-| 60 | 169 | 2.2% / 97.2% / 0.6% | 94.9% / 5.1% |
+### 9.7 XP sources
 
-- **Daily XP** uses the shared placeholder `F.DAILY.xpPerLevel`; the quests and streak designs supply the real one at integration.
-- **Barely-fishing check (R2):** a Founder cannot level by dailies alone. Fishing is 95–98% of its public XP.
+<!-- generated:founder-xp-sources -->
+| Public level | Real level | Account XP: fishing base / fishing profile bonus | Account XP: quests base / quest profile bonus | Account XP: buffs | Public XP: fishing / quests / daily / buffs |
+| --- | --- | --- | --- | --- | --- |
+| 10 | 45 | 2.2% / 96.5% | 0.27% / 1.08% | 0.0% | 89.0% / 11.0% / 0.0% / 0.0% |
+| 20 | 73 | 2.2% / 96.0% | 0.14% / 0.57% | 1.1% | 92.9% / 5.4% / 0.7% / 1.0% |
+| 30 | 97 | 2.1% / 93.1% | 0.14% / 0.54% | 4.1% | 90.3% / 3.2% / 2.6% / 3.9% |
+| 40 | 120 | 2.1% / 92.6% | 0.14% / 0.55% | 4.6% | 89.8% / 3.8% / 2.0% / 4.4% |
+| 50 | 144 | 2.1% / 92.4% | 0.13% / 0.51% | 4.9% | 89.9% / 2.5% / 2.9% / 4.7% |
+| 60 | 168 | 2.1% / 92.4% | 0.12% / 0.48% | 4.9% | 90.2% / 1.9% / 3.3% / 4.7% |
+
+Regular Founder, public gate, integrated ledgers at each public milestone. Quests = story + repeatable, daily = daily + weekly quests (as R2 groups them); the account columns put daily with quests. Buffs = the Double XP bonus (public for everyone, `P-BUFFS-PUBLIC`).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-xp-sources -->
+
+**Barely-fishing check (R2).** A Founder cannot level by quests alone: fishing is nearly all of its public XP, and the profile bonus on fishing is nearly all of its account XP.
 
 ---
 
-## 7. Public level (F1)
+## 10. Which level gates gameplay (framework `P-FOUNDER-GATE`)
 
-### 7.1 Fields and rules
-| Field | Meaning | Rule |
-| --- | --- | --- |
-| `xp`, `level` (existing) | The account's **real** XP and level | Unchanged. `xp` receives every final reward. `level = max(stored level, curve(xp))` under the new curve. Never faked, never overwritten. |
-| `publicXp` (new, Number) | **Base/competitive XP** | Every base reward (see below). Invariant: `publicXp ≤ xp`. For Normal and Test profiles, `publicXp === xp` exactly (profile multipliers are 1). |
-| `publicLevel` (new, Number) | Level from `publicXp` | `publicLevel = max(stored publicLevel, curve(publicXp))`, the same no-demotion rule as `level`. |
-
-**Counts toward `publicXp`:**
-- **Catch XP, base.** This is `rewards.catchXp.base` = the per-fish roll × rarity weight × `xp.withoutProfile`. It includes gear/bait XP bonus, active buffs (Double XP) and event multipliers.
-- **Quest XP, base.** This is `rewards.questXp.base` (quest XP × event).
-- **Daily/streak XP, base.** The streak design pays no direct XP (streak.md S4). Any Double XP buff it grants flows through catch base.
-- **Events.** They are in the "without profile" part, so they count.
-
-Together these are `rewards.xp.base` of every applied cast.
-
-**Excluded:** `profileBonus` (Founder ×45 catch XP, ×5 quest XP). Pets never grant user XP.
-
-**Developer grants.** `/dev xp add|set` gets a `scope` option: `both` (default) | `real` | `public`.
-- `both` applies the same operation to both fields, so a normal player's public level never diverges after an admin correction.
-- After any dev operation, `publicXp = min(publicXp, xp)`.
-- The audit record stores both before/after pairs.
-
-### 7.2 Surfaces
-
-| Surface | Shows | Change |
-| --- | --- | --- |
-| `/profile` (public; anyone can view anyone) | **public level** and progress to the next public level | Also F0: no Founder badge |
-| `/inventory` (public) | **public level** line | The "Inventory value" line should use `valueBase` (the stored public value, like the sale display); see Risks |
-| `/fish` catch card | `+X XP` = base (already); **"⭐ Level up!" only on public level-ups** | `result.level.public.{before, after, levelUp}` |
-| Quest completion lines, `/daily`, `/quests` | base rewards (already base on the card). Level-scaled rewards are computed from the gate level. | — |
-| Any future level leaderboard | `publicLevel`, competitive (Normal-profile) accounts only | — |
-| `/fishing-stats` (ephemeral) | **Both:** "Level 68 (public) · 190 real", XP public / real, progress for each, multipliers, pity, "👑 Founder · non-competitive" | `presentation.privateStatsFields` gains a Level field |
-
-### 7.3 Which level gates gameplay (decision D1)
 Gates are biome access (`/biome`), permits, the rods level cap on parts, shop level requirements, quest requirements and level-scaled rewards.
-- **Recommended: the public level** (`PARAMS.publicLevel.gate = 'public'`).
-  - A public card can then never show a catch the public level could not have made.
-  - The Founder still reaches the world **2.6–7.7× faster than a normal player** (§6.2), with 200×+ XP/h and 494×+ $/h behind it.
-  - The real level becomes a private record, as decision 6 describes.
-- **Alternative: the real level.**
-  - Access keeps today's pace: all tiers bought by 0.38 h, against 8.97 h to T4 under the public gate (`report().lifecycle.upgrades`).
-  - But the Founder fishes above its public level from its first minutes (River at public Lv 2–3). It reaches Swamp at **public Lv 10–11** (real Lv 50) after 0.15–0.32 h (`report().lifecycle.tellWindowRealGating`).
-  - It stays above its public level for **8.9 h (grinder) to 16.9 h (casual) of play**, up to public Lv 59 / real Lv ~170 in Swamp. Anyone who knows the biome ladder can spot that.
-  - Under this option, level-scaled rewards still **show** a base computed from the public level, and the account receives the real-level amount × multiplier.
-- **Both options meet every target in §3.** The multipliers are solved for the stricter one (public gate).
 
-### 7.4 Migration (additive, idempotent; reference: `migratePublicXp()`, `journalProfileBonus()`)
-1. **Runs at bootstrap** in `runMigrations`, before the bot logs in, so no cast runs concurrently. It uses the existing `migrateAutoLockSpecies` guard pattern.
-2. **Founder/test accounts first.**
-   - Aggregate applied Cast journals whose `result.profile` is set and is not `'normal'` (Founder, Test, or a `/dev founder` override), grouped by `userId`.
-   - Sum each journal's profile bonus:
-     - `result.rewards.xp.profileBonus` (a2ab9a8 onward), exact;
-     - otherwise the Phase 3 shape (`result.modifiers.xp.profile`): catch `xp.catch − floor(xp.base × multiplier / profile)`, plus quest `q.xp − floor(q.xp / profile.questXp)`;
-     - otherwise 0 (before profiles existed).
-   - `updateOne({ userId, publicXp: { $exists: false } }, { $set: { publicXp: max(0, xp − bonus), publicLevel: floor(0.1·√publicXp) } })`.
-   - The level uses **today's** curve, so the Phase 5B no-demotion rule treats `level` and `publicLevel` identically at the curve change.
-3. **Everyone else:** `updateMany({ publicXp: { $exists: false } }, [{ $set: { publicXp: '$xp', publicLevel: '$level' } }])`. Normal players' public level equals their stored level exactly.
-4. **Guards.**
-   - Only missing fields are written. `xp` and `level` are never touched.
-   - Running it again is a no-op.
-   - Pending journals are excluded. When recovery applies them, the new `writeCast` adds `rewards.xp.base` to `publicXp` (or `total − journalProfileBonus` for an old-shape result).
-5. **New accounts:** `User.create` sets `publicXp: 0, publicLevel: 1` explicitly. The schema fields have **no default**, so the `$exists` guard still finds old documents.
+<!-- generated:founder-gate -->
+| Player | Gate | Hours fished above the public level | First | First on the top live biome | Ends | Tier purchases T1–T5 (hours) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Casual | public | 0.00 h | — | — | — | 0.30 / 1.23 / 3.15 / 6.48 / 11.90 |
+| Casual | real | 17.30 h | 0.03 h (public Lv 3, real Lv 20, River) | 0.37 h (public Lv 11, real Lv 51, Swamp) | 17.33 h (public Lv 59, real Lv 160, Swamp) | 0.03 / 0.05 / 0.12 / 0.22 / 0.37 |
+| Regular | public | 0.00 h | — | — | — | 0.22 / 0.95 / 2.37 / 4.95 / 9.05 |
+| Regular | real | 13.83 h | 0.03 h (public Lv 4, real Lv 23, River) | 0.25 h (public Lv 11, real Lv 51, Swamp) | 13.87 h (public Lv 59, real Lv 167, Swamp) | 0.03 / 0.05 / 0.08 / 0.15 / 0.25 |
+| Active | public | 0.00 h | — | — | — | 0.18 / 0.82 / 2.10 / 4.27 / 7.85 |
+| Active | real | 12.07 h | 0.03 h (public Lv 4, real Lv 25, River) | 0.22 h (public Lv 12, real Lv 52, Swamp) | 12.10 h (public Lv 59, real Lv 169, Swamp) | 0.03 / 0.05 / 0.07 / 0.13 / 0.22 |
+| Grinder | public | 0.00 h | — | — | — | 0.15 / 0.65 / 1.68 / 3.50 / 6.28 |
+| Grinder | real | 9.70 h | 0.03 h (public Lv 4, real Lv 27, Lake) | 0.17 h (public Lv 11, real Lv 52, Swamp) | 9.73 h (public Lv 59, real Lv 169, Swamp) | 0.03 / 0.05 / 0.07 / 0.10 / 0.17 |
 
-Worked example (`migratePublicXp`, tested in the module):
-- A Founder with 100,000 XP.
-- Journals: one exact journal (+2,640 bonus), one Phase 3 journal (+2,200: catch 250 → 50 base, quest 2,500 → 500 base), one pre-profile journal (0), and one pending journal (ignored).
-- Result: `publicXp` 95,160, `publicLevel` 30.
+Integrated runs to public Lv 60. Under the real gate (live today) the Founder fishes biomes and rod tiers above its public level; under the public gate it never does. A normal regular player buys the same tiers at 1.42 / 5.28 / 12.60 / 25.15 / 43.67 h.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-gate -->
+
+- **Recommended: the public level** (`PARAMS.publicLevel.gate = 'public'`). A public card can then never show a catch the public level could not have made. The real level becomes a private record.
+- **Alternative: the real level (live today).** Access keeps today's pace: every tier is bought within minutes of play. But the Founder fishes above its public level from its first minutes, reaches Swamp at a low public level, and stays above its public level for many hours of play. Anyone who knows the biome ladder can spot that.
+- **Both options meet every target in §6.** The multipliers are solved for the stricter one: public-gate M2 needs are the larger (M2 by archetype and gate).
 
 ---
 
-## 8. Code touchpoints (after approval; none are changed now)
+## 11. Integration contract: the Founder as a system on the shared core
 
-| File | Change |
+`founder.system({ gate, profile })` returns a fresh hook object on every call, and all per-run state lives in `state.sys.founder`. `integrate.run({ variant: { founder: true, gate } })` adds it to the reference loop and runs until the Founder's **public** level reaches the stop level (the real level races ahead).
+
+<!-- generated:founder-system -->
+| Part | Contract |
 | --- | --- |
-| `src/engine/balance.js` | `PROFILES.founder`: stats `{ durabilityEfficiency: 0.85, fishingSpeed: 0.6, luck: 0.95 }`, multipliers `{ xp: 45, sell: 50, questXp: 5, questCash: 5 }`, limits `{ maxDraws: 5, maxPerDraw: 1 }`. `bonusDraws`, pity and gacha are unchanged. Values are baked from `founderProfile()` at the final framework version. Add `LEVEL_GATE: 'public'` and `LUCKY_ITEM_RULE: 'normal-base'`. Bump `BALANCE_VERSION`. |
-| `src/engine/modifiers.js` | `rollDraws`: gear draws are the normal chain roll (rods/framework work); the profile bonus is added and the sum capped at `limits.maxDraws` (5). Keep `expectedDraws` for `/fishing-stats`. |
-| `src/engine/cast.js` | (1) Durability: `x = units × durabilityCostPerFish`, `cost = floor(x) + (rng.random() < x − floor(x) ? 1 : 0)`, no minimum. It is identical for efficiency 0. (2) Lucky item branch: `P(item) = 0.2 × normalBaseLucky / pityTable.lucky`, capped at 0.2. (3) `level`: add `public: { before, after, levelUp }` from `user.publicXp + rewards.xp.base`. (4) Commit: `$inc publicXp: rewards.xp.base`, `$set publicLevel`. (5) Recovery of old-shape pending results derives base with `journalProfileBonus`. |
-| `src/class/User.js` | `getPublicLevel()`, `getGateLevel()` (public under D1), `getXPToNextLevel({ public })`. The curve change must also replace the hard-coded `level ** 2 * 100` there. `addXP(amount, { base = amount })` updates both fields. `User.create` sets `publicXp: 0, publicLevel: 1`. |
-| `src/schemas/UserSchema.js` | `publicXp: { type: Number }`, `publicLevel: { type: Number }`, with no defaults (migration guard). |
-| `src/commands/slash/User/profile.js` | Public level and progress. **F0:** remove the Founder badge. |
-| `src/commands/slash/User/inventory.js` | Level line → public level. Inventory value from `valueBase`. |
-| `src/commands/slash/Fish/fish.js` | Level-up field uses `result.level.public`. |
-| `src/engine/presentation.js`, `src/commands/slash/User/fishing-stats.js` | A Level field with public and real level/XP. It is already ephemeral. |
-| Gates: `src/commands/slash/Fish/biome.js:95`, `User/startQuest.js:76`, `src/class/Quest.js:124` (and `generateDailyQuest` level scaling), `components/buttons/buy-rod.js:170`, `buy-bait.js:190`, `buy-other.js:229`, rods' level cap in `modifiers.rodStats`, permits | `getLevel()` → `getGateLevel()`. For Normal players this is identical. |
-| `src/engine/dev.js`, `src/commands/slash/Admin/dev.js` | `xp(actor, target, mode, amount, scope = 'both')`, keeping `publicXp ≤ xp`, and auditing both. |
-| `src/bootstrap/migrations.js` | `migratePublicXp()` (§7.4), called from `runMigrations`. |
-| `src/engine/competitive.js`, `src/engine/gacha.js` | No change. Founder catches stay `competitiveEligible: false`. Gacha stats and pity are kept. |
+| option `gate` | 'public' (default: PARAMS.publicLevel.gate, framework decision P-FOUNDER-GATE) \| 'real'; must equal simulate({ gate }); integrate.run passes variant.gate |
+| option `profile` | trial profile for the cast outcome (default founderProfile()) |
+| hook `init` | state.profile = 'founder'; state.sys.founder = { gate, profile, key, fishing, tell }; throws if the run's gate differs |
+| hook `outcome` | founderCastOutcome(input): visible fish = normal chain (input.multiChance + stats.multiChance, or input.fishDist) + Founder bonus fish, capped at F.MULTI.maxFish; per draw = F.castOutcome with the Founder rarity table and gear + other systems' + profile stats (clamped to STAT_CAPS), input sellMult / xpMult, fish / fishKey and rules; base = visible mean x per draw (public card, publicXp); final = base x profile xp / sell; durability per F.RULES.durability (or input.rules); an input.table is refused (the profile brings its own base table) |
+| hook `outcomeCacheKey` | the profile (the outcome is a pure function of the input and the profile) |
+| hook `beforeStep` | the public tell (gate 'real' only): steps fished on a biome or tier above the public level; hours, first step, first step on the top live biome, last step |
+| hook `onCasts` | base (public) fish value, Legendary+ caught (with pity) and fishing totals (state.sys.founder.fishing) |
+| ledger sources | none of its own: the core books its outcome under 'fishing' (xp.fishing = final, publicXp.fishing = base, cash.fishing = final); base cash is state.sys.founder.fishing.valueBase (the core keeps no public cash ledger) |
+| spend | none; no goals, no 'box' events, no sessionDone |
+| reads | state.publicLevel / state.level (tell); ctx.path (tier levels) |
+| read by | rods (state.profile: Founder crate luck via founderCrates), quests (founderProfile().multipliers questXp / questCash; Daily Box fish at the Founder sell), streak and buffs (Founder box odds and sell) |
+| integration | integrate.run({ variant: { founder: true, gate } }); integrate.run stops a Founder run when its PUBLIC level reaches the stop level |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-system -->
+
+- **One cast-outcome override per run.** The core allows at most one system with `outcome()`. Everything else composes through `modifyCast` (bait stats, buff multipliers, gear), and the Founder outcome honours every field they set.
+- **Counting rule.** The Founder grants no boxes, so it emits no `'box'` events. Its box odds and sell multiplier apply privately inside the systems that grant boxes (quests, streak) and value buffs.
+- **Profile multipliers elsewhere.** Quests read `founderProfile().multipliers` (`questXp` / `questCash`; Daily Box fish at the Founder sell). Rods price assemblies with `founderCrates(t)`. Streak and buffs use the Founder box odds and sell.
+- **`lifecycle(archetype, { profile, gating, horizon })`** is this module's view of one integrated run. `profile: null` gives Normal. The horizons are `'lifecycle'` (the default stop), `'real'` (until the real level reaches the maximum level) and `'day30'`.
+
+### Retired-loop parity
+
+Until 5b.4 this module also had its own lifecycle loop, `lifecycle()`. It ran on its own 1-minute steps with the 5b.1 placeholder daily and purchase rules, and `validateSystem()` compared it with `system()` on the core. `system()` reproduced that loop exactly before it was deleted; the record is kept as a constant (`RETIRED_LOOP_PARITY`):
+
+<!-- generated:founder-parity -->
+| Record | Value |
+| --- | --- |
+| Source | validateSystem() output at a83b5f0 (deleted with the private loop), commit `a83b5f0` |
+| Method | LC.simulate with system({ gate }) plus validation-only systems that reproduced the retired lifecycle()'s placeholder rules (its purchase rule: F.PURCHASE.saveHours of Normal stage income x the Founder crate factor; its daily: F.DAILY.xpPerLevel x level, base at the public level, final at the gate level x questXp) and its XP-source basis, against the retired lifecycle(); every archetype under both gates, and Normal (the same baseline without the founder system). Compared step-exact: real and public milestone hours, XP by source at every milestone, the real level at each public milestone, tier upgrade hours, the public-tell points and hours, XP and money at the stop. |
+| Runs | 8 Founder (4 archetypes × gates public, real) + 4 Normal |
+| Milestones (real and public) step-exact | 144 of 144 |
+| Tier upgrades step-exact | 52 of 52 |
+| Public-tell points and hours identical | 8 of 8 runs |
+| XP and money at the stop | 12 runs compared |
+| Largest relative difference | 0 (tolerance 0.005) |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-parity -->
 
 ---
 
-## 9. Migrations
-- **Player documents:** only `publicXp` and `publicLevel` are **added**, where missing (§7.4). Nothing else is written or rewritten. `xp`, `level`, money, fish and journals are untouched.
-- **Existing Founder fish** keep their stored `value` (×10 era) and `valueBase`. The new ×50 applies to new catches only.
+## 12. Code touchpoints in `src/` (after approval; F1 rows are shipped)
+
+| File | Change | Status |
+| --- | --- | --- |
+| `src/engine/balance.js` | `PROFILES.founder`: stats, multipliers and limits from `founderProfile()` at the final framework version (Current → proposed). `bonusDraws`, pity and gacha are unchanged. Add the level-gate and Lucky-item rules. Bump `BALANCE_VERSION`. | proposed |
+| `src/engine/modifiers.js` | `rollDraws`: gear draws are the normal chain roll (rods and framework work); the profile bonus is added and the sum capped at `limits.maxDraws`. Keep `expectedDraws` for `/fishing-stats`. | proposed |
+| `src/engine/cast.js` | Durability: stochastic rounding with no minimum (`P-DURABILITY`). Lucky-item branch pinned to the normal base (`P-LUCKY`). `result.level.public` and the `publicXp` increment are shipped. | partly shipped |
+| `src/engine/publicLevel.js` | `publicXp`, the public level, `journalProfileBonus` and the migration are shipped. At the curve change: read a stored public-level floor, and replace the hard-coded curve in `publicProgressOf` (`P-FOUNDER-PUBLIC-LEVEL`). | partly shipped |
+| `src/class/User.js` | `getPublicLevel()` and `getPublicXPToNextLevel()` are shipped. Proposed: `getGateLevel()` (public under `P-FOUNDER-GATE`). The curve change must also replace the hard-coded curve in `getXPToNextLevel`. | partly shipped |
+| `src/schemas/UserSchema.js` | `publicXp` is shipped. Proposed: `publicLevel: { type: Number }` with no default, written at the curve change. | partly shipped |
+| `src/commands/slash/User/profile.js` | Public level: shipped. **F0:** remove the Founder badge from the public embed. | F0 open |
+| `src/commands/slash/User/inventory.js`, `src/commands/slash/Economy/balance.js` | Level line: shipped. Money lines: `P-FOUNDER-WALLET` (ephemeral for everyone; inventory value from `valueBase`). | F1b open |
+| `src/commands/slash/Fish/fish.js`, `src/engine/presentation.js` | Public level-up line; real and public level in `/fishing-stats`. | shipped |
+| Gates: `src/commands/slash/Fish/biome.js`, `User/startQuest.js`, `src/class/Quest.js` (and `generateDailyQuest` level scaling), `components/buttons/buy-rod.js`, `buy-bait.js`, `buy-other.js`, the rods level cap in `modifiers.rodStats`, permits | `getLevel()` → `getGateLevel()` (`P-FOUNDER-GATE`). This is identical for normal players. | proposed |
+| `src/engine/dev.js`, `src/commands/slash/Admin/dev.js` | Both fields move, clamped and audited: shipped. A `scope` option is only an alternative (`P-FOUNDER-DEV-GRANTS`). | shipped |
+| `src/bootstrap/migrations.js` | `migratePublicXp`: shipped. Proposed: the public-level floor at the curve change (`P-FOUNDER-MIGRATION`). | partly shipped |
+| `src/engine/competitive.js`, `src/engine/gacha.js` | No change. Founder catches stay `competitiveEligible: false`; gacha stats and pity are kept. | — |
+
+---
+
+## 13. Migrations
+
+Additive and idempotent (`P-FOUNDER-MIGRATION`).
+
+- **`publicXp` (shipped).** Only accounts without the field are written, with a guarded update, so running it again is a no-op. `xp` and `level` are never touched.
+- **`publicLevel` (proposed, at the curve change, with `P-CURVE-EXISTING`'s freeze).** Before the new curve applies, write `publicLevel` = today's-curve level of `publicXp`, only where missing. From then on the public level is `max(stored publicLevel, curve(publicXp))`, the same no-demotion rule as `level`. Under the rescale alternative, `publicXp` is rescaled in the same idempotent step as `xp` instead.
+- **Existing Founder fish** keep their stored `value` (today's sell era) and `valueBase`. The new sell multiplier applies to new catches only.
+- **Profile values** are code (`balance.js`), not player data: a `BALANCE_VERSION` bump, with no document rewrite.
 - **No catalog change** comes from this subsystem.
 
 ---
 
-## 10. Tests to add
-1. **F0:** the public `/profile` embed never contains "Founder" or the real level, whoever views it. `/fishing-stats` is ephemeral and shows both levels.
-2. **Invariant:** for Normal and Test profiles, after N seeded casts (catches, quests, level-ups), `publicXp === xp` and `publicLevel === level`.
-3. **Founder cast:** `xp += rewards.xp.final`, `publicXp += rewards.xp.base`, `publicLevel` from `publicXp`. The public card level-up line fires only on public level-ups.
-4. **Visible count:** Founder casts always land 1–5 units. The seeded distribution matches `visibleDistribution()` within tolerance (Old Rod mean 3.0; T4 ≈ 3.5). No cast exceeds `F.MULTI.maxFish`.
-5. **Durability rule:**
-   - Efficiency 0 charges exactly `units` (all normal rods unchanged).
-   - Efficiency 0.85 averages `units × 0.15` over seeded casts, and a cast can cost 0.
-   - The Old Rod is never charged (rods).
-6. **Lucky-item pin:** with the Founder table, pity or Strong Magnet, seeded Lucky items drop at the normal base per-draw rate (statistical test).
-7. **Migration:**
-   - A Normal account gets `publicXp = xp` and `publicLevel = level`.
-   - A Founder account gets `xp − Σ profile bonus`, with all three journal shapes (`journalProfileBonus` fixtures).
-   - Pending journals are ignored.
-   - A second run is a no-op.
-   - `xp` and `level` are unchanged byte-for-byte.
-8. **Gates:** a Founder with real Lv 150 / public Lv 30 cannot `/biome` into Coast, buy Lv 40 items, or get Ultra parts above the Rare cap (D1 = public). Normal players are unaffected.
-9. **Dev grants:** `scope` both / real / public, `publicXp ≤ xp` after each, and the audit holds both pairs.
-10. **Competitive:** Founder catches and box fish stay `competitiveEligible: false` (existing tests keep passing).
-11. **Parity:** `balance.js` `PROFILES.founder` equals `founder.founderProfile()` at the implementation framework version.
-12. **Economy regression** (fast, ~1.5 s): `founder.report().checks.pass` at the current framework version.
-13. **Bait and streak:** a Founder cast with 5 fish consumes 1 bait unit and counts as 1 streak cast (the bait and streak designs' tests, plus a Founder case).
+## 14. Tests to add
+
+**Already shipped** (`test/founder-public-level.test.js`, `test/founder-dev.test.js`):
+- a real level-up without a public one shows no line;
+- seeded casts move `publicXp` by exactly the XP the card shows;
+- `/profile` shows the public level, `/fishing-stats` shows both levels;
+- migration exactness and idempotence, including legacy pending journals;
+- dev grants.
+
+**To add:**
+1. **F0:** the public `/profile` embed never contains "Founder" or the real level, whoever views it.
+2. **F1b** (if `P-FOUNDER-WALLET` is approved): `/balance` and the `/inventory` money lines are ephemeral; inventory value is from `valueBase`.
+3. **Visible count:** Founder casts always land between one fish and `F.MULTI.maxFish`. The seeded distribution matches `visibleDistribution()` within tolerance.
+4. **Durability rule** (`P-DURABILITY`):
+   - efficiency 0 charges exactly `units` (all normal rods unchanged);
+   - the Founder's efficiency averages `units × (1 − eff)` over seeded casts;
+   - a cast can cost 0;
+   - the Old Rod is never charged.
+5. **Lucky-item pin** (`P-LUCKY`): with the Founder table, pity or luck bait, seeded Lucky items drop at the normal base per-draw rate.
+6. **Gates** (`P-FOUNDER-GATE`): a Founder with a high real level and a low public level cannot enter a biome, buy items or get parts above its public level. Normal players are unaffected.
+7. **Public-level floor** (`P-FOUNDER-PUBLIC-LEVEL`): across the curve change, no account's public level drops. For members, the public level equals the level.
+8. **Competitive:** Founder catches and box fish stay `competitiveEligible: false`.
+9. **Parity:** `balance.js` `PROFILES.founder` equals `founder.founderProfile()` at the implementation framework version.
+10. **Economy regression:** `node scripts/economy/5b/check-shared.js` (decision records match the model; generated tables current) and `founder.report().checks`.
+11. **Bait and streak:** a Founder cast with several fish consumes one bait unit and counts as one streak cast.
 
 ---
 
-## 11. Risks
-- **Remaining public tells, not solved here:**
-  - `/balance` and `/inventory` show the real balance, and the inventory value uses final fish values (×50).
-  - `/profile` and `/stats` show total fish caught. The Founder catches 2.0–3.0× as many fish per cast and casts 1.45–1.55× as often: **2.9–4.5× Normal's fish per hour** (`report().power[*].ratio.fishPerHour`).
+## 15. Risks
+
+- **Remaining public tells** (Fix first):
+  - F0, the money lines and the real-level gates are open.
+  - `/profile` and `/stats` show total fish caught, and the Founder catches several times Normal's fish per hour (Per tier, fish/h ratio).
+  - The cast cadence is visibly faster (Per tier, cooldown).
+  - Large casts and Legendary+ cards are more frequent (Visible catch).
   - Catch leaderboards exclude the Founder, so its absence can be noticed.
-  - The cast cadence is 1.5–2.0 s against 4–5 s.
-  - 5-fish casts land 10–31% of the time, against 0–2.3% for Normal.
-  - About 1 card in 4 shows a Legendary+.
-  - **Recommendation (D4):** make `/balance` and the money lines of `/inventory` ephemeral for **every** player (wallet privacy), and show inventory value from `valueBase`.
+- **Day-30 money for the casual Founder** under the public gate (§2, Day 30).
 - **The absurd sell multiplier makes Founder money meaningless next to Normal.** That is harmless while there is no trading. Any future trading or gifting must exclude the Founder profile.
-- **Under D1 = public, the real level has no gameplay effect.** It is a private record. The Founder still progresses 2.6–7.7× faster than Normal, but reaches Swamp after about 9 h of play (regular) instead of 0.2 h.
-- **The values are solved at 5b.2 on the provisional path.** At the R3 cutover they must be regenerated. The preview gives sell ×55 and luck +0.60; XP ×45 and efficiency 0.85 are unchanged.
-- **Buff stacking.** Double XP multiplies both base and final, so it raises `publicXp` like any buff. That is intended: buffs are public-legitimate.
+- **Under the public gate, the real level has no gameplay effect.** It is a private record. The Founder still progresses several times faster than Normal (Public pace), but reaches Swamp after hours of play instead of minutes (Level gate).
+- **Buff stacking.** Double XP multiplies both base and final, so it raises `publicXp` like any buff (`P-BUFFS-PUBLIC`). That is intended: buffs are public-legitimate.
 - **Model approximations, all conservative** (they under-state the Founder):
   - the Lucky pity rule is not modelled;
   - pity's XP/value uplift is omitted;
   - Lucky items are valued at $0.
 
-  The pity model otherwise reproduces today's measurement: 5.72% against 5.83%.
-- **A changed engine rule.** The stochastic durability rounding adds one RNG call per cast and allows 0-cost casts when efficiency > 0. Only Founder and Test have efficiency > 0.
+  The pity model otherwise reproduces today's measurement (Checks).
+- **Counterfactual and sensitivities.** Trial profiles change the Founder's own casts. Quests, boxes and buffs keep reading the proposed profile, which moves money slightly but not the real-level hours.
+- **A changed engine rule.** The stochastic durability rounding (`P-DURABILITY`) adds one RNG call per cast and allows 0-cost casts when efficiency > 0. Only Founder and Test have efficiency > 0.
 
 ---
 
-## 12. Decisions for you
-1. **D1 — level gate:** the **public level** (recommended; no impossible catches on public cards) or the real level (today's access pace, with a public tell for 9–17 h of play).
-2. **D2 — private luck +0.95** (recommended; keeps Legendary+ per hour at or above today's ratio at every tier, with about 1 card in 4 showing a Legendary+) or none (about 1 card in 5–6, and the Old Rod and T3–T5 at 78–98% of today's ratio).
-3. **D3 — pin Lucky items to the normal base table for the Founder too** (recommended; a Booster Pack stays an Easter egg) or keep the Founder's rate (a Lucky item every ~13 minutes of play at T5).
-4. **D4 — wallet privacy:** make `/balance` and `/inventory` money ephemeral for everyone (recommended) or accept the balance tell.
-5. **D5 — durability rule:** stochastic rounding with efficiency 0.85 (recommended; Founder rods last 1.6–2.3× Normal's in hours) or keep today's `max(1, ceil)` rule (Founder rods last 0.67–0.95× as long; repairs cost 0.003% of income either way).
+## 16. Checks
 
----
+<!-- generated:founder-checks -->
+| Check | Result |
+| --- | --- |
+| M1: XP ratio at equal gear ≥ today's in every tier × biome | pass |
+| M3: $ ratio at equal gear ≥ today's in every tier × biome | pass |
+| M2: real-level hours ≤ today's Founder, every archetype, both gates (integrated) | pass |
+| M4: minutes to afford ≤ today's | pass |
+| M5: Legendary+ per hour ratio ≥ today's at every tier | pass |
+| Every visible cast is 1–5 fish | pass |
+| Visible mean at most 4 at every tier (approved "~4 on strong casts") | pass |
+| Public cards with a Legendary+ ≤ 33.3% | pass |
+| The Normal crate chain reproduces rods.cratesDistribution() exactly | pass |
+| M6: rod life ratio ≥ today's at every crafted tier | pass |
+| Day 30 (integrated): real XP ≥ today's Founder and money ÷ Normal ≥ today's, every archetype | **fail** |
+| Founder stays non-competitive | pass |
+| The model's public XP matches the shipped definition (Public level) | pass |
+| Under the public gate the Founder never fishes above its public level (integrated) | pass |
 
-## 13. Dependencies and framework requests
-- **Uses:**
-  - rods' crate helpers: `crateDefinition`, `cratesDistribution`, `cratePrice`, `openOutcomes`, `CATALOG`, `SLOTS`, `RARITY_ORDER`, `legacyCombine`;
-  - rods' `craftRod(referenceSet(t))` for durability and repair only. Performance comes from `F.gearPath()` (R3).
-- **Assumes from other designs:**
-  - bait: per-cast consumption (B1);
-  - streak: cast-count gate (S2) and no direct XP (S4);
-  - quests: ×5 quest multipliers and base quest XP feeding `publicXp` (quests.md §10);
-  - permits: gate level per D1;
-  - buffs: Double XP counts toward base.
-- **Framework change requests** (no edits made):
-  1. `castOutcome` should accept a full fish-count distribution (or a profile `bonusFish` plus cap). `founder.js` scales per-draw outcomes by its own visible mean: exact for value and XP (linear), but durability needs the distribution.
-  2. Model the engine's durability rule (`ceil` with min 1, or the proposed stochastic rule) from the count distribution (same as rods request 2).
-  3. Split Lucky fish from Lucky items in `castOutcome`, and support the pinned item rule (same as bait requests 2–3).
-  4. A shared exact pity model (per-cast renewal and per-box renewal). `founder.js` carries `pityLegendaryPlus` and `boxLegendaryRate` locally.
-  5. Export the lifecycle core with a **gate-level** notion (public vs real). `founder.js` mirrors `curve.js` with a public/real split; rods request 4 asks for the same export.
-  6. Clamp combined stats to `STAT_CAPS` in `castOutcome`, as `resolveModifiers` does. `founder.js` clamps locally. Founder speed 0.6 + 0.2 exceeds the 0.75 cap, and the 1.5 s floor hides it today.
+Pity model: today's measured Founder Old Rod Legendary+ per fish 5.83%; the model predicts 5.72% with pity (5.00% without).
 
----
-
-## 14. Reproduce
-```
-node -e "require('./scripts/economy/5b/founder.js').report()"      # every number above (sync, ~1.5 s)
-node scripts/economy/5b/founder.js > /tmp/founder.json            # same, as JSON
-node -e "console.log(require('./scripts/economy/5b/founder.js').founderProfile())"
-node -e "const f=require('./scripts/economy/5b/founder.js'); console.log(f.founderOutcome({ tier: 4, biome: 'Swamp' }))"
-node scripts/economy/5b/check-shared.js                            # must pass
-```
-
----
-
-## Integration (framework 5b.3)
-
-The Founder profile is now a SYSTEM on the shared lifecycle core (`lifecycle.js`). `integrate.js` runs it as the `founder` variant: `run({ variant: { founder: true, gate } })`. The gate is `'public'` (recommended, decisions.js `P-FOUNDER-GATE`) or `'real'`. `lifecycle()` stays until the old loops are retired.
-
-**`system({ gate, profile })`** returns a fresh system each call. All per-run state lives in `state.sys.founder`.
-
-| Hook | What it does |
-|---|---|
-| `init` | Sets `state.profile = 'founder'`. Rods, quests, streak and buffs read this and take the Founder's values from `founderProfile()`. Throws if the run's `simulate({ gate })` differs from the system's `gate`, because the level gate is a profile rule (`PARAMS.publicLevel.gate`). |
-| `outcome` | `founderCastOutcome(input)` replaces `F.castOutcome` on every cast (the core allows one such system per run). It honours every input field. **Visible fish:** the normal chain (`input.multiChance` + `stats.multiChance`, or a full `input.fishDist`) plus the Founder bonus fish, capped at `F.MULTI.maxFish`. **Per draw:** `F.castOutcome` with the Founder rarity table, gear + other systems' stats + profile stats (clamped to `STAT_CAPS`), `input.sellMult` / `xpMult`, `fish` / `fishKey` and `rules`. **Base** = visible mean × per draw (public card, `publicXp`). **Final** = base × profile XP / sell. Durability follows `F.RULES.durability` or `input.rules`. An `input.table` is refused: the profile brings its own base table. |
-| `outcomeCacheKey` | The profile. The outcome is a pure function of the input and the profile, so the core caches it. |
-| `beforeStep` | Records the **public tell**: steps fished on a biome or rod tier above the public level. This is possible only under gate `'real'`. It records hours, the first step, the first step on Swamp and the last step. |
-| `onCasts` | Records base (public) fish value, Legendary+ caught (with pity) and fishing totals in `state.sys.founder.fishing`. |
-
-- **Ledger:**
-  - The system has no source of its own. The core books its outcome under `'fishing'`:
-    - `ledger.xp.fishing` = final (account) XP
-    - `ledger.publicXp.fishing` = base XP
-    - `ledger.cash.fishing` = final cash
-  - The fishing profile bonus is `xp.fishing − publicXp.fishing`.
-  - Base cash is in `state.sys.founder.fishing.valueBase`, because the core keeps no public cash ledger.
-  - No goals, no spend items, no `sessionDone`.
-- **Counting rule:** the Founder grants no boxes, so it emits no `'box'` events.
-- **Profile multipliers elsewhere:**
-  - quests read `founderProfile().multipliers` (questXp / questCash; Daily Box fish at the Founder sell)
-  - rods price assemblies with `founderCrates(t)`
-  - streak and buffs use the Founder box odds and sell
-
-**`validateSystem()`** is included in `report().integration.validation` and in `report().checks.systemReproducesLifecycle`. It runs the system on `LC.simulate` with validation-only systems that reproduce `lifecycle()`'s placeholder assumptions:
-- `lifecycleRods()`: the next tier once the gate level reaches it and the player's own income covers `F.PURCHASE.saveHours` of NORMAL stage income × the Founder crate factor.
-- `lifecycleDaily()`: `F.DAILY.xpPerLevel` × level. Base is at the public level; final is at the gate level × questXp.
-- `dayEndProbe()`: `lifecycle()`'s XP-source basis for levels reached on a day's final step.
-
-It compares the result with `lifecycle()` for all four archetypes under both gates, and for the Normal run of the same baseline:
-
-- **Exact.** All 144 milestones (real and public) land on the same step. Every XP source at every milestone, the real level at each public milestone, every tier upgrade, every public-tell point and hour, and XP and money at the stop agree. Max relative difference: **0**.
-- **Days:** only hours are compared. The core counts a level reached on a day's final step in that day, while `ceil(h/dayH)` counted it in the next day.
-- **Stop:** `lifecycle()` ran until both levels reached Lv 60. The core stops on the public level (real ≥ public). When the stop falls mid-day, the core still ends that day with one more daily, after the last milestone.
-- **For quests (gate `'real'` only):** `lifecycle()` credited the level-scaled daily's base at the public level and its final at the real level. The quests system credits both at the gate level. Under the recommended `'public'` gate the two agree.
-- **For the integrator (gate `'real'` only):** `integrate.run` stops on the gate level by default. Under `'real'` it therefore ends at real Lv 60 after about 0.4 h, with public Lv ~14. Pass `stopOn: 'public'` to record the public milestones.
-- **Composition smoke test:** runs with the reference loop (rods, world, quests, streak, buffs), with bait (`'cash'` and `'xp'`), for fixed and minimum-daily archetypes, under both gates.
-- **Fixed in this stage:** `report().checks.normalLifecycleMatchesCurveJson` had been false since the R3 cutover, for two reasons:
-  - `curve.json` is fitted on the provisional path.
-  - The outcome caches keyed gear-path steps by index only, so a provisional-path run read rods-path outcomes.
-
-  The check now runs on the path `curve.json` names, and the cache keys include the step's content. All 14 checks pass again (the 13 design checks plus `systemReproducesLifecycle`). Every other report number is unchanged (checked at full precision).
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `founder.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:founder-checks -->

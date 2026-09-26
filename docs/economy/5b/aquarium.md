@@ -1,376 +1,565 @@
 # Phase 5B · Aquarium, pets and aquarium licenses
 
-**Status: analysis only.** Nothing here is live. No `src/` file, catalog row or player document changes until you approve.
+**Status: proposal only.** Nothing here is live. No `src/` file, catalog row or player document changes until you approve.
 
-- **Framework:** 5b.2, shared digest `26bbca823c8b2b8b`, curve quartic 0.0475.
-  - All shared inputs come from `framework.js` / `assumptions.js`: archetypes, lifecycle step, placeholder daily XP, purchase delay, biome levels and the shared gear path.
-  - `check-shared.js` passes for this module.
-- **Where the numbers come from:** every figure below is computed at runtime by `scripts/economy/5b/aquarium.js`. Each table names the function or `report()` key that produces it.
-  - The only hand-set values are the design parameters in `PARAMS`.
-  - Prices are formulas of stage income (hours of the gate stage's income), so a framework bump regenerates them.
-- **Rods interplay:** rods are reused through `rods.assembly(t)` (crate cost of each tier), the crate unlock levels and the repair upkeep share. `rods.gearPath()` is never used (R3), and income comes from `F.gearPath()`.
-- **Gear path:** tables use the provisional shared path. At the 5b.3 cutover (R3) they regenerate from the rods path with no edits here.
-- **Reproduce:** `node -e "require('./scripts/economy/5b/aquarium.js').report()"`, or `node scripts/economy/5b/aquarium.js` for JSON. It takes about 1 s.
+- **Framework 5b.4.** Every table below is **generated** by `node scripts/economy/5b/render-docs.js` from `scripts/economy/5b/aquarium.js` `markdownTables()`, and carries the framework version and shared digest it was computed at. Prose cites numbers only by pointing at a table. `check-shared.js` fails if a table is stale.
+- **One model.** Per-stage figures (prices, companion cash per hour, pet supply, upkeep sizing, the pet income bound) come from the framework's `castOutcome()` on the shared gear path (`F.gearPath()`, the rods design). Every lifecycle figure (when licenses are bought, payback, shares of income, the effect on XP and on other purchases) comes from `integrate.run()`: the reference core loop (rods, world, quests, streak, buffs) with `variant.aquarium` on, against the same loop with it off. The aquarium is a **system on the shared lifecycle core** and has no time-stepping loop of its own.
+- **Hand-set values:** only the design parameters in `PARAMS`. Prices are hours of stage income, so a framework change regenerates them. Every non-obvious choice, and every fix-first correctness item, is a **proposed** decision (§1) whose record `check-shared.js` verifies against the model. Only you approve.
+- **Reproduce:** `node scripts/economy/5b/aquarium.js` prints the full report as JSON (a few seconds).
 - **Booster Packs** are not part of any figure here (decision 12).
 
 ---
 
 ## 0. Summary
 
-1. **The infinite-money loop is closed, together with nine other bugs in this area (§1).** Today `/pet play` → `/pet sell` pays **$0.30M–$2.55M per hour from one pet**, and $10.2M/h from one tank. That is 65× the best proposed fishing income, and 7× today's best measured rod.
-   - Care actions now have cooldowns.
-   - Pet XP becomes a capped **bond**.
-   - A pet's sale value follows its species, age and condition, never its XP.
-   - Sales are limited to 3 per week.
-2. **The breeding bug is fixed.** The comparison becomes `rng.random() < rate`, so a thriving pair succeeds 65% of the time. Today that pair needs about 154 attempts per baby. A 7-day cooldown per parent and a free-slot check are added.
-3. **Licenses are repriced to the new income scale.**
-   - Basic Lv 15 **$30,000**, Advanced Lv 30 **$120,000**, Expert Lv 45 **$250,000**, per water type.
-   - That is 2 / 2.5 / 3 hours of the gate stage's income (today: $1M / $5M / $10M at Lv 0 / 10 / 20, which is 117–339 hours of proposed income).
-   - A license now also limits the **number of tanks**; today it limits only tank size.
-4. **Benefit loop: companion bonus.**
-   - Thriving pets add to the cast's **sell bonus**: 0.25% (Common) to 0.55% (Lucky) per pet.
-   - Only the best 2 / 5 / 9 pets count, by license tier (**+1% / +2.5% / +4.5%** with Legendary pets, at most +4.95%).
-   - It is **cash only, with zero XP**, so the curve windows (R1) and the XP decomposition (R2) are untouched. `baselineMatchesCurveJson()` confirms this: identical milestones with and without the aquarium.
-5. **No money upkeep.** A flat daily fee is regressive: set at 25% of a regular player's bonus, it eats 120% of a casual player's bonus and 3% of a grinder's (§5). Upkeep is **care** instead: pets thrive when fed within 30 h in a tank at least 50% clean, so one short care session a day keeps the bonus.
-6. **The aquarium is an optional sink that partly pays for itself.**
-   - Over the ladder to Lv 60, the three freshwater licenses cost **7.1%** of a regular player's income. The bonus returns **3.8%**, a net −3.4%.
-   - The reference player earns Basic back in 45 h of play after purchase, Advanced in 74 h and Expert in 97 h (after Lv 60).
-   - Display tanks ($0.41M / $0.82M / $1.6M per water type) are a pure aspirational sink with no power.
-7. **The temperature bugs are fixed.** Drift is unbounded (+1 °C/h), and the four formulas disagree on the ideal (hunger 25 °C, mood/stress/health 0 °C). The proposal uses one ideal of **25 °C**, the heater holds its setting, and stored values are read clamped to the adjust range.
+<!-- generated:aquarium-headline -->
+| Figure | Value | Table |
+| --- | --- | --- |
+| Today: `/pet play` → `/pet sell` | $300,000–$2,550,000 per hour from one pet; $10,200,000/h from one 3-pet tank (64.8× the best proposed fishing income) | Fixes |
+| Today: breeding a thriving pair | 0.65% per attempt (about 154 attempts per baby); fixed: 65% | Fixes; Breeding |
+| License prices (Basic / Advanced / Expert, per water type) | $30,000 / $120,000 / $260,000 at Lv 15 / 30 / 45: 2.0 / 2.5 / 3.0 h of the gate stage's income | Licenses |
+| Companion bonus (cash only) | +1.00% / +2.50% / +4.50% with Legendary pets; at most +4.95% | Companion bonus by tier |
+| XP effect of the aquarium (integrated) | none: every level 1–60 on the same step with the same XP by source, in all 9 runs (every archetype and the minimum-daily player; also with money bait) | Effects on progression |
+| When licenses are bought (integrated) | every player buys each license before the next tier's gate; the regular player at Lv 15 / 30 / 45 | When licenses are bought |
+| Regular player to L60 (integrated) | licenses 4.3% of income; bonus 3.67% of fish income; net −1.9% of income; Basic pays for itself in 45.7 h of play after purchase | Payback and shares |
+| Money upkeep | none (care-based); a flat fee at 25% of the regular player's bonus would take 120% of a casual player's bonus | Upkeep |
+| Pet income bound (worst case, weekly limit on) | $13,041/week: 8.5% of a casual and 1.7% of a regular player's fishing | Pet income bound |
+| Display tanks (aspirational) | $3,000,000 per water type: 20.8 h of top-stage income for the regular player | Display tanks |
+| Design checks | 11 of 11 pass | Checks |
+| Retired private loop | system() matched it: 102/102 milestones step-exact, largest relative difference 0.05% (`a83b5f0`) | Retired-loop parity |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-headline -->
+
+1. **The infinite-money loop is closed, with the other bugs in this area (§2).** Today `/pet play` → `/pet sell` out-earns the best proposed fishing many times over. Care actions get per-pet cooldowns, pet XP becomes a capped **bond**, a pet sells for its species, age and condition (never its XP), and sales are limited per week.
+2. **Breeding works as intended.** The comparison bug makes it almost never succeed today. The fixed comparison keeps today's formula; a cooldown per parent and a free-slot check are added.
+3. **Licenses are repriced to the new income scale** (hours of the gate stage's income) and now limit the **number of tanks**, not only their size.
+4. **The benefit loop is a companion bonus.** Thriving pets in a license's companion slots add a small sell bonus. It is **cash only, with zero XP**: on the integrated model every level is reached on the same step with and without the aquarium, for every player type.
+5. **No money upkeep.** A flat fee is regressive. Upkeep is **care**: one short care session a day keeps pets thriving.
+6. **An optional sink that partly pays for itself.** On the integrated model every player buys each license at or just after its gate, the licenses delay no gear or permit, Basic pays for itself within the ladder, and Advanced and Expert keep paying after it. Display tanks are a pure aspirational sink with no power.
+7. **The temperature bugs are fixed:** one ideal in every formula, no drift, and legacy values read clamped.
 
 ---
 
-## 1. Correctness fixes (separate from tuning; ship first)
+## 1. Decisions for approval
 
-`report().current.exploit` quantifies A1–A2 from a mirror of today's rules (`CURRENT`).
+<!-- generated:aquarium-decisions -->
+| ID | Proposed decision | Modelled | Alternatives | Why | Record = model |
+| --- | --- | --- | --- | --- | --- |
+| `P-AQUARIUM-LICENSE-PRICE` | License prices are hours of the gate stage's income (regular cadence, the shared gear tier at the gate), rounded to two significant digits; both water types cost the same | Basic 2 h = $30,000, Advanced 2.5 h = $120,000, Expert 3 h = $260,000; 2 significant digits | today: fixed prices of hundreds of hours of proposed stage income (Current → proposed); fixed prices (drift with every framework change); more hours (a wall rather than a milestone) | a milestone, not a wall; prices regenerate with any framework change (Licenses) | yes |
+| `P-AQUARIUM-LICENSE-GATES` | License gates every 15 levels; prerequisites stay Basic → Advanced → Expert per water type | Basic Lv 15, Advanced Lv 30, Expert Lv 45 | today: Lv 0 / 10 / 20; gates at biome unlocks | Basic follows the first freshwater species (River); Expert is ready before Swamp | yes |
+| `P-AQUARIUM-TANKS` | A license grants a number of tanks of a size per water type (capacity becomes finite) | Basic 1 × 3 (3 pets), Advanced 2 × 4 (8 pets), Expert 3 × 5 (15 pets) | today: unlimited tanks of the license's size (bug A6) | closes the unlimited-tanks loophole; companion slots, not capacity, are the power lever | yes |
+| `P-AQUARIUM-COMPANION-SLOTS` | Companion slots come from the best license tier held; only the best thriving pets up to that count add a bonus | Basic 2 slots, Advanced 5 slots, Expert 9 slots | every pet counts (bonus scales with capacity); one slot per tank | rarer pets reach the maximum in the same slots, leaving room for collection and breeding | yes |
+| `P-AQUARIUM-SECOND-WATER` | A second water type costs the same and adds tanks (collection, breeding, display), not companion slots | secondWaterAddsSlots false | its own companion slots too (the maximum bonus doubles) | no power creep from buying the same benefit twice (Sensitivity: both water types) | yes |
+| `P-AQUARIUM-COMPANION-BONUS` | Thriving companion pets add to the cast's sell bonus by species rarity: cash only (no XP, rarity or multi-catch effect) | sellBonus: common +0.25%, uncommon +0.3%, rare +0.35%, ultra +0.4%, giant +0.45%, legendary +0.5%, lucky +0.55% | an XP bonus (moves the approved windows and R2); a rarity or luck bonus (moves catches and competitive standings); no benefit (today) | a small, bounded reason to own an aquarium that leaves progression and leaderboards untouched (Companion bonus by tier; Effects on progression) | yes |
+| `P-AQUARIUM-THRIVE` | A pet thrives (and counts) when fed recently, its tank is clean enough and the temperature is near the ideal | fed within 30 h; cleanliness ≥ 50; within ±3 °C of 25 °C | stat-based thresholds on hunger, mood and health; no condition (the bonus is passive) | one short care session a day keeps every pet thriving; neglect costs the bonus, never the pets (Pet rules) | yes |
+| `P-AQUARIUM-BOND` | Pet XP becomes a capped bond: care off cooldown adds bond XP, and bond ramps a pet's bonus from half to full | +50 × trait multiplier per care action; cap 700 (stored xp never reduced); bonus 50% → 100% | no bond (full bonus at adoption); uncapped XP (today) | a new companion earns its place in about a week of care; the cap ends XP farming (Pet rules) | yes |
+| `P-AQUARIUM-CARE-COOLDOWN` | /pet feed, /pet play and /aquarium feed act on a pet at most once per cooldown each; /aquarium feed feeds every pet off cooldown | feed 8 h, play 8 h, per pet | today: only the command cooldown (bug A1); once per day | care is a daily ritual, not a clicker; bounds bond XP per pet per day (Pet rules) | yes |
+| `P-AQUARIUM-UPKEEP` | No money upkeep: upkeep is care (the bonus needs thriving pets) | moneyPerDay 0 | a flat fee per pet per day (sized at 25% of the regular player's bonus it is regressive: Upkeep); a fee per cast (only a smaller bonus; changes no decision) | the benefit scales with hours fished and a daily fee with calendar days, so any flat fee hits casual players hardest (Upkeep) | yes |
+| `P-AQUARIUM-PET-SALE` | A pet sells for its species value × age × origin × condition × attraction, never its XP (at most 1.25× the fish it came from) | age 0.25 → 1 at 28 days; bred ×0.5; not thriving ×0.5; +1% per attraction point up to 25 | today: xp × attraction (unbounded; bug A1); no pet sales | pets are companions, not a money printer; adopting and selling never beats selling the fish (Sale value) | yes |
+| `P-AQUARIUM-SALE-LIMIT` | Weekly rehoming limit on pet sales | 3 sales per 7 days | no limit (the pet income bound rises: Pet income bound, uncapped columns) | bounds calendar-based pet cash whatever the capacity, so breeding stays a way to get rare pets (Pet income bound) | yes |
+| `P-AQUARIUM-BREEDING` | Breeding keeps today's success formula and age/health rules; adds a cooldown per parent and a free-slot check; babies are marked bred (half sale value) | parents ≥ 20 days, health ≥ 50; cooldown 7 days per parent; bred ×0.5 | no cooldown (with the comparison fixed, a pair could breed every command cooldown); bred pets sell at full value | breeding is how players get Legendary and Lucky companions, not income (Breeding; Pet income bound) | yes |
+| `P-AQUARIUM-DISPLAY-TANKS` | Display tanks for an Expert water type: an aspirational sink with capacity only (no companion slots), priced in hours of the top live stage's income, doubling per tank | 3 per water type × 5 pets; first 3 h, ×2 each: $430,000 / $870,000 / $1,700,000 | no aspirational aquarium sink; display tanks with companion slots (power creep) | absorbs late-game cash with no power (Display tanks) | yes |
+| `P-AQUARIUM-OPTIONAL-SINK` | License spending is an optional sink and display tanks an aspirational one: never blocking, so rods and permits always come first | license: optional, priority 50, non-blocking; display: aspirational, priority 90, non-blocking | licenses as progression (blocking) purchases | the aquarium is a choice; it may never delay gear or a biome (Effects on progression) | yes |
+| `P-AQUARIUM-LEGACY-LICENSES` | Legacy licenses keep their stored fields and extra tanks; capacity is the larger of the stored and the new tank size; companion slots are level-capped; no refunds | read-time LICENSE_DEFS by name; a legacy Expert gives 2 slots at Lv 15 and 5 at Lv 30 | a partial credit to legacy buyers; no level cap (legacy Expert holders get full slots early) | no player document is rewritten; legacy buyers get more capacity than they paid for today (Legacy licenses) | yes |
+| `P-AQUARIUM-NO-CLAWBACK` | No clawback of past /pet sell proceeds (optionally an analytics audit) | migration rule (not a PARAMS value) | claw back proceeds identified by Interaction analytics | the farmed XP is kept as bond; it simply stops selling | n/a (not a PARAMS value) |
+| `P-AQUARIUM-FIX-PLAY-SELL` | Fix first (A1): close the /pet play → /pet sell money loop | care cooldowns (P-AQUARIUM-CARE-COOLDOWN), capped bond (P-AQUARIUM-BOND), sale value from species, never XP (P-AQUARIUM-PET-SALE), weekly limit (P-AQUARIUM-SALE-LIMIT), atomic sale (A8) | cooldowns only (the sale still pays xp × attraction); remove pet sales | today one pet out-earns the best proposed fishing (Fixes) | yes |
+| `P-AQUARIUM-FIX-BREEDING` | Fix first (A2, A3, A5): breeding compares rng.random() < rate, reads lastBred for the cooldown, and gives parents the success XP | thriving pair 65% per attempt (today 0.65%) | keep the percent comparison (breeding practically never succeeds); a new success formula | restores the intended odds; the cooldown keeps them from becoming a farm (Breeding) | yes |
+| `P-AQUARIUM-FIX-CAPACITY` | Fix first (A4): the breeding capacity check awaits the tank size (it compares a number with a Promise today) and the baby is added to the tank | code fix (not a PARAMS value): await aquarium.getSize() against the effective capacity; aquarium.addFish in the same flow | none (tanks overfill) | capacity is the rule every other limit relies on (P-AQUARIUM-TANKS) | n/a (not a PARAMS value) |
+| `P-AQUARIUM-FIX-DUPLICATE-LICENSE` | Fix first (A7): the shop never offers an owned license or a lower tier of an owned water type | aquariumOptions() offers only the next tier per water type | refund duplicates on purchase | a second copy is wasted money today | yes |
+| `P-AQUARIUM-FIX-SALE-RACE` | Fix first (A8): a pet sale claims the pet atomically and pays with $inc under the user lock (no whole-document save) | code fix (not a PARAMS value): PetFish.updateOne({ _id, owner }) claim, then $inc only if it matched, under withUserLock | keep the read-modify-write save (lost cast income, double sells) | the whole-document save can overwrite concurrent cast income, and two sells can race | n/a (not a PARAMS value) |
+| `P-AQUARIUM-FIX-TEMPERATURE` | Fix first (A9): one ideal temperature in every formula, no drift, stored values read clamped to the adjust range, new tanks at the ideal | ideal 25 °C; drift 0 °C/h; read clamped to -30…30 °C; new tanks 25 °C | a bounded drift toward a room temperature (a chore without a decision); fix only the ideal and keep the drift | today no temperature is ideal for all four formulas and drift is unbounded (Temperature) | yes |
 
-| # | Bug | Evidence | Fix |
-| --- | --- | --- | --- |
-| **A1** | **`/pet play` / `/pet feed` / `/aquarium feed` → `/pet sell`: unbounded money.** Each care action gives +50 pet XP × multiplier, limited only by the 3 s command cooldown. `Pet.sell` pays `xp × attraction`. | 1,200 actions/h. One pet: **$300,000/h** (attraction 5, ×1.0) to **$2,550,000/h** (attraction 25, ×1.7). One 3-pet tank with `/pet` + `/aquarium feed`: **$10,200,000/h**. That is 64.6× the best proposed fishing income ($157,859/h, T5 Swamp) and 7.17× today's best measured rod ($1,421,638/h). Attraction needs a 7+ day-old pet (fins) or 14+ days (color). 22.7% of pets have attraction 0. | Per-pet cooldowns (feed and play 8 h). Bond XP only off cooldown, capped at 700. Sale value from species, age and condition, **never XP** (§6.2). At most 3 sales per 7 days. Atomic sale (A8). |
-| **A2** | **Breeding succeeds 0.1–0.65% instead of 10–65%.** `rng.random() * 100 < rate`, where `rate` is 0.1–0.65 (`Pet.js:661`). | A thriving pair (stress 0, health 100) has rate 0.65: **0.65% today, about 154 attempts per baby.** | `rng.random() < rate` (the formula itself is kept; it yields 10–65%). |
-| A3 | Breeding has no cooldown: `lastBred` is written but never read. | Code reading. Once A2 is fixed, a pair could breed every 3 s. | 7-day cooldown per parent. |
-| A4 | The breeding capacity check never blocks. `aquariumPets.length >= aquarium.getSize()` compares a number with a Promise (`pet.js:213`). The baby is also never added to the tank's `fish` list (only `reconcileOwner` adds it later), so tanks exceed capacity. | Code reading. | `await aquarium.getSize()` against the effective capacity. Add the baby with `aquarium.addFish` in the same flow. |
-| A5 | On a successful breed the parents get the **failure** XP. `updateBreeding()` is called without `true` (`Pet.js:716–717`), so they get 25 instead of 250. | Code reading. | `updateBreeding(true)` (bond XP, capped). |
-| A6 | **One license allows unlimited tanks.** `/build` checks only that some license exists, and each tank holds the license's size. | Code reading (`build.js`). Unlimited pets per $1M. | A license grants `tanks` × `tankSize` per water type (§3). Existing extra tanks are grandfathered. |
-| A7 | A license can be bought twice (`buy-other.js` has no ownership check). The second copy is wasted money. | Code reading. | Hide owned licenses and lower tiers of an owned water type in the shop. |
-| A8 | `Pet.sell` credits money with a read-modify-write `user.save()` (`Pet.js:497–501`). This can overwrite concurrent cast income (a lost update), and two sells can race. | Code reading. | Claim the pet atomically (`PetFish.updateOne({ _id, owner: userId }, { $set: { owner: '' } })`). Pay with `$inc` only if the claim matched, under `withUserLock`. |
-| A9 | **Temperature drift is unbounded and the ideal is inconsistent.** Drift is +1 °C/h with no limit (`Aquarium.js:89`). Hunger uses the deviation from 25 °C; mood, stress and health use the deviation from 0 °C. New tanks start at 0 °C. | At 0 °C hunger is ×2.00. At 25 °C health is ×0.75 and mood/stress ×1.25. **No temperature is ideal for all four.** A tank left alone from 0 °C reaches health ×0 after 100 h (`report().current.exploit.temperature`). | §7: one ideal of 25 °C everywhere, the heater holds its setting, stored values are read clamped to −30…30, and new tanks start at 25 °C. |
-| A10 | `calculateMultiplier` ignores `unlocked`, so locked traits already boost pet XP. `calculateAttraction` respects it. | Code reading. | Respect `unlocked`, as attraction does. |
-| A11 | Cosmetic: the second pet's underage message shows the first pet's name (`Pet.js:649`). | Code reading. | Use the second pet's name. |
+Status of every entry: `proposed`. Only the user approves; `decisions.js` joins these to the Phase 5B registry (alongside the framework's `P-LUCKY`, `P-DOUBLE-CASH` and `P-EVENTS`) and `check-shared.js` verifies each record against the model.
 
-**No clawback** of past `/pet sell` proceeds is proposed (never wipe; decision 13). Interaction analytics ("Pet sold.") can size it if you want an audit.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-decisions -->
+
+- **Fix first.** The `P-AQUARIUM-FIX-*` entries are correctness fixes. They can ship before any tuning, and the play → sell fix should ship first of all.
+- **The choices that shape the system:** `P-AQUARIUM-COMPANION-BONUS` (cash only), `P-AQUARIUM-UPKEEP` (care, not money), `P-AQUARIUM-SECOND-WATER` (no second set of slots) and `P-AQUARIUM-SALE-LIMIT` (the weekly limit that bounds pet cash).
+- **Legacy owners** (`P-AQUARIUM-LEGACY-LICENSES`, `P-AQUARIUM-NO-CLAWBACK`) are migration rules, not model values.
+- **No design value changed** in the migration to the integrated model. The design-stage stand-in for other spending (a share of income) is gone: permits are part of the reference loop, and money bait is a variant.
 
 ---
 
-## 2. Current → Proposed
+## 2. Correctness fixes (separate from tuning; ship first)
 
-| Item | Current | Proposed | Rationale |
-| --- | --- | --- | --- |
-| License prices | $1M / $5M / $10M per water type | **$30,000 / $120,000 / $250,000** (`licensePrice`) | 2 / 2.5 / 3 h of the gate stage's income: a milestone, not a wall. |
-| License gates | Lv 0 / 10 / 20 | **Lv 15 / 30 / 45** | Every 15 levels. Basic follows the first freshwater species (River, Lv 10). Expert is ready before Swamp. |
-| What a license grants | Tank size 1 / 2 / 3; **unlimited tanks** | **1 × 3 / 2 × 4 / 3 × 5** tanks × size per water type (3 / 8 / 15 pets), plus **2 / 5 / 9 companion slots** | Capacity becomes finite (A6). Slots are the power lever. |
-| Benefit to fishing | none | **Companion bonus** on the cast's sell bonus: thriving pets in companion slots add 0.25–0.55% each. Typical (Legendary) +1.0% / +2.5% / +4.5%; maximum +4.95%. | The reason to own an aquarium. Cash only, so no XP-curve impact. |
-| Second water type | same price, same benefit | Same price. It adds tanks (collection, breeding, display), **not** companion slots. | No power creep from buying twice. Decision for you (§15). |
-| Legacy licenses above the player's level | n/a | Tanks and capacity are kept. Companion slots are **level-capped** to the best tier whose gate the player has reached. | Same principle as rods' part level cap. |
-| Upkeep | none (cleaning and feeding are free) | **None in money.** Care-based: the bonus needs thriving pets. | A flat fee is regressive (§5). |
-| Care actions | +50 pet XP each, 3 s cooldown | Feed / play once per 8 h per pet. +50 × multiplier bond XP, capped at 700 (the stored `xp` is never reduced). | Closes A1. Bond ramps a pet's bonus from 50% to 100% in 7 days of care. |
-| Pet sale | `xp × attraction` (unbounded) | species value (`F.proposedValue`) × age factor (0.25 → 1.0 at 28 days) × origin (bred ×0.5) × condition (not thriving ×0.5) × (1 + attraction%). **At most 1.25× the fish it came from.** 3 sales per 7 days. | Closes A1. Pets are companions, not a money printer. |
-| Breeding | 0.1–0.65% (bug), no cooldown, no capacity check | **10–65%** (same formula), 7-day cooldown per parent, needs a free slot. Babies are marked `bred`. | A2–A5. Breeding is a way to get rare pets (companion slots, collection), not income. |
-| Temperature | +1 °C/h unbounded; ideals 25 / 0 / 0 / 0 °C; new tanks at 0 °C | Ideal **25 °C** in every formula. The heater holds its setting. Read clamped to −30…30. New tanks at 25 °C. Thriving band ±3 °C. | A9. Temperature becomes a setting, not an endless chore. |
-| Cleanliness | −1/h (floor 0) | Unchanged. Thriving needs ≥ 50 (clean at least every 50 h). | Existing rule; it gives the daily care loop. |
-| Aspirational sink | none | **Display tanks** for an Expert water type: 3 per water type, 5 pets each, **$410,000 / $820,000 / $1,600,000**. No companion slots. | Aquarium expansion as an optional sink (decision 10), with no power. |
+`report().current.exploit` quantifies A1, A2 and A9 from a frozen mirror of today's rules (`CURRENT`).
+
+### Fixes
+
+<!-- generated:aquarium-fixes -->
+| # | Bug | Evidence | Fix | Decision |
+| --- | --- | --- | --- | --- |
+| **A1** | **`/pet play` / `/pet feed` / `/aquarium feed` → `/pet sell`: unbounded money.** Each care action gives pet XP × the trait multiplier, limited only by the command cooldown. `Pet.sell` pays `xp × attraction`. | 1,200 actions/h at the 3 s cooldown, +50 XP each. One pet: **$300,000/h** (attraction 5, ×1.0) to **$2,550,000/h** (attraction 25, ×1.7). One 3-pet tank with `/pet` + `/aquarium feed`: **$10,200,000/h**, 64.8× the best proposed fishing income ($157,331/h, Swamp · T5) and 7.2× today's best measured rod ($1,421,638/h, Swamp · Custom (Legendary parts)). Attraction needs a pet aged 7+ days; 22.7% of pets have attraction 0. | Per-pet cooldowns (feed 8 h, play 8 h). Bond XP only off cooldown, capped at 700. Sale value from species, age and condition, **never XP** (at most 1.25× the species value). At most 3 sales per 7 days. Atomic sale (A8). | `P-AQUARIUM-FIX-PLAY-SELL` |
+| **A2** | **Breeding almost never succeeds.** `rng.random() * 100 < rate`, where `rate` is already a probability (`Pet.js:661`). | A thriving pair (stress 0, health 100) has rate 0.65: **0.65% per attempt today, about 154 attempts per baby.** | `rng.random() < rate`. The formula itself is kept (Breeding). | `P-AQUARIUM-FIX-BREEDING` |
+| A3 | Breeding has no cooldown: `lastBred` is written but never read. | Code reading. Once A2 is fixed, a pair could breed every command cooldown. | 7-day cooldown per parent. | `P-AQUARIUM-FIX-BREEDING`, `P-AQUARIUM-BREEDING` |
+| A4 | The breeding capacity check never blocks: `aquariumPets.length >= aquarium.getSize()` compares a number with a Promise (`pet.js:213`). The baby is never added to the tank's `fish` list (only `reconcileOwner` adds it later), so tanks exceed capacity. | Code reading. | `await aquarium.getSize()` against the effective capacity; add the baby with `aquarium.addFish` in the same flow. | `P-AQUARIUM-FIX-CAPACITY` |
+| A5 | On a successful breed the parents get the **failure** XP: `updateBreeding()` is called without `true` (`Pet.js:716–717`). | Code reading. | `updateBreeding(true)` (bond XP, capped). | `P-AQUARIUM-FIX-BREEDING` |
+| A6 | **One license allows unlimited tanks.** `/build` checks only that some license exists, and each tank holds the license's size. | Code reading (`build.js`). | A license grants tanks × size per water type (Licenses). Existing extra tanks are grandfathered. | `P-AQUARIUM-TANKS` |
+| A7 | A license can be bought twice (`buy-other.js` has no ownership check); the second copy is wasted money. | Code reading. | The shop hides owned licenses and lower tiers of an owned water type. | `P-AQUARIUM-FIX-DUPLICATE-LICENSE` |
+| A8 | `Pet.sell` credits money with a read-modify-write `user.save()` of the whole document (`Pet.js:497–501`): it can overwrite concurrent cast income (a lost update), and two sells can race. | Code reading. | Claim the pet atomically (`PetFish.updateOne({ _id, owner: userId }, { $set: { owner: '' } })`); pay with `$inc` only if the claim matched, under `withUserLock`. | `P-AQUARIUM-FIX-SALE-RACE` |
+| A9 | **Temperature drift is unbounded and the ideal is inconsistent.** Drift is +1 °C/h with no limit (`Aquarium.js:89`). Hunger uses the deviation from 25 °C; mood, stress and health the deviation from 0 °C. New tanks start at 0 °C (`HabitatSchema`). | At 0 °C hunger is ×2.00. At 25 °C health is ×0.75 and mood/stress ×1.25. **No temperature is ideal for all four.** A new tank left alone reaches health ×0 after 100 h (Temperature). | One ideal of 25 °C everywhere; the heater holds its setting; stored values read clamped to -30…30 °C; new tanks at 25 °C. | `P-AQUARIUM-FIX-TEMPERATURE` |
+| A10 | `calculateMultiplier` ignores `unlocked`, so locked traits already boost pet XP (`calculateAttraction` respects it). | Code reading. | Respect `unlocked`, as attraction does. | — |
+| A11 | Cosmetic: the second pet's underage message shows the first pet's name (`Pet.js:649`). | Code reading. | Use the second pet's name. | — |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-fixes -->
+
+**No clawback** of past `/pet sell` proceeds (`P-AQUARIUM-NO-CLAWBACK`; never wipe, decision 13). Interaction analytics ("Pet sold.") can size it if you want an audit.
 
 ---
 
-## 3. Licenses
+## 3. Current → proposed
 
-### 3.1 Proposed rows (`licenses()`, `report().priceTable`)
-Both water types share these numbers. The price formula is `sig2(priceHours × stage $/h at the gate)`, where the stage is the gate level's biome and the shared gear tier held at that level, at regular cadence.
+<!-- generated:aquarium-current-proposed -->
+| Item | Current | Proposed | Rationale | Decision |
+| --- | --- | --- | --- | --- |
+| License prices | $1,000,000 / $5,000,000 / $10,000,000 per water type: 117 / 331 / 319 h of proposed income at today's gate stages | **$30,000 / $120,000 / $260,000**: 2.0 / 2.5 / 3.0 h of the gate stage's income | A milestone, not a wall. | `P-AQUARIUM-LICENSE-PRICE` |
+| License gates | Lv 0 / 10 / 20 | **Lv 15 / 30 / 45** | Every 15 levels: Basic after River's first freshwater species, Expert before Swamp. | `P-AQUARIUM-LICENSE-GATES` |
+| What a license grants | Tank size 1 / 2 / 3; **unlimited tanks** | **1 × 3 / 2 × 4 / 3 × 5** tanks × size per water type (3 / 8 / 15 pets), and **2 / 5 / 9 companion slots** | Capacity becomes finite (A6). Slots are the power lever. | `P-AQUARIUM-TANKS`, `P-AQUARIUM-COMPANION-SLOTS` |
+| Benefit to fishing | none | **Companion bonus** on the cast's sell bonus: 0.25% (Common) to 0.55% (Lucky) per thriving pet in a slot; Legendary pets +1.00% / +2.50% / +4.50%; maximum +4.95% | The reason to own an aquarium. Cash only, so no XP-curve impact. | `P-AQUARIUM-COMPANION-BONUS` |
+| Second water type | same price, same (no) benefit | Same price. Adds tanks (collection, breeding, display), **not** companion slots | No power creep from buying twice. | `P-AQUARIUM-SECOND-WATER` |
+| Legacy licenses above the player's level | n/a | Tanks and capacity kept; companion slots **level-capped** to the best tier whose gate the player has reached | Same principle as rods' part level cap. | `P-AQUARIUM-LEGACY-LICENSES` |
+| Upkeep | none (cleaning and feeding are free) | **None in money** ($0/day). Care-based: the bonus needs thriving pets | A flat fee is regressive (Upkeep). | `P-AQUARIUM-UPKEEP` |
+| Care actions | +50 pet XP each, 3 s command cooldown | Feed / play once per 8 h / 8 h per pet. +50 × multiplier bond XP, capped at 700 | Closes A1. Bond ramps a pet's bonus from 50% to 100% in 7 days of care. | `P-AQUARIUM-CARE-COOLDOWN`, `P-AQUARIUM-BOND` |
+| Pet sale | `xp × attraction` (unbounded) | Species value × age × origin × condition × attraction: **at most 1.25× the fish it came from**; 3 sales per 7 days | Closes A1. Pets are companions, not a money printer. | `P-AQUARIUM-PET-SALE`, `P-AQUARIUM-SALE-LIMIT` |
+| Breeding | 0.10%–0.65% (bug), no cooldown, no capacity check | **10%–65%** (same formula), 7-day cooldown per parent, needs a free slot; babies marked `bred` | A2–A5. Breeding is a way to get rare pets, not income. | `P-AQUARIUM-FIX-BREEDING`, `P-AQUARIUM-BREEDING` |
+| Temperature | +1 °C/h unbounded; ideals 25 / 0 / 0 / 0 °C (hunger / mood / stress / health); new tanks at 0 °C | Ideal **25 °C** in every formula; the heater holds its setting; read clamped to -30…30 °C; new tanks at 25 °C; thriving band ±3 °C | A9. Temperature becomes a setting, not an endless chore. | `P-AQUARIUM-FIX-TEMPERATURE` |
+| Cleanliness | −1/h (floor 0) | Unchanged. Thriving needs ≥ 50 | Existing rule; it gives the care loop. | `P-AQUARIUM-THRIVE` |
+| Aspirational sink | none | **Display tanks** for an Expert water type: 3 per water type, 5 pets each, **$430,000 / $870,000 / $1,700,000**; no companion slots | Aquarium expansion as an optional sink (decision 10), with no power. | `P-AQUARIUM-DISPLAY-TANKS` |
 
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-current-proposed -->
+
+---
+
+## 4. Licenses
+
+### Licenses
+
+`licenses()`, `report().priceTable`.
+
+<!-- generated:aquarium-licenses -->
 | Tier | Gate | Gate stage ($/h) | Price | Price (h of gate income) | Tanks × size | Pets per water type | Companion slots | Typical bonus (Legendary) | Max (Lucky) | Today |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Basic | Lv 15 | River, Old Rod ($15,119) | **$30,000** | 2 | 1 × 3 | 3 | 2 | +1.0% | +1.1% | $1,000,000, Lv 0, size 1, unlimited tanks |
-| Advanced | Lv 30 | Pond, T2 ($48,425) | **$120,000** | 2.5 | 2 × 4 | 8 | 5 | +2.5% | +2.75% | $5,000,000, Lv 10, size 2 |
-| Expert | Lv 45 | Coast, T3 ($82,706) | **$250,000** | 3 | 3 × 5 | 15 | 9 | +4.5% | +4.95% | $10,000,000, Lv 20, size 3 |
+| **Basic** | Lv 15 | River · Old Rod ($15,119) | **$30,000** | 2.0 | 1 × 3 | 3 | 2 | +1.00% | +1.10% | $1,000,000, Lv 0, size 1, unlimited tanks |
+| **Advanced** | Lv 30 | Pond · T2 ($49,399) | **$120,000** | 2.5 | 2 × 4 | 8 | 5 | +2.50% | +2.75% | $5,000,000, Lv 10, size 2, unlimited tanks |
+| **Expert** | Lv 45 | Coast · T3 ($86,034) | **$260,000** | 3.0 | 3 × 5 | 15 | 9 | +4.50% | +4.95% | $10,000,000, Lv 20, size 3, unlimited tanks |
 
-Today's prices under the new income scale (`currentLicenses()`):
-- Basic: $1M at Lv 0 is 117 h of Ocean Old Rod income, **156 days** for a regular player.
-- Advanced: $5M is 331 h.
-- Expert: $10M is 339 h.
+Both water types share these rows. Price = two significant digits of (hours × the gate stage's $/h), where the stage is the gate level's biome with the shared gear tier held there, at the regular player's cadence.
 
-### 3.2 Time to afford: hours of the gate stage's income (`report().priceTable[*].hoursOfGateIncome`)
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-licenses -->
 
+### Hours of gate-stage income
+
+`report().priceTable[*].hoursOfGateIncome`: what each price costs in fishing income alone.
+
+<!-- generated:aquarium-afford-hours -->
 | Tier | Casual | Regular | Active | Grinder |
 | --- | --- | --- | --- | --- |
-| Basic ($30k) | 2.65 h (12.7 days) | 1.98 h (2.65 days) | 1.76 h (0.88 days) | 1.54 h (0.31 days) |
-| Advanced ($120k) | 3.33 h (16.0 days) | 2.48 h (3.30 days) | 2.19 h (1.10 days) | 1.91 h (0.38 days) |
-| Expert ($250k) | 4.09 h (19.6 days) | 3.02 h (4.03 days) | 2.67 h (1.33 days) | 2.31 h (0.46 days) |
+| Basic ($30,000) | 2.65 h (12.70 days) | 1.98 h (2.65 days) | 1.76 h (0.88 days) | 1.54 h (0.31 days) |
+| Advanced ($120,000) | 3.26 h (15.66 days) | 2.43 h (3.24 days) | 2.15 h (1.08 days) | 1.87 h (0.37 days) |
+| Expert ($260,000) | 4.09 h (19.63 days) | 3.02 h (4.03 days) | 2.67 h (1.33 days) | 2.31 h (0.46 days) |
 
-The hours differ because cadence (reaction overhead) changes $/h. The days differ because of minutes played per day.
+Hours of the gate stage's fishing income at each archetype's cadence (reaction overhead changes $/h); days at its minutes per day. Fishing income only: on the integrated model quests, streak and buffs add to it (When licenses are bought).
 
-### 3.3 Time to afford inside the lifecycle (`lifecycle(archetype)`; rods first)
-**Method.**
-- The XP timeline is exactly `curve.js`: 1-minute steps, the highest unlocked biome, the provisional path, the placeholder daily XP of `F.DAILY` × level, and rod tiers after `F.PURCHASE.saveHours` of stage income.
-- Money: fish income, minus rods' **real** costs (`rods.assembly(t).expectedCost` when each tier is bought, plus repairs at `rods.PARAMS.repair.upkeepShare`).
-- **Rods first:** a license is bought only if the next rod tier's assembly cost stays reserved once its crates unlock.
-- Licenses are bought in order (prerequisites), freshwater, as soon as that rule allows.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-afford-hours -->
 
-| Player | Basic (gate Lv 15) | Advanced (gate Lv 30) | Expert (gate Lv 45) |
-| --- | --- | --- | --- |
-| Casual | Lv 19, 4.95 h, day 24 (+1.90 h / +9 days after the gate) | Lv 39, 19.23 h, day 93 (+7.98 h / +38 days) | Lv 50, 32.42 h, day 156 (+6.78 h / +32 days) |
-| **Regular** | Lv 16, 3.82 h, day 6 (+0.80 h / +1 day) | Lv 30, 13.50 h, day 19 (at the gate) | Lv 45, 33.15 h, day 45 (at the gate) |
-| Active | Lv 16, 3.42 h, day 2 (+0.53 h) | Lv 30, 13.40 h, day 7 (at the gate) | Lv 45, 33.95 h, day 17 (at the gate) |
-| Grinder | Lv 15, 2.98 h, day 1 (+0.38 h) | Lv 30, 12.20 h, day 3 (at the gate) | Lv 45, 31.08 h, day 7 (at the gate) |
+### When licenses are bought
 
-**With other spending** (`report().sensitivity.otherSpend`): a share of income also goes to permits, bait and so on. Permit prices belong to another design; this is a stand-in.
+`lifecycle(archetype)` and `lifecycle(archetype, { bait: 'cash' })`, integrated.
 
-| Player | 15% of income elsewhere | 30% of income elsewhere |
-| --- | --- | --- |
-| Casual | Basic Lv 20 (d27), Advanced Lv 40 (d102), Expert Lv 59 (d235) | Basic Lv 22 (d31), **Advanced and Expert not by Lv 60** |
-| Regular | Basic Lv 17, Advanced Lv 30 (+0.08 h), Expert Lv 45 (at the gate) | Basic Lv 19, Advanced Lv 37 (+7.77 h, +10 days), Expert Lv 47 (+3.77 h) |
-| Active / Grinder | within ≤ 1.8 h of every gate | within ≤ 1.8 h of every gate |
+<!-- generated:aquarium-afford-integrated -->
+| Player | Basic (gate Lv 15) | Advanced (gate Lv 30) | Expert (gate Lv 45) | With money bait: bought at |
+| --- | --- | --- | --- | --- |
+| Casual (12.5 min/day) | Lv 15 · 2.62 h · day 13 (at the gate) | Lv 30 · 11.75 h · day 57 (at the gate) | Lv 45 · 29.52 h · day 142 (at the gate) | Lv 15 / Lv 30 / Lv 45 |
+| **Regular (45 min/day)** | Lv 15 · 2.53 h · day 4 (at the gate) | Lv 30 · 12.60 h · day 17 (at the gate) | Lv 45 · 33.03 h · day 45 (at the gate) | Lv 15 / Lv 30 / Lv 45 |
+| Active (120 min/day) | Lv 15 · 2.85 h · day 2 (+0.20 h after the gate) | Lv 30 · 13.30 h · day 7 (+0.62 h after the gate) | Lv 45 · 33.37 h · day 17 (at the gate) | Lv 15 / Lv 30 / Lv 45 |
+| Grinder (300 min/day) | Lv 15 · 2.63 h · day 1 (+0.23 h after the gate) | Lv 31 · 12.25 h · day 3 (+0.83 h after the gate) | Lv 45 · 30.62 h · day 7 (at the gate) | Lv 15 / Lv 30 / Lv 45 |
+| Minimum-daily (R2 adversary) | Lv 15 · 1.48 h · day 23 (at the gate) | Lv 30 · 6.45 h · day 83 (at the gate) | Lv 45 · 16.90 h · day 188 (at the gate) | — |
 
-- **Casual players** are the constrained group. Placeholder daily XP levels them with fewer fishing hours, so their income per level is lowest (rods noted the same, rods.md §10). The aquarium is optional, so this is acceptable. Casual cash from the streak/daily designs would move it (R2).
-- **Checks** (`checks()`):
-  - Every license is affordable before the next tier's gate for every archetype (rods first, no other spend).
-  - Buying licenses never leaves a rod tier unaffordable that was affordable without them.
+Model: integrate.run(): the reference core loop (rods, world, quests, streak, buffs), with variant.aquarium true against false. Licenses are non-blocking optional purchases, so rod assemblies and permits (blocking progression goals) are always served first; the licensed water type is Freshwater.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-afford-integrated -->
+
+- **Money no longer constrains anyone.** With quest, streak and buff cash on top of fishing, every player buys each license at its gate or shortly after, and no later with money bait running. Licenses remain a milestone, not a wall, and never compete with gear or permits: those are blocking progression goals and always come first (`P-AQUARIUM-OPTIONAL-SINK`).
+- **Casual and minimum-daily players** need the most calendar days to reach each gate, but once there they can afford the license at once.
 
 ---
 
-## 4. The benefit loop: companion bonus
+## 5. The benefit loop: companion bonus
 
-### 4.1 Rules (`perPetBonus`, `companionBonus`, `companionSlots`, `thriving`, `bondFactor`)
-- **Per pet**, by the pet's species rarity: Common 0.25%, Uncommon 0.30%, Rare 0.35%, Ultra 0.40%, Giant 0.45%, Legendary 0.50%, Lucky 0.55%. This is added to the cast's `sellBonus` stat through the modifier pipeline's reserved pets/aquarium source.
-- **Slots:** only the best `companionSlots` thriving pets count, where the count comes from the best license tier held (2 / 5 / 9).
-  - Rarer pets reach the maximum with the same slots, which leaves space for collection and breeding.
-  - **Level cap:** a legacy license above the player's level gives the slots of the best tier whose gate they have reached. For example, a Lv 20 Expert holder gets 2 slots until Lv 30.
-- **Thriving:** fed within **30 h**, tank cleanliness **≥ 50**, and temperature within **±3 °C** of 25 °C. One care session a day keeps every pet thriving (`thriving()` also returns the hours until that stops).
-- **Bond:** the stored pet `xp` becomes bond. Care off cooldown adds 50 × the pet's trait multiplier. The bonus ramps from **50% at adoption to 100% at 700 bond XP**, which is **7 days** at one feed and one play a day (`bondDays()`). Existing pets that already hold ≥ 700 XP start at full bond.
-- **Deliberately cash only:**
-  - No XP bonus, so the approved windows (R1) and R2 are unaffected.
-  - No rarity or multi-catch effect, so no effect on catches.
-  - Leaderboards rank catches by count, size and weight (`global-leaderboard.js`), never money, so competitive standings are untouched.
+**Rules** (`perPetBonus`, `companionBonus`, `companionSlots`, `thriving`, `bondFactor`; values in Pet rules, §8):
+- **Per pet**, by species rarity, added to the cast's `sellBonus` stat through the modifier pipeline's reserved pets/aquarium source.
+- **Slots:** only the best thriving pets up to the license's companion slots count (best tier held). Rarer pets reach the maximum in the same slots, leaving space for collection and breeding.
+- **Level cap:** a legacy license above the player's level gives the slots of the best tier whose gate they have reached (Legacy licenses, §14).
+- **Thriving:** fed recently, a clean enough tank and a temperature near the ideal. One care session a day keeps every pet thriving; `thriving()` also returns the hours until that stops.
+- **Bond:** the stored pet `xp` becomes bond. Care off cooldown adds bond XP, and bond ramps a pet's bonus from half to full within about a week of care. Existing pets already at the cap start at full bond.
+- **Deliberately cash only:** no XP bonus (the approved windows, R1, and R2 are unaffected), no rarity or multi-catch effect (catches are unchanged), and leaderboards rank catches by count, size and weight, never money (`global-leaderboard.js`), so competitive standings are untouched.
 
-### 4.2 Bonus by tier and pet mix (`report().companion.byTier`)
+### Companion bonus by tier
 
+`report().companion.byTier`.
+
+<!-- generated:aquarium-bonus-tiers -->
 | Tier | Slots | All Common | All Rare | All Legendary (typical) | All Lucky (max) |
 | --- | --- | --- | --- | --- | --- |
 | Basic | 2 | +0.50% | +0.70% | **+1.00%** | +1.10% |
 | Advanced | 5 | +1.25% | +1.75% | **+2.50%** | +2.75% |
 | Expert | 9 | +2.25% | +3.15% | **+4.50%** | +4.95% |
 
-**What it adds per hour at each stage** (`report().companion.cashPerHourAtStages`; regular cadence; the tier whose gate has been reached; Legendary pets):
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-bonus-tiers -->
 
-| Stage | Fish income | Tier held | Bonus | Extra $/h |
+### What it adds per hour
+
+`report().companion.cashPerHourAtStages`: the tier whose gate has been reached at each stage.
+
+<!-- generated:aquarium-bonus-stages -->
+| Stage | Fish income | Tier held (gate reached) | Bonus | Extra $/h |
 | --- | --- | --- | --- | --- |
-| Lake, T1 (Lv 20) | $29,500 | Basic | +1.0% | $295 |
-| Pond, T2 (Lv 30) | $48,425 | Advanced | +2.5% | $1,211 |
-| Coast, T3 (Lv 40) | $82,706 | Advanced | +2.5% | $2,068 |
-| Swamp, T4 (Lv 50) | $136,016 | Expert | +4.5% | $6,121 |
+| Lake · T1 (Lv 20) | $31,364/h | Basic | +1.00% | $314 |
+| Pond · T2 (Lv 30) | $49,399/h | Advanced | +2.50% | $1,211 |
+| Coast · T3 (Lv 40) | $86,034/h | Advanced | +2.50% | $2,068 |
+| Swamp · T4 (Lv 50) | $144,221/h | Expert | +4.50% | $6,123 |
 
-### 4.3 Is "typical = Legendary" realistic? (`availability(level)`)
-Fish of each rarity caught per hour at the gate stages (framework draw model; Lucky items excluded):
+Regular cadence, Legendary pets at full bond, one water type.
 
-| Gate | Stage | Fish/h | Ultra/h | Legendary/h | Lucky/h |
-| --- | --- | --- | --- | --- | --- |
-| Lv 15 | River, Old Rod | 400 | 3.93 | 0.79 | 0.03 |
-| Lv 30 | Pond, T2 | 535 | 7.19 | 1.23 | 0.05 |
-| Lv 45 | Coast, T3 (saltwater) | 635 | 9.63 | 1.69 | 0.07 |
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-bonus-stages -->
 
-- **Legendary pets:** two freshwater Legendaries take about 2.5 h of River fishing. So Legendary is the realistic steady state within a few hours of each purchase.
-- **Lucky pets** (one every 15–35 h) are the collection chase. Breeding a Lucky pair is the other route.
-- **Adopting has a cost:** a Legendary pet costs the sale of that fish (Swamp Legendary up to $3,478). That is small next to the bonus, but it is a real choice.
+### Pet supply
 
-### 4.4 Payback and share of income per archetype (`report().lifecycles`)
-Setup: freshwater Basic → Advanced → Expert bought as in §3.3, Legendary pets, daily care, lifecycle to Lv 60. Payback is counted in hours of play after purchase. It is marked * when it falls after Lv 60 and is extrapolated at the Lv 60 stage's income; Mountain Stream would shorten it.
+`availability(level)`: is "typical = Legendary" realistic?
 
-| Player | Basic payback / recovered by Lv 60 | Advanced | Expert | License spend (share of income) | Bonus (share of fish income) | Net | Money upkeep |
+<!-- generated:aquarium-pet-supply -->
+| Gate | Stage | Water | Fish/h | Ultra/h | Legendary/h | Lucky/h | Hours for 2 Legendary | Hours per Lucky |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Lv 15 | River · Old Rod | Freshwater | 400 | 3.93 | 0.79 | 0.03 | 2.5 h | 33 h |
+| Lv 30 | Pond · T2 | Freshwater | 535 | 7.19 | 1.23 | 0.05 | 1.6 h | 20 h |
+| Lv 45 | Coast · T3 | Saltwater | 635 | 9.63 | 1.69 | 0.07 | 1.2 h | 14 h |
+
+Framework draw model at the regular cadence (Lucky items excluded, under the framework's Lucky-item rule). A pet must match the tank's water type; the Lv 45 stage (Coast) is saltwater.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-pet-supply -->
+
+- **Legendary pets** fill the Basic slots within a few hours of fishing after the purchase, and faster at later stages. Legendary is the realistic steady state.
+- **Lucky pets** are the collection chase. Breeding a Lucky pair is the other route.
+- **Adopting has a cost:** a pet is a catch the player did not sell (Sale value, §8). Small next to the bonus, but a real choice.
+
+---
+
+## 6. On the integrated model
+
+The aquarium system runs on the shared core with every reference system: gear purchases and repairs, permits, quests, streak and buffs. Licenses are bought out of money that has already paid for rods and permits. Buffs (Double Cash) multiply the whole catch, companion bonus included; the companion cash below is measured on the core's own casts, so that interaction is counted, not assumed.
+
+### Payback and shares
+
+`lifecycle(archetype)`, `report().integrated.byArchetype`.
+
+<!-- generated:aquarium-integrated -->
+| Player | Basic: payback / recovered by L60 | Advanced: payback / recovered by L60 | Expert: payback / recovered by L60 | License spend (share of income) | Bonus (share of fish income) | Net (share of income) | Money upkeep |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Casual | 46.0 h* (221 days) / 93% | 86.0 h* (413 d) / 30% | 125.8 h* (604 d) / 13% | 13.5% | 3.35% | −10.3% | 0 |
-| **Regular** | **45.1 h** (60 d) / 179% | **74.2 h*** (99 d) / 64% | **96.7 h*** (129 d) / 31% | **7.1%** | **3.81%** | **−3.4%** | 0 |
-| Active | 43.8 h (22 d) / 210% | 68.6 h* (34 d) / 74% | 87.1 h* (44 d) / 35% | 6.0% | 3.71% | −2.4% | 0 |
-| Grinder | 41.5 h (8 d) / 212% | 63.2 h* (13 d) / 73% | 80.5 h* (16 d) / 30% | 5.6% | 3.30% | −2.4% | 0 |
+| Casual (12.5 min/day) | 50.5 h (242 d) / 123% | 93.4 h* (448 d) / 44% | 134.0 h* (643 d) / 21% | 4.3% | 3.67% | −2.8% | $0 |
+| **Regular (45 min/day)** | **45.7 h (61 d) / 198%** | **74.6 h* (99 d) / 70%** | **100.5 h* (134 d) / 33%** | **4.3%** | **3.67%** | **−1.9%** | $0 |
+| Active (120 min/day) | 43.5 h (22 d) / 228% | 68.1 h* (34 d) / 80% | 90.4 h* (45 d) / 37% | 4.6% | 3.57% | −1.7% | $0 |
+| Grinder (300 min/day) | 41.0 h (8 d) / 228% | 62.7 h* (13 d) / 78% | 83.3 h* (17 d) / 32% | 4.8% | 3.17% | −1.9% | $0 |
+| Minimum-daily (R2 adversary) | 33.8 h / 102% | 66.7 h* / 36% | 97.7 h* / 17% | 4.3% | 3.71% | −3.0% | $0 |
+
+Model: integrate.run(): the reference core loop (rods, world, quests, streak, buffs), with variant.aquarium true against false; to L60. Payback = hours of play after the purchase until the companion cash it added covers its price; * = after L60, extrapolated at the last step's income per unit of bonus at full bond (Mountain Stream would shorten it). Income = every cash source (fishing, quests, streak, buffs, salvage); fish income = fishing without the companion cash. Legendary pets, care every day.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-integrated -->
 
 **How to read it.**
-- **Basic** is a milestone that pays for itself within the ladder for regular, active and grinder players.
-- **Advanced and Expert** are the aspirational part: each returns a real share by Lv 60 and keeps paying afterwards.
-- **Casual players** get the least back per dollar: they fish the fewest hours per level.
-- **The design check** (`checks()`) requires the reference player's paybacks to be ≤ 60 / 90 / 120 h, and to rise with the tier.
+- **Basic** pays for itself within the ladder for every player type.
+- **Advanced and Expert** are the aspirational part: each returns a real share by the end of the ladder and keeps paying afterwards (starred paybacks).
+- **The design check** (Checks, §17) requires the regular player's paybacks to stay within their targets and to rise with the tier.
+- **The aquarium is a small sink.** Licenses take a few percent of income to the end of the ladder, and the bonus returns a good part of it. Display tanks are the large aspirational sink (§10).
 
-**Sensitivity** (`report().sensitivity`, regular player):
+### Effects on progression
 
-| Variant | Bonus / fish income | Recovered by Lv 60 (Basic / Advanced / Expert) | Payback h (B / A / E) |
+`lifecycle(archetype).effect`: the same loop with and without the aquarium, level by level.
+
+<!-- generated:aquarium-effects -->
+| Player | XP at every level, with vs without the aquarium | Progression purchases the licenses move | Still bought in time |
 | --- | --- | --- | --- |
-| All-Common pets (floor) | 1.90% | 90% / 32% / 15% | 67.1 / 133.0 / 188.6 |
-| All-Rare pets | 2.67% | 125% / 45% / 22% | 54.5 / 99.4 / 136.1 |
-| **All-Legendary (typical)** | **3.81%** | **179% / 64% / 31%** | **45.1 / 74.2 / 96.7** |
-| All-Lucky (ceiling) | 4.19% | 197% / 70% / 34% | 43.1 / 68.9 / 88.3 |
-| Care on half the days | 1.90% | 90% / 32% / 15% | — |
-| Both water types (collector) | the same bonus | +$400,000 of spend: 13.5% / 7.1% / 6.0% / 5.6% of income (casual / regular / active / grinder) | — |
+| Casual (12.5 min/day) | identical (60 levels); with money bait identical | T2 rod assembly 5.00 h → 5.42 h (needed at Lv 30, 11.73 h) | yes |
+| Regular (45 min/day) | identical (60 levels); with money bait identical | T2 rod assembly 5.28 h → 6.02 h (needed at Lv 30, 12.58 h) | yes |
+| Active (120 min/day) | identical (60 levels); with money bait identical | T2 rod assembly 5.33 h → 6.02 h (needed at Lv 30, 12.67 h) | yes |
+| Grinder (300 min/day) | identical (60 levels); with money bait identical | T2 rod assembly 5.10 h → 5.70 h (needed at Lv 30, 11.40 h) | yes |
+| Minimum-daily (R2 adversary) | identical (60 levels) | T2 rod assembly 2.75 h → 2.82 h (needed at Lv 30, 6.43 h) | yes |
+
+Identical = every level reached on the same 1-minute step with the same XP by source. A moved purchase is in time when it is still bought by the time the level that uses it is reached (a rod tier's level, a biome's permit level); a dropped purchase would fail.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-effects -->
+
+- **No XP effect**, at every level, for every player type, with or without money bait. The measured XP effect of the bonus on each cast is also exactly zero.
+- **The only purchase that moves** is an early rod-crate assembly: the Basic license competes with it for cash for a short while. It is still bought long before its tier is equipped, and no permit moves.
+
+### Sensitivity
+
+`report().integrated.sensitivity`, `report().integrated.withBait`.
+
+<!-- generated:aquarium-sensitivity -->
+| Variant (regular player) | Bonus / fish income | Recovered by L60 (B / A / E) | Payback h (B / A / E) | Licenses / income | Net |
+| --- | --- | --- | --- | --- | --- |
+| All-Common pets (floor) | 1.83% | 99% / 35% / 17% | 67.7* / 133.4* / 196.1* | 4.4% | −3.2% |
+| All-Rare pets | 2.57% | 139% / 49% / 23% | 55.1 / 99.8* / 141.5* | 4.4% | −2.7% |
+| **All-Legendary pets (typical)** | 3.67% | 198% / 70% / 33% | 45.7 / 74.6* / 100.5* | 4.3% | −1.9% |
+| All-Lucky pets (ceiling) | 4.03% | 218% / 77% / 37% | 43.7 / 69.3* / 91.8* | 4.3% | −1.7% |
+| Pets thriving 50% of the time | 1.83% | 99% / 35% / 17% | 67.7* / 133.4* / 196.1* | 4.4% | −3.2% |
+| Money bait on (both sides) | 3.66% | 213% / 76% / 36% | 43.5 / 69.6* / 92.8* | 4.1% | −1.6% |
+
+| Player | License spend, one water type (share of income) | Both water types | Net, both water types | Bonus / fish income, both |
+| --- | --- | --- | --- | --- |
+| Casual (12.5 min/day) | 4.3% | 8.6% | −7.1% | 3.67% |
+| Regular (45 min/day) | 4.3% | 8.6% | −6.2% | 3.66% |
+| Active (120 min/day) | 4.6% | 9.1% | −6.2% | 3.56% |
+| Grinder (300 min/day) | 4.8% | 9.5% | −6.7% | 3.17% |
+
+Integrated, to L60. * = payback after L60 (extrapolated). The second water type adds spend and capacity but no companion cash (`P-AQUARIUM-SECOND-WATER`).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-sensitivity -->
+
+- **Pet mix** sets the return: an all-Common aquarium roughly halves the bonus of the typical Legendary one.
+- **Care matters as much as pet rarity:** Legendary pets thriving half the time earn the same bonus as Common pets thriving all the time. Neglect never costs the pets.
+- **Money bait** buys every license no later and pays it back sooner: more value per fish means more companion cash.
+- **A second water type** doubles the license spend and adds no companion cash (`P-AQUARIUM-SECOND-WATER`). It is a collector's purchase.
 
 ---
 
-## 5. Upkeep: why none in money (`upkeepAlternatives()`)
-**Why a flat fee fails.** The benefit scales with **hours fished**, and a daily fee scales with **calendar days**, so any flat fee is regressive. Take a per-pet fee sized at 25% of a regular player's daily bonus from that pet at each gate stage:
+## 7. Upkeep: care, not money
 
-| Tier (gate stage) | Fee per pet per day | Casual: fee / bonus | Regular | Active | Grinder | Casual: fee as share of income (full slots) |
+`upkeepAlternatives()`. `P-AQUARIUM-UPKEEP`.
+
+### Upkeep
+
+<!-- generated:aquarium-upkeep -->
+| Tier (gate stage) | Fee per pet per day | Casual: fee / bonus | Regular: fee / bonus | Active: fee / bonus | Grinder: fee / bonus | Casual: fee / income (full slots) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Basic (River, Old Rod) | $14 | **120%** | 25% | 8.3% | 2.9% | 1.2% |
-| Advanced (Pond, T2) | $45 | **121%** | 25% | 8.3% | 2.9% | 3.0% |
-| Expert (Coast, T3) | $78 | **122%** | 25% | 8.3% | 2.9% | 5.5% |
+| Basic (River · Old Rod) | $14 | **120%** | 25.0% | 8.3% | 2.9% | 1.2% |
+| Advanced (Pond · T2) | $45 | **121%** | 25.0% | 8.3% | 2.9% | 3.0% |
+| Expert (Coast · T3) | $78 | **122%** | 25.0% | 8.3% | 2.9% | 5.3% |
 
-- **The only "decision" it creates is regressive.** Casual players would find their pets cost more than they return, while a grinder would not notice the fee.
-- **A per-cast fee is no better.** Food eaten per catch is just a smaller bonus and changes no decision.
+The rejected alternative: a flat fee per pet per day sized at 25% of the regular player's daily bonus from that pet (Legendary) at each gate stage.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-upkeep -->
+
+**Why a flat fee fails.** The benefit scales with **hours fished**, and a daily fee scales with **calendar days**, so any flat fee is regressive. Sized to be noticeable for a regular player, it costs a casual player more than the bonus returns, while a grinder would not notice it. A per-cast fee (food eaten per catch) is no better: it is only a smaller bonus and changes no decision.
 
 **The recommendation is care-based upkeep:**
-- The bonus needs pets fed within 30 h and tanks cleaned about every 2 days.
+- The bonus needs pets fed within the thriving window and tanks cleaned every couple of days (Pet rules).
 - Neglect costs the bonus, never the pets. Pets never die and are never deleted.
-- The recurring money sinks in this area are optional instead: licenses for a second water type, display tanks (§8), and adoption (giving up a rare catch).
-
-**Upkeep as a share of income: 0% for every archetype.**
+- The money sinks in this area are optional instead: licenses for a second water type, display tanks (§10), and adoption (giving up a catch).
 
 ---
 
-## 6. Pets
+## 8. Pets
 
-### 6.1 Care and bond
-- **Cooldowns:** `/pet feed`, `/pet play` and `/aquarium feed` act on a pet at most once per 8 h each. `/aquarium feed` feeds every pet in the tank that is off cooldown. An action on cooldown replies "try again in X h" and changes nothing.
-- **Bond XP:** +50 × multiplier per action. The multiplier comes from traits, respecting `unlocked` (A10); it averages 1.19 and reaches at most 1.7 (`report().current.exploit.traits`).
-- **Cap:** a pet stops gaining bond XP at 700. The stored `xp` is never reduced.
-- **Bound:** at most 6 bond-earning actions per pet per day (3 feeds + 3 plays), at most 510 XP a day at the top multiplier. Bond XP has **no cash value**.
+### Pet rules
 
-### 6.2 Sale value (`petSaleValue`)
-`speciesValue × ageFactor × (bred ? 0.5 : 1) × (thriving ? 1 : 0.5) × (1 + attraction/100)`, where:
-- `speciesValue` is `F.proposedValue` of the species, the same number a catch of it is worth;
-- `ageFactor` runs from 0.25 at day 1 to 1.0 at day 28;
-- attraction is 0–25 (today's color and fin traits, unlocked with age).
+<!-- generated:aquarium-pet-rules -->
+| Rule | Value | Decision |
+| --- | --- | --- |
+| Care cooldowns (per pet) | feed 8 h, play 8 h; `/aquarium feed` feeds every pet off cooldown | `P-AQUARIUM-CARE-COOLDOWN` |
+| Bond XP per care action off cooldown | +50 × the trait multiplier (mean ×1.19, max ×1.7, respecting `unlocked`) | `P-AQUARIUM-BOND` |
+| Most bond XP per pet per day | 6 actions × 50 × 1.7 = 510; bond XP has no cash value | `P-AQUARIUM-BOND` |
+| Bond cap and ramp | cap 700 (stored `xp` never reduced); a pet's bonus ramps 50% → 100%: 7 days at 2 care actions a day | `P-AQUARIUM-BOND` |
+| Companion bonus per thriving pet | Common 0.25%, Uncommon 0.30%, Rare 0.35%, Ultra 0.40%, Giant 0.45%, Legendary 0.50%, Lucky 0.55% | `P-AQUARIUM-COMPANION-BONUS` |
+| Thriving | fed within 30 h; tank cleanliness ≥ 50; temperature within ±3 °C of 25 °C | `P-AQUARIUM-THRIVE` |
+| Cleanliness | −1/h (unchanged): clean at least every 50 h | `P-AQUARIUM-THRIVE` |
+| Sale value | species value (`F.proposedValue`) × age (0.25 at day 1 → 1.00 at day 28) × (bred ? 0.50 : 1) × (thriving ? 1 : 0.50) × (1 + 1% per attraction point, up to 25) | `P-AQUARIUM-PET-SALE` |
+| Sales limit | 3 per 7 days | `P-AQUARIUM-SALE-LIMIT` |
+| Breeding | parents aged 20+ days, health ≥ 50, same water type; 7-day cooldown per parent; a free slot in the tank; chance 10%–65% | `P-AQUARIUM-BREEDING` |
 
-| Case (`report().sale.examples`) | Share of species value |
-| --- | --- |
-| Adopted 1 day ago | 25% |
-| 14 days | 61% |
-| 28+ days | 100% |
-| 28+ days, attraction 25 | 125% (**the maximum**) |
-| 28+ days, bred | 50% |
-| 28+ days, not thriving | 50% |
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-pet-rules -->
 
-| Species (`report().sale.species`) | Mean value | Max value | Max sale |
+- **Cooldowns:** an action on cooldown replies "try again in X h" and changes nothing. `/aquarium feed` feeds every pet in the tank that is off cooldown.
+- **Bond** is bounded per pet per day and has **no cash value**. The trait multiplier respects `unlocked` (A10).
+
+### Sale value
+
+`petSaleValue()`, `report().sale`. `speciesValue` is `F.proposedValue` of the species, the same number a catch of it is worth.
+
+<!-- generated:aquarium-sale -->
+| Case | Age (days) | Share of species value |
+| --- | --- | --- |
+| Adopted 1 day ago | 1 | 25% |
+| Half-way to full value | 14 | 61% |
+| Full age | 28 | 100% |
+| Full age, maximum attraction | 28 | **125%** (the maximum) |
+| Full age, bred | 28 | 50% |
+| Full age, not thriving | 28 | 50% |
+
+| Species | Mean value | Max value | Max sale |
 | --- | --- | --- | --- |
 | River Common | $29 | $32 | $41 |
+| Swamp Common | $122 | $174 | $217 |
 | River Legendary | $761 | $943 | $1,178 |
 | Swamp Legendary | $2,809 | $3,478 | $4,347 |
+| River Lucky | $1,523 | $1,885 | $2,356 |
 | Swamp Lucky | $5,618 | $6,955 | $8,694 |
 
-- **Adopt → sell** returns at most 1.25× the fish given up, after 28 days, with a 0.9%-chance trait (attraction ≥ 20).
-- **Plus a sales limit:** 3 sales per 7 days.
+Attraction ≥ 20 is rare today (0.9% of pets); 22.7% have none.
 
-### 6.3 Breeding (`breedingRate`)
-Today's formula `max(min(0.65, (50 − stress)/50), max(min(0.6, health/100 − 0.5), 0.1))` is kept. Only the comparison changes.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-sale -->
 
-| Stress / health | Rate | Today (`random()*100 < rate`) | Fixed |
-| --- | --- | --- | --- |
-| 0 / 100 (thriving) | 0.65 | 0.65% | **65%** |
-| 20 / 80 | 0.60 | 0.60% | 60% |
-| 40 / 60 | 0.20 | 0.20% | 20% |
-| 80 / 50 | 0.10 | 0.10% | 10% |
+- **Adopt → sell** returns at most a quarter more than the fish given up, only after the full age and with a rare trait, and sales are limited per week (`P-AQUARIUM-SALE-LIMIT`).
 
-Existing rules are kept:
-- parents aged 20+ days;
-- health ≥ 50;
-- same water type.
+### Breeding
 
-New rules:
-- 7-day cooldown per parent;
-- a free slot in the chosen tank (capacity check fixed, A4);
-- the baby is added to the tank and marked `bred`;
-- the baby takes a parent's species.
+`breedingRate()`: today's formula `max(min(0.65, (50 − stress)/50), max(min(0.6, health/100 − 0.5), 0.1))` is kept; only the comparison changes (`P-AQUARIUM-FIX-BREEDING`).
 
-**What breeding is for:** Legendary and Lucky pets for companion slots and collection, not income.
+<!-- generated:aquarium-breeding -->
+| Stress / health | Rate | Today (`random()*100 < rate`) | Fixed | Attempts per baby: today → fixed |
+| --- | --- | --- | --- | --- |
+| 0 / 100 (thriving) | 0.65 | 0.65% | **65%** | 154 → 1.54 |
+| 20 / 80 | 0.60 | 0.60% | **60%** | 167 → 1.67 |
+| 40 / 60 | 0.20 | 0.20% | **20%** | 500 → 5.00 |
+| 80 / 50 | 0.10 | 0.10% | **10%** | 1,000 → 10.00 |
 
-### 6.4 Pet income bound (`petIncomeBound`, `report().petIncome`)
-**Method.** An upper bound: thriving parents (65%), each baby aged to full value with maximum attraction, the better of "sell at birth" and "age 28 days", then the weekly limit. Parents are the most valuable Swamp species. Shares are of weekly fishing income at Swamp, T4.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-breeding -->
 
-| Parents | Capacity | Births/week | Sales/week | $/week (uncapped → capped) | Casual | Regular | Active | Grinder |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Legendary ($3,478) | Expert, one water type (15) | 2.12 | 2.12 | $4,607 | 3.2% | 0.65% | 0.21% | 0.07% |
-| Legendary | Expert both + all display tanks (60) | 8.48 | 3 | $18,427 → **$6,520** | 4.5% | 0.91% | 0.30% | 0.10% |
-| Lucky ($6,955) | 15 | 2.12 | 2.12 | $9,213 | 6.3% | 1.29% | 0.43% | 0.15% |
-| Lucky | 60 | 8.48 | 3 | $36,854 → **$13,041** | 9.0% | 1.83% | 0.60% | 0.21% |
+Kept: minimum parent age, minimum health, same water type. New: a cooldown per parent, a free slot in the chosen tank (capacity check fixed, A4), the baby is added to the tank and marked `bred`, and it takes a parent's species (`P-AQUARIUM-BREEDING`). **What breeding is for:** Legendary and Lucky companions and the collection, not income.
 
-- **Without the weekly limit,** the 60-slot Lucky case would reach 25% of a casual player's fishing. With it, the worst case is 9.0% (casual) and 1.8% (regular).
-- **Checks:** ≤ 10% casual and ≤ 5% regular.
+### Pet income bound
 
-**R2 note** (`report().r2`):
-- The aquarium adds **0 XP**, and its cash bonus needs fish caught.
-- Pet sales are the only calendar-based cash. The minimum-daily player can take at most **$13,041/week** from them, which is 1.8% of what a regular player's fishing earns in the same week.
-- **Verdict:** the aquarium cannot make "barely fishing" optimal. No guardrail beyond the weekly limit is needed.
+`petIncomeBound()`, `report().petIncome`.
 
----
+<!-- generated:aquarium-pet-income -->
+| Parents (max species value) | Capacity (slots) | Best strategy | Births/week | Sales/week | $/week (uncapped → capped) | Casual (uncapped → capped) | Regular (uncapped → capped) | Active (uncapped → capped) | Grinder (uncapped → capped) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Legendary ($3,478) | Expert, one water type (15) | age to full value | 2.12 | 2.12 | $4,607 | 3.0% | 0.6% | 0.2% | 0.1% |
+| Legendary ($3,478) | Expert, both water types + all display tanks (60) | age to full value | 8.48 | 3.00 | $18,427 → **$6,520** | 12.0% → 4.2% | 2.4% → 0.9% | 0.8% → 0.3% | 0.3% → 0.1% |
+| Lucky ($6,955) | Expert, one water type (15) | age to full value | 2.12 | 2.12 | $9,213 | 6.0% | 1.2% | 0.4% | 0.1% |
+| Lucky ($6,955) | Expert, both water types + all display tanks (60) | age to full value | 8.48 | 3.00 | $36,854 → **$13,041** | 23.9% → 8.5% | 4.9% → 1.7% | 1.6% → 0.6% | 0.5% → 0.2% |
 
-## 7. Temperature and cleanliness (`effectiveTemperature`, `thriving`)
+An upper bound: thriving parents (65%), the most valuable Swamp species, every baby at maximum attraction, the better of selling at birth and aging to full value, then the weekly limit. Shares are of weekly fishing income at Swamp · T4. The minimum-daily player (R2) can take at most the capped figure; the aquarium gives it no XP (Effects on progression).
 
-**Today** (`report().current.exploit.temperature`; factors multiply the rate of change or health):
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-pet-income -->
 
-| Tank °C | Hunger | Mood / stress | Health |
-| --- | --- | --- | --- |
-| 0 (new tank) | ×2.00 | ×1.00 | ×1.00 |
-| 25 | ×1.00 | ×1.25 | ×0.75 |
-| 50 (50 h unattended from 0) | ×2.00 | ×1.50 | ×0.50 |
-| 100 (100 h) | ×4.00 | ×2.00 | ×0 |
-
-**Proposed:**
-- **One ideal for all four formulas:** every formula uses `|T − 25|`.
-- **No drift:** the heater holds the set temperature, so the unbounded +1 °C/h is removed.
-- **Legacy values:** stored temperatures are read clamped to the `/aquarium adjust` range (−30…30), so a drifted 812 °C reads as 30 °C.
-- **New tanks** start at 25 °C.
-- **Thriving band:** ±3 °C.
-- **Existing tanks** sitting at 0 °C or a drifted value show "not thriving: set 25 °C" until adjusted once. They lose nothing, because no benefit exists today.
-- **Cleanliness** is unchanged (−1/h). Thriving needs ≥ 50.
-
-**Alternative (decision):** a bounded drift toward a 20 °C room temperature instead of no drift. It adds a chore without adding a decision, so it is not recommended.
+- **The weekly limit is what bounds pet cash:** without it the largest setup would reach a large share of a casual player's fishing (uncapped columns). With it every setup stays inside the design targets (Checks).
+- **R2** (`report().r2`): the aquarium adds no XP and its cash bonus needs fish caught, so it cannot make "barely fishing" optimal. Pet sales are the only calendar-based cash, capped as above. No guardrail beyond the weekly limit is needed.
 
 ---
 
-## 8. Display tanks: the aspirational sink (`displayTanks()`)
-- **Who can buy:** players holding an Expert license of that water type, from Lv 45.
-- **What they buy:** up to 3 extra tanks per water type, 5 pets each. They hold pets for **collection, breeding and show**. **No companion slots**, so no power.
-- **Price:** 3 h of the top live stage's income (Swamp, T4, $136,016/h), doubling per tank.
+## 9. Temperature and cleanliness
 
+`effectiveTemperature()`, `thriving()`. `P-AQUARIUM-FIX-TEMPERATURE`.
+
+### Temperature
+
+<!-- generated:aquarium-temperature -->
+| Tank °C (stored) | Today: hunger | Today: mood / stress | Today: health | Proposed: read as | Proposed: deviation from the ideal | Proposed: within the thriving band |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 (new tank today) | ×2.00 | ×1.00 | ×1.00 | 0 °C | 25 °C | no: set the heater once |
+| 25 (proposed ideal) | ×1.00 | ×1.25 | ×0.75 | 25 °C | 0 °C | yes |
+| 50 (50 h unattended from a new tank) | ×2.00 | ×1.50 | ×0.50 | 30 °C | 5 °C | no: set the heater once |
+| 100 (100 h unattended from a new tank) | ×4.00 | ×2.00 | ×0.00 | 30 °C | 5 °C | no: set the heater once |
+| 812 (long-drifted legacy tank) | ×32.48 | ×9.12 | ×0.00 | 30 °C | 5 °C | no: set the heater once |
+
+Today's factors multiply the rate of change (hunger, mood, stress) or health. Proposed: every formula uses |T − 25|, the heater holds its setting (drift 0 °C/h), and stored values are read clamped to the `/aquarium adjust` range.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-temperature -->
+
+- **One ideal for all four formulas**, and the heater holds the set temperature: the unbounded drift is removed.
+- **Legacy values** are read clamped to the `/aquarium adjust` range, so a long-drifted tank reads as the range's edge. New tanks start at the ideal.
+- **Existing tanks** at today's default or a drifted value show "not thriving: set the temperature" until adjusted once. They lose nothing, because no benefit exists today.
+- **Cleanliness** is unchanged; thriving needs a minimum (Pet rules).
+- **Alternative:** a bounded drift toward a room temperature. It adds a chore without adding a decision, so it is not recommended.
+
+---
+
+## 10. Display tanks: the aspirational sink
+
+`displayTanks()`. `P-AQUARIUM-DISPLAY-TANKS`.
+- **Who can buy:** players holding an Expert license of that water type.
+- **What they buy:** extra tanks per water type that hold pets for **collection, breeding and show**. **No companion slots**, so no power.
+- **Price:** hours of the top live stage's income, doubling per tank.
+
+### Display tanks
+
+<!-- generated:aquarium-display -->
 | Tank | 1 | 2 | 3 | Total per water type | Both water types |
 | --- | --- | --- | --- | --- | --- |
-| Price | $410,000 | $820,000 | $1,600,000 | $2,830,000 | $5,660,000 |
+| Price | $430,000 | $870,000 | $1,700,000 | $3,000,000 | $6,000,000 |
 
-| Player | One water type: hours of Swamp income / days | Both water types |
-| --- | --- | --- |
-| Casual | 28.4 h / 136 days | 56.7 h / 272 days |
-| Regular | 20.8 h / 27.7 days | 41.6 h / 55.5 days |
-| Active | 18.3 h / 9.1 days | 36.6 h / 18.3 days |
-| Grinder | 15.8 h / 3.2 days | 31.5 h / 6.3 days |
+| Player | One water type: hours of Swamp income / days | Both water types | Integrated, display tanks on: bought at | Display spend / income to L60 |
+| --- | --- | --- | --- | --- |
+| Casual (12.5 min/day) | 28.4 h / 136.2 days | 56.7 h / 272.3 days | Lv 45 / Lv 45 / Lv 53 | 31.3% |
+| Regular (45 min/day) | 20.8 h / 27.7 days | 41.6 h / 55.5 days | Lv 45 / Lv 45 / Lv 53 | 31.7% |
+| Active (120 min/day) | 18.3 h / 9.1 days | 36.6 h / 18.3 days | Lv 45 / Lv 46 / Lv 54 | 33.3% |
+| Grinder (300 min/day) | 15.8 h / 3.2 days | 31.5 h / 6.3 days | Lv 45 / Lv 47 / Lv 55 | 34.8% |
 
-This targets the post-Lv 50 accumulation that Phase 5 flagged for active players and grinders. Pets in display tanks can breed, but sales stay capped at 3 per week (§6.4).
+Price = 3 h of the top live stage's income (Swamp · T4, $144,221/h at the regular cadence), ×2 per tank, two significant digits. The integrated column runs the reference loop with `systemOpts.aquarium.displayTanks` on (one water type).
 
----
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-display -->
 
-## 9. For the integrator
-
-### `aquariumOptions(level, { owned, mix, archetype })`
-Returns what a player at `level` can buy, given `owned = { Freshwater, Saltwater, display: { Freshwater, Saltwater } }`.
-
-Each entry: `{ kind: 'license'|'display', name, waterType, tier, level, price, upkeepPerDay (0), capacityAfter, tanksAfter, hoursOfIncome, benefit: { stat: 'sellBonus', xpBonus: 0, slotsAfter, slotsAdded, typicalBonusAdded, maxBonusAdded, typicalCashPerHourAdded } }`.
-
-Example: `aquariumOptions(15)` offers Basic Freshwater and Basic Saltwater at $30,000 each (1.98 h of income), each +2 slots and +1.0% typical.
-
-### `holdingsBonus(holdings, { mix, bond, care, level })`
-The `sellBonus` to add to the cast's stats for a holding. It is level-capped.
-
-### `lifecycle(archetype, opts)`
-The reference implementation of purchases, bond ramp and payback, to fold into the integrated lifecycle. It reproduces `curve.json` exactly (`baselineMatchesCurveJson()`).
-
-**Stacking.** The companion bonus is a **stat**: it adds to the gear `sellBonus` (for example rods' handle bonus, 0–8%) before the profile and event multipliers. Double Cash stacking belongs to the buffs design.
+On the integrated model a player who wants them buys the first right after Expert, the second soon after and the last during the Swamp stage; together they absorb about a third of all income to the end of the ladder (integrated column). This targets the late-game accumulation Phase 5 flagged. Pets in display tanks can breed, but sales stay limited per week (§8).
 
 ---
 
-## 10. Founder and public output
+## 11. Integration contract: the aquarium as a system on the shared core
+
+`aquarium.system(opts)` returns a fresh hook object on every call, and all per-run state lives in `state.sys.aquarium`. `integrate.run({ variant: { aquarium: true } })` adds it to the reference loop; `systemOpts.aquarium` passes its options.
+
+**Options** (defaults in brackets): `buy` [true; false gives an inert system], `displayTanks` [false], `waters` [Freshwater; a second water type adds tanks, not slots], `tiers` [all], `mix` [Legendary], `care` [pets always thriving], `reserve` [none; a number or `(state, ctx) => number`].
+
+| Hook | What it does |
+| --- | --- |
+| `init` | Creates `state.sys.aquarium`: holdings (`owned`), one record per purchase (price, slots added, bond start, stamps, companion cash, payback), gates, spend, `companionCash`, the measured XP effect, and milestone snapshots. |
+| `goals` | Offers what `aquariumOptions(gate level, { owned })` offers, as a chain per water type: the next license tiers, then (with `displayTanks`) the display tanks of an Expert water type. Prices rise along a chain, so a later offer is affordable in a pass only after its prerequisite is bought. Licenses are `'optional'` at `LC.PRIORITY.license`; display tanks are `'aspirational'` at `LC.PRIORITY.aspirational`. All are **non-blocking**, so blocking progression goals (rod assemblies, permits) are served first. |
+| `modifyCast` | Adds the companion bonus to `input.stats.sellBonus`: per purchase, slots added × per-pet bonus of the mix × `bondFactorAfterDays(care days owned)` × care. At full bond the sum equals `holdingsBonus(owned)`. Care days follow play hours ÷ session hours, so bond grows only on days the player attends; the minimum-daily player counts completed play days. |
+| `onCasts` | Measures the bonus's marginal cash on the core's own cast: cash minus the same cast without the bonus, with other systems' changes kept and the run's outcome function. It splits that over purchases by their share of the bonus, stamps payback, and measures the XP effect the same way (always zero). |
+| `on('levelUp')` | Snapshots companion cash and spend at each milestone (real and public). |
+
+- **Ledgers:** the system writes **no XP or cash source**. The companion bonus is a cast stat, so the core's `'fishing'` cash already includes it; the aquarium's share is `state.sys.aquarium.companionCash` (per purchase in `purchases[i].cash`). It is a marginal, so with bait or Double Cash it includes the bonus on their extra income. Never edit `'fishing'`. Spend items: `ledger.spend.optional['license:<name>']` and `ledger.spend.aspirational['display:<name>']`.
+- **No upkeep, no boxes:** there is no money upkeep (§7). The aquarium grants no boxes and emits no `'box'` events.
+- **Profile:** the rules are profile-independent (§12). An outcome override (Founder) honours `input.stats.sellBonus`, so the Founder sell multiplier multiplies the bonus as it multiplies gear.
+- **Figures:** `systemSummary(result)` turns any run into this module's figures; `lifecycle(archetype, opts)` runs the pair (with / without) and adds the effect on XP and on other purchases.
+- **Stacking:** the companion bonus adds to the gear `sellBonus` (for example rods' handle bonus) before the profile and temporary multipliers. Double Cash stacking is the buffs design's rule (`P-DOUBLE-CASH`).
+
+### Retired-loop parity
+
+Until 5b.4 this module also had its own lifecycle loop (the 5b.1 placeholder gear rule and daily XP on 1-minute steps). `system()` reproduced it before it was deleted; the record is kept as a constant (`RETIRED_LOOP_PARITY`):
+
+<!-- generated:aquarium-parity -->
+| Record | Value |
+| --- | --- |
+| Source | validateSystem() output at a83b5f0 (deleted with the private loop), commit `a83b5f0` |
+| Method | LC.simulate with system(), the retired loop's assumptions as baseline systems (its gear rule on stage income without the bonus, rods' assembly cost at each equip, repairs at rods' upkeep share, other spend, the placeholder daily XP, and its rods-first reserve) on the shared gear path, against the retired lifecycle(archetype, variant). Compared: milestone hours as step indices, each license's purchase pass, payback hours after purchase, share of the price recovered by the end, run totals, shares of income and final money. |
+| Cases | 17: casual; regular; active; grinder; every archetype with 15% and 30% of income spent elsewhere; regular with Common, Rare and Lucky pets; regular with care on half the time; regular licensing Saltwater |
+| Milestones step-exact | 102 of 102 |
+| License purchase passes | identical in every case |
+| Largest relative difference | 0.05% (tolerance 0.5%): grinder, 15% of income elsewhere: Basic payback hours (41.92 h against 41.90 h) |
+| Companion cash, regular player to L60 | $223,143 (retired loop) vs $223,121 (system) |
+| Largest payback difference | 0.02 h |
+| Replay of the retired loop's conventions | 102 milestones step-exact; relative difference 0 (exact) |
+| No XP effect | identical: 4 archetypes × levels 1–60 |
+| The one rule difference | bond clock: the retired loop started a purchase's bond ramp one step (1 min of play) before adoption; system() starts it at the purchase, which is right. The replay isolated this rule and was exact. |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-parity -->
+
+---
+
+## 12. Founder and public output
+
 - **Profile-independent rules:** the companion bonus, care, sale values, the weekly limit and breeding odds are the same for every profile. The Founder profile's sell multiplier multiplies the bonus exactly as it multiplies gear. There is no Founder-specific rule, so no Founder tell.
 - **Public output:** the companion bonus is gear-like, not a profile modifier. The catch card's base value includes it, and the account receives the final value as today.
 - **Competitive:** catches are unchanged, so `competitiveEligible` is unaffected. Founder catches stay `false`.
@@ -378,191 +567,118 @@ The reference implementation of purchases, bond ramp and payback, to fold into t
 
 ---
 
-## 11. Code touchpoints (after approval; none are changed now)
+## 13. Code touchpoints (after approval; none are changed now)
 
 | File | Change |
 | --- | --- |
-| `src/engine/balance.js` | `AQUARIUM` block: `LICENSE_DEFS` (by catalog name: level, tanks, tankSize, companionSlots), `COMPANION` (per-pet by rarity, bond, thrive rule), `PET_CARE` (cooldowns, bond cap), `PET_SALE` (formula factors, weekly limit), `BREEDING` (cooldown), `TEMPERATURE` (ideal, adjust range). Values are baked from `aquarium.js` `PARAMS`, and a test asserts equality. Bump `BALANCE_VERSION`. |
-| `src/engine/modifiers.js` (`resolveModifiers`, line 147) | New `aquarium` source: `addStats(total, { sellBonus: user.companion.sellBonus })` when `now < user.companion.validUntil`. Record it in `sources`. |
-| `src/engine/cast.js` (line 190) | No new query. The user document already reaches `resolveModifiers`, which reads the snapshot. |
-| `src/class/Pet.js` | `feed`/`play` (446/476): per-pet cooldown and capped bond gain. `sell` (497): new formula, atomic claim + `$inc` under `withUserLock`, weekly limit (A1, A8). `breed` (647): `rng.random() < rate` (A2, line 661), cooldown from `lastBred` (A3), `updateBreeding(true)` (A5, 716–717), second-pet message (A11), mark babies `bred`. Hunger/mood/stress/health use `|T − 25|` (171/215/268/412). `calculateMultiplier` respects `unlocked` (A10, 310). New `companionSnapshot(owner)`: best-k thriving pets → `{ sellBonus, slots, validUntil }`. |
-| `src/class/Aquarium.js` | `updateStatus` (77): no temperature drift; cleanliness decay unchanged. `effectiveTemperature` clamp. Effective capacity = max(stored `size`, license `tankSize`). `compareBiome` (193): add Mountain Stream as Freshwater. |
-| `src/commands/slash/Pet/pet.js` | Cooldown replies. `sell` shows the value and asks for confirmation. `breed`: `await` the capacity (A4, line 213) and add the baby to the tank. Every pet action refreshes the companion snapshot. |
-| `src/commands/slash/Pet/aquarium.js` | `view`: thriving status per pet, companion bonus and slots, "care needed in X h", ideal 25 °C. `feed`: per-pet cooldown. `upgrade`: effective size. Every action refreshes the snapshot. |
-| `src/commands/slash/Pet/build.js` | Tank limit = license `tanks` (+ display tanks), counted per water type. Existing extra tanks stay usable. New tanks start at 25 °C. |
+| `src/engine/balance.js` | `AQUARIUM` block: `LICENSE_DEFS` (by catalog name: level, tanks, tankSize, companionSlots), `COMPANION` (per-pet by rarity, bond, thrive rule), `PET_CARE` (cooldowns, bond cap), `PET_SALE` (formula factors, weekly limit), `BREEDING` (cooldown), `TEMPERATURE` (ideal, adjust range). Values baked from `aquarium.js` `PARAMS`; a test asserts equality. Bump `BALANCE_VERSION`. |
+| `src/engine/modifiers.js` (`resolveModifiers`) | New `aquarium` source: `addStats(total, { sellBonus: user.companion.sellBonus })` when `now < user.companion.validUntil`. Record it in `sources`. |
+| `src/engine/cast.js` | No new query: the user document already reaches `resolveModifiers`, which reads the snapshot. |
+| `src/class/Pet.js` | `feed` / `play`: per-pet cooldown and capped bond gain. `sell`: new formula, atomic claim + `$inc` under `withUserLock`, weekly limit (A1, A8). `breed`: `rng.random() < rate` (A2), cooldown from `lastBred` (A3), `updateBreeding(true)` (A5), second pet's name (A11), mark babies `bred`. Hunger, mood, stress and health use the one ideal (A9). `calculateMultiplier` respects `unlocked` (A10). New `companionSnapshot(owner)`: best thriving pets → `{ sellBonus, slots, validUntil }`. |
+| `src/class/Aquarium.js` | `updateStatus`: no temperature drift; cleanliness decay unchanged. `effectiveTemperature` clamp. Effective capacity = max(stored `size`, license `tankSize`). `compareBiome`: Mountain Stream as Freshwater. |
+| `src/commands/slash/Pet/pet.js` | Cooldown replies. `sell` shows the value and asks for confirmation. `breed`: `await` the capacity and add the baby to the tank (A4). Every pet action refreshes the companion snapshot. |
+| `src/commands/slash/Pet/aquarium.js` | `view`: thriving status per pet, companion bonus and slots, "care needed in X h", the ideal temperature. `feed`: per-pet cooldown. `upgrade`: effective size. Every action refreshes the snapshot. |
+| `src/commands/slash/Pet/build.js` | Tank limit = license `tanks` (+ display tanks), counted per water type. Existing extra tanks stay usable. New tanks start at the ideal. |
 | `src/commands/slash/Pet/adopt.js` | Capacity = effective size. Refresh the snapshot. |
-| `src/components/buttons/buy-other.js` | Hide or block owned licenses and lower tiers of an owned water type (A7). Display tanks as a purchase (requires Expert of that water type, Lv 45). |
-| `src/class/User.js` (`getAquariumLicense`, 267) | Merge `LICENSE_DEFS` by name (read-time). A helper for companion slots, level-capped. |
+| `src/components/buttons/buy-other.js` | Hide or block owned licenses and lower tiers of an owned water type (A7). Display tanks as a purchase (requires Expert of that water type). |
+| `src/class/User.js` (`getAquariumLicense`) | Merge `LICENSE_DEFS` by name (read-time). A helper for level-capped companion slots. |
 | `src/bootstrap/data/licenses.js` | New `price`, `requirements.level`, `aquarium.size`, and additive `aquarium.tanks` / `aquarium.companionSlots`, for fresh databases. New display-tank catalog items. |
-| `src/bootstrap/seed.js` | License catalog sync step (see §12), or a read-time price overlay. |
-| `src/schemas/PetSchema.js`, `HabitatSchema.js`, `UserSchema.js` | Additive fields only (§12). `HabitatSchema.temperature` default 25, which affects new documents only. |
+| `src/bootstrap/seed.js` | License catalog sync step (§14), or a read-time price overlay. |
+| `src/schemas/PetSchema.js`, `HabitatSchema.js`, `UserSchema.js` | Additive fields only (§14). `HabitatSchema.temperature` default = the ideal, which affects new documents only. |
 | `src/commands/slash/User/fishing-stats.js` | Private view: companion bonus, counted pets, time until care is needed. |
 
 ---
 
-## 12. Migrations (additive and idempotent only)
-- **Player documents: no rewrite.**
+## 14. Migrations (additive and idempotent only)
+
+- **Player documents: no rewrite** (`P-AQUARIUM-LEGACY-LICENSES`).
   - **Licenses:** owned `LicenseData` keep their stored fields. The engine reads `LICENSE_DEFS` by name, so capacity = max(stored size, new tank size), and slots are level-capped.
-  - **Aquariums:** every existing `Habitat` stays usable, including tanks beyond the new limit. They are grandfathered, and only new builds are limited.
+  - **Aquariums:** every existing `Habitat` stays usable, including tanks beyond the new limit. They are grandfathered; only new builds are limited.
   - **Temperature:** read clamped; no write needed. The first `/aquarium adjust` stores a valid value.
-  - **Pets:** keep `xp`, which becomes bond (≥ 700 means full bond). No pet is deleted or modified.
-- **New additive fields** (defaults mean "legacy"):
+  - **Pets:** keep `xp`, which becomes bond (at or above the cap means full bond). No pet is deleted or modified.
+- **New additive fields** (absent means "legacy"):
   - `PetFish.bred` (Boolean; absent = wild).
-  - `User.companion = { sellBonus, slots, validUntil, computedAt }`: a derived snapshot, recomputed by every aquarium or pet command. Absent = 0 bonus.
-  - `User.petSales = [Date]`: the last 7 days of sales, for the weekly limit. Absent = none.
-- **Catalog (6 license rows, `user: null`).** One sync step writes `price`, `requirements.level`, `aquarium.size`, `aquarium.tanks` and `aquarium.companionSlots`. It is guarded by `catalogRevision: 'aquarium-5b'` and skips rows that already carry it, so it is idempotent and never touches `*Data` collections. Display-tank items are inserted by the normal bootstrap upsert.
-  - If you prefer zero catalog updates, the shop can overlay `LICENSE_DEFS` prices at read time (same option as bait.md §12).
-- **No refunds and no clawbacks by default.** See decisions 4 and 6.
+  - `User.companion = { sellBonus, slots, validUntil, computedAt }`: a derived snapshot, recomputed by every aquarium or pet command. Absent = no bonus.
+  - `User.petSales = [Date]`: the last week of sales, for the weekly limit. Absent = none.
+- **Catalog (the six license rows, `user: null`).** One sync step writes `price`, `requirements.level`, `aquarium.size`, `aquarium.tanks` and `aquarium.companionSlots`. It is guarded by `catalogRevision: 'aquarium-5b'` and skips rows that already carry it, so it is idempotent and never touches `*Data` collections. Display-tank items are inserted by the normal bootstrap upsert. If you prefer zero catalog updates, the shop can overlay `LICENSE_DEFS` prices at read time (same option as bait).
+- **No refunds and no clawbacks by default** (`P-AQUARIUM-LEGACY-LICENSES`, `P-AQUARIUM-NO-CLAWBACK`).
+
+### Legacy licenses
+
+`report().legacy`: what an existing license becomes.
+
+<!-- generated:aquarium-legacy -->
+| License | Paid today | Tank size: stored → effective | Tanks: today → proposed | New price | Companion slots at Lv 0 / 15 / 30 / 45 |
+| --- | --- | --- | --- | --- | --- |
+| Basic Freshwater Aquarium License | $1,000,000 | 1 → 3 | unlimited → 1 (extra tanks grandfathered) | $30,000 | 0 / 2 / 2 / 2 |
+| Basic Saltwater Aquarium License | $1,000,000 | 1 → 3 | unlimited → 1 (extra tanks grandfathered) | $30,000 | 0 / 2 / 2 / 2 |
+| Advanced Freshwater Aquarium License | $5,000,000 | 2 → 4 | unlimited → 2 (extra tanks grandfathered) | $120,000 | 0 / 2 / 5 / 5 |
+| Advanced Saltwater Aquarium License | $5,000,000 | 2 → 4 | unlimited → 2 (extra tanks grandfathered) | $120,000 | 0 / 2 / 5 / 5 |
+| Expert Freshwater Aquarium License | $10,000,000 | 3 → 5 | unlimited → 3 (extra tanks grandfathered) | $260,000 | 0 / 2 / 5 / 9 |
+| Expert Saltwater Aquarium License | $10,000,000 | 3 → 5 | unlimited → 3 (extra tanks grandfathered) | $260,000 | 0 / 2 / 5 / 9 |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-legacy -->
 
 ---
 
-## 13. Tests to add
-1. **A1:**
-   - `/pet play`, `/pet feed` and `/aquarium feed` on cooldown change nothing.
-   - Bond gain stops at 700, and an existing XP above 700 is never reduced.
-   - The sale value ignores XP and never exceeds 1.25× the species value.
-   - A 4th sale within 7 days is refused.
-2. **A8:**
-   - Two concurrent sells of one pet pay once.
-   - A sell during a cast loses no cast income.
-3. **A2:**
-   - A seeded statistical test on `breed` at rate 0.65 gives ≈ 65% (and not 0.65%).
-   - The chance stays within 10–65% for any stress and health.
-4. **A3–A5:**
-   - A parent bred < 7 days ago is refused.
-   - A full tank refuses breeding.
-   - The baby appears in the tank's `fish` list and is marked `bred`.
-   - Parents get the success XP.
-5. **A6/A7:**
-   - `/build` stops at the license's tank count; an account with more legacy tanks keeps them all usable.
-   - An owned license is not offered again.
-6. **Temperature:**
-   - No drift over time.
-   - A stored 812 °C reads as 30 °C.
-   - All four formulas are neutral at 25 °C.
-   - New tanks start at 25 °C.
-7. **Companion bonus:**
-   - The thriving rule (30 h / 50% clean / ±3 °C).
-   - Only the best k thriving pets count.
-   - The level cap on legacy licenses.
-   - Bond ramp 50% → 100%.
-   - `resolveModifiers` adds it to `sellBonus` only before `validUntil`.
-   - The cast's XP is identical with and without it.
-   - `competitiveEligible` is unchanged.
+## 15. Tests to add
+
+1. **A1:** `/pet play`, `/pet feed` and `/aquarium feed` on cooldown change nothing. Bond gain stops at the cap, and an existing XP above it is never reduced. The sale value ignores XP and never exceeds the maximum share of the species value (Sale value). A sale over the weekly limit is refused.
+2. **A8:** two concurrent sells of one pet pay once; a sell during a cast loses no cast income.
+3. **A2:** a seeded statistical test on `breed` at the thriving rate gives that rate as a probability, not a hundredth of it; the chance stays within the intended range for any stress and health (Breeding).
+4. **A3–A5:** a parent inside its cooldown is refused; a full tank refuses breeding; the baby appears in the tank's `fish` list and is marked `bred`; parents get the success XP.
+5. **A6 / A7:** `/build` stops at the license's tank count, and an account with more legacy tanks keeps them all usable; an owned license is not offered again.
+6. **Temperature:** no drift over time; a long-drifted stored value reads as the adjust range's edge; all four formulas are neutral at the ideal; new tanks start at the ideal.
+7. **Companion bonus:** the thriving rule (Pet rules); only the best thriving pets up to the slots count; the level cap on legacy licenses; the bond ramp; `resolveModifiers` adds it to `sellBonus` only before `validUntil`; the cast's XP is identical with and without it; `competitiveEligible` is unchanged.
 8. **Parity:** `balance.js` `AQUARIUM` equals `aquarium.js` `PARAMS`, and `CURRENT.traits` equals `Pet.generateTraits` weights.
-9. **Economy regression** (about 1 s): `require('scripts/economy/5b/aquarium').checks().pass` at the current framework version.
+9. **Economy regression** at the current framework version: `require('scripts/economy/5b/aquarium').checks().pass`, and `node scripts/economy/5b/check-shared.js` (decision records match the model, generated tables current).
 
 ---
 
-## 14. Risks
-- **Legacy license buyers paid 33–42× the new price.** A full water type cost $16M today against $400k proposed. They keep their licenses with larger tanks, and get full slots once they reach each gate. No refund is proposed (decision 4).
-- **Players mid-exploit lose the cash value of farmed pet XP.** This is intended: the XP is kept as bond, but it no longer sells.
-- **Care is a daily habit.** Missing days halves the benefit (care on half the days gives 1.90% instead of 3.81%). It never costs pets, but the UI must say clearly why the bonus stopped.
-- **Existing tanks show "not thriving"** until the temperature is set once (0 °C default, or drifted values).
-- **Casual players get the least back per dollar** (licenses are 13.5% of their income to Lv 60, recovering 93% / 30% / 13%). The aquarium is optional, and cash from the streak/daily designs changes this (R2).
-- **The second water type is collection-only.** Some players may see it as a dead purchase (decision 2).
-- **Calendar-based pet cash** is bounded (≤ $13,041/week in the most extreme setup) but real. It must be kept in the integrated money model.
-- **Stacking with Double Cash and other sell bonuses** must be defined by the buffs design. The companion bonus is a stat and adds to gear `sellBonus`.
+## 16. Risks
+
+- **Legacy license buyers paid far more than the new prices** (Legacy licenses). They keep their licenses with larger tanks and get full slots once they reach each gate. No refund is proposed (`P-AQUARIUM-LEGACY-LICENSES`).
+- **Players mid-exploit lose the cash value of farmed pet XP.** Intended: the XP is kept as bond, but it no longer sells.
+- **Care is a daily habit.** Missing care costs as much bonus as swapping Legendary pets for Common ones (Sensitivity). It never costs pets, but the UI must say clearly why the bonus stopped.
+- **Existing tanks show "not thriving"** until the temperature is set once.
+- **The second water type is collection-only.** Some players may see it as a dead purchase (`P-AQUARIUM-SECOND-WATER`).
+- **Calendar-based pet cash** is bounded by the weekly limit (Pet income bound) but real. It is not part of the integrated lifecycle (the model does not play pet sales); the bound is the figure to watch.
+- **Licenses are a small sink.** On the integrated model they take a few percent of income; accumulated cash is absorbed here only if players buy display tanks (Display tanks). The overall accumulation picture belongs to the integrated sink summary, not to this module.
+- **Payback past the ladder** (Advanced, Expert) is extrapolated at the last live stage. When Mountain Stream enters the lifecycle it regenerates with no edit here; a later "Master" license tier for that era is not proposed now.
 - **The snapshot can go stale** if a pet changes outside the aquarium and pet commands. `validUntil` bounds that, and every aquarium or pet command recomputes it.
 
 ---
 
-## 15. Decisions for you
-1. **Money upkeep:** none, care-based (recommended), or a modest per-pet daily fee (§5 table: 120% of the bonus for casual players).
-2. **Second water type:** adds tanks only (recommended), or also its own companion slots (the bonus could double to about +9.9%).
-3. **Weekly rehoming limit of 3 pet sales** (recommended), or no limit (the pet income bound for casual players rises from 9% to 25% of fishing).
-4. **Legacy license buyers:** keep their licenses with improved capacity (recommended), or a partial credit.
-5. **Temperature:** the heater holds the setting (recommended), or a bounded drift toward 20 °C.
-6. **Past `/pet sell` proceeds:** no clawback (recommended), optionally an analytics audit.
+## 17. Checks and reproduce
 
----
+### Checks
 
-## 16. Dependencies and framework change requests
-**Dependencies:**
-- **Rods:** `rods.assembly(t)`, crate unlock levels and the repair upkeep share feed the rods-first lifecycle.
-- **Permits:** priced by another design. The `otherSpendShare` 0 / 15 / 30% columns are a stand-in until the integrator adds them.
-- **Streak/daily:** casual affordability improves with daily cash.
-- **Buffs:** stacking with Double Cash.
-- **Integrator:** the companion bonus, license and display spending, and pet sales, all in one money model.
+`checks()`: design targets, lifecycle checks on the integrated model.
 
-**Framework change requests** (none edited):
-1. **Export the `curve.js` lifecycle core** (XP timeline + rod-tier timing) from a side-effect-free module. `aquarium.js` re-implements it, as rods, bait and streak do, and guards the copy with `baselineMatchesCurveJson()`.
-2. **Add attendance to the shared archetypes** (days played per week, or a daily attendance probability). The streak design models attendance, and the companion bonus depends on daily care. Both should read one shared value instead of each assuming "plays every day".
-3. **When Mountain Stream enters `LIVE_BIOMES` / the lifecycle,** Expert payback (now extrapolated after Lv 60 at the Swamp T5 stage) regenerates automatically. Nothing changes here, but the report's post-60 extrapolation should then be dropped. A future "Master" license tier for the Mountain Stream era is not proposed now.
-
----
-
-## 17. Reproduce
-```
-node -e "require('./scripts/economy/5b/aquarium.js').report()"          # every number above (~1 s)
-node scripts/economy/5b/aquarium.js > /tmp/aquarium.json                  # same, as JSON
-node -e "console.log(require('./scripts/economy/5b/aquarium.js').checks())"
-node scripts/economy/5b/check-shared.js                                   # shared-assumption guard (passes)
-```
-
----
-
-## Integration (framework 5b.3)
-
-The aquarium now runs as a **system on the shared lifecycle core** (`lifecycle.js`). `aquarium.system(opts)` returns a fresh hook object each call, and all per-run state lives in `state.sys.aquarium`. `integrate.run({ variant: { aquarium: true } })` adds it to the reference loop. `lifecycle()` and `report()` still work, and `report().system` carries the system's contract and `validateSystem()`. The tables above are still the 5b.2 figures; the next stage regenerates them.
-
-**Options** (defaults in brackets): `buy` [true; false gives an inert system, the no-aquarium baseline], `displayTanks` [false], `waters` [Freshwater; a second water type adds tanks, not slots], `tiers` [all], `mix` [Legendary], `care` [1], `reserve` [0; a number or `(state, ctx) => number`], `conventions` ['core'; 'lifecycle' is the validation replay].
-
-| Hook | What it does |
-| --- | --- |
-| `init` | Creates `state.sys.aquarium`: holdings (`owned`), one record per purchase (price, slots added, bond start, stamps, companion cash, payback), gates, spend, `companionCash`, the measured XP effect, and milestone snapshots. |
-| `goals` | Offers what `aquariumOptions(gate level, { owned })` offers, as a chain per water type: the next license tiers, then (with `displayTanks`) the display tanks of an Expert water type. Prices rise along a chain, so a later offer is affordable in a pass only after its prerequisite is bought. Licenses are `'optional'` at `LC.PRIORITY.license`; display tanks are `'aspirational'` at `LC.PRIORITY.aspirational`. All are **non-blocking** (user decision 10), so blocking progression goals of higher priority (permits, rod assemblies) are served first. That is the integrated "rods first" rule. |
-| `modifyCast` | Adds the companion bonus to `input.stats.sellBonus`. Per purchase: slots added × per-pet bonus of the mix × `bondFactorAfterDays(care days owned)` × care. This is `holdingsBonus()` per purchase with each purchase's own bond; at full bond the sum equals `holdingsBonus(owned)`. Care days follow play hours ÷ session hours, so bond grows only on days the player attends. The minimum-daily player counts completed play days. |
-| `beforeStep` | Notes the step's start (used by the replay's stamps). |
-| `onCasts` | Measures the bonus's marginal cash on the core's own cast: cash minus the same cast without the bonus, with other systems' changes kept and the run's outcome function. It splits that over purchases by their share of the bonus, stamps payback, and measures the XP effect the same way (always 0). |
-| `onDayStart` / `onDayEnd` | Mark the day-end purchase pass, which the replay skips. |
-| `on('levelUp')` | Snapshots companion cash and spend at each milestone (real and public). |
-
-- **Ledgers:** the system writes **no XP or cash source**. The companion bonus is a cast stat, so the core's `'fishing'` cash already includes it; the aquarium's share is `state.sys.aquarium.companionCash` (per purchase in `purchases[i].cash`). It is a marginal, so with bait or Double Cash it includes the bonus on their extra income. Spend items: `ledger.spend.optional['license:<name>']` and `ledger.spend.aspirational['display:<name>']`.
-- **No upkeep, no boxes:** there is no money upkeep (care is the upkeep, §5). The aquarium grants no boxes, so it emits no `'box'` events.
-- **Profile:** the rules are profile-independent (§10). An outcome override (Founder) honours `input.stats.sellBonus`, so the Founder sell multiplier multiplies the bonus as it multiplies gear.
-- **Figures:** `systemSummary(result)` turns any run into this module's figures: purchases, gate and purchase stamps, payback hours (extrapolated past the end as `lifecycle()` did), totals and shares of income.
-
-**Validation** (`validateSystem()`). This runs `LC.simulate` with `system()` on the shared (rods) gear path. The baseline systems reproduce what `lifecycle()` assumed:
-- **Gear rule** (`lifecycleMoney`): `LC.provisionalRods`' rule, applied to stage income without the bonus.
-- **Money:** `rods.assembly(t)` at each equip, repairs at rods' upkeep share, and other spend.
-- **Daily XP:** `LC.provisionalDaily`.
-- **Rods first:** `lifecycleReserve` as the goals' reserve.
-
-It covers 17 cases: all four archetypes; each with 15% and 30% of income spent elsewhere; and the regular player with Common, Rare and Lucky pets, care on half the days, and Saltwater.
-
-| Run | Milestones step-exact | License purchase passes | Max relative difference |
+<!-- generated:aquarium-checks -->
+| Check | Target | Measured | Result |
 | --- | --- | --- | --- |
-| Replay (`conventions: 'lifecycle'`) | 102 / 102 | all identical | **0** (exact: payback, recovered, totals, shares, final money) |
-| **Default system** | 102 / 102 | all identical | **0.09%** (tolerance 0.5%) |
+| companion bonus is small and bounded | <= 0.05 | 0.0495 | pass |
+| a pet never sells for more than 1.25x the fish it was adopted from | <= 1.25 | 1.25 | pass |
+| breeding chance (fixed) within the intended 10-65% | 0.1-0.65 | 0.1-0.65 | pass |
+| pet income bound (any parents, any capacity) within the target share of a regular player's fishing | <= 0.05 | 0.0172 | pass |
+| pet income bound (any parents, any capacity) within the target share of a casual player's fishing | <= 0.1 | 0.0846 | pass |
+| the aquarium adds no XP: every level is reached on the same step with the same XP by source, with and without it (integrated: every archetype and the minimum-daily player; reference loop and money bait) | yes | yes | pass |
+| every license is bought before the next tier's gate (integrated: every archetype and the minimum-daily player; reference loop and money bait) | yes | yes | pass |
+| licenses never delay progression: every rod assembly or permit they move is still bought by the time its level is reached, and none is dropped (integrated) | yes | yes | pass |
+| reference player earns each license back within its payback target, and higher tiers take longer (integrated) | basic 60, advanced 90, expert 120 | basic 45.65, advanced 74.61, expert 100.52 | pass |
+| a legacy Expert license at the Basic gate level gives only Basic companion slots (level cap) | 2 | 2 | pass |
+| no mandatory money upkeep | 0 | 0 | pass |
 
-The default system's largest difference is on a small net: companion cash minus licenses for the casual player spending 30% elsewhere, −$2,205 vs −$2,203. Elsewhere, companion cash is about 1e-4 lower (regular: $208,128 vs $208,149), and payback hours move by at most 0.02 h.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `aquarium.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:aquarium-checks -->
 
-**No XP effect:** with and without licenses, every level (1–60) is reached on the same step with the same XP ledger, for every archetype. The measured per-cast XP effect is 0.
+**Dependencies:** rods (the gear path and its assembly and repair purchases, read through the integrated loop), world (permits), quests and streak (cash that makes licenses affordable at the gate), buffs (Double Cash on the whole catch, companion bonus included) and bait (the money-bait variant). None is copied here: each comes from its own system on the shared core.
 
-**What differs, and which rule is right.**
-- **Days:** the core counts a level reached on a day's final step in that day; `ceil(h/dayH)` counted the next day. Hours are compared.
-- **Stamps:** `lifecycle()` stamps a purchase at the start of the step whose income paid for it. The core buys in the pass after that step, so purchase passes are compared, and payback counts the same earning steps.
-- **Bond clock** (the one rule difference): `lifecycle()` starts the ramp one step (1 min of play) before the pets are adopted. The core starts it at the purchase, which is right. The replay isolates this rule and is exact.
-- **Day-end pass:** the core also buys after a day's last step. A gate reached on that step is acted on before the next session, where `lifecycle()` waited for the next step. No validated case is affected.
-- **Extrapolated payback** (after Lv 60): `lifecycle()` counted one step more than the purchase earned over. The core counts the earning steps.
-- **Gear rule:** `LC.provisionalRods` as-is saves the core's cast income, bonus included. While a bond ramps, the saved sum trails the current income, so the active player's L50 and the grinder's L40–60 come 1 step later. That is an artifact of a placeholder rule that reads income, not an XP effect. `lifecycle()`'s rule (stage income without the bonus) is the right baseline.
-
-**On the integrated reference loop** (`integrate.run`, default system, all archetypes to Lv 60). Income is every cash source, including quests and streak.
-
-| Player | Basic / Advanced / Expert bought | Basic payback | Bonus / fish income | Licenses / income | Net | Other purchases moved |
-| --- | --- | --- | --- | --- | --- | --- |
-| Casual | 2.58 h Lv 15 / 11.35 h Lv 30 / 28.08 h Lv 45 | 49.4 h | 3.65% | 4.57% | −3.09% | T2 assembly 4.85 → 5.37 h |
-| **Regular** | 2.55 h Lv 15 / 12.38 h Lv 30 / 31.70 h Lv 45 | **44.5 h** | **3.64%** | **4.62%** | **−2.22%** | T2 assembly 5.27 → 6.02 h |
-| Active | 2.87 h Lv 15 / 13.13 h Lv 30 / 31.75 h Lv 45 | 42.4 h | 3.54% | 4.91% | −2.03% | T2 assembly 5.30 → 6.02 h |
-| Grinder | 2.65 h Lv 15 / 12.08 h Lv 31 / 29.20 h Lv 45 | 40.1 h | 3.11% | 5.10% | −2.33% | T2 assembly 5.03 → 5.68 h |
-
-- **XP milestones are identical** with and without the aquarium for every archetype.
-- The licenses compete for cash only with the T2 crate assembly, which is bought 0.5–0.75 h later but still long before its Lv 30 equip.
-- Advanced and Expert paybacks fall after Lv 60 (extrapolated), as before.
-
-**Fixes in this module** (no design value changed):
-- `lifecycle()` takes a `gearPath` option, and `baselineMatchesCurveJson()` checks curve.json on `F.PROVISIONAL_GEAR_PATH`, the path it was fitted on (hours only). The check had failed since the R3 cutover.
-- `gearRates()` is now cached by tier content, since the provisional and rods paths share the keys `t1`–`t5`.
-- The shared path is read once per module (`F.gearPath()` rebuilds rods' path on every call).
-- Every other `report()` number is unchanged.
+```
+node scripts/economy/5b/aquarium.js > /tmp/aquarium.json            # the full report (a few seconds)
+node -e "console.log(require('./scripts/economy/5b/aquarium.js').checks().pass)"
+node scripts/economy/5b/render-docs.js                              # regenerate this document's tables
+node scripts/economy/5b/check-shared.js                             # shared-assumption, decision and docs guard
+```
