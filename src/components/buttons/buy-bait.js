@@ -4,6 +4,8 @@ const { Item, ItemData } = require('../../schemas/ItemSchema');
 const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
+const { purchase, replaceCollector } = require('../../engine/purchase');
+const { checkLevelGate } = require('../../engine/levelGate');
 
 module.exports = {
 	customId: 'buy-bait',
@@ -31,7 +33,7 @@ module.exports = {
 				components: [...components, row],
 			});
 
-			await getBaitSelection(response, user.id, analyticsObject);
+			await getBaitSelection(response, user.id, analyticsObject, interaction.message.id);
 
 		}
 		catch (err) {
@@ -74,8 +76,9 @@ const removeAdditionalActionRows = (num, components) => {
 	return components;
 };
 
-const getBaitSelection = async (response, user, analyticsObject) => {
+const getBaitSelection = async (response, user, analyticsObject, messageId) => {
 	const collector = response.createMessageComponentCollector({ filter: Utils.getCollectionFilter(['select-bait'], user), time: 90_000 });
+	replaceCollector('buy-bait:select', messageId, user, collector);
 
 	collector.on('collect', async i => {
 		if (process.env.ANALYTICS || config.client.analytics) {
@@ -90,7 +93,9 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 	const baitChoice = selection.values[0];
 	const originalItem = await getItemById(baitChoice);
 
-	if (!meetsItemRequirements(userData, originalItem)) {
+	// Awaited: the un-awaited Promise was always truthy, so the level gate never refused anything.
+	const gate = await checkLevelGate(userData, originalItem);
+	if (!gate.ok) {
 		if (process.env.ANALYTICS || config.client.analytics) {
 			await analyticsObject.setStatus('failed');
 			await analyticsObject.setStatusMessage('User does not meet level requirements');
@@ -101,7 +106,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 			.setTitle('Shop')
 			.setColor('Red')
 			.addFields(
-				{ name: 'Uh-oh!', value: `You need to be level ${originalItem.toJSON().requirements.level} to buy this item!`, inline: false },
+				{ name: 'Uh-oh!', value: `You need to be level ${gate.required} to buy this item!`, inline: false },
 			),
 		);
 		
@@ -121,6 +126,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 	});
 
 	const amountCollector = await amountResponse.createMessageComponentCollector({ filter: Utils.getCollectionFilter(['buy-one', 'buy-five', 'buy-ten', 'buy-hundred', 'select-bait', 'buy-other'], user), time: 90_000 });
+	replaceCollector('buy-bait:amount', selection.message.id, user, amountCollector);
 	amountCollector.on('collect', async i => {
 		if (i.customId === 'select-bait') return amountCollector.stop();
 		if (i.customId === 'buy-other') return amountCollector.stop();
@@ -132,7 +138,9 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 			await Interaction.generateCommandObject(i, analyticsObject);
 		}
 
-		if (!await hasEnoughMoney(userData, originalItem, amount)) {
+		// The balance check is the guarded debit at click time, never the snapshot from the select.
+		const result = await buyItem(user, originalItem, amount);
+		if (!result.ok) {
 			// update interaction
 			if (process.env.ANALYTICS || config.client.analytics) {
 				await analyticsObject.setStatus('failed');
@@ -146,7 +154,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 				.addFields(
 					{ name: 'Uh-oh!', value: 'You do not have enough money to buy that amount', inline: false },
 					{ name: 'Price', value: `$${(originalItem.price * amount).toLocaleString()}`, inline: true },
-					{ name: 'Balance', value: `$${(await userData.getMoney()).toLocaleString()}`, inline: true },
+					{ name: 'Balance', value: `$${(result.balance).toLocaleString()}`, inline: true },
 				),
 			);
 			
@@ -157,7 +165,6 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 			});
 		}
 		else {
-			await buyItem(userData, originalItem, amount);
 			// update interaction
 			if (process.env.ANALYTICS || config.client.analytics) {
 				await analyticsObject.setStatus('completed');
@@ -169,7 +176,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 				.setColor('Green')
 				.addFields(
 					{ name: 'Congrats!', value: `You have successfully bought ${amount} ${originalItem.name}!`, inline: false },
-					{ name: 'New Balance', value: `$${(await userData.getMoney()).toLocaleString()}`, inline: true },
+					{ name: 'New Balance', value: `$${(result.balance).toLocaleString()}`, inline: true },
 				),
 			);
 			
@@ -184,11 +191,6 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 
 const getItemById = async (itemId) => {
 	return await Item.findById(itemId);
-};
-
-const meetsItemRequirements = async (userData, item) => {
-	const userLevel = await userData.getLevel();
-	return userLevel >= item.toJSON().requirements.level;
 };
 
 const createAmountActionRow = () => {
@@ -215,12 +217,12 @@ const getAmountFromChoice = async (amountChoice) => {
 	}
 };
 
-const hasEnoughMoney = async (userData, item, amount) => {
-	return (await userData.getMoney()) >= item.price * amount;
+/** Pays and grants in one locked step (see engine/purchase). Resolves { ok, balance }. */
+const buyItem = async (userId, item, amount) => {
+	return purchase(userId, item.price * amount, (userData) => grantBait(userData, item, amount));
 };
 
-const buyItem = async (userData, item, amount) => {
-	await userData.addMoney(-item.price * amount);
+const grantBait = async (userData, item, amount) => {
 	let baitItem;
 	const baits = await userData.getAllBaits();
 	const itemId = baits.find((bait) => bait.name === item.name);

@@ -59,7 +59,7 @@ module.exports = {
 				await analyticsObject.setStatusMessage('Displayed user stats.');
 			}
 
-			await buttonPagination(interaction, embeds, analyticsObject);
+			await buttonPagination(interaction, embeds, analyticsObject, false, [], undefined, { privateReply: true });
 		}
 		catch (err) {
 			console.error(err);

@@ -3,7 +3,6 @@ const buttonPagination = require('../../../buttonPagination');
 const { RodData } = require('../../../schemas/RodSchema');
 const { User } = require('../../../class/User');
 const config = require('../../../config');
-const { resolveProfile } = require('../../../engine/balance');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -28,9 +27,8 @@ module.exports = {
 			const user = new User(await User.get(target.id));
 			const rods = await RodData.find({ user: target.id });
 			const stats = await user.getStats();
-			// Founder status is private: only shown when players view their own profile.
-			const isFounder = target.id === interaction.user.id && resolveProfile(target.id, user.user).name === 'founder';
 
+			// /profile is public: it never shows Founder status (that lives only in the private /fishing-stats).
 			// Public level (base XP): a profile never shows private profile bonuses (engine/publicLevel.js).
 			let fields = [{
 				name: `Level ${await user.getPublicLevel() || 0}`,
@@ -57,7 +55,7 @@ module.exports = {
 
 				embeds.push(new EmbedBuilder()
 					.setFooter({ text: `Page ${Math.floor(i / chunkSize) + 1} / ${Math.ceil(fields.length / chunkSize)} ` })
-					.setTitle(`${target.globalName || target.username}'s Profile${isFounder ? ' · 👑 Founder' : ''}`)
+					.setTitle(`${target.globalName || target.username}'s Profile`)
 					.setColor('Green')
 					.addFields(chunk),
 				);

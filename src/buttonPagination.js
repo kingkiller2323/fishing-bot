@@ -2,12 +2,15 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlag
 const config = require('./config');
 const { Interaction } = require('./class/Interaction');
 
-module.exports = async (interaction, pages, analyticsObject = null, deferred = false, components = [], time = 90_000) => {
+// `options.privateReply`: reply privately to the invoking player (e.g. /inventory, /stats, /collection).
+// Callers that omit it keep the previous public behaviour (e.g. /profile).
+module.exports = async (interaction, pages, analyticsObject = null, deferred = false, components = [], time = 90_000, options = {}) => {
 	try {
 		if (!interaction || !pages || !Array.isArray(pages) || pages.length === 0) throw new Error('Invalid arguments');
+		const ephemeral = Boolean(options?.privateReply);
 
 		if (!deferred) {
-			await interaction.deferReply();
+			await interaction.deferReply(ephemeral ? { flags: MessageFlags.Ephemeral } : undefined);
 		}
 
 		if (pages.length === 1) {
@@ -32,6 +35,9 @@ module.exports = async (interaction, pages, analyticsObject = null, deferred = f
 			components: [buttons, ...components],
 			fetchReply: true,
 		});
+		// An ephemeral message cannot be edited with the bot token (Message#edit); edit it through the
+		// original interaction's webhook instead. Public replies keep using Message#edit as before.
+		const edit = (payload) => (ephemeral ? interaction.editReply(payload) : msg.edit(payload));
 
 		const mc = await msg.createMessageComponentCollector({
 			componentType: ComponentType.Button,
@@ -74,7 +80,7 @@ module.exports = async (interaction, pages, analyticsObject = null, deferred = f
 				next.setDisabled(false);
 			}
 
-			await msg.edit({
+			await edit({
 				embeds: [pages[index]],
 				components: [buttons, ...components],
 			});
@@ -85,7 +91,7 @@ module.exports = async (interaction, pages, analyticsObject = null, deferred = f
 		});
 
 		mc.on('end', async () => {
-			await msg.edit({
+			await edit({
 				embeds: [pages[index]],
 				components: [],
 			});

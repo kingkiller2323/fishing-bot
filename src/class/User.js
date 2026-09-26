@@ -3,6 +3,7 @@ const { Fish, FishData } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
 const { User: UserSchema } = require('../schemas/UserSchema');
 const { BuffData } = require('../schemas/BuffSchema');
+const { activeBuffFilter } = require('../engine/buffs');
 const config = require('../config');
 const fetch = require('node-fetch');
 const { QuestData } = require('../schemas/QuestSchema');
@@ -169,7 +170,7 @@ class User {
 
 	async generateBoostedXP() {
 		// check for active buffs
-		const activeBuffs = await BuffData.find({ user: await this.getUserId(), active: true });
+		const activeBuffs = await BuffData.find(activeBuffFilter(await this.getUserId(), Date.now()));
 		const xpBuff = activeBuffs.find((buff) => buff.capabilities.includes('xp'));
 		const xpMultiplier = xpBuff ? parseFloat(xpBuff.capabilities[1]) : 1;
 
@@ -178,7 +179,7 @@ class User {
 
 	async generateBoostedCash() {
 		// check for active buffs
-		const activeBuffs = await BuffData.find({ user: await this.getUserId(), active: true });
+		const activeBuffs = await BuffData.find(activeBuffFilter(await this.getUserId(), Date.now()));
 		const cashBuff = activeBuffs.find((buff) => buff.capabilities.includes('cash'));
 		const cashMultiplier = cashBuff ? parseFloat(cashBuff.capabilities[1]) : 1;
 

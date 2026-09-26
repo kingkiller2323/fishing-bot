@@ -152,7 +152,7 @@ module.exports = {
 				await analyticsObject.setStatusMessage('Displayed inventory.');
 			}
 
-			await buttonPagination(interaction, embeds, analyticsObject);
+			await buttonPagination(interaction, embeds, analyticsObject, false, [], undefined, { privateReply: true });
 		}
 		catch (err) {
 			if (process.env.ANALYTICS || config.client.analytics) {

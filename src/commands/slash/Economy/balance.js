@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { User } = require('../../../class/User');
 const config = require('../../../config');
 
@@ -15,7 +15,7 @@ module.exports = {
      */
 	run: async (client, interaction, analyticsObject) => {
 
-		await interaction.deferReply();
+		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
 		let money = 0;
 		const user = new User(await User.get(interaction.user.id));
@@ -29,6 +29,7 @@ module.exports = {
 		}
 
 		await interaction.followUp({
+			flags: MessageFlags.Ephemeral,
 			embeds: [
 				new EmbedBuilder()
 					.setTitle('Bank')

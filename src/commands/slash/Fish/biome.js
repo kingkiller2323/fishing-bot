@@ -75,7 +75,15 @@ module.exports = {
 			components: [row],
 		});
 
-		const collector = response.createMessageComponentCollector({ componentType: ComponentType.StringSelect, time: 15000 });
+		// Only the invoker may use this menu: the selection acts on their account.
+		const collector = response.createMessageComponentCollector({
+			componentType: ComponentType.StringSelect,
+			filter: (i) => i.user.id === user.id,
+			time: 15000,
+		});
+		collector.on('ignore', async (i) => {
+			await i.reply({ content: 'This menu is not yours! Run the command yourself to use it.', flags: MessageFlags.Ephemeral }).catch(() => undefined);
+		});
 
 		collector.on('collect', async i => {
 			if (process.env.ANALYTICS || config.client.analytics) {

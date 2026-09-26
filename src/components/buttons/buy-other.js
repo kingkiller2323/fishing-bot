@@ -4,6 +4,7 @@ const { Item, ItemData } = require('../../schemas/ItemSchema');
 const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
+const { purchase, replaceCollector } = require('../../engine/purchase');
 
 module.exports = {
 	customId: 'buy-other',
@@ -28,7 +29,7 @@ module.exports = {
 
 			const response = await updateInteraction(interaction, row, components);
 
-			await getSelection(response, user.id, analyticsObject);
+			await getSelection(response, user.id, analyticsObject, interaction.message.id);
 		}
 		catch (err) {
 			// console.error(err);
@@ -86,8 +87,9 @@ const updateInteraction = async (interaction, row, components) => {
 	});
 };
 
-const getSelection = async (response, userId, analyticsObject) => {
+const getSelection = async (response, userId, analyticsObject, messageId) => {
 	const collector = response.createMessageComponentCollector({ filter: Utils.getCollectionFilter(['select-item'], userId), time: 90_000 });
+	replaceCollector('buy-other:select', messageId, userId, collector);
 
 	collector.on('collect', async i => {
 		if (process.env.ANALYTICS || config.client.analytics) {
@@ -128,7 +130,7 @@ const processItemSelection = async (selection, userData, analyticsObject) => {
 		});
 	}
 	else if (canBuy) {
-		let amount = 1;
+		const amount = 1;
 		if (originalItem.type === 'gacha') {
 			const amountRow = createAmountActionRow();
 			const components = removeAdditionalActionRows(3, selection.message.components);
@@ -138,17 +140,18 @@ const processItemSelection = async (selection, userData, analyticsObject) => {
 				components: [...components, amountRow],
 			});
 
-			const amountCollector = await amountResponse.createMessageComponentCollector({ filter: Utils.getCollectionFilter(['buy-one', 'buy-five', 'buy-ten', 'buy-hundred'], await userData.getUserId()), time: 90_000 });
+			const userId = await userData.getUserId();
+			const amountCollector = await amountResponse.createMessageComponentCollector({ filter: Utils.getCollectionFilter(['buy-one', 'buy-five', 'buy-ten', 'buy-hundred'], userId), time: 90_000 });
+			replaceCollector('buy-other:amount', selection.message.id, userId, amountCollector);
 			amountCollector.on('collect', async i => {
 				if (process.env.ANALYTICS || config.client.analytics) {
 					await Interaction.generateCommandObject(i, analyticsObject);
 				}
 				const amountChoice = i.customId;
-				amount = await getAmountFromChoice(amountChoice);
-				if (await userData.getMoney() >= originalItem.price * amount) {
-					await buyItem(i, originalItem, userData, amount);
-				}
-				else {
+				const chosenAmount = await getAmountFromChoice(amountChoice);
+				// The balance check is the guarded debit at click time, never the snapshot from the select.
+				const result = await buyItem(i, originalItem, userId, chosenAmount);
+				if (!result.ok) {
 					if (process.env.ANALYTICS || config.client.analytics) {
 						await analyticsObject.setStatus('failed');
 						await analyticsObject.setStatusMessage('User does not have enough money to buy items');
@@ -160,8 +163,8 @@ const processItemSelection = async (selection, userData, analyticsObject) => {
 						.setColor('Red')
 						.addFields(
 							{ name: 'Uh-oh!', value: 'You do not have enough money to buy that amount', inline: false },
-							{ name: 'Price', value: `$${(originalItem.price * amount).toLocaleString()}`, inline: true },
-							{ name: 'Balance', value: `$${(await userData.getMoney()).toLocaleString()}`, inline: true },
+							{ name: 'Price', value: `$${(originalItem.price * chosenAmount).toLocaleString()}`, inline: true },
+							{ name: 'Balance', value: `$${(result.balance).toLocaleString()}`, inline: true },
 						),
 					);
 
@@ -174,7 +177,25 @@ const processItemSelection = async (selection, userData, analyticsObject) => {
 			});
 		}
 		else {
-			await buyItem(selection, originalItem, userData, amount);
+			const result = await buyItem(selection, originalItem, await userData.getUserId(), amount);
+			if (!result.ok) {
+				if (process.env.ANALYTICS || config.client.analytics) {
+					await analyticsObject.setStatus('failed');
+					await analyticsObject.setStatusMessage('User does not have enough money to buy item');
+				}
+				return await selection.reply({
+					embeds: [new EmbedBuilder()
+						.setTitle('Shop')
+						.setColor('Red')
+						.addFields(
+							{ name: 'Uh-oh!', value: 'You do not have enough money to buy that item', inline: false },
+							{ name: 'Price', value: `$${(originalItem.price).toLocaleString()}`, inline: true },
+							{ name: 'Balance', value: `$${(result.balance).toLocaleString()}`, inline: true },
+						)],
+					flags: MessageFlags.Ephemeral,
+					components: [],
+				});
+			}
 		}
 
 		if (process.env.ANALYTICS || config.client.analytics) {
@@ -257,9 +278,10 @@ const getAmountFromChoice = async (amountChoice) => {
 	}
 };
 
-const buyItem = async (i, originalItem, userData, amount) => {
-	await userData.addMoney(-originalItem.price * amount);
-	await userData.sendToInventory(originalItem, amount);
+/** Pays and grants in one locked step; on success replies with the new balance. Returns the purchase result. */
+const buyItem = async (i, originalItem, userId, amount) => {
+	const result = await purchase(userId, originalItem.price * amount, (fresh) => fresh.sendToInventory(originalItem, amount));
+	if (!result.ok) return result;
 
 	let embeds = [];
 	embeds.push(new EmbedBuilder()
@@ -267,12 +289,13 @@ const buyItem = async (i, originalItem, userData, amount) => {
 		.setColor('Green')
 		.addFields(
 			{ name: 'Congrats!', value: `You have successfully bought ${amount} ${originalItem.name}`, inline: false },
-			{ name: 'New Balance', value: `$${(await userData.getMoney()).toLocaleString()}`, inline: true },
+			{ name: 'New Balance', value: `$${(result.balance).toLocaleString()}`, inline: true },
 		),
 	);
-	return await i.reply({
+	await i.reply({
 		components: [],
 		embeds: embeds,
 		flags: MessageFlags.Ephemeral,
 	});
+	return result;
 };
