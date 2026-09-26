@@ -7,8 +7,10 @@
 //   'approved-direction'  the user approved the direction (e.g. "reduce normal multi-catch"); the
 //                         specific numbers still await approval of the final Phase 5B tables
 //   'proposed'            a recommendation the model runs so numbers are comparable; NOT approved
-// No entry may claim more than that: final approval happens only after the user reviews Phase 5B.
-const STATUSES = ['approved-direction', 'proposed'];
+// Only the user approves: APPROVED below records the user's Phase 5B decision set verbatim by id.
+//   'approved'            the user approved this specific rule/number (Phase 5B decision set, after the
+//                         final report); only the user moves an entry here
+const STATUSES = ['approved', 'approved-direction', 'proposed'];
 
 /** Lazily read a modelled value (framework/integrator), so this file never copies one. */
 const F = () => require('./framework');
@@ -39,6 +41,29 @@ const DECISIONS = [
 	{ id: 'P-FOUNDER-GATE', status: 'proposed', title: 'Founder: gameplay gates read the PUBLIC level', modelled: 'public', alternatives: ['real'], source: 'founder design D1', why: 'otherwise the Founder fishes Swamp at public Lv ~10 within the first hour. For normal players public = real level only while both keep the stored no-demotion floor at the curve change (P-FOUNDER-PUBLIC-LEVEL, P-CURVE-EXISTING)', get: () => require('./integrate').DEFAULT_FOUNDER_GATE, expected: 'public' },
 ];
 
+// The user's Phase 5B decision set (after the final report). Only these ids are 'approved'; everything
+// else keeps the status its module gives it. Entries the user approved WITH a change are listed only once
+// the module models the chosen option (the note says which).
+const APPROVED = {
+	'A-CURVE': 'xp(L) = 100L^2 + 0.0525L^4; coefficient locked',
+	'P-CURVE-EXISTING': 'no-demotion migration',
+	'P-VALUE-MODEL': 'approved',
+	'P-XP-RARITY': 'approved',
+	'A-MULTICATCH': 'global normal-player ceiling 1.80 average fish/cast (rod ladder itself reopened for the standard/custom redesign)',
+	'A-PERMITS': 'approved', 'P-WORLD-PERMIT-PRICES': 'River $1,000 / Lake $6,200 / Pond $23,000 / Coast $62,000 / Swamp $160,000 / Mountain Stream $380,000',
+	'P-WORLD-MS-LADDER': 'Mountain Stream as the Lv 60 expansion biome, existing salmon kept', 'P-MS-VALUE': 'as designed',
+	'A-TOPGG': 'Top.gg retired; Voter\'s Crates stay openable', 'P-STREAK-VOTE': 'retired', 'P-STREAK-VOTERS-CRATE': 'stay openable',
+	'P-QUESTS-KINDS': 'quest typing approved',
+	'P-SAVINGS': 'accept ~70-75% retained income at launch; telemetry; no mandatory sinks',
+	'P-DAILY-FACTOR': 'keep 1.0; monitor equal-level XP/hour after release',
+	'P-DOUBLE-CASH': 'catch-time stamp; selling later never reapplies the multiplier',
+	'P-BUFFS-DURATION': '1 hour real time', 'P-BUFFS-FIX-DURATION': 'one unit per activation; B1+B2 ship with catch-time Double Cash',
+	'P-BUFFS-QUEUE': 'same-kind queue, max 3', 'P-BUFFS-SCOPE': 'catch-only Double XP / Double Cash', 'P-BUFFS-EVENT-STACKING': 'additive same-category stacking',
+	'P-BUFFS-HOTFIX': 'B3 shipped alone (hotfix L1)',
+};
+const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id); // "aquarium redesign: approve the overall design"
+const withApproval = (d) => (APPROVED[d.id] || isApprovedModule(d.id) ? { ...d, status: 'approved', approval: APPROVED[d.id] || 'aquarium redesign approved' } : d);
+
 // Subsystem modules export their own proposed decisions (same shape) as DECISIONS; they join the
 // registry here so there is ONE list for the Phase 5B report.
 const MODULES = ['rods', 'bait', 'quests', 'streak', 'aquarium', 'founder', 'buffs', 'world'];
@@ -48,7 +73,7 @@ function all() {
 		const list = require(`./${m}`).DECISIONS;
 		if (Array.isArray(list)) out.push(...list.map((d) => ({ module: m, ...d })));
 	}
-	return out;
+	return out.map(withApproval);
 }
 
 /** Verifies the registry: allowed statuses only, unique ids, and every modelled value is what runs. */
@@ -65,6 +90,7 @@ function verify() {
 			if (actual !== JSON.stringify(d.expected)) problems.push(`${d.id}: registry says ${JSON.stringify(d.expected)} but the model runs ${actual}`);
 		}
 	}
+	for (const id of Object.keys(APPROVED)) if (!seen.has(id)) problems.push(`APPROVED lists ${id}, which is not a registered decision`);
 	// Every candidate engine rule the framework runs must be registered as a decision.
 	const covered = new Set(DECISIONS.filter((d) => d.get).map((d) => String(d.get)));
 	const rulesCovered = Object.keys(F().RULES).every((k) => DECISIONS.some((d) => String(d.get).includes(`RULES.${k}`)));
@@ -76,4 +102,4 @@ function verify() {
 // The `get`/`expected` verification fields are left out of the report rows.
 const table = () => all().map((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== 'get' && k !== 'expected'))).sort((a, b) => (a.status === b.status ? 0 : a.status === 'proposed' ? -1 : 1));
 
-module.exports = { STATUSES, DECISIONS, MODULES, all, verify, table };
+module.exports = { STATUSES, DECISIONS, APPROVED, MODULES, all, verify, table };

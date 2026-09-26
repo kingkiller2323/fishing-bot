@@ -7,8 +7,8 @@
 //      a line may opt out only with an explicit `// shared-ok: <reason>` comment;
 //   2. runtime: framework.verifyShared() passes (shared values match the digest pinned for
 //      FRAMEWORK_VERSION), and every module's report() carries that exact version and digest;
-//   3. R1: the integrated sweep's best fit (docs/economy/5b/curve-integrated.json) equals framework
-//      CURVE.quartic, was generated at the current digest, and keeps the regular player in every window;
+//   3. R1: the curve coefficient is user-approved and locked; docs/economy/5b/curve-integrated.json was
+//      generated at the current digest, at that coefficient, and keeps the regular player in every window;
 //   4. the decision registry (decisions.js + every module's DECISIONS) only uses allowed statuses
 //      (nothing claims user approval of a candidate rule) and every modelled value is what runs;
 //   5. every module doc's generated tables, and the final report's (docs/economy/PHASE5B_REPORT.md,
@@ -116,7 +116,10 @@ async function main() {
 	else {
 		const curve = JSON.parse(fs.readFileSync(integratedFile, 'utf8'));
 		if (curve.model !== 'integrated') problems.push(`curve-integrated.json has model ${curve.model}`);
-		if (curve.chosen !== F.CURVE.quartic) problems.push(`the integrated sweep's best fit is quartic ${curve.chosen} but framework CURVE.quartic is ${F.CURVE.quartic} (R1)`);
+		// The coefficient is user-approved and LOCKED (decision A-CURVE, approved after R1). The sweep's best
+		// fit is recorded for information only; the guard requires the record to be made at the locked value
+		// and the regular player to stay in every approved window there.
+		if (curve.framework?.quartic !== F.CURVE.quartic) problems.push(`curve-integrated.json was evaluated at quartic ${curve.framework?.quartic}, but the locked CURVE.quartic is ${F.CURVE.quartic}; regenerate it`);
 		if (curve.sharedDigest !== expected.sharedDigest) problems.push(`curve-integrated.json was generated at digest ${curve.sharedDigest}; regenerate it (framework is ${expected.sharedDigest})`);
 		if (!curve.framework?.allInWindow) problems.push(`R1: the regular player misses an approved window at quartic ${F.CURVE.quartic}`);
 	}
