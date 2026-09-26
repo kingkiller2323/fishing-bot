@@ -1,6 +1,7 @@
 const { User } = require('../../class/User');
 const { FishData } = require('../../schemas/FishSchema');
 const { BuffData } = require('../../schemas/BuffSchema');
+const { activeBuffFilter } = require('../../engine/buffs');
 const { ButtonBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../../config');
 const { partitionProtected } = require('../../engine/protection');
@@ -60,7 +61,7 @@ module.exports = {
 			}
 
 			// check for buffs
-			const activeBuffs = await BuffData.find({ user: await userData.getUserId(), active: true });
+			const activeBuffs = await BuffData.find(activeBuffFilter(await userData.getUserId(), Date.now()));
 			const cashBuff = activeBuffs.find((buff) => buff.capabilities.includes('cash'));
 			const cashMultiplier = cashBuff ? parseFloat(cashBuff?.capabilities[1]) : 1;
 

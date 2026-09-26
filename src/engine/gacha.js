@@ -14,6 +14,7 @@ const { User: UserModel } = require('../schemas/UserSchema');
 const { Fish: FishTemplate } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
 const { BuffData } = require('../schemas/BuffSchema');
+const { activeBuffFilter } = require('./buffs');
 const { Biome } = require('../schemas/BiomeSchema');
 const { GachaOpen } = require('../schemas/GachaOpenSchema');
 const { rng } = require('./rng');
@@ -136,7 +137,7 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 
 	// Modifiers: profile gacha stats + gacha buffs (legacy ['gacha', '1.5'] = +50% to every
 	// Rare-and-above tier) + event gacha stats. Stats add, then feed the RarityEngine.
-	const buffs = (await BuffData.find({ user: String(userId), active: true })).map(plain)
+	const buffs = (await BuffData.find(activeBuffFilter(userId, now))).map(plain)
 		.filter((b) => (b.capabilities || [])[0] === 'gacha');
 	const sources = [{ source: 'box', name: def.name, id: def.id }, { source: 'profile', name: profile.name, stats: { ...(profile.gacha?.stats || {}) } }];
 	const total = { ...(profile.gacha?.stats || {}) };

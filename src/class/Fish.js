@@ -1,5 +1,6 @@
 const { Fish: FishSchema, FishData } = require('../schemas/FishSchema');
 const { BuffData } = require('../schemas/BuffSchema');
+const { activeBuffFilter } = require('../engine/buffs');
 const { Utils } = require('./Utils');
 const { User } = require('../class/User');
 const { partitionProtected } = require('../engine/protection');
@@ -23,7 +24,7 @@ class Fish {
 		const user = new User(await User.get(userId));
 
 		// check for buffs
-		const activeBuffs = await BuffData.find({ user: userId, active: true });
+		const activeBuffs = await BuffData.find(activeBuffFilter(userId, Date.now()));
 		const cashBuff = activeBuffs.find((buff) => buff.capabilities.includes('cash'));
 		const cashMultiplier = cashBuff ? parseFloat(cashBuff.capabilities[1]) : 1;
 

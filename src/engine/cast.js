@@ -21,6 +21,7 @@ const { User: UserModel } = require('../schemas/UserSchema');
 const { Fish: FishTemplate, FishData } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
 const { BuffData } = require('../schemas/BuffSchema');
+const { activeBuffFilter } = require('./buffs');
 const { QuestData } = require('../schemas/QuestSchema');
 const { Pond } = require('../schemas/PondSchema');
 const { Cast } = require('../schemas/CastSchema');
@@ -186,7 +187,7 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 
 	// One resolved modifier snapshot for the whole cast (profile, rod, bait, buffs, dev, event).
 	const rodParts = rod.type === 'customrod' ? (await ItemData.find({ _id: { $in: [rod.rod, rod.reel, rod.hook, rod.handle].filter(Boolean) } })).map(plain) : null;
-	const activeBuffs = (await BuffData.find({ user: String(userId), active: true })).map(plain);
+	const activeBuffs = (await BuffData.find(activeBuffFilter(userId, now))).map(plain);
 	const baitApplies = Boolean(bait && (bait.biomes || []).includes(biomeKey));
 	const modifiers = resolveModifiers({ profile, rod, rodParts, bait, baitApplies, buffs: activeBuffs, event: activeEvent(now), user: plain(user), now });
 	base.competitiveEligible = modifiers.competitiveEligible;
