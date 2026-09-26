@@ -1,0 +1,706 @@
+{
+	"schema": 1,
+	"balanceVersion": "5b",
+	"frameworkVersion": "5b.5",
+	"sharedDigest": "d7374a03d62e8b81",
+	"generatedBy": "scripts/economy/5b/export-balance.js",
+	"curve": {
+		"base": 100,
+		"quartic": 0.0525
+	},
+	"value": {
+		"biome": {
+			"Ocean": 18,
+			"River": 29,
+			"Lake": 43,
+			"Pond": 61,
+			"Coast": 82,
+			"Swamp": 107,
+			"Mountain Stream": 149
+		},
+		"liveBiomes": [
+			"Ocean",
+			"River",
+			"Lake",
+			"Pond",
+			"Coast",
+			"Swamp"
+		],
+		"rarity": {
+			"common": 1,
+			"uncommon": 1.6,
+			"rare": 3,
+			"ultra": 6,
+			"giant": 12,
+			"legendary": 25,
+			"lucky": 50
+		},
+		"quality": {
+			"weak": 1,
+			"strong": 1.3
+		},
+		"speciesClamp": [
+			0.8,
+			1.25
+		]
+	},
+	"xp": {
+		"perFishMean": 17,
+		"rarity": {
+			"common": 1,
+			"uncommon": 1.2,
+			"rare": 1.5,
+			"ultra": 2,
+			"giant": 2.5,
+			"legendary": 4,
+			"lucky": 6
+		}
+	},
+	"multiCatch": {
+		"jackpotChain": 0.35,
+		"maxFish": 5,
+		"ceilingMean": 1.8
+	},
+	"world": {
+		"biomeOrder": [
+			"Ocean",
+			"River",
+			"Lake",
+			"Pond",
+			"Coast",
+			"Swamp",
+			"Mountain Stream"
+		],
+		"biomeLevel": {
+			"Ocean": 0,
+			"River": 10,
+			"Lake": 20,
+			"Pond": 30,
+			"Coast": 40,
+			"Swamp": 50,
+			"Mountain Stream": 60
+		}
+	},
+	"rods": {
+		"oldRod": {
+			"name": "Old Rod",
+			"unlockLevel": 0,
+			"qualities": [
+				"weak"
+			],
+			"stats": {},
+			"meanFish": 1,
+			"multiChance": 0,
+			"unbreakable": true,
+			"cooldownMs": 5000,
+			"maxDurability": null,
+			"maxRepairs": null,
+			"repairCost": 0
+		},
+		"standard": [
+			{
+				"tier": 1,
+				"name": "Trusty Rod",
+				"role": "basic",
+				"unlockLevel": 10,
+				"price": 5100,
+				"qualities": [
+					"weak",
+					"strong"
+				],
+				"stats": {
+					"rareFind": 0.1,
+					"luck": 0.05,
+					"trophyChance": 0,
+					"sellBonus": 0,
+					"xpBonus": 0,
+					"fishingSpeed": 0.02,
+					"durabilityEfficiency": 0
+				},
+				"meanFish": 1,
+				"multiChance": 0,
+				"lifeHours": 3,
+				"cooldownMs": 4900,
+				"maxDurability": 1200,
+				"maxRepairs": null,
+				"repairCost": 2100
+			},
+			{
+				"tier": 2,
+				"name": "Angler's Rod",
+				"role": "better",
+				"unlockLevel": 20,
+				"price": 13000,
+				"qualities": [
+					"weak",
+					"strong"
+				],
+				"stats": {
+					"rareFind": 0.15,
+					"luck": 0.08,
+					"trophyChance": 0.05,
+					"sellBonus": 0,
+					"xpBonus": 0,
+					"fishingSpeed": 0.03,
+					"durabilityEfficiency": 0
+				},
+				"meanFish": 1.15,
+				"multiChance": 0.0989853996536,
+				"lifeHours": 3.5,
+				"cooldownMs": 4850,
+				"maxDurability": 1650,
+				"maxRepairs": null,
+				"repairCost": 4200
+			},
+			{
+				"tier": 3,
+				"name": "Pro Angler Rod",
+				"role": "midgame",
+				"unlockLevel": 30,
+				"price": 57000,
+				"qualities": [
+					"weak",
+					"strong"
+				],
+				"stats": {
+					"rareFind": 0.3,
+					"luck": 0.15,
+					"trophyChance": 0.08,
+					"sellBonus": 0.01,
+					"xpBonus": 0,
+					"fishingSpeed": 0.07,
+					"durabilityEfficiency": 0
+				},
+				"meanFish": 1.28,
+				"multiChance": 0.18477274602,
+				"lifeHours": 4,
+				"cooldownMs": 4650,
+				"maxDurability": 2150,
+				"maxRepairs": null,
+				"repairCost": 7800
+			},
+			{
+				"tier": 4,
+				"name": "Expedition Rod",
+				"role": "advanced",
+				"unlockLevel": 40,
+				"price": 140000,
+				"qualities": [
+					"weak",
+					"strong"
+				],
+				"stats": {
+					"rareFind": 0.45,
+					"luck": 0.3,
+					"trophyChance": 0.2,
+					"sellBonus": 0.02,
+					"xpBonus": 0,
+					"fishingSpeed": 0.1,
+					"durabilityEfficiency": 0
+				},
+				"meanFish": 1.48,
+				"multiChance": 0.316753278891,
+				"lifeHours": 5,
+				"cooldownMs": 4500,
+				"maxDurability": 3150,
+				"maxRepairs": null,
+				"repairCost": 16000
+			},
+			{
+				"tier": 5,
+				"name": "Master's Rod",
+				"role": "elite",
+				"unlockLevel": 50,
+				"price": 390000,
+				"qualities": [
+					"weak",
+					"strong"
+				],
+				"stats": {
+					"rareFind": 0.7,
+					"luck": 0.45,
+					"trophyChance": 0.35,
+					"sellBonus": 0.04,
+					"xpBonus": 0,
+					"fishingSpeed": 0.15,
+					"durabilityEfficiency": 0
+				},
+				"meanFish": 1.62,
+				"multiChance": 0.409139651901,
+				"lifeHours": 6,
+				"cooldownMs": 4250,
+				"maxDurability": 4250,
+				"maxRepairs": null,
+				"repairCost": 33000
+			},
+			{
+				"tier": 6,
+				"name": "Summit Rod",
+				"role": "endgame",
+				"unlockLevel": 60,
+				"price": 880000,
+				"qualities": [
+					"weak",
+					"strong"
+				],
+				"stats": {
+					"rareFind": 0.85,
+					"luck": 0.55,
+					"trophyChance": 0.45,
+					"sellBonus": 0.05,
+					"xpBonus": 0,
+					"fishingSpeed": 0.14,
+					"durabilityEfficiency": 0
+				},
+				"meanFish": 1.75,
+				"multiChance": 0.494926998268,
+				"lifeHours": 7,
+				"cooldownMs": 4300,
+				"maxDurability": 5300,
+				"maxRepairs": null,
+				"repairCost": 42000
+			}
+		]
+	},
+	"permits": {
+		"free": [
+			"Ocean"
+		],
+		"requiresPrevious": false,
+		"prices": {
+			"River": 1000,
+			"Lake": 6200,
+			"Pond": 23000,
+			"Coast": 62000,
+			"Swamp": 160000,
+			"Mountain Stream": 380000
+		}
+	},
+	"upgrades": {
+		"levels": 6,
+		"unlockLevels": [
+			5,
+			15,
+			25,
+			35,
+			45,
+			55
+		],
+		"categories": {
+			"casting": {
+				"name": "Casting Technique",
+				"stat": "fishingSpeed",
+				"perLevel": 0.01,
+				"priceHours": 0.3,
+				"prices": [
+					2600,
+					5400,
+					9000,
+					14000,
+					25000,
+					41000
+				]
+			},
+			"knowledge": {
+				"name": "Fish Knowledge",
+				"stat": "rareFind",
+				"perLevel": 0.05,
+				"priceHours": 0.25,
+				"prices": [
+					2100,
+					4500,
+					7500,
+					12000,
+					20000,
+					34000
+				]
+			},
+			"negotiation": {
+				"name": "Negotiation",
+				"stat": "sellBonus",
+				"perLevel": 0.02,
+				"priceHours": 0.3,
+				"prices": [
+					2600,
+					5400,
+					9000,
+					14000,
+					25000,
+					41000
+				]
+			},
+			"tackleCare": {
+				"name": "Tackle Care",
+				"stat": "durabilityEfficiency",
+				"perLevel": 0.05,
+				"priceHours": 0.15,
+				"prices": [
+					1300,
+					2700,
+					4500,
+					7200,
+					12000,
+					20000
+				]
+			},
+			"baitConservation": {
+				"name": "Bait Conservation",
+				"stat": "baitSave",
+				"perLevel": 0.04,
+				"priceHours": 0.15,
+				"prices": [
+					1300,
+					2700,
+					4500,
+					7200,
+					12000,
+					20000
+				]
+			},
+			"trophyInstinct": {
+				"name": "Trophy Instinct",
+				"stat": "trophyChance",
+				"perLevel": 0.05,
+				"priceHours": 0.15,
+				"prices": [
+					1300,
+					2700,
+					4500,
+					7200,
+					12000,
+					20000
+				]
+			},
+			"experience": {
+				"name": "Experience",
+				"stat": "xpBonus",
+				"perLevel": 0.005,
+				"priceHours": 0.25,
+				"prices": [
+					2100,
+					4500,
+					7500,
+					12000,
+					20000,
+					34000
+				]
+			}
+		}
+	},
+	"buffs": {
+		"doubleCashTiming": "catch",
+		"catalog": {
+			"Double XP": {
+				"kind": "xp",
+				"multiplier": 2,
+				"duration": {
+					"type": "wallclock",
+					"seconds": 3600
+				}
+			},
+			"Double Cash": {
+				"kind": "cash",
+				"multiplier": 2,
+				"duration": {
+					"type": "wallclock",
+					"seconds": 3600
+				}
+			},
+			"Lucky Draw": {
+				"kind": "gacha",
+				"bonusSlots": 1,
+				"duration": {
+					"type": "charges",
+					"opens": 2
+				},
+				"excludeBoxes": [
+					"Booster Pack"
+				]
+			}
+		},
+		"queue": {
+			"sameKind": "queue",
+			"maxQueued": 3,
+			"acrossKinds": "independent"
+		},
+		"stacking": {
+			"withEvent": "additive",
+			"withGearAndProfile": "multiply"
+		},
+		"eventsPerThirtyDays": {
+			"Double XP": 0,
+			"Double Cash": 1,
+			"Lucky Draw": 1
+		}
+	},
+	"bait": {
+		"consumption": {
+			"unit": "cast",
+			"perCast": 1,
+			"onlyWhereItWorks": true,
+			"profileIndependent": true
+		},
+		"packSize": 10,
+		"roster": {
+			"Shrimp": {
+				"price": 4,
+				"packPrice": 40,
+				"pricing": "money",
+				"levelRequirement": 0,
+				"band": "starter",
+				"biomes": [
+					"Ocean"
+				],
+				"grantsStrong": true,
+				"stats": {},
+				"multiChance": 0
+			},
+			"Worm": {
+				"price": 4.6,
+				"packPrice": 46,
+				"pricing": "money",
+				"levelRequirement": 10,
+				"band": "starter",
+				"biomes": [
+					"River"
+				],
+				"grantsStrong": true,
+				"stats": {},
+				"multiChance": 0
+			},
+			"Fly": {
+				"price": 5.2,
+				"packPrice": 52,
+				"pricing": "money",
+				"levelRequirement": 20,
+				"band": "mid",
+				"biomes": [
+					"Lake",
+					"Pond"
+				],
+				"grantsStrong": false,
+				"stats": {
+					"rareFind": 1
+				},
+				"multiChance": 0
+			},
+			"Minnow": {
+				"price": 3.4,
+				"packPrice": 34,
+				"pricing": "money",
+				"levelRequirement": 20,
+				"band": "mid",
+				"biomes": [
+					"Lake",
+					"Pond"
+				],
+				"grantsStrong": false,
+				"stats": {
+					"trophyChance": 1.5
+				},
+				"multiChance": 0
+			},
+			"Magnet": {
+				"price": 4.9,
+				"packPrice": 49,
+				"pricing": "money",
+				"levelRequirement": 20,
+				"band": "mid",
+				"biomes": [
+					"Lake",
+					"Pond"
+				],
+				"grantsStrong": false,
+				"stats": {
+					"luck": 2
+				},
+				"multiChance": 0
+			},
+			"Spinner": {
+				"price": 22.5,
+				"packPrice": 225,
+				"pricing": "xp",
+				"levelRequirement": 20,
+				"band": "mid",
+				"biomes": [
+					"Lake",
+					"Pond"
+				],
+				"grantsStrong": false,
+				"stats": {},
+				"multiChance": 0.1
+			},
+			"Lure": {
+				"price": 12,
+				"packPrice": 120,
+				"pricing": "xp",
+				"levelRequirement": 20,
+				"band": "mid",
+				"biomes": [
+					"Lake",
+					"Pond"
+				],
+				"grantsStrong": false,
+				"stats": {
+					"xpBonus": 0.15
+				},
+				"multiChance": 0
+			},
+			"Bloodworm": {
+				"price": 16,
+				"packPrice": 160,
+				"pricing": "money",
+				"levelRequirement": 40,
+				"band": "late",
+				"biomes": [
+					"Coast",
+					"Swamp"
+				],
+				"grantsStrong": false,
+				"stats": {
+					"rareFind": 1,
+					"trophyChance": 0.75
+				},
+				"multiChance": 0
+			},
+			"Magic Lure": {
+				"price": 53,
+				"packPrice": 530,
+				"pricing": "xp",
+				"levelRequirement": 40,
+				"band": "late",
+				"biomes": [
+					"Coast",
+					"Swamp"
+				],
+				"grantsStrong": false,
+				"stats": {
+					"rareFind": 0.75,
+					"trophyChance": 0.75,
+					"luck": 0.75,
+					"xpBonus": 0.12
+				},
+				"multiChance": 0
+			},
+			"Strong Magnet": {
+				"price": 25.5,
+				"packPrice": 255,
+				"pricing": "money",
+				"levelRequirement": 40,
+				"band": "universal",
+				"biomes": [
+					"Ocean",
+					"River",
+					"Lake",
+					"Pond",
+					"Coast",
+					"Swamp"
+				],
+				"grantsStrong": false,
+				"stats": {
+					"luck": 4
+				},
+				"multiChance": 0
+			}
+		}
+	},
+	"aquarium": {
+		"licenses": [
+			{
+				"name": "Basic Freshwater Aquarium License",
+				"water": "Freshwater",
+				"tier": "basic",
+				"prerequisite": null,
+				"level": 15,
+				"tanks": 1,
+				"tankSize": 3,
+				"capacity": 3,
+				"companionSlots": 2,
+				"price": 30000
+			},
+			{
+				"name": "Advanced Freshwater Aquarium License",
+				"water": "Freshwater",
+				"tier": "advanced",
+				"prerequisite": "Basic Freshwater Aquarium License",
+				"level": 30,
+				"tanks": 2,
+				"tankSize": 4,
+				"capacity": 8,
+				"companionSlots": 5,
+				"price": 120000
+			},
+			{
+				"name": "Expert Freshwater Aquarium License",
+				"water": "Freshwater",
+				"tier": "expert",
+				"prerequisite": "Advanced Freshwater Aquarium License",
+				"level": 45,
+				"tanks": 3,
+				"tankSize": 5,
+				"capacity": 15,
+				"companionSlots": 9,
+				"price": 260000
+			},
+			{
+				"name": "Basic Saltwater Aquarium License",
+				"water": "Saltwater",
+				"tier": "basic",
+				"prerequisite": null,
+				"level": 15,
+				"tanks": 1,
+				"tankSize": 3,
+				"capacity": 3,
+				"companionSlots": 2,
+				"price": 30000
+			},
+			{
+				"name": "Advanced Saltwater Aquarium License",
+				"water": "Saltwater",
+				"tier": "advanced",
+				"prerequisite": "Basic Saltwater Aquarium License",
+				"level": 30,
+				"tanks": 2,
+				"tankSize": 4,
+				"capacity": 8,
+				"companionSlots": 5,
+				"price": 120000
+			},
+			{
+				"name": "Expert Saltwater Aquarium License",
+				"water": "Saltwater",
+				"tier": "expert",
+				"prerequisite": "Advanced Saltwater Aquarium License",
+				"level": 45,
+				"tanks": 3,
+				"tankSize": 5,
+				"capacity": 15,
+				"companionSlots": 9,
+				"price": 260000
+			}
+		],
+		"display": {
+			"requires": "expert",
+			"perWaterType": 3,
+			"tankSize": 5,
+			"prices": [
+				430000,
+				870000,
+				1700000
+			]
+		}
+	},
+	"founder": {
+		"model": "hybrid",
+		"rolls": 7,
+		"xp": 35,
+		"sell": 25,
+		"repairRebate": 0.4,
+		"gates": [
+			"public"
+		],
+		"boxLuck": "non-buff",
+		"competitiveEligible": false
+	},
+	"contentHash": "ddebe71c47b08a0f"
+}

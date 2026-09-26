@@ -164,6 +164,41 @@ const BAIT_STATS = {
 	'Strong Magnet': { luck: 4.0 },
 };
 
+// ---------------------------------------------------------------------------------------------
+// Phase 5B balance release. The 5B numbers live in a generated file (data/balance-5b.json, written by
+// scripts/economy/5b/export-balance.js from the approved framework values; never edited by hand) and are
+// the '5b' balance version. They apply only while the BALANCE_5B flag is on, and every 5B code path asks
+// isBalance5b() first. With the flag off (the default) nothing here is read and the game is today's.
+const BALANCE_VERSION_5B = '5b';
+
+/** True when the Phase 5B balance release is switched on (env BALANCE_5B, read at boot). */
+function isBalance5b(cfg = config) {
+	return cfg.flags?.balance5b === true;
+}
+
+let balance5bCache = null;
+/** The '5b' balance data (frozen). Loaded lazily; throws if the generated file is missing or malformed. */
+function loadBalance5b() {
+	if (balance5bCache) return balance5bCache;
+	const data = require('./data/balance-5b.json');
+	if (data.balanceVersion !== BALANCE_VERSION_5B || !data.contentHash || !data.curve) throw new Error('balance-5b.json is not a 5b balance export; regenerate it with scripts/economy/5b/export-balance.js');
+	const freeze = (v) => {
+		if (v && typeof v === 'object') {
+			for (const x of Object.values(v)) freeze(x);
+			Object.freeze(v);
+		}
+		return v;
+	};
+	balance5bCache = freeze(structuredClone(data));
+	return balance5bCache;
+}
+
+/** Balance data by version: '5b' is the generated file. Today's numbers are the constants in this module. */
+function balanceData(version) {
+	if (version === BALANCE_VERSION_5B) return loadBalance5b();
+	throw new Error(`unknown balance version ${version}`);
+}
+
 /** Level curve: floor(0.1 * sqrt(xp)), minimum 1. */
 function levelForXp(xp) {
 	return Math.max(Math.floor(0.1 * Math.sqrt(Math.max(0, xp || 0))), 1);
@@ -202,6 +237,10 @@ module.exports = {
 	activeEvent,
 	levelForXp,
 	resolveProfile,
+	BALANCE_VERSION_5B,
+	isBalance5b,
+	loadBalance5b,
+	balanceData,
 	// Back-compat for Phase 2 callers.
 	BASE: { xpPerFish: XP_PER_FISH },
 };
