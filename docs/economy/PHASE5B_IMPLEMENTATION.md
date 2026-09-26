@@ -23,13 +23,15 @@ Already live on `main` (`71fde4d`):
 4. **Old journals stay compatible.** Pending cast and box journals written by today's code must replay under the new code. Recovery is isolated per journal, so one bad journal is logged and left pending instead of stopping the boot.
 5. **Every step is verified the same way:**
    - full `npm test` three times;
-   - deploy to **DCC Staging** (Railway) first;
+   - deploy to **DCC Fishing Staging** (Railway) first, never to the Dynasty Command Center "DCC Staging";
    - smoke-test the step's commands there;
    - then `main` → production, a deploy SUCCESS, and a log check, as with the hotfixes.
 
 ## Order
 
 ### Step A: foundations (ships alone; no player-visible change)
+Rehearsed on DCC Fishing Staging **before** it lands on `main` (`scripts/staging/stepA-rehearsal.js`): the migrations run twice and the second pass changes no player data; publicXp is reconciled exactly; the floors equal their anchors; no stored level goes down; 3.2.0 cast and box journals replay; a malformed journal stays pending without blocking the boot or other players; with `BALANCE_5B=off` the game is today's (`test/flag-off-golden.test.js` pins the output of production `71fde4d`); the full suite passes on the staging candidate. Step A and the model package land on `main` together, after that result is approved.
+
 - `BALANCE_5B` flag plumbing, the `5b` balance version, the `export-balance.js` data file and the registry-vs-data test.
 - Journal-shape compatibility for `writeCast` / `applyGachaResult`, plus per-journal recovery isolation (§18 rule of the report).
 - `publicXp` follow-up (founder F4):
@@ -48,9 +50,13 @@ Already live on `main` (`71fde4d`):
 - **Aquarium:** A3–A5 and A7–A9 (breeding cooldown record, capacity await, success XP, duplicate licences, atomic pet sale, temperature clamp). **A2 (the breeding chance fix) is not a step-B item.** It is held until A1 (the play → sell loop) closes in the balance release (step C.10).
 - **Stealth closure (D4 privacy part):** `/sell` and `/boosters` ephemeral for everyone. Plus the `/dev founder` override hardening (`P-FOUNDER-DEV-OVERRIDE`).
 - **L6B rod gates** use the final D1 rule: a custom rod's required level is that of its highest-rarity part, enforced at `/craft` and `/equip`, and the Rod Workshop previews that level before crafting. The Common rod piece is 1.05 fish per cast. L6B ships **with** step C's standard shop rods, never before, so no one is stranded on the Old Rod.
-  - **Open item to confirm:** under the final rule, 944 existing crafted-rod combinations get a higher requirement than today.
-    - **The plan's default follows your L6 instruction:** an already-equipped rod stays equipped and keeps working, with no forced unequip or cast-time fallback. Only a new `/equip` or `/craft` is gated.
-    - **The alternative in rods.md §18:** the cast path reads the gate and falls back to the best usable rod. It is not adopted unless you choose it.
+  - **Grandfathering (decided):** the new highest-part-rarity rule raises the requirement of 944 existing crafted-rod combinations. Existing players keep what they have:
+    - ownership is always preserved;
+    - a rod that is already equipped stays equipped and usable, even if its new requirement is above the player's level (no auto-downgrade, no replacement, no cast-time fallback to a "best usable rod");
+    - `/craft` of a newly gated combination is refused below its required level;
+    - `/equip` of an unequipped gated rod is refused below its required level;
+    - once a grandfathered above-level rod is voluntarily unequipped, the normal gate applies before it can be equipped again;
+    - the Rod Workshop preview keeps showing the resulting required level before crafting.
 
 ### Step C: the balance release (built dark behind `BALANCE_5B`, one PR per system, merged in this order)
 1. **Curve, value model, XP per rarity** (`balance.js`, `cast.js`, `rewards.js`, `publicLevel.js`): the new curve behind the flag, with the floors from step A.
@@ -146,4 +152,6 @@ Track:
 Decided:
 - Step A approved.
 - Rehearsals run on a dedicated **DCC Fishing Staging** project, never the Dynasty Command Center "DCC Staging".
+- Step A is rehearsed on staging first, then lands on `main` with the model package (the drift test depends on it). That does not authorise any step C behaviour.
+- Already-equipped crafted rods are grandfathered (step B, L6B above).
 - One-flag release: code rolls out incrementally and dark; gameplay switches in one atomic flip.
