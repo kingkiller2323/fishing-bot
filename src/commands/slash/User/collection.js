@@ -56,7 +56,7 @@ module.exports = {
 				await analyticsObject.setStatusMessage('Checked collection.');
 			}
 
-			await buttonPagination(interaction, embeds, analyticsObject);
+			await buttonPagination(interaction, embeds, analyticsObject, false, [], undefined, { privateReply: true });
 		}
 		catch (err) {
 			console.error(err);

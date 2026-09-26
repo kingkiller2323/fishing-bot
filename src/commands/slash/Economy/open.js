@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const config = require('../../../config');
 const { Icons } = require('../../../class/Icons');
 const { User } = require('../../../class/User');
@@ -18,7 +18,7 @@ function slotLine(slot) {
 	return `${Icons.of({ icon: r.icon, type: r.type })} ${name} · ${label(slot.rarity)}${high ? ' ✨' : ''}${extra}`;
 }
 
-/** Public reveal. Identical structure for every profile (no profile/luck/pity information). */
+/** Reveal card (sent ephemerally). Identical structure for every profile (no profile/luck/pity information). */
 function revealEmbed(result) {
 	return new EmbedBuilder()
 		.setTitle(`🎁 ${result.box.name}`)
@@ -44,7 +44,10 @@ module.exports = {
 	 */
 	// Extra args: (user, boxName) when called from the 'Open another' button.
 	run: async (client, interaction, analyticsObject, ...rest) => {
-		await interaction.deferReply();
+		// Private for everyone: the reveal (and every 'Open another' reveal, which re-enters here with the
+		// button interaction) is ephemeral. The collector below listens for interactions, which works on
+		// ephemeral messages; the clean-up edit goes through interaction.editReply, never Message#edit.
+		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 		const name = rest[1] || interaction.options.getString('name');
 		await User.get(interaction.user.id);
 		const result = await openBox({ userId: interaction.user.id, guildId: interaction.guild?.id, boxName: name });

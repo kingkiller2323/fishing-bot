@@ -164,13 +164,15 @@ test('Founder catches stay non-competitive', async () => {
 	for (const c of r.catches) assert.equal((await FishData.findById(c.id).lean()).competitiveEligible, false);
 });
 
-test('Founder status shows only on your own profile', async () => {
+test('/profile is public and never shows Founder status, not even on your own profile', async () => {
 	const founder = { id: FOUNDER, globalName: 'Casey', username: 'casey' };
 	const member = { id: MEMBER, globalName: 'Pat', username: 'pat' };
 	const own = interactionFor(founder, { target: founder });
 	await profileCommand.run({}, own, null);
 	const ownTitle = own.sent.find((s) => s.kind === 'edit').embeds[0].toJSON().title;
-	assert.match(ownTitle, /Casey's Profile · 👑 Founder/);
+	assert.equal(ownTitle, 'Casey\'s Profile');
+	assert.ok(!PROFILE_TELLS.test(json(own.sent.find((s) => s.kind === 'edit'))));
+	assert.ok(!own.sent.some(isEphemeral), '/profile stays public');
 
 	const viewed = interactionFor(member, { target: founder });
 	await profileCommand.run({}, viewed, null);

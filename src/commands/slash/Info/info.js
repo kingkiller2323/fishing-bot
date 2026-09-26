@@ -51,7 +51,7 @@ module.exports = {
 				)
 				.setColor('Green');
 
-			await interaction.reply({ embeds: [embed] });
+			await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 		}
 		else if (subcommand === 'weather') {
 			try {
