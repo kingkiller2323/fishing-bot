@@ -82,7 +82,9 @@ const APPROVED = {
 };
 // "Aquarium redesign: approve the overall design."
 const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id);
-const withApproval = (d) => (APPROVED[d.id] || isApprovedModule(d.id) ? { ...d, status: 'approved', approval: APPROVED[d.id] || 'aquarium redesign approved' } : d);
+/** True when the user approved this decision id (cheap: no module is loaded). */
+const isApproved = (id) => Boolean(APPROVED[id] || isApprovedModule(id));
+const withApproval = (d) => (isApproved(d.id) ? { ...d, status: 'approved', approval: APPROVED[d.id] || 'aquarium redesign approved' } : d);
 
 // Subsystem modules export their own proposed decisions (same shape) as DECISIONS; they join the
 // registry here so there is ONE list for the Phase 5B report.
@@ -94,6 +96,16 @@ function all() {
 		if (Array.isArray(list)) out.push(...list.map((d) => ({ module: m, ...d })));
 	}
 	return out.map(withApproval);
+}
+
+/**
+ * The approved entries as { module, id, approval, get, expected }, WITHOUT copying the full entries: all()
+ * spreads each entry, which evaluates the report getters (modelled/why/alternatives) of some modules and
+ * runs their heavy solves. This reads only `id`, `get` and `expected`.
+ */
+function approvedEntries() {
+	const lists = [['framework', DECISIONS], ...MODULES.map((m) => [m, require(`./${m}`).DECISIONS || []])];
+	return lists.flatMap(([module, list]) => list.filter((d) => isApproved(d.id)).map((d) => ({ module, id: d.id, approval: APPROVED[d.id] || 'aquarium redesign approved', get: d.get, expected: d.expected })));
 }
 
 /** Verifies the registry: allowed statuses only, unique ids, and every modelled value is what runs. */
@@ -122,4 +134,4 @@ function verify() {
 // The `get`/`expected` verification fields are left out of the report rows.
 const table = () => all().map((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== 'get' && k !== 'expected'))).sort((a, b) => (a.status === b.status ? 0 : a.status === 'proposed' ? -1 : 1));
 
-module.exports = { STATUSES, DECISIONS, APPROVED, MODULES, all, verify, table };
+module.exports = { STATUSES, DECISIONS, APPROVED, MODULES, isApproved, all, approvedEntries, verify, table };

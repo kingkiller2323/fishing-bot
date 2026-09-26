@@ -25,7 +25,7 @@ const DIR = __dirname;
 const SOURCE_FILES = new Set(['framework.js', 'assumptions.js', 'decisions.js', 'check-shared.js']);
 // Infrastructure and runners: scanned for local copies, but not subsystem modules (no report() stamp;
 // runners print on load, so they are never required here).
-const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js', 'render-docs.js', 'summary.js', 'delta.js']);
+const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js', 'render-docs.js', 'summary.js', 'delta.js', 'export-balance.js']);
 const num = (n) => String(n).replace('.', '\\.').replace(/^0\\\./, '0?\\.');
 
 const RULES = [
@@ -139,6 +139,10 @@ async function main() {
 		for (const p of r.problems) problems.push(`docs: ${p}`);
 		if (r.changed) problems.push(`docs: ${docName(name)} is stale; run node scripts/economy/5b/render-docs.js`);
 	}
+	// Engine data: src/engine/data/balance-5b.json is what export-balance.js generates now.
+	const exporter = require('./export-balance');
+	const exported = exporter.serialise(exporter.build());
+	if (!fs.existsSync(exporter.OUT) || fs.readFileSync(exporter.OUT, 'utf8') !== exported) problems.push('src/engine/data/balance-5b.json is stale; run node scripts/economy/5b/export-balance.js');
 	// Decision registry: candidate rules stay 'proposed' and match what the model runs.
 	const decisions = require('./decisions').verify();
 	for (const p of decisions.problems) problems.push(`decisions.js: ${p}`);
