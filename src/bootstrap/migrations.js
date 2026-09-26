@@ -5,8 +5,14 @@ const { User: UserModel } = require('../schemas/UserSchema');
 const { FishData } = require('../schemas/FishSchema');
 const { Cast } = require('../schemas/CastSchema');
 const { Item } = require('../schemas/ItemSchema');
-const { migratePublicXp } = require('../engine/publicLevel');
+const { DevAudit } = require('../schemas/DevAuditSchema');
+const config = require('../config');
+const { migratePublicXp, reconcilePublicXp, checkPublicXp } = require('../engine/publicLevel');
 const { migrateLevelFloors } = require('../engine/levels');
+
+// One-time migrations record a marker document here ({ _id: name, appliedAt, result }).
+const MARKERS = 'migrations';
+const PUBLIC_XP_RECONCILE = 'publicXpReconcile-v1';
 
 /**
  * autoLock.species: before Foundation V2, locking a species also locked future catches of it.
@@ -39,16 +45,45 @@ async function migrateDelistFishingCrate() {
 	return { delisted: res.modifiedCount };
 }
 
+/** The marker collection (one-time migrations). */
+const markers = () => UserModel.db.collection(MARKERS);
+
+/**
+ * Runs `fn` once per database: skipped when its marker exists; the marker (with the result, as the
+ * audit record) is written only after `fn` succeeds, so a failed run is retried on the next boot.
+ * `fn` must itself be idempotent (two instances booting together may both run it).
+ */
+async function runOnce(name, fn) {
+	if (await markers().findOne({ _id: name })) return { skipped: true };
+	const result = await fn();
+	await markers().updateOne({ _id: name }, { $setOnInsert: { appliedAt: new Date(), result } }, { upsert: true });
+	return { skipped: false, result };
+}
+
+/** F4 reconcile, once: members publicXp = xp; Founder accounts recomputed from their journals. */
+function migrateReconcilePublicXp() {
+	return runOnce(PUBLIC_XP_RECONCILE, () => reconcilePublicXp({ UserModel, Cast, DevAudit }));
+}
+
 async function runMigrations(log) {
 	const autoLock = await migrateAutoLockSpecies();
 	if (autoLock.scanned > 0) log(`Migration autoLock.species: ${autoLock.scanned} player(s) initialised, ${autoLock.withRules} with species auto-lock.`, 'done');
 	const publicXp = await migratePublicXp({ UserModel, Cast });
 	if (publicXp.scanned > 0) log(`Migration publicXp: ${publicXp.scanned} player(s) initialised, ${publicXp.withBonus} with private profile bonuses excluded.`, 'done');
+	const reconcile = await migrateReconcilePublicXp();
+	if (!reconcile.skipped) {
+		const r = reconcile.result;
+		log(`Migration ${PUBLIC_XP_RECONCILE}: ${r.scanned} player(s) checked; ${r.members} member(s) (publicXp = xp, ${r.membersChanged} corrected); ${r.recomputed.length} account(s) with profile bonuses recomputed from their journals.`, 'done');
+		for (const f of r.recomputed.filter((x) => x.before !== x.after)) log(`Migration ${PUBLIC_XP_RECONCILE}: ${f.userId} publicXp ${f.before ?? 'missing'} -> ${f.after} (xp ${f.xp}, profile bonus ${f.bonus}).`, 'info');
+	}
 	// Level floors from TODAY's curve, after publicXp is final (the public floor anchors on it).
 	const floors = await migrateLevelFloors({ UserModel });
 	if (floors.scanned > 0) log(`Migration levelFloors: ${floors.scanned} player(s); ${floors.levelFloors} levelFloor and ${floors.publicLevelFloors} publicLevelFloor written from today's curve.`, 'done');
+	const check = await checkPublicXp({ UserModel, founders: config.users?.founders || [] });
+	if (check.mismatched > 0) log(`Check publicXp: ${check.mismatched} of ${check.members} member(s) have publicXp != xp (e.g. ${check.sample.join(', ')}).`, 'warn');
+	else log(`Check publicXp: all ${check.members} member(s) have publicXp == xp.`, 'info');
 	const crate = await migrateDelistFishingCrate();
 	if (crate.delisted > 0) log(`Migration delistFishingCrate: ${crate.delisted} catalog row(s) removed from the shop (shopItem -> false); owned crates untouched.`, 'done');
 }
 
-module.exports = { runMigrations, migrateAutoLockSpecies, migratePublicXp, migrateLevelFloors, migrateDelistFishingCrate };
+module.exports = { runMigrations, runOnce, migrateAutoLockSpecies, migratePublicXp, migrateReconcilePublicXp, migrateLevelFloors, migrateDelistFishingCrate, PUBLIC_XP_RECONCILE };

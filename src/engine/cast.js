@@ -428,6 +428,16 @@ async function writeCast(result, { session, fault }) {
 		await Pond.collection.updateOne({ id: result.pond.id, ...notApplied(castId) }, { $set: set, $push: guardPush(castId) }, opts);
 	}
 
+	// publicXp self-healing (F4): a document without publicXp (not reached by the migration) starts from
+	// its own xp, never from 0. A separate guarded pipeline update in the same session/transaction, just
+	// before the commit: a filter clause on the commit itself would drop the whole commit. Idempotent
+	// (only a missing field is set, and never once this cast has committed).
+	await UserModel.collection.updateOne(
+		{ userId, publicXp: { $exists: false }, ...notApplied(castId) },
+		[{ $set: { publicXp: { $ifNull: ['$publicXp', { $ifNull: ['$xp', 0] }] } } }],
+		opts,
+	);
+
 	// Commit point: catches, XP, cash, stats, level and pity in one atomic update.
 	await fault('commit');
 	const fishIds = result.writes.fishDocs.map((d) => oid(d._id));
