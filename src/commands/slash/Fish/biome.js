@@ -100,7 +100,7 @@ module.exports = {
 			for (const requirement of originalBiome.requirements) {
 				if (requirement.toLowerCase().includes('level')) {
 					reqLevel = requirement.split(' ')[1];
-					const level = await userData.getLevel();
+					const level = await userData.getGateLevel();
 
 					if (level < reqLevel) {
 						unlocked = false;

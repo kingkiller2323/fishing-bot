@@ -79,6 +79,7 @@ const APPROVED = {
 	'P-BUFFS-TARGETS': 'D2: steady-state target excludes events; event guard 20% / 10% / 7% / 5%',
 	'P-FOUNDER-HYBRID': 'D4: 7 private rolls/cast, XP x35, sell x25, 40% private repair rebate; public cast identical to Normal; private pity; gacha luck on non-buff slots only; non-competitive',
 	'P-FOUNDER-HYBRID-SURFACES': 'D4: /sell and /boosters ephemeral for everyone; private rolls never advance quests/streak/bait; private delivery only; /aquarium and /pet stay public',
+	'P-FOUNDER-DEV-OVERRIDE': 'B1 locked: identity = FOUNDER_IDS only; a real Founder is never competitive and its gates never follow an override (real level until P-FOUNDER-GATE in step C); on only for FOUNDER_IDS; a non-Founder returning to Normal gets publicXp = xp and a coherent public floor, audited; default = identity',
 };
 // "Aquarium redesign: approve the overall design."
 const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id);

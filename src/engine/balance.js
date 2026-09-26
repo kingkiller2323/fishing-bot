@@ -204,16 +204,23 @@ function levelForXp(xp) {
 	return Math.max(Math.floor(0.1 * Math.sqrt(Math.max(0, xp || 0))), 1);
 }
 
+/** True when `userId` is a real Founder: identity comes only from FOUNDER_IDS, never from a profile override. */
+function isFounderId(userId, cfg = config) {
+	return (cfg.users?.founders || []).includes(String(userId));
+}
+
 /**
  * The profile a player casts under. FOUNDER_IDS decides Founder (DEVELOPER_IDS does not); a
- * developer override on the player (`devOverrides.profile` = 'founder' | 'normal' | 'test') wins.
+ * developer override on the player (`devOverrides.profile` = 'founder' | 'normal' | 'test') wins for
+ * the cast mechanics only. A real Founder is never competitive, whatever its override
+ * (P-FOUNDER-DEV-OVERRIDE): `founderIdentity` carries the identity so callers never infer it from the name.
  */
 function resolveProfile(userId, userDoc = null, cfg = config) {
 	const override = userDoc?.devOverrides?.profile;
-	const founders = cfg.users?.founders || [];
-	let name = founders.includes(String(userId)) ? 'founder' : 'normal';
+	const founderIdentity = isFounderId(userId, cfg);
+	let name = founderIdentity ? 'founder' : 'normal';
 	if (override && PROFILES[override]) name = override;
-	return { name, ...PROFILES[name], override: override || null };
+	return { name, ...PROFILES[name], competitiveEligible: PROFILES[name].competitiveEligible && !founderIdentity, founderIdentity, override: override || null };
 }
 
 module.exports = {
@@ -237,6 +244,7 @@ module.exports = {
 	activeEvent,
 	levelForXp,
 	resolveProfile,
+	isFounderId,
 	BALANCE_VERSION_5B,
 	isBalance5b,
 	loadBalance5b,

@@ -8,7 +8,7 @@ const { User: UserModel } = require('../schemas/UserSchema');
 const { Fish: FishTemplate, FishData } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
 const { DevAudit } = require('../schemas/DevAuditSchema');
-const { BALANCE_VERSION } = require('./balance');
+const { BALANCE_VERSION, isFounderId } = require('./balance');
 const { publicXpOf, publicLevelOf } = require('./publicLevel');
 const { levelOf, curveLevel, floorOf, levelWithFloor } = require('./levels');
 const { grantItem } = require('./cast');
@@ -126,16 +126,43 @@ async function luck(actor, target, value, minutes = 60) {
 // /dev founder modes -> profile override stored on the player (FOUNDER_IDS itself is never changed).
 const FOUNDER_MODES = { on: 'founder', off: 'normal', test: 'test', default: null };
 
-/** Per-player profile override: 'on' (Founder) | 'off' (Normal) | 'test' | 'default' (FOUNDER_IDS decides). */
+/**
+ * Per-player profile override: 'on' (Founder) | 'off' (Normal) | 'test' | 'default' (FOUNDER_IDS decides).
+ * P-FOUNDER-DEV-OVERRIDE (locked): the override changes cast mechanics only. Identity stays FOUNDER_IDS:
+ * a real Founder is never competitive and its gates never follow the override (balance.resolveProfile,
+ * levelGate.gateLevelOf). 'on' is refused for a non-Founder (use 'test'), before anything is written.
+ * When a non-Founder returns to Normal ('off' / 'default'), the Normal invariant is restored in the same
+ * audited update: publicXp = xp and publicLevelFloor raised to levelFloor. A real Founder's publicXp is never touched.
+ */
 async function founder(actor, target, mode) {
 	assertDeveloper(actor);
 	if (!(mode in FOUNDER_MODES)) throw new Error('Mode must be on, off, test or default.');
+	const founderIdentity = isFounderId(target);
+	if (mode === 'on' && !founderIdentity) {
+		throw Object.assign(new Error('`on` is only for FOUNDER_IDS accounts. Use `test` to test on a non-Founder account.'), { code: 'NOT_FOUNDER' });
+	}
 	const doc = await targetDoc(target);
 	const before = doc.devOverrides?.profile || 'default';
 	const profile = FOUNDER_MODES[mode];
-	await UserModel.updateOne({ userId: String(target) }, profile ? { $set: { 'devOverrides.profile': profile } } : { $unset: { 'devOverrides.profile': 1 } });
-	await audit(actor, target, 'founder', { profile: before }, { profile: profile || 'default' }, { mode });
-	return { before, after: profile || 'default' };
+	const update = profile ? { $set: { 'devOverrides.profile': profile } } : { $unset: { 'devOverrides.profile': 1 } };
+	const filter = { userId: String(target) };
+	let repair = null;
+	if (!founderIdentity && (mode === 'off' || mode === 'default')) {
+		const realXp = doc.xp || 0;
+		const levelFloor = floorOf(doc.levelFloor);
+		const publicFloor = floorOf(doc.publicLevelFloor);
+		const floorAfter = Math.max(publicFloor, levelFloor);
+		if (doc.publicXp !== realXp || floorAfter !== publicFloor) {
+			repair = { publicXp: { before: doc.publicXp ?? null, after: realXp }, publicLevelFloor: { before: doc.publicLevelFloor ?? null, after: floorAfter } };
+			update.$set = { ...(update.$set || {}), publicXp: realXp, publicLevelFloor: floorAfter };
+			// Compare-and-set on xp: a cast landing in between is never overwritten.
+			filter.xp = doc.xp;
+		}
+	}
+	const res = await UserModel.updateOne(filter, update);
+	if (res.matchedCount === 0) throw new Error('The account changed while updating; nothing was written. Try again.');
+	await audit(actor, target, 'founder', { profile: before }, { profile: profile || 'default' }, repair ? { mode, repair } : { mode });
+	return { before, after: profile || 'default', repair };
 }
 
 module.exports = { assertDeveloper, DevAuthError, money, xp, give, spawn, luck, founder, audit };

@@ -121,7 +121,7 @@ class Quest {
 		}
 		else {
 			// check requirements
-			const level = await user.getLevel();
+			const level = await user.getGateLevel();
 			if (originalQuest.requirements.level > level) {
 				return await this.generateDailyQuest(userId);
 			}

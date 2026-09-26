@@ -245,6 +245,12 @@ class User {
 		return levelOf(this.user);
 	}
 
+	/** The level every gear, biome and quest gate compares against (engine/levelGate.js gateLevelOf: identity-keyed). */
+	async getGateLevel() {
+		const { gateLevelOf } = require('../engine/levelGate');
+		return gateLevelOf(this.user);
+	}
+
 	/** Level other players see (base/competitive XP; equal to getLevel() for normal players). */
 	async getPublicLevel() {
 		return publicLevelOf(this.user);

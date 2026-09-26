@@ -1,6 +1,7 @@
 const {
 	SlashCommandBuilder,
 	EmbedBuilder,
+	MessageFlags,
 } = require('discord.js');
 const { Fish } = require('../../../class/Fish');
 const config = require('../../../config');
@@ -21,7 +22,8 @@ module.exports = {
      * @param {ChatInputCommandInteraction<true>} interaction
      */
 	run: async (client, interaction, analyticsObject) => {
-		await interaction.deferReply();
+		// Private for everyone from the first response on (B1): success, validation and error replies alike.
+		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
 		let sold = 0;
 		const rarity = interaction.options.getString('rarity');
@@ -44,7 +46,24 @@ module.exports = {
 			});
 		}
 
-		const result = await withUserLock(interaction.user.id, () => Fish.sellByRarity(interaction.user.id, rarity));
+		let result;
+		try {
+			result = await withUserLock(interaction.user.id, () => Fish.sellByRarity(interaction.user.id, rarity));
+		}
+		catch (error) {
+			if (process.env.ANALYTICS || config.client.analytics) {
+				await analyticsObject.setStatus('failed');
+				await analyticsObject.setStatusMessage(String(error?.message || error));
+			}
+			return interaction.editReply({
+				embeds: [
+					new EmbedBuilder()
+						.setTitle('Sale Failed')
+						.setDescription(String(error?.message || 'Something went wrong while selling.'))
+						.setColor('Red'),
+				],
+			});
+		}
 		// Public message shows base value; the balance receives result.total.
 		sold = result.baseTotal;
 		const keptNote = result.protected > 0 ? `\n🔒 ${result.protected} locked fish ${result.protected === 1 ? 'was' : 'were'} kept.` : '';

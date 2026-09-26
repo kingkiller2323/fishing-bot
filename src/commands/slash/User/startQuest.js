@@ -81,7 +81,7 @@ module.exports = {
 
 			// Check if user meets quest requirements
 			const reqLevel = await originalQuest.getLevelRequirement();
-			const level = await userData.getLevel();
+			const level = await userData.getGateLevel();
 			if (level < reqLevel) {
 				if (process.env.ANALYTICS || config.client.analytics) {
 					await analyticsObject.setStatus('failed');

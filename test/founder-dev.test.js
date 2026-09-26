@@ -146,8 +146,9 @@ test('/dev founder toggles the gameplay profile without touching FOUNDER_IDS', a
 	await makeUser('toggle');
 	await useTestRod('toggle', { capabilities: ['weak', '1'] });
 	assert.equal((await castLine({ userId: 'toggle' })).profile, 'normal');
-	await dev.founder('dev', 'toggle', 'on');
-	assert.equal((await castLine({ userId: 'toggle' })).profile, 'founder');
+	// 'on' is only for FOUNDER_IDS accounts (P-FOUNDER-DEV-OVERRIDE); a non-Founder tests with 'test'.
+	await assert.rejects(dev.founder('dev', 'toggle', 'on'), { code: 'NOT_FOUNDER' });
+	assert.equal((await castLine({ userId: 'toggle' })).profile, 'normal');
 	await dev.founder('dev', 'toggle', 'test');
 	assert.equal((await castLine({ userId: 'toggle' })).profile, 'test');
 	await dev.founder('dev', 'toggle', 'default');

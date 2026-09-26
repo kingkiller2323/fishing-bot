@@ -247,7 +247,7 @@ const getItemById = async (itemId) => {
 
 const checkItemRequirements = async (item, userData) => {
 	item = item.toJSON();
-	const userLevel = await userData.getLevel();
+	const userLevel = await userData.getGateLevel();
 	const meetsLevelRequirement = userLevel >= (item.requirements?.level || 0);
 
 	const items = await Promise.all((await userData.getItems()).map(async (i) => await ItemData.findById(i)));

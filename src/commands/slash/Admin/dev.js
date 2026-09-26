@@ -91,6 +91,7 @@ module.exports = {
 			case 'founder': {
 				const r = await dev.founder(actor, target.id, interaction.options.getString('mode'));
 				summary = `👑 Profile override: ${r.before} → ${r.after}`;
+			if (r.repair) summary += `\n🔧 Normal invariant restored: publicXp ${r.repair.publicXp.before ?? 'missing'} → ${r.repair.publicXp.after}, public level floor ${r.repair.publicLevelFloor.before ?? 'missing'} → ${r.repair.publicLevelFloor.after}.`;
 				break;
 			}
 			default:

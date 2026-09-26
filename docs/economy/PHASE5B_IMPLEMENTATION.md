@@ -48,7 +48,13 @@ Rehearsed on DCC Fishing Staging **before** it lands on `main` (`scripts/staging
   - Q4 (daily eligibility from `questLog`, no recursion);
   - Q5 (an unfinished daily no longer blocks `/daily`).
 - **Aquarium:** A3–A5 and A7–A9 (breeding cooldown record, capacity await, success XP, duplicate licences, atomic pet sale, temperature clamp). **A2 (the breeding chance fix) is not a step-B item.** It is held until A1 (the play → sell loop) closes in the balance release (step C.10).
-- **Stealth closure (D4 privacy part):** `/sell` and `/boosters` ephemeral for everyone. Plus the `/dev founder` override hardening (`P-FOUNDER-DEV-OVERRIDE`).
+- **B1, stealth closure (D4 privacy part) and `/dev founder` hardening (`P-FOUNDER-DEV-OVERRIDE`, locked):**
+  - `/sell` is ephemeral for everyone from the first defer on (success, validation and error replies); `/boosters` is ephemeral for everyone, every page button included. The catch-card Sell button is unchanged (it updates the public card with the base amount).
+  - Identity comes only from `FOUNDER_IDS`. A real Founder is never competitive, whatever its override (`off`, `test` or any future one), wherever eligibility is stamped (casts, box fish).
+  - Every gate reads one identity-keyed gate level (`levelGate.gateLevelOf`), never the override. In B1 both branches are the real level, so no live access changes; step C switches the Founder branch to the public level together with `P-FOUNDER-GATE` and the `P-FOUNDER-MIGRATION` biome move.
+  - `/dev founder on` is refused for a non-Founder (use `test`), with no write and no audit.
+  - A non-Founder returning to Normal (`off` / `default`) gets `publicXp = xp` and its public floor raised to its real floor, in the same audited update. A real Founder's `publicXp` is never touched.
+  - `default` means identity: `FOUNDER_IDS` → Founder profile, everyone else → Normal.
 - **L6B rod gates** use the final D1 rule: a custom rod's required level is that of its highest-rarity part, enforced at `/craft` and `/equip`, and the Rod Workshop previews that level before crafting. The Common rod piece is 1.05 fish per cast. L6B ships **with** step C's standard shop rods, never before, so no one is stranded on the Old Rod.
   - **Grandfathering (decided):** the new highest-part-rarity rule raises the requirement of 944 existing crafted-rod combinations. Existing players keep what they have:
     - ownership is always preserved;

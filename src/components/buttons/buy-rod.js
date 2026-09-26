@@ -187,7 +187,7 @@ const getItemById = async (itemId) => {
 };
 
 const checkItemRequirements = async (item, userData) => {
-	const userLevel = await userData.getLevel();
+	const userLevel = await userData.getGateLevel();
 	return userLevel >= item.toJSON().requirements.level;
 };
 

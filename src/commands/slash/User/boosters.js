@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { BuffData } = require('../../../schemas/BuffSchema');
 const { User } = require('../../../class/User');
 const buttonPagination = require('../../../buttonPagination');
@@ -73,10 +73,14 @@ module.exports = {
 				await analyticsObject.setStatusMessage('Displayed boosters.');
 			}
 
-			await buttonPagination(interaction, embeds, analyticsObject);
+			// Private for everyone (B1): the first page and every page button reply only to the player.
+			await buttonPagination(interaction, embeds, analyticsObject, false, [], undefined, { privateReply: true });
 		}
 		catch (err) {
 			console.error(err);
+			const payload = { content: 'Something went wrong while loading your boosters.', flags: MessageFlags.Ephemeral };
+			if (interaction.deferred || interaction.replied) await interaction.followUp(payload).catch(() => undefined);
+			else await interaction.reply(payload).catch(() => undefined);
 		}
 	},
 };
