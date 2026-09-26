@@ -1,0 +1,572 @@
+{
+	"openId": "6ab8061eddbc63abecdb8af6",
+	"userId": "journal-fixture",
+	"guildId": null,
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1790445086067"
+		}
+	},
+	"profile": "normal",
+	"balanceVersion": "3.2.0",
+	"competitiveEligible": true,
+	"status": "ok",
+	"box": {
+		"id": "6ab8061eddbc63abecdb8af0",
+		"name": "Voter's Crate",
+		"definitionId": "voters-crate",
+		"legacy": false,
+		"countBefore": {
+			"$numberInt": "2"
+		},
+		"countAfter": {
+			"$numberInt": "1"
+		},
+		"depleted": false
+	},
+	"modifiers": {
+		"sources": [
+			{
+				"source": "box",
+				"name": "Voter's Crate",
+				"id": "voters-crate"
+			},
+			{
+				"source": "profile",
+				"name": "normal",
+				"stats": {}
+			}
+		],
+		"stats": {
+			"rareFind": {
+				"$numberInt": "0"
+			},
+			"luck": {
+				"$numberInt": "0"
+			},
+			"trophyChance": {
+				"$numberInt": "0"
+			}
+		}
+	},
+	"rarity": {
+		"base": {
+			"common": {
+				"$numberDouble": "48.6145"
+			},
+			"uncommon": {
+				"$numberDouble": "40.5121"
+			},
+			"rare": {
+				"$numberDouble": "8.1024"
+			},
+			"ultra": {
+				"$numberDouble": "1.6205"
+			},
+			"giant": {
+				"$numberDouble": "0.8102"
+			},
+			"legendary": {
+				"$numberDouble": "0.3241"
+			},
+			"lucky": {
+				"$numberDouble": "0.0162"
+			}
+		},
+		"modified": {
+			"common": {
+				"$numberDouble": "48.6145"
+			},
+			"uncommon": {
+				"$numberDouble": "40.5121"
+			},
+			"rare": {
+				"$numberDouble": "8.1024"
+			},
+			"ultra": {
+				"$numberDouble": "1.6205"
+			},
+			"giant": {
+				"$numberDouble": "0.8102"
+			},
+			"legendary": {
+				"$numberDouble": "0.3241"
+			},
+			"lucky": {
+				"$numberDouble": "0.0162"
+			}
+		},
+		"withPity": {
+			"common": {
+				"$numberDouble": "48.6145"
+			},
+			"uncommon": {
+				"$numberDouble": "40.5121"
+			},
+			"rare": {
+				"$numberDouble": "8.1024"
+			},
+			"ultra": {
+				"$numberDouble": "1.6205"
+			},
+			"giant": {
+				"$numberDouble": "0.8102"
+			},
+			"legendary": {
+				"$numberDouble": "0.3241"
+			},
+			"lucky": {
+				"$numberDouble": "0.0162"
+			}
+		}
+	},
+	"pity": {
+		"before": {},
+		"after": {},
+		"applied": {},
+		"guarantee": null
+	},
+	"slots": [
+		{
+			"slot": {
+				"$numberInt": "0"
+			},
+			"baseTable": {
+				"common": {
+					"$numberDouble": "48.6145"
+				},
+				"uncommon": {
+					"$numberDouble": "40.5121"
+				},
+				"rare": {
+					"$numberDouble": "8.1024"
+				},
+				"ultra": {
+					"$numberDouble": "1.6205"
+				},
+				"giant": {
+					"$numberDouble": "0.8102"
+				},
+				"legendary": {
+					"$numberDouble": "0.3241"
+				},
+				"lucky": {
+					"$numberDouble": "0.0162"
+				}
+			},
+			"table": {
+				"common": {
+					"$numberDouble": "48.6145"
+				},
+				"uncommon": {
+					"$numberDouble": "40.5121"
+				},
+				"rare": {
+					"$numberDouble": "8.1024"
+				},
+				"ultra": {
+					"$numberDouble": "1.6205"
+				},
+				"giant": {
+					"$numberDouble": "0.8102"
+				},
+				"legendary": {
+					"$numberDouble": "0.3241"
+				},
+				"lucky": {
+					"$numberDouble": "0.0162"
+				}
+			},
+			"rarity": "common",
+			"guaranteed": false,
+			"reward": {
+				"kind": "fish",
+				"templateId": "6ab8061dddbc63abecdb8973",
+				"name": "Salmon",
+				"type": "fish",
+				"rarity": "common",
+				"icon": {
+					"animated": false,
+					"data": "Salmon"
+				},
+				"quantity": {
+					"$numberInt": "1"
+				},
+				"id": "6ab8061eddbc63abecdb8afd",
+				"size": {
+					"$numberDouble": "62.664"
+				},
+				"weight": {
+					"$numberDouble": "7.006"
+				},
+				"rawValue": {
+					"$numberInt": "38"
+				},
+				"value": {
+					"$numberInt": "38"
+				},
+				"valueBase": {
+					"$numberInt": "38"
+				}
+			}
+		},
+		{
+			"slot": {
+				"$numberInt": "1"
+			},
+			"baseTable": {
+				"common": {
+					"$numberDouble": "48.6145"
+				},
+				"uncommon": {
+					"$numberDouble": "40.5121"
+				},
+				"rare": {
+					"$numberDouble": "8.1024"
+				},
+				"ultra": {
+					"$numberDouble": "1.6205"
+				},
+				"giant": {
+					"$numberDouble": "0.8102"
+				},
+				"legendary": {
+					"$numberDouble": "0.3241"
+				},
+				"lucky": {
+					"$numberDouble": "0.0162"
+				}
+			},
+			"table": {
+				"common": {
+					"$numberDouble": "48.6145"
+				},
+				"uncommon": {
+					"$numberDouble": "40.5121"
+				},
+				"rare": {
+					"$numberDouble": "8.1024"
+				},
+				"ultra": {
+					"$numberDouble": "1.6205"
+				},
+				"giant": {
+					"$numberDouble": "0.8102"
+				},
+				"legendary": {
+					"$numberDouble": "0.3241"
+				},
+				"lucky": {
+					"$numberDouble": "0.0162"
+				}
+			},
+			"rarity": "uncommon",
+			"guaranteed": false,
+			"reward": {
+				"kind": "fish",
+				"templateId": "6ab8061dddbc63abecdb89e3",
+				"name": "Fall Blue Trout",
+				"type": "fish",
+				"rarity": "uncommon",
+				"icon": {
+					"animated": false,
+					"data": "Herring"
+				},
+				"quantity": {
+					"$numberInt": "1"
+				},
+				"id": "6ab8061eddbc63abecdb8afe",
+				"size": {
+					"$numberDouble": "38.442"
+				},
+				"weight": {
+					"$numberDouble": "2.757"
+				},
+				"rawValue": {
+					"$numberInt": "167"
+				},
+				"value": {
+					"$numberInt": "167"
+				},
+				"valueBase": {
+					"$numberInt": "167"
+				}
+			}
+		},
+		{
+			"slot": {
+				"$numberInt": "2"
+			},
+			"baseTable": {
+				"common": {
+					"$numberDouble": "48.6145"
+				},
+				"uncommon": {
+					"$numberDouble": "40.5121"
+				},
+				"rare": {
+					"$numberDouble": "8.1024"
+				},
+				"ultra": {
+					"$numberDouble": "1.6205"
+				},
+				"giant": {
+					"$numberDouble": "0.8102"
+				},
+				"legendary": {
+					"$numberDouble": "0.3241"
+				},
+				"lucky": {
+					"$numberDouble": "0.0162"
+				}
+			},
+			"table": {
+				"common": {
+					"$numberDouble": "48.6145"
+				},
+				"uncommon": {
+					"$numberDouble": "40.5121"
+				},
+				"rare": {
+					"$numberDouble": "8.1024"
+				},
+				"ultra": {
+					"$numberDouble": "1.6205"
+				},
+				"giant": {
+					"$numberDouble": "0.8102"
+				},
+				"legendary": {
+					"$numberDouble": "0.3241"
+				},
+				"lucky": {
+					"$numberDouble": "0.0162"
+				}
+			},
+			"rarity": "common",
+			"guaranteed": false,
+			"reward": {
+				"kind": "fish",
+				"templateId": "6ab8061dddbc63abecdb8975",
+				"name": "Bass",
+				"type": "fish",
+				"rarity": "common",
+				"icon": {
+					"animated": false,
+					"data": "Smallmouth_Bass"
+				},
+				"quantity": {
+					"$numberInt": "1"
+				},
+				"id": "6ab8061eddbc63abecdb8aff",
+				"size": {
+					"$numberDouble": "45.318"
+				},
+				"weight": {
+					"$numberDouble": "3.573"
+				},
+				"rawValue": {
+					"$numberInt": "49"
+				},
+				"value": {
+					"$numberInt": "49"
+				},
+				"valueBase": {
+					"$numberInt": "49"
+				}
+			}
+		}
+	],
+	"best": "uncommon",
+	"writes": {
+		"fishDocs": [
+			{
+				"name": "Salmon",
+				"description": "Salmon is a type of fish found in rivers and streams. It is known for its distinctive pink flesh and rich flavor. Salmon are popular food fish and are often sought after by anglers for their fighting spirit.",
+				"rarity": "Common",
+				"value": {
+					"$numberInt": "38"
+				},
+				"baseValue": {
+					"$numberInt": "10"
+				},
+				"locked": false,
+				"qualities": [
+					"strong"
+				],
+				"icon": {
+					"animated": false,
+					"data": "Salmon"
+				},
+				"count": {
+					"$numberInt": "1"
+				},
+				"type": "fish",
+				"biome": "River",
+				"guild": "0",
+				"size": {
+					"$numberDouble": "62.664"
+				},
+				"weight": {
+					"$numberDouble": "7.006"
+				},
+				"minSize": {
+					"$numberInt": "50"
+				},
+				"minWeight": {
+					"$numberInt": "3"
+				},
+				"maxSize": {
+					"$numberInt": "100"
+				},
+				"maxWeight": {
+					"$numberInt": "10"
+				},
+				"catchId": {
+					"$numberInt": "0"
+				},
+				"weather": "all",
+				"season": "all",
+				"_id": "6ab8061eddbc63abecdb8afd",
+				"__t": "FishData",
+				"user": "journal-fixture",
+				"obtained": {
+					"$numberLong": "1790445086067"
+				},
+				"valueBase": {
+					"$numberInt": "38"
+				},
+				"openId": "6ab8061eddbc63abecdb8af6",
+				"source": "gacha",
+				"profile": "normal",
+				"balanceVersion": "3.2.0",
+				"competitiveEligible": false
+			},
+			{
+				"name": "Fall Blue Trout",
+				"description": "A chill trout with frosty-blue scales, preparing for winter.",
+				"rarity": "Uncommon",
+				"value": {
+					"$numberInt": "167"
+				},
+				"baseValue": {
+					"$numberInt": "85"
+				},
+				"locked": false,
+				"qualities": [
+					"weak"
+				],
+				"icon": {
+					"animated": false,
+					"data": "Herring"
+				},
+				"count": {
+					"$numberInt": "1"
+				},
+				"type": "fish",
+				"biome": "River",
+				"guild": "0",
+				"size": {
+					"$numberDouble": "38.442"
+				},
+				"weight": {
+					"$numberDouble": "2.757"
+				},
+				"minSize": {
+					"$numberInt": "25"
+				},
+				"minWeight": {
+					"$numberInt": "2"
+				},
+				"maxSize": {
+					"$numberInt": "50"
+				},
+				"maxWeight": {
+					"$numberInt": "4"
+				},
+				"catchId": {
+					"$numberInt": "0"
+				},
+				"weather": "all",
+				"season": "Fall",
+				"_id": "6ab8061eddbc63abecdb8afe",
+				"__t": "FishData",
+				"user": "journal-fixture",
+				"obtained": {
+					"$numberLong": "1790445086067"
+				},
+				"valueBase": {
+					"$numberInt": "167"
+				},
+				"openId": "6ab8061eddbc63abecdb8af6",
+				"source": "gacha",
+				"profile": "normal",
+				"balanceVersion": "3.2.0",
+				"competitiveEligible": false
+			},
+			{
+				"name": "Bass",
+				"description": "Bass is a type of fish found in lakes and rivers. It is known for its large size and powerful swimming ability. Bass fishing is a popular sport in many parts of the world.",
+				"rarity": "Common",
+				"value": {
+					"$numberInt": "49"
+				},
+				"baseValue": {
+					"$numberInt": "20"
+				},
+				"locked": false,
+				"qualities": [
+					"strong"
+				],
+				"icon": {
+					"animated": false,
+					"data": "Smallmouth_Bass"
+				},
+				"count": {
+					"$numberInt": "1"
+				},
+				"type": "fish",
+				"biome": "Lake",
+				"guild": "0",
+				"size": {
+					"$numberDouble": "45.318"
+				},
+				"weight": {
+					"$numberDouble": "3.573"
+				},
+				"minSize": {
+					"$numberInt": "30"
+				},
+				"minWeight": {
+					"$numberInt": "2"
+				},
+				"maxSize": {
+					"$numberInt": "60"
+				},
+				"maxWeight": {
+					"$numberInt": "5"
+				},
+				"catchId": {
+					"$numberInt": "0"
+				},
+				"weather": "all",
+				"season": "all",
+				"_id": "6ab8061eddbc63abecdb8aff",
+				"__t": "FishData",
+				"user": "journal-fixture",
+				"obtained": {
+					"$numberLong": "1790445086067"
+				},
+				"valueBase": {
+					"$numberInt": "49"
+				},
+				"openId": "6ab8061eddbc63abecdb8af6",
+				"source": "gacha",
+				"profile": "normal",
+				"balanceVersion": "3.2.0",
+				"competitiveEligible": false
+			}
+		],
+		"grants": []
+	}
+}

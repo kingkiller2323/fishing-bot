@@ -34,6 +34,7 @@ const { applyPity, roll, toPercent } = require('./rarity');
 const { oid, notApplied, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
 const { publicXpOf, publicXpOfResult, publicLevelOf } = require('./publicLevel');
 const { levelOf, levelWithFloor } = require('./levels');
+const { Utils } = require('../class/Utils');
 const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
@@ -507,13 +508,44 @@ async function applyCastResult(result, { fault = async () => undefined } = {}) {
 	return { applied: true };
 }
 
-/** Completes interrupted casts (optionally for one player). Returns how many were rolled forward. */
-async function recoverPendingCasts({ userId } = {}) {
+const logRecoveryFailure = (kind, id, error) => Utils.log(`[RECOVERY] ${kind} ${id} could not be applied and stays pending: ${error?.stack || error?.message || error}`, 'err');
+
+/**
+ * Completes interrupted casts (optionally for one player), each in isolation: a journal that fails
+ * (corrupt, or from a shape the code cannot apply) is logged with its id and left pending; it never
+ * stops the others, the boot or the player's next cast. Returns { recovered, failed: [{ id, error }] }.
+ */
+async function recoverPendingCastsDetailed({ userId, onFailure = (id, error) => logRecoveryFailure('cast', id, error) } = {}) {
 	const query = { status: 'pending' };
 	if (userId) query.userId = String(userId);
 	const pending = await Cast.find(query).sort({ createdAt: 1 }).lean();
-	for (const cast of pending) await applyCastResult(cast.result);
-	return pending.length;
+	let recovered = 0;
+	const failed = [];
+	for (const cast of pending) {
+		try {
+			if (!cast.result || typeof cast.result !== 'object') throw new Error('journal has no result');
+			// A journal whose castId disagrees with its own id would write under another key: refuse it.
+			if (String(cast.result.castId) !== String(cast._id)) throw new Error(`journal result.castId ${cast.result.castId} != ${cast._id}`);
+			await applyCastResult(cast.result);
+			recovered++;
+		}
+		catch (error) {
+			failed.push({ id: String(cast._id), error: String(error?.message || error) });
+			await Cast.updateOne({ _id: cast._id }, { $set: { lastError: String(error?.message || error) } }).catch(() => undefined);
+			try {
+				onFailure(String(cast._id), error);
+			}
+			catch {
+				// Logging never breaks recovery.
+			}
+		}
+	}
+	return { recovered, failed };
+}
+
+/** Completes interrupted casts (optionally for one player). Returns how many were rolled forward. */
+async function recoverPendingCasts(options = {}) {
+	return (await recoverPendingCastsDetailed(options)).recovered;
 }
 
 /**
@@ -539,4 +571,4 @@ async function fishingStats(userId) {
 	};
 }
 
-module.exports = { castLine, applyCastResult, recoverPendingCasts, fishingStats, grantItem, NoCatchError, MAX_DRAW_ATTEMPTS };
+module.exports = { castLine, applyCastResult, recoverPendingCasts, recoverPendingCastsDetailed, fishingStats, grantItem, NoCatchError, MAX_DRAW_ATTEMPTS };

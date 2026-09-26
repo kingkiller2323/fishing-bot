@@ -309,12 +309,46 @@ async function applyGachaResult(result, { fault = async () => undefined } = {}) 
 }
 
 /** Completes interrupted opens (optionally for one player). Returns how many were rolled forward. */
-async function recoverPendingOpens({ userId } = {}) {
+/**
+ * Completes interrupted opens (optionally for one player), each in isolation: a journal that fails is
+ * logged with its id and left pending; it never stops the others, the boot or the player's next open.
+ * Returns { recovered, failed: [{ id, error }] }.
+ */
+async function recoverPendingOpensDetailed({ userId, onFailure = logOpenRecoveryFailure } = {}) {
 	const query = { status: 'pending' };
 	if (userId) query.userId = String(userId);
 	const pending = await GachaOpen.find(query).sort({ createdAt: 1 }).lean();
-	for (const open of pending) await applyGachaResult(open.result);
-	return pending.length;
+	let recovered = 0;
+	const failed = [];
+	for (const open of pending) {
+		try {
+			if (!open.result || typeof open.result !== 'object') throw new Error('journal has no result');
+			if (String(open.result.openId) !== String(open._id)) throw new Error(`journal result.openId ${open.result.openId} != ${open._id}`);
+			await applyGachaResult(open.result);
+			recovered++;
+		}
+		catch (error) {
+			failed.push({ id: String(open._id), error: String(error?.message || error) });
+			await GachaOpen.updateOne({ _id: open._id }, { $set: { lastError: String(error?.message || error) } }).catch(() => undefined);
+			try {
+				onFailure(String(open._id), error);
+			}
+			catch {
+				// Logging never breaks recovery.
+			}
+		}
+	}
+	return { recovered, failed };
+}
+
+function logOpenRecoveryFailure(id, error) {
+	const { Utils } = require('../class/Utils');
+	Utils.log(`[RECOVERY] box opening ${id} could not be applied and stays pending: ${error?.stack || error?.message || error}`, 'err');
+}
+
+/** Completes interrupted opens (optionally for one player). Returns how many were rolled forward. */
+async function recoverPendingOpens(options = {}) {
+	return (await recoverPendingOpensDetailed(options)).recovered;
 }
 
 /** Opens one box for a player: serialized per player, recovers first, then decides and persists. */
@@ -354,4 +388,4 @@ async function validateBoxes(names) {
 	return { problems, tables };
 }
 
-module.exports = { openLine, applyGachaResult, recoverPendingOpens, openBox, validateBoxes, buildPools, baseTable, canonicalRarity, GachaDefinitionError, HIGH_TIER };
+module.exports = { openLine, applyGachaResult, recoverPendingOpens, recoverPendingOpensDetailed, openBox, validateBoxes, buildPools, baseTable, canonicalRarity, GachaDefinitionError, HIGH_TIER };

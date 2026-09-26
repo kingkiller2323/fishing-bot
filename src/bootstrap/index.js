@@ -237,14 +237,25 @@ async function bootstrap() {
 	await ensureWeatherPatterns();
 	await validate();
 	await runMigrations(log);
-	// Finish casts whose persistence was interrupted (e.g. the process died mid-cast).
-	const { recoverPendingCasts } = require('../engine/cast');
-	const recovered = await recoverPendingCasts();
-	if (recovered > 0) log(`Recovered ${recovered} interrupted cast(s).`, 'warn');
-	const { recoverPendingOpens } = require('../engine/gacha');
-	const recoveredOpens = await recoverPendingOpens();
-	if (recoveredOpens > 0) log(`Recovered ${recoveredOpens} interrupted box opening(s).`, 'warn');
+	// Finish casts and box openings whose persistence was interrupted (e.g. the process died mid-cast).
+	// Each journal is recovered in isolation: one that fails is logged and stays pending, never stopping the boot.
+	await recoverJournals();
 	log(`Bootstrap complete in ${Date.now() - started}ms.`, 'done');
 }
 
-module.exports = { bootstrap, seedStatic, validate, canonicalWeather };
+async function recoverJournals() {
+	const { recoverPendingCastsDetailed } = require('../engine/cast');
+	const { recoverPendingOpensDetailed } = require('../engine/gacha');
+	for (const [kind, recover] of [['cast', recoverPendingCastsDetailed], ['box opening', recoverPendingOpensDetailed]]) {
+		try {
+			const { recovered, failed } = await recover();
+			if (recovered > 0) log(`Recovered ${recovered} interrupted ${kind}(s).`, 'warn');
+			if (failed.length > 0) log(`${failed.length} interrupted ${kind}(s) could not be recovered and stay pending: ${failed.map((f) => f.id).join(', ')}`, 'err');
+		}
+		catch (error) {
+			log(`Recovery of interrupted ${kind}s failed and was skipped: ${error?.message || error}`, 'err');
+		}
+	}
+}
+
+module.exports = { bootstrap, recoverJournals, seedStatic, validate, canonicalWeather };
