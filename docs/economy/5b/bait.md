@@ -2,390 +2,572 @@
 
 **Status: proposal only.** Nothing here is live. No `src/` file, catalog row or player document changes until you approve.
 
-- Framework: **5b.2** (`CURVE.quartic` **0.0475**, the authoritative coefficient from `curve.js`). Every number below is computed at runtime by `scripts/economy/5b/bait.js` from `framework.js`. The shared gear path, archetypes and lifecycle are a view of `assumptions.js`, not a copy. When regenerated from 5b.1, the only change is that the shared Tier 5 (Lv 60) now appears in the gear and consumption tables; no bait price changed.
-- Reproduce: `node scripts/economy/5b/bait.js` prints the full report. `node -e "require('./scripts/economy/5b/bait.js').report()"` returns it as an object.
-- Tables are printed at the provisional rod path. `withGear(rods.gearPath())` rebuilds every price and check on the final rods; see §10.
-- If a shared value changes, re-run `report()`. Nothing is scaled by hand.
+- **Framework 5b.4.** Every table below is **generated** by `node scripts/economy/5b/render-docs.js` from `scripts/economy/5b/bait.js` `markdownTables()`, and carries the framework version and shared digest it was computed at. Prose cites numbers only by pointing at a table. When a shared value changes, re-rendering regenerates every price, return and hour; nothing is scaled by hand.
+- **One model.** Per-cast figures come from the framework's `castOutcome()` on the shared gear path (`F.gearPath()`, the rods design). Every lifecycle figure (hours to a level, income shares, XP sources) comes from `integrate.run()`: the reference core loop (rods, world, quests, streak, buffs) with `variant.bait` set to `'cash'` or `'xp'`, against `'none'`. Bait is a **system on the shared lifecycle core** and has no time-stepping loop of its own.
+- **Reproduce.** `node scripts/economy/5b/bait.js` prints the full report as JSON.
+- **Decisions.** Every non-obvious choice is a **proposed** decision (§2), verified against the model by `check-shared.js`. Only you approve.
 
 ---
 
-## 1. Decisions at a glance
+## 1. Summary
 
-| # | Decision | Why (numbers from the module) |
+<!-- generated:bait-headline -->
+| Figure | Value | Table |
 | --- | --- | --- |
-| B1 | Bait is consumed **once per cast**, only when the cast succeeds in a biome where the bait works. | Per-fish consumption would charge 1.15–1.65 units/cast from Tier 1 to Tier 4. A 5-fish jackpot would burn 5 units at the best moment of the game. Today's Founder would burn 3 units/cast (`consumptionModel()`). |
-| B2 | Bait works **only in its listed biomes**. Elsewhere it does nothing (including XP) and is **not consumed**. | Today, bait outside its biomes still gives its XP bonus and still burns units. |
-| B3 | Ten baits in three ladder bands plus one universal. Each bait has one clear role. | See §3. Biome lists are the balance lever: fixed prices with biome-scaled value would otherwise balloon returns up the ladder. |
-| B4 | **Money baits** are priced so the cash return per $1 is **1.3 at the centre of their home band**. The accepted band across home stages is **1.0–1.7**. The net gain is capped at 6% of cast value. | The return is positive but modest everywhere at home: 1.03–1.62 (`bandCheck()`). |
-| B5 | **XP baits** are priced at **1× the stage's own $/XP** at the band centre (K = 1: an hour of income buys an hour of XP). Any cash effect is charged at par. | The net $ per extra XP is 0.68–1.40× the stage rate across home stages. |
-| B6 | XP bonuses are sized so that **always-on XP bait speeds any milestone by at most 10%**. | 9.1% measured. **Decision for you:** this puts always-on buyers ~0.5 h under the L40 window and ~1 h under the L50 window (§8). |
-| B7 | Strong-fish access comes **only from the two starter baits, each in its starter biome**. | At starter prices, an Old Rod + Worm would return 10× in Swamp; Shrimp would return 6.7× in Coast (`strongAccessByBiome()`). |
-| B8 | Magnet → mid-band Legendary/Lucky bait. Strong Magnet → the universal collection-completion bait, priced for Swamp. Magic Lure → the late-band all-rounder (XP + every rarity stat). | See §5. |
-| B9 | Sold in **packs of 10 casts**. | Per-cast prices are $3.90–$60. Integer pack prices keep them precise to ~1%. |
-| B10 | Bait spending is **optional**, never mandatory upkeep. | Skipping bait costs at most 5.8% of cast value at a starter stage and ≤3.2% later. Always using the best money bait nets +2.4% of income (§8). |
+| Consumption | 1 unit per successful cast where the bait works; per fish would be 1.20–1.80 units/cast on Tiers 1–5 | Consumption |
+| Money baits: cash return per $1 at their home stages | 1.04–1.61 (target 1.3, accepted 1–1.7) | Home stages |
+| XP baits: net $ per extra XP against the stage's own rate | 0.68×–1.42× (target K = 1) | Home stages |
+| Pricing checks | all pass | Pricing checks |
+| Money bait always on, regular player (integrated) | net +1.6% of income; milestones at most 1.6% sooner | Regular player; Income and XP sources |
+| XP bait always on, regular player (integrated) | L50 43.65 h → 39.57 h; largest speed-up 9.7% at L60 (cap 10%: pass); net −8.9% of income | Regular player |
+| Approved windows with always-on XP bait (regular player) | **under the lower edge at L30, L40, L50** | Regular player; XP-bait sizing |
+| Largest XP-bait speed-up, any archetype | 11.8% (grinder, L60) | Every archetype |
+| Retired private loop | system() matched it exactly: 72/72 milestones step-exact (a83b5f0) | Retired-loop parity |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-headline -->
 
 ---
 
-## 2. Consumption: per cast (B1, B2)
+## 2. Decisions for approval
 
-`consumptionModel()`, framework multi-catch at the provisional tiers:
+<!-- generated:bait-decisions -->
+| ID | Proposed decision | Modelled | Alternatives | Why | Record = model |
+| --- | --- | --- | --- | --- | --- |
+| `P-BAIT-PER-CAST` | Bait is consumed once per successful cast, not per fish, for every profile | 1 unit per cast; a Founder cast uses one too; a failed cast (no catch, broken rod) uses none | per fish (today: every fish of a multi-catch burns a unit; today's Founder about three per cast) | a fixed, knowable cost per cast; jackpots never cost more bait; no Founder tell in bait counts (Consumption) | yes |
+| `P-BAIT-WHERE-IT-WORKS` | Bait works only in its listed biomes: elsewhere no stats, no XP bonus, and no unit is used | onlyWhereItWorks true | today: the XP multiplier applies in every biome and units burn everywhere | biome lists are the balance lever: a fixed price against biome-scaled value would otherwise balloon returns up the ladder (Starter baits) | yes |
+| `P-BAIT-ROSTER` | Ten baits, one clear role each: two starter baits, five mid-band specialists, two late combination baits and one universal luck bait; Spinner (the only volume bait) is mid-band only | Shrimp: strong access (Ocean starter); Worm: strong access (River starter); Fly: rarity targeting (Rare/Ultra); Minnow: trophy targeting (Giant); Magnet: luck / collection (Legendary+Lucky); Spinner: multi-catch jackpots (+XP); Lure: XP; Bloodworm: rarity + trophy (late); Magic Lure: endgame all-rounder (XP + every rarity stat); Strong Magnet: luck / collection completion, any biome | today's roster (stacked capabilities, water-type biome lists, XP multipliers everywhere); Spinner in the late band too (pushes Tier 3-5 casts past the approved fish-per-cast range) | the player chooses by goal (collection, trophies, Legendary hunting, jackpots, XP); each band gets one specialist per role (Roster) | yes |
+| `P-BAIT-STARTER-BIOME` | Strong-fish access comes only from the two starter baits, each in its own starter biome | Shrimp: Ocean; Worm: River | by water type (today: Shrimp in salt water, Worm in fresh water); strong access on more baits (today: most of the catalog) | from Lv 20 every crafted rod reaches strong fish; in later biomes strong access at a starter price would be a money-maker for players who never craft (Starter baits) | yes |
+| `P-BAIT-UNIVERSAL` | Strong Magnet is the one universal bait (collection completion): every live biome, priced at Swamp, no strong access; Mountain Stream gets its own bait band later | biomes Ocean, River, Lake, Pond, Coast, Swamp; priced at swamp-t4 | a Lake/Pond-priced luck bait everywhere (a money-maker in late biomes); keep legacy strong access (an Old Rod money-maker in Swamp) | priced at the most valuable stage it works in, it is a deliberate cash loss below Swamp and never a money-maker anywhere (Chase) | yes |
+| `P-BAIT-MONEY-RETURN` | Money baits are priced for a modest positive cash return at home, with the net gain capped as a share of the cast | return 1.3 per $1 at the geometric centre of the home stages; accepted 1-1.7 at every home stage; net gain at most 6% of the cast's value | a return of 1.0 (bait as a pure sink); a higher return (bait becomes mandatory) | bait pays back a little where it works, so it is worth buying, while skipping it costs little (Home stages; Pricing checks) | yes |
+| `P-BAIT-XP-PRICE` | XP-class baits are priced at K times the stage's own cash per XP (K = 1: an hour of income buys an hour of XP); their cash effect is charged at par | K 1; accepted utility return 0.75-1.35 at every home stage | K > 1 (XP bait a premium luxury); K < 1 (XP bait close to mandatory) | converts money into time at the stage's own exchange rate; XP baits are band-restricted because XP gets dearer in cash up the ladder (Stage rates) | yes |
+| `P-BAIT-XP-SIZING` | XP bonuses sized so always-on XP bait speeds the regular player by at most the cap; this accepts that always-on buyers fall under some approved windows | Lure XP +15%, Magic Lure XP +12%, Spinner extra-fish chance +10%; cap 10% (regular player, milestones from Lv 20) | the design-stage alternative (smaller XP bonuses; XP-bait sizing); size to the window bound so even always-on buyers stay inside every window (XP-bait sizing); no XP-class baits | a paid, optional accelerator; at 5b.4 the integrated model puts the always-on buyer under some windows (Regular player; XP-bait sizing): the user decides whether that is acceptable | yes |
+| `P-BAIT-PACK` | Sold in packs of casts, pack prices rounded to whole dollars | 10 casts per pack; $1 steps below $100, $5 steps above | single units at a fractional price (money is an integer); larger packs | per-cast prices are a few dollars; integer pack prices keep them precise (Proposed prices) | yes |
+| `P-BAIT-SHOP-LEVEL` | Each bait is sold from the unlock level of its first biome; Strong Magnet with the late band | Shrimp Lv 0, Worm Lv 10, Fly Lv 20, Minnow Lv 20, Magnet Lv 20, Spinner Lv 20, Lure Lv 20, Bloodworm Lv 40, Magic Lure Lv 40, Strong Magnet Lv 40 | today's level requirements; Strong Magnet from Lv 0 (a universal bait for new players) | a bait is offered when the player can first use it; Strong Magnet is an endgame collection tool | yes |
+| `P-BAIT-OPTIONAL-SINK` | Bait spending is an optional sink, never mandatory upkeep | spend item optional.bait | upkeep (bait required to fish competitively) | no stage requires bait; money bait returns a small net gain and XP bait buys time (Income and XP sources) | yes |
+| `P-BAIT-LEGACY-STACKS` | Owned bait stacks keep their count (one unit = one cast under the new rules); no refunds; behaviour read by name from the new definitions | migration rule (not a PARAMS value) | refund the difference between the old and the new price; convert stacks by value | no player document is rewritten; legacy units work better than before within the new biome lists (Migrations) | n/a (not a PARAMS value) |
 
-| Rod tier | Units/cast if consumed per fish | Units/cast, proposed | P(≥3 units in one cast) if per fish | P(5 units) if per fish |
+Status of every entry: `proposed`. Only the user approves; `decisions.js` joins these to the Phase 5B registry (alongside the framework's `P-LUCKY`, `P-DOUBLE-CASH` and `P-EVENTS`, and the streak design's `P-STREAK-BAIT-PACK`, which this design relies on) and `check-shared.js` verifies each record against the model.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-decisions -->
+
+**The one decision the integrated numbers sharpen: `P-BAIT-XP-SIZING`.** At 5b.4, a regular player who runs XP bait at every stage ends up under the lower edge of some approved windows, even though the speed-up cap still passes for that player (Regular player, Pricing checks). Active and grinder players go past the cap, which is defined on the regular player only (Every archetype). The choices are in XP-bait sizing:
+
+- **Keep the proposed sizing.** XP bait stays a paid, optional accelerator. It costs a real share of income (Income and XP sources), and only players who buy it every cast move under the window edges.
+- **Shrink the XP bonuses.** Compare the design-stage alternative and the window bound in the Every window column. The bound keeps the always-on buyer inside every window, at the cost of a much smaller XP effect.
+- **Drop XP-class baits.**
+
+This is a parameter-only change in any direction (`PARAMS.baits`, `PARAMS.pricing.maxXpBaitSpeedup`). No value was changed during the migration.
+
+---
+
+## 3. Consumption: once per cast, only where it works
+
+`P-BAIT-PER-CAST`, `P-BAIT-WHERE-IT-WORKS`. Framework multi-catch on the shared rod tiers, plus today's Founder profile:
+
+### Consumption
+
+<!-- generated:bait-consumption -->
+| Rod | Units/cast if consumed per fish | Units/cast, proposed | P(≥3 units in one cast), per fish | P(5 units), per fish |
 | --- | --- | --- | --- | --- |
-| Old Rod | 1.00 | 1 | 0% | 0% |
-| Tier 1 | 1.15 | 1 | 3.5% | 0.4% |
-| Tier 2 | 1.30 | 1 | 6.9% | 0.9% |
-| Tier 3 | 1.50 | 1 | 11.6% | 1.4% |
-| Tier 4 | 1.65 | 1 | 15.0% | 1.8% |
+| Old Rod | 1.00 | 1 | 0.0% | 0.0% |
+| T1 | 1.20 | 1 | 4.6% | 0.6% |
+| T2 | 1.30 | 1 | 6.9% | 0.9% |
+| T3 | 1.50 | 1 | 11.6% | 1.4% |
+| T4 | 1.65 | 1 | 15.0% | 1.8% |
+| T5 | 1.80 | 1 | 18.5% | 2.3% |
+| Founder today (starter rod, bonus draws) | 3.00 | 1 | — | — |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-consumption -->
 
 Why per cast:
 
 - **The cost is fixed and knowable.** A bait's price means "what one cast costs".
-- **Jackpots are pure upside.** The 3–5 fish casts never cost more bait.
+- **Jackpots are pure upside.** Multi-fish casts never cost more bait.
 - **Bait complements gear instead of taxing it.** A better rod lands more (and rarer) fish per unit, so the same bait is worth more with better gear.
-- **No Founder tell.** Founder uses exactly 1 unit per cast, like everyone else. Per fish, today's Founder would burn about 3 units per cast (1 + 2.0 average bonus draws, from `PROFILES.founder.bonusDraws`).
-- **Unchanged per fish.** Quest progress and pond counts stay per fish.
+- **No Founder tell.** A Founder uses one unit per cast, like everyone else. Per fish, today's Founder would burn several units per cast (last row).
+- **Per-fish counters are unchanged.** Quest progress and pond counts stay per fish.
 
 **Where it works.** A cast in a biome the bait doesn't list gets no stats and no XP, and the bait is not consumed. Today (`cast.js:189`, `cast.js:275`, `modifiers.js:160`) the XP bonus applies everywhere and units burn everywhere. A failed cast (no catch, broken rod) consumes nothing, as today.
 
 ---
 
-## 3. Roster and roles
+## 4. Roster and roles
 
-Stats are in the framework's stat model: Rare Find boosts Rare/Ultra, Luck boosts Legendary/Lucky, and Trophy boosts Giant. Extra-fish chance adds to the rod's multi-catch chance.
+`P-BAIT-ROSTER`. Stats use the framework's stat model: Rare Find boosts Rare/Ultra, Luck boosts Legendary/Lucky, and Trophy boosts Giant. Extra-fish chance adds to the rod's multi-catch chance (`stats.multiChance`, shared with the rods design).
 
-| Band (biomes, typical gear) | Strong access | Rarity (Rare/Ultra) | Trophy (Giant) | Luck (Legendary/Lucky) | Jackpots | XP |
+### Roster
+
+<!-- generated:bait-roster -->
+| Band (biomes · typical rod) | Strong access | Rare Find (Rare/Ultra) | Trophy (Giant) | Luck (Legendary/Lucky) | Extra-fish chance (jackpots) | XP |
 | --- | --- | --- | --- | --- | --- | --- |
 | **Starter** (Ocean, River · Old Rod) | Shrimp (Ocean), Worm (River) | — | — | — | — | — |
-| **Mid** (Lake, Pond · Tier 1–2) | — | Fly | Minnow | Magnet | Spinner | Lure |
-| **Late** (Coast, Swamp · Tier 3–4) | — | Bloodworm (+Trophy) | Bloodworm | — | — | Magic Lure (+ all rarity stats) |
-| **Universal** (all six, priced for Swamp) | — | — | — | Strong Magnet | — | — |
+| **Mid** (Lake, Pond · T1–T2) | — | Fly (+100%) | Minnow (+150%) | Magnet (+200%) | Spinner (+10%) | Lure (+15%) |
+| **Late** (Coast, Swamp · T3–T4) | — | Bloodworm (+100%), Magic Lure (+75%) | Bloodworm (+75%), Magic Lure (+75%) | Magic Lure (+75%) | — | Magic Lure (+12%) |
+| **Universal** (every live biome · priced at Swamp · T4) | — | — | — | Strong Magnet (+400%) | — | — |
 
-- **Starter:** strong access only. It is the single big lever an Old Rod has, and it goes away once the rod reaches strong fish.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-roster -->
+
+- **Starter:** strong access only. It is the one big lever an Old Rod has, and it stops mattering once the rod reaches strong fish.
 - **Mid:** one specialist per role. The player chooses by goal: collection, trophies, Legendary hunting, jackpots or XP.
 - **Late:** combination baits.
-- **Spinner is mid-band only.** It is the only volume bait. Its +10% extra-fish chance keeps Tier 1–2 inside the approved 1.1–1.5 fish/cast. It is not allowed at Tier 3–5, where it would push the endgame past 1.8.
-- **Mountain Stream (Lv 60)** is in no bait's list. It gets its own band when its species ladder exists, priced by the same functions (`prices()`, `bandCheck()`). Adding it to a late bait would raise that bait's return by the Swamp→Mountain Stream value step. Its weather-bound salmon are a natural fit for a species/weather-targeting bait then. Species targeting needs catalog tags and is not proposed now.
+- **Spinner is mid-band only.** It is the only volume bait. In the late band it would push casts past the approved fish-per-cast range of the endgame rods.
+- **Mountain Stream** is in no bait's list. It gets its own band once its species ladder exists, priced by the same functions (`prices()`, `bandCheck()`). Adding it to a late bait would raise that bait's return by the Swamp → Mountain Stream value step. Its weather-bound species would suit a species/weather-targeting bait then; species targeting needs catalog tags and is not proposed now.
 
 ---
 
-## 4. Current → Proposed
+## 5. Current → proposed
 
-### 4.1 Today (`currentBaits()`: real engine, `measurements.json`, Old Rod, 1,000 casts per scenario)
+### Today
 
+`currentBaits()`: the real engine, measured with an Old Rod (`docs/economy/measurements.json`).
+
+<!-- generated:bait-current -->
 | Bait | Price/unit | Consumption | Cost/cast | Works in | Engine stats | XP mult | Best return per $1 (biome) | $ per extra XP |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Shrimp | $200 | per fish | $200 | ocean, coast | strong | ×1 | 0.29 (ocean) | — |
-| Worm | $10 | per fish | $10 | river, lake, pond, swamp | none | ×1 | 1.18 (swamp; noise on $10) | — |
+| Worm | $10 | per fish | $10 | river, lake, pond, swamp | none | ×1 | 1.18 (swamp) | — |
 | Fly | $1,000 | per fish | $1,000 | river, lake, pond, swamp | Rare Find +100%, strong | ×1.25 | 0.13 (swamp) | $262 |
 | Minnow | $150 | per fish | $150 | river, lake, pond, swamp | Trophy +150%, strong | ×1 | 0.84 (swamp) | — |
-| Magnet | $5,000 | per fish | $5,000 | all 6 | Luck +200% | ×1 | 0.00 | — |
-| Spinner | $500 | per fish | $1,000 | all 6 | +1 fish/draw, strong | ×1.25 | 0.32 (swamp) | $40 |
-| Lure | $2,500 | per fish | $5,000 | all 6 | Rare Find +100%, +1 fish/draw, strong | ×1.5 | 0.07 (swamp) | $149 |
+| Magnet | $5,000 | per fish | $5,000 | river, lake, pond, ocean, coast, swamp | Luck +200% | ×1 | 0.00 (river) | — |
+| Spinner | $500 | per fish | $1,000 | river, lake, pond, ocean, coast, swamp | +1 fish/draw, strong | ×1.25 | 0.32 (swamp) | $40 |
+| Lure | $2,500 | per fish | $5,000 | river, lake, pond, ocean, coast, swamp | Rare Find +100%, +1 fish/draw, strong | ×1.5 | 0.07 (swamp) | $149 |
 | Bloodworm | $1,000 | per fish | $1,000 | ocean, coast | Rare Find +100%, strong | ×1.25 | 0.09 (ocean) | $262 |
-| Magic Lure | $15,000 | per fish | **$30,000** | all 6 | Rare Find +150%, Trophy +100%, Luck +150%, +1 fish/draw, strong | ×2.5 | 0.01 | **$444** |
-| Strong Magnet | $15,000 | per fish | $15,000 | all 6 | Luck +400%, strong | ×1 | 0.01 | — |
+| Magic Lure | $15,000 | per fish | $30,000 | river, lake, pond, ocean, coast, swamp | Rare Find +150%, Trophy +100%, Luck +150%, +1 fish/draw, strong | ×2.5 | 0.01 (river) | $444 |
+| Strong Magnet | $15,000 | per fish | $15,000 | river, lake, pond, ocean, coast, swamp | Luck +400%, strong | ×1 | 0.01 (swamp) | — |
 
-### 4.2 Proposed (`prices()`, `PARAMS.baits`)
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-current -->
 
+### Proposed prices
+
+`prices()`: each price is set from `castOutcome` at the bait's home stages (the geometric centre of their utilities), then rounded to a whole-dollar pack price (`P-BAIT-PACK`).
+
+<!-- generated:bait-proposed -->
 | Bait | Role | Works in | Shop from | Effect | Pack of 10 casts | Per cast | Pricing |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Shrimp | strong access, Ocean starter | Ocean | Lv 0 | strong access | $40 | $4.00 | money |
-| Worm | strong access, River starter | River | Lv 10 | strong access | $46 | $4.60 | money |
-| Fly | rarity targeting | Lake, Pond | Lv 20 | Rare Find +100% | $58 | $5.80 | money |
-| Minnow | trophy targeting | Lake, Pond | Lv 20 | Trophy +150% | $39 | $3.90 | money |
-| Magnet | Legendary/Lucky, collection | Lake, Pond | Lv 20 | Luck +200% | $54 | $5.40 | money |
-| Spinner | jackpots (+XP) | Lake, Pond | Lv 20 | extra-fish chance +10% | $230 | $23.00 | XP |
-| Lure | XP | Lake, Pond | Lv 20 | XP +15% | $140 | $14.00 | XP |
-| Bloodworm | rarity + trophy | Coast, Swamp | Lv 40 | Rare Find +100%, Trophy +75% | $170 | $17.00 | money |
-| Magic Lure | endgame all-rounder | Coast, Swamp | Lv 40 | Rare Find, Trophy, Luck +75%; XP +12% | $600 | $60.00 | XP |
-| Strong Magnet | collection completion, any biome | all 6 | Lv 40 | Luck +400% | $265 | $26.50 | money |
+| Shrimp | strong access (Ocean starter) | Ocean | Lv 0 | strong access | $40 | $4.00 | money |
+| Worm | strong access (River starter) | River | Lv 10 | strong access | $46 | $4.60 | money |
+| Fly | rarity targeting (Rare/Ultra) | Lake, Pond | Lv 20 | Rare Find +100% | $60 | $6.00 | money |
+| Minnow | trophy targeting (Giant) | Lake, Pond | Lv 20 | Trophy +150% | $40 | $4.00 | money |
+| Magnet | luck / collection (Legendary+Lucky) | Lake, Pond | Lv 20 | Luck +200% | $56 | $5.60 | money |
+| Spinner | multi-catch jackpots (+XP) | Lake, Pond | Lv 20 | extra-fish chance +10% | $235 | $23.50 | XP |
+| Lure | XP | Lake, Pond | Lv 20 | XP +15% | $145 | $14.50 | XP |
+| Bloodworm | rarity + trophy (late) | Coast, Swamp | Lv 40 | Rare Find +100%, Trophy +75% | $180 | $18.00 | money |
+| Magic Lure | endgame all-rounder (XP + every rarity stat) | Coast, Swamp | Lv 40 | Rare Find +75%, Trophy +75%, Luck +75%, XP +12% | $630 | $63.00 | XP |
+| Strong Magnet | luck / collection completion, any biome | every live biome (6) | Lv 40 | Luck +400% | $285 | $28.50 | money |
 
-**Shop level.** "Shop from" is the unlock level of the bait's first biome. Strong Magnet is set to the late band at Lv 40.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-proposed -->
 
-**Removed qualities.** Only Shrimp and Worm grant strong access. The legacy `strong` capability is removed from every other bait (B7), including Strong Magnet: an Old Rod + Strong Magnet in Swamp would return 2.6×.
+- **Shop level** (`P-BAIT-SHOP-LEVEL`) is the unlock level of the bait's first biome. Strong Magnet opens with the late band.
+- **Removed qualities.** Only Shrimp and Worm grant strong access (`P-BAIT-STARTER-BIOME`). The legacy `strong` capability is removed from every other bait, including Strong Magnet.
 
-### 4.3 Proposed, at each home stage (`evaluate()`; provisional gear of that stage)
+### Home stages
 
-| Bait | Stage | Base $/cast | +$/cast | +XP/cast | Cost/cast | Cash return per $1 | Net gain (share of cast) | Net $ per extra XP | × stage $/XP | Jackpot 3+ (base → bait) |
+`evaluate()` at each home stage, on the shared gear of that stage.
+
+<!-- generated:bait-home -->
+| Bait | Stage | Base $/cast | +$/cast | +XP/cast (share) | Cost/cast | Cash return per $1 | Net gain (share of cast) | Net $ per extra XP | × stage $/XP | Jackpot 3+ (base → bait) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Shrimp | Ocean · Old Rod | $21.4 | $5.24 | 0 | $4.00 | **1.31** | +5.8% | profit | — | — |
-| Worm | River · Old Rod | $37.8 | $5.93 | 0 | $4.60 | **1.29** | +3.5% | profit | — | — |
-| Fly | Lake · T1 | $73.8 | $6.08 | 0.52 (+2.4%) | $5.80 | **1.05** | +0.4% | profit | — | 3.5% |
-| Fly | Pond · T2 | $117.7 | $9.30 | 0.57 (+2.3%) | $5.80 | **1.60** | +3.0% | profit | — | 6.9% |
-| Minnow | Lake · T1 | $73.8 | $4.00 | 0.20 (+0.9%) | $3.90 | **1.03** | +0.1% | profit | — | 3.5% |
-| Minnow | Pond · T2 | $117.7 | $6.30 | 0.22 (+0.9%) | $3.90 | **1.62** | +2.0% | profit | — | 6.9% |
-| Magnet | Lake · T1 | $73.8 | $6.02 | 0.24 (+1.1%) | $5.40 | **1.11** | +0.8% | profit | — | 3.5% |
-| Magnet | Pond · T2 | $117.7 | $8.10 | 0.27 (+1.1%) | $5.40 | **1.50** | +2.3% | profit | — | 6.9% |
-| Spinner | Lake · T1 | $73.8 | $9.72 | 2.84 (+13.2%) | $23.00 | 0.42 | −18.0% | $4.67 | **1.37×** | 3.5% → 7.0% |
-| Spinner | Pond · T2 | $117.7 | $13.72 | 2.86 (+11.7%) | $23.00 | 0.60 | −7.9% | $3.24 | **0.68×** | 6.9% → 10.4% |
-| Lure | Lake · T1 | $73.8 | $0 | 3.24 (+15.0%) | $14.00 | 0 | −19.0% | $4.33 | **1.27×** | — |
-| Lure | Pond · T2 | $117.7 | $0 | 3.68 (+15.0%) | $14.00 | 0 | −11.9% | $3.80 | **0.79×** | — |
-| Bloodworm | Coast · T3 | $195.3 | $18.46 | 0.75 (+2.6%) | $17.00 | **1.09** | +0.8% | profit | — | 11.6% |
-| Bloodworm | Swamp · T4 | $311.7 | $26.89 | 0.80 (+2.5%) | $17.00 | **1.58** | +3.2% | profit | — | 15.0% |
-| Magic Lure | Coast · T3 | $195.3 | $19.57 | 4.22 (+14.8%) | $60.00 | 0.33 | −20.7% | $9.59 | **1.40×** | — |
-| Magic Lure | Swamp · T4 | $311.7 | $28.41 | 4.64 (+14.7%) | $60.00 | 0.47 | −10.1% | $6.80 | **0.69×** | — |
-| Strong Magnet | Swamp · T4 | $311.7 | $34.55 | 0.65 (+2.0%) | $26.50 | **1.30** | +2.6% | profit | — | 15.0% |
+| Shrimp | Ocean · Old Rod | $21.37 | $5.24 | 0 | $4.00 | **1.31** | +5.8% | profit | — | — |
+| Worm | River · Old Rod | $37.80 | $5.93 | 0 | $4.60 | **1.29** | +3.5% | profit | — | — |
+| Fly | Lake · T1 | $77.10 | $6.33 | 0.54 (+2.4%) | $6.00 | **1.06** | +0.4% | profit | — | 4.6% |
+| Fly | Pond · T2 | $120.07 | $9.48 | 0.57 (+2.3%) | $6.00 | **1.58** | +2.9% | profit | — | 6.9% |
+| Minnow | Lake · T1 | $77.10 | $4.17 | 0.21 (+0.9%) | $4.00 | **1.04** | +0.2% | profit | — | 4.6% |
+| Minnow | Pond · T2 | $120.07 | $6.42 | 0.22 (+0.9%) | $4.00 | **1.61** | +2.0% | profit | — | 6.9% |
+| Magnet | Lake · T1 | $77.10 | $6.39 | 0.25 (+1.1%) | $5.60 | **1.14** | +1.0% | profit | — | 4.6% |
+| Magnet | Pond · T2 | $120.07 | $8.42 | 0.27 (+1.1%) | $5.60 | **1.50** | +2.4% | profit | — | 6.9% |
+| Spinner | Lake · T1 | $77.10 | $9.74 | 2.84 (+12.6%) | $23.50 | 0.41 | −17.8% | $4.84 | **1.41×** | 4.6% → 8.1% |
+| Spinner | Pond · T2 | $120.07 | $14.00 | 2.86 (+11.7%) | $23.50 | 0.60 | −7.9% | $3.32 | **0.68×** | 6.9% → 10.4% |
+| Lure | Lake · T1 | $77.10 | $0.00 | 3.38 (+15.0%) | $14.50 | 0.00 | −18.8% | $4.29 | **1.25×** | 4.6% |
+| Lure | Pond · T2 | $120.07 | $0.00 | 3.68 (+15.0%) | $14.50 | 0.00 | −12.1% | $3.94 | **0.81×** | 6.9% |
+| Bloodworm | Coast · T3 | $203.14 | $19.19 | 0.75 (+2.6%) | $18.00 | **1.07** | +0.6% | profit | — | 11.6% |
+| Bloodworm | Swamp · T4 | $330.51 | $28.49 | 0.80 (+2.5%) | $18.00 | **1.58** | +3.2% | profit | — | 15.0% |
+| Magic Lure | Coast · T3 | $203.14 | $20.44 | 4.22 (+14.8%) | $63.00 | 0.32 | −21.0% | $10.09 | **1.42×** | 11.6% |
+| Magic Lure | Swamp · T4 | $330.51 | $30.24 | 4.64 (+14.7%) | $63.00 | 0.48 | −9.9% | $7.05 | **0.68×** | 15.0% |
+| Strong Magnet | Swamp · T4 | $330.51 | $37.34 | 0.65 (+2.0%) | $28.50 | **1.31** | +2.7% | profit | — | 15.0% |
 
-**Stage $/XP** is the cash per cast divided by the XP per cast at that stage without bait: Ocean $1.15, River $2.03, Lake $3.42, Pond $4.80, Coast $6.85, Swamp $9.85. XP gets about 8.5× dearer in cash from the start of the ladder to Swamp. That is why XP baits are band-restricted: a Lake-priced XP bait used in Swamp would cost 0.35× the stage rate and become mandatory.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-home -->
 
-**How to read the results.** The ROI band holds. Every money bait returns 1.03–1.62 at its home stages (centre 1.3), with net gain ≤5.8% of the cast. Every XP bait's net cost per extra XP is 0.68–1.40× the stage's own rate (centre 1.0×).
+### Stage rates
 
-**Why the bands straddle the target.** Within a two-biome band, value per cast rises ~1.6× (the next biome and the next tier). So a price set at the band centre gives ≈1.0 at the band's entry and ≈1.6 at its top.
+What XP pricing reads: the stage's own cash per XP without bait.
 
----
-
-## 5. What Magnet, Strong Magnet and Magic Lure become
-
-| Bait | Today | Proposed | Result (`chaseMetrics()`, `evaluate()`) |
+<!-- generated:bait-stage-rates -->
+| Typical stage | Cash per cast | XP per cast | Stage $/XP |
 | --- | --- | --- | --- |
-| **Magnet** | $5,000 per fish, Luck +200%, all biomes; returns $0.00 per $1 | Mid-band Legendary/Lucky bait: Luck +200%, Lake/Pond, **$5.40/cast** | Casts per Legendary+ at Pond · T2: **321 → 121**. Lucky fish: 8,350 → 3,144 casts. It pays for itself: return 1.11–1.50. |
-| **Strong Magnet** | $15,000 per fish, Luck +400% + strong, all biomes | Universal collection-completion bait: Luck +400%, every biome, no strong access, **$26.50/cast**, priced at Swamp · T4 (return 1.30 there) | Swamp · T4: 196 → 56 casts per Legendary+; 5,089 → 1,465 per Lucky fish. An endgame player finishing Ocean (Magikarp, Pearl) pays a net **$1,567 per extra Legendary+** (4.4 min of income) and $40,755 per extra Lucky fish. Below Swamp it is a deliberate cash loss (return 0.11–0.93), so it can't be a money-maker anywhere else. |
-| **Magic Lure** | $30,000/cast for ~$200 extra; $444 per extra XP | Late-band all-rounder: Rare Find, Trophy, Luck +75%; XP +12% (≈ +15% XP in total, counting rarer catches). Coast/Swamp, **$60/cast** | +$19.57 / +$28.41 cash and +4.2 / +4.6 XP per cast (Coast / Swamp). Net **$9.59 / $6.80 per extra XP** (1.40× / 0.69× the stage rate). 46–65× cheaper per extra XP than today, and a real choice rather than a trap. |
+| Ocean · Old Rod | $21.37 | 18.65 | $1.15 |
+| River · Old Rod | $37.80 | 18.65 | $2.03 |
+| Lake · T1 | $77.10 | 22.52 | $3.42 |
+| Pond · T2 | $120.07 | 24.54 | $4.89 |
+| Coast · T3 | $203.14 | 28.52 | $7.12 |
+| Swamp · T4 | $330.51 | 31.66 | $10.44 |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-stage-rates -->
+
+XP gets much dearer in cash up the ladder. That is why XP baits are band-restricted: a Lake-priced XP bait used in Swamp would cost a fraction of the stage rate there and become mandatory.
+
+### Pricing checks
+
+<!-- generated:bait-checks -->
+| Check | Target | Measured | Result |
+| --- | --- | --- | --- |
+| Money baits: cash return at every home stage | 1–1.7 (centre 1.3) | 1.04–1.61 | pass |
+| Money baits: net gain, share of the cast | ≤ 6% | ≤ 5.8% | pass |
+| XP baits: utility return at every home stage | 0.75–1.35 | 0.80–1.25 | pass |
+| XP baits: net $ per extra XP against the stage rate | centre K = 1 | 0.68×–1.42× | reported |
+| No money bait above the band at a typical stage outside its home | ≤ 1.7 | none above | pass |
+| Always-on XP bait speed-up, regular player (integrated, from L20) | ≤ 10% | 9.7% (L60) | pass |
+| Always-on XP bait, regular player: approved windows (integrated) | inside every window | L30 11.72 h (0.28 h under); L40 22.82 h (1.18 h under); L50 39.57 h (0.43 h under) | **flag for the user** (`P-BAIT-XP-SIZING`) |
+| Always-on XP bait speed-up, every archetype (integrated; the cap is defined on the regular player) | ≤ 10% (informative) | casual 6.9%, regular 9.7%, active 11.5%, grinder 11.8% | over the cap: active, grinder |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-checks -->
+
+**How to read the results.**
+- **Money baits** (`P-BAIT-MONEY-RETURN`) return a modest positive amount at every home stage, and the net gain stays a small share of the cast.
+- **XP baits** (`P-BAIT-XP-PRICE`) cost about the stage's own rate per extra XP.
+- **Why the bands straddle the target.** Within a two-biome band, value per cast rises with the next biome and the next tier (Stage rates). A price set at the band centre therefore gives a return near 1.0 at the band's entry and near the top of the band at its end.
 
 ---
 
-## 6. Starter baits: why one biome each (B7)
+## 6. Magnet, Strong Magnet and Magic Lure
+
+### Chase
+
+`chaseMetrics()`, under the Lucky-item rule the framework runs (proposed `P-LUCKY`).
+
+<!-- generated:bait-chase -->
+| Bait | Stage | Price/cast | Casts per Legendary+ (no bait → bait) | Casts per Lucky fish (no bait → bait) | Net $ per extra Legendary+ | In minutes of income | Net $ per extra Lucky fish |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Magnet | Lake · T1 | $5.60 | 375 → 133 | 9,559 → 2,974 | −$163 | −0.3 | −$3,421 |
+| Magnet | Pond · T2 | $5.60 | 321 → 120 | 8,055 → 2,688 | −$542 | −0.7 | −$11,391 |
+| Strong Magnet | Coast · T3 | $28.50 | 241 → 63 | 5,901 → 1,366 | $197 | 0.1 | $4,140 |
+| Strong Magnet | Swamp · T4 | $28.50 | 195 → 56 | 4,691 → 1,219 | −$693 | −0.3 | −$14,560 |
+| Strong Magnet | Ocean · T4 | $28.50 | 195 → 56 | 4,691 → 1,219 | $1,669 | 4.4 | $35,040 |
+| Strong Magnet | River · T4 | $28.50 | 195 → 56 | 4,691 → 1,219 | $1,439 | 2.3 | $30,214 |
+
+Lucky-item rule: `pinned` (the framework's proposed `P-LUCKY`). A negative net cost means the bait pays for itself in cash while it raises the odds.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-chase -->
+
+- **Magnet** becomes the mid-band Legendary/Lucky bait. Today it costs a fortune per fish and returns almost nothing (Today). Now it pays for itself at its home stages and multiplies the chase odds.
+- **Strong Magnet** becomes the universal collection-completion bait (`P-BAIT-UNIVERSAL`), priced at Swamp. Below Swamp it is a deliberate net cost. For an endgame player finishing the starter waters, that cost is minutes of income per extra Legendary+ (Ocean and River rows).
+- **Magic Lure** becomes the late-band all-rounder: every rarity stat plus XP. Today it costs a large multiple of what it returns per extra XP (Today). Now it is priced at the stage's own rate (Home stages), a real choice rather than a trap.
+
+---
+
+## 7. Starter baits: one biome each
+
+### Starter baits
 
 `strongAccessByBiome()`: what strong-fish access is worth to an Old Rod, at the price of the starter bait of that water type.
 
-| Biome | Old Rod $/cast | + strong access | Share | Return at starter price | Starter works here | Typical rod here |
+<!-- generated:bait-starter -->
+| Biome | Old Rod $/cast | + strong access | Share | Return at the starter price (bait) | Starter works here | Typical rod here |
 | --- | --- | --- | --- | --- | --- | --- |
 | Ocean | $21.37 | $5.24 | 24.5% | 1.31 (Shrimp) | yes | Old Rod |
 | River | $37.80 | $5.93 | 15.7% | 1.29 (Worm) | yes | Old Rod |
-| Lake | $51.87 | $10.87 | 20.9% | 2.36 (Worm) | no | Tier 1 |
-| Pond | $80.60 | $5.86 | 7.3% | 1.27 (Worm) | no | Tier 2 |
-| Coast | $94.03 | $26.95 | 28.7% | 6.74 (Shrimp) | no | Tier 3 |
-| Swamp | $123.93 | $46.32 | 37.4% | 10.07 (Worm) | no | Tier 4 |
+| Lake | $51.87 | $10.87 | 21.0% | 2.36 (Worm) | no | T1 |
+| Pond | $80.60 | $5.86 | 7.3% | 1.27 (Worm) | no | T2 |
+| Coast | $94.03 | $26.95 | 28.7% | 6.74 (Shrimp) | no | T3 |
+| Swamp | $123.93 | $46.32 | 37.4% | 10.07 (Worm) | no | T4 |
 
-- **Starter waters only.** From Lv 20 every crafted rod reaches strong fish, so strong access is only for the starter biomes. In later biomes it would be a large bonus for players who never craft.
-- **Lake at Lv 20 is not a bait problem.** Old Rod players arriving there (while saving for Tier 1) have no strong-access bait. Weak-only Lake ($51.87) already beats River with a Worm ($43.73); Tier 1 is the upgrade.
-- **Magikarp needs no bait.** It is weak, so an Old Rod can catch it already. Strong access matters only for each biome's strong Legendary/Lucky species.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-starter -->
+
+- **Starter waters only** (`P-BAIT-STARTER-BIOME`). From Lake on, every crafted rod reaches strong fish. In later biomes, strong access at a starter price would be a large bonus for players who never craft (return column).
+- **Lake is not a bait problem.** Old Rod players arriving there while saving for T1 have no strong-access bait. Weak-only Lake already beats River with a Worm (Old Rod $/cast in Lake against River plus its strong access); T1 is the upgrade.
+- **Magikarp needs no bait.** It is weak, so an Old Rod can already catch it. Strong access matters only for each biome's strong Legendary/Lucky species.
 
 ---
 
-## 7. What a bait-using player picks: `baitOption(stage, { goal })`
+## 8. What a bait-using player picks
 
-This is the integrator's entry point. It returns `{ bait, costPerCast, extraValuePerCast, extraXpPerCast, netValuePerCast, cashReturn, xpPriceRatio, role, goal }`, or `bait: null` when nothing fits.
+`baitOption(stage, { goal })` is what the bait system calls at each stage the core fishes.
 
-- `goal: 'cash'` (default) picks the bait with the best positive net cash.
-- `goal: 'xp'` picks the XP-class bait with the most extra XP.
+- `goal: 'cash'` picks the bait with the best positive net cash.
+- `goal: 'xp'` picks the XP-class bait with the most extra XP, and otherwise falls back to `'cash'`.
 - A bait name forces that bait.
-- A stage is an id (`'pond-t2'`) or `{ biome, tier }`, or `{ biome, gear }` with rods-style `{ qualities, stats, multiChance | meanFish }`.
-- For consistent prices, call it on `withGear(rods.gearPath())`.
 
-| Stage | goal: cash | Net $/cast | goal: xp | +XP/cast | Cost/cast |
+<!-- generated:bait-options -->
+| Stage | goal: cash | Net $/cast | goal: xp | +XP/cast | Cost/cast (xp) |
 | --- | --- | --- | --- | --- | --- |
-| Ocean · Old Rod | Shrimp | +$1.24 | Shrimp (no XP bait here) | 0 | $4.00 |
-| River · Old Rod | Worm | +$1.33 | Worm (no XP bait here) | 0 | $4.60 |
-| Lake · T1 | Magnet | +$0.62 | Lure | 3.24 | $14.00 |
-| Pond · T2 | Fly | +$3.50 | Lure | 3.68 | $14.00 |
-| Coast · T3 | Bloodworm | +$1.46 | Magic Lure | 4.22 | $60.00 |
-| Swamp · T4 | Bloodworm | +$9.89 | Magic Lure | 4.64 | $60.00 |
-| Lake · Old Rod (transitional) | none | — | Spinner | 2.83 | $23.00 |
-| Pond · T1 (transitional) | Fly | +$2.66 | Lure | 3.24 | $14.00 |
-| Coast · T2 (transitional) | none | — | Magic Lure | 3.65 | $60.00 |
-| Swamp · T3 (transitional) | Bloodworm | +$8.40 | Magic Lure | 4.22 | $60.00 |
+| Ocean · Old Rod | Shrimp | $1.24 | Shrimp (no XP bait here) | 0.00 | $4.00 |
+| River · Old Rod | Worm | $1.33 | Worm (no XP bait here) | 0.00 | $4.60 |
+| Lake · T1 | Magnet | $0.79 | Lure | 3.38 | $14.50 |
+| Pond · T2 | Fly | $3.48 | Lure | 3.68 | $14.50 |
+| Coast · T3 | Bloodworm | $1.19 | Magic Lure | 4.22 | $63.00 |
+| Swamp · T4 | Bloodworm | $10.49 | Magic Lure | 4.64 | $63.00 |
+| Lake · Old Rod (transitional) | none | — | Spinner | 2.83 | $23.50 |
+| Pond · T1 (transitional) | Fly | $2.81 | Lure | 3.38 | $14.50 |
+| Coast · T2 (transitional) | none | — | Magic Lure | 3.65 | $63.00 |
+| Swamp · T3 (transitional) | Bloodworm | $8.40 | Magic Lure | 4.22 | $63.00 |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-options -->
 
 ---
 
-## 8. Effect on progression and income (`lifecycleSensitivity()`)
+## 9. Progression and income on the integrated model
 
-**Method.** A curve.js-style lifecycle on the provisional path: 1-minute steps, highest unlocked biome, 60 XP × level per day, and each tier bought after saving 1.5 h of no-bait stage income. Bait is bought every cast from `baitOption`.
+The bait system runs on the shared core with every reference system: gear purchases and repairs, permits, quests, streak and buffs. A rod tier is bought at its fixed assembly cost out of money that has already paid for bait, so bait spending can delay gear. Buffs double the whole catch, bait effect included.
 
-**Validation.** With no bait it reproduces `curve.json` exactly: `baselineMatchesCurveJson: true`, quartic 0.0475 in both.
+### Regular player
 
-Regular player (45 min/day):
+<!-- generated:bait-lifecycle -->
+| Level | Approved window | No bait | Money bait (goal cash) | XP bait (goal xp) | XP-bait speed-up | XP bait inside the window |
+| --- | --- | --- | --- | --- | --- | --- |
+| L10 | — | 1.18 h | 1.18 h | 1.18 h | — | — |
+| L20 | 5–6 h | 5.27 h | 5.27 h | 5.27 h | 0.0% | yes |
+| L30 | 12–15 h | 12.58 h | 12.50 h | **11.72 h** | 6.9% | **no** (0.28 h under) |
+| L40 | 24–30 h | 25.13 h | 24.78 h | **22.82 h** | 9.2% | **no** (1.18 h under) |
+| L50 | 40–45 h | 43.65 h | 42.93 h | **39.57 h** | 9.4% | **no** (0.43 h under) |
+| L60 | — | 69.77 h | 68.87 h | 63.02 h | 9.7% | — |
 
-| Level | Approved window | No bait | Money bait (goal cash) | XP bait (goal xp) | XP-bait speed-up |
+Regular player (45 min/day). Model: integrate.run(), the reference core loop (rods, world, quests, streak, buffs); the bait columns add system({ policy }) through variant.bait 'cash' | 'xp'.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-lifecycle -->
+
+### Income and XP sources
+
+<!-- generated:bait-lifecycle-income -->
+| Policy | Bait bought (share of income) | Extra catch value | Net effect on income | XP at L50: fishing / bait / quests / daily / buffs | Baits used |
 | --- | --- | --- | --- | --- | --- |
-| L20 | 5–6 h | 5.62 h | 5.62 h | 5.62 h | 0% (no XP bait before Lv 20) |
-| L30 | 12–15 h | 13.50 h | 13.43 h | 12.72 h | 5.8% |
-| L40 | 24–30 h | 25.52 h | 25.23 h | **23.47 h** | 8.0% |
-| L50 | 40–45 h | 42.73 h | 42.02 h | **39.02 h** | 8.7% |
-| L60 | — | 66.35 h | 65.27 h | 60.33 h | 9.1% |
+| no bait | 0.0% | 0.0% | **0.0%** | 79.0% / 0.0% / 4.6% / 14.5% / 1.9% | — |
+| money bait | 4.3% | 6.0% | **+1.6%** | 77.6% / 1.6% / 4.6% / 14.3% / 1.9% | Shrimp, Worm, Magnet, Fly, Bloodworm |
+| XP bait | 14.5% | 5.6% | **−8.9%** | 71.4% / 9.6% / 4.3% / 12.7% / 2.0% | Shrimp, Worm, Lure, Magic Lure |
 
-| Policy | Bait spend (share of gross income) | Extra catch value | Net effect on income | XP sources at L50: fishing / bait / daily |
-| --- | --- | --- | --- | --- |
-| none | 0% | 0% | 0% | 79.0% / 0% / 21.0% |
-| money bait | 6.2% | 8.7% | **+2.4%** | 77.4% / 1.5% / 21.1% |
-| XP bait | 21.9% | 8.3% | **−13.5%** | 71.1% / 9.5% / 19.5% |
+Shares of the run's income to L60 before the bait's effect (every cash source minus the bait's extra catch value). XP sources as R2 groups them: quests = story + repeatable, daily = daily + weekly quests, buffs = the Double XP bonus (on the whole catch, bait included); the bait's share is carved out of fishing.
 
-- **Money bait is a gross sink and a small net source.** It spends 6.2% of income and returns 8.7%. It never moves a milestone by more than 1.7%.
-- **XP bait converts money into time at ~1× the stage rate.** Always on, it costs 13.5% of income (net of the extra catch value) and reaches L50 3.7 h (8.7%) sooner. Its extra XP is 9.5% of all XP at L50.
-- **Grinder and casual.** A grinder reaches L50 at 40.2 h → 36.1 h with XP bait. A casual is unchanged by money bait (32.3 h → 32.1 h). The XP-source split per archetype is part of R2 (INTEGRATION_REQUIREMENTS.md). This module provides the bait column; dailies/streaks belong to their own design.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-lifecycle-income -->
 
-> **Decision for you (B6).** Always-on XP bait takes a regular player about 0.5 h under the L40 window and about 1 h under the L50 window, in exchange for 13.5% of their income. I recommend accepting this: it is a paid, optional accelerator, capped at a 10% speed-up. The alternative is to keep even always-on buyers inside every window. That needs Lure and Magic Lure at +8% XP and Spinner at about +5% extra-fish chance (measured: L40 24.3 h, L50 40.3 h), which would make XP bait barely noticeable. It is a parameter-only change. The cap is `PARAMS.pricing.maxXpBaitSpeedup`, and `lifecycleSensitivity().xpBaitSpeedupCheck` fails if a future change exceeds it.
+- **Money bait is a gross sink and a small net source** (`P-BAIT-OPTIONAL-SINK`). It spends a few percent of income, returns a little more, and barely moves any milestone.
+- **XP bait converts money into time** at about the stage rate. Always on, it costs a real share of income net of its extra catch value, and it supplies a visible slice of all XP by L50.
+
+### Every archetype
+
+<!-- generated:bait-archetypes -->
+| Archetype | L50 no bait | L50 money bait | L50 XP bait | Largest money-bait speed-up | Largest XP-bait speed-up | Over the 10% cap |
+| --- | --- | --- | --- | --- | --- | --- |
+| casual (12.5 min/day) | 38.52 h | 38.05 h | 35.85 h | 1.2% (L50) | 6.9% (L50) | no |
+| regular (45 min/day) | 43.65 h | 42.93 h | 39.57 h | 1.6% (L50) | 9.7% (L60) | no |
+| active (120 min/day) | 44.02 h | 43.57 h | 39.48 h | 1.9% (L60) | 11.5% (L60) | **yes** |
+| grinder (300 min/day) | 40.23 h | 39.83 h | 35.95 h | 2.1% (L60) | 11.8% (L60) | **yes** |
+
+Speed-ups are measured from L20 (no XP bait exists before Lake). The cap is a design check on the regular player only.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-archetypes -->
+
+### What each bait did
+
+<!-- generated:bait-by-bait -->
+| Policy | Bait | Casts with it | Spent | Extra catch value | Realised cash return | Extra XP | Net $ per extra XP |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| money bait | Shrimp | 480 | $1,920 | $2,517 | 1.31 | 0 | — |
+| money bait | Worm | 1,627 | $7,483 | $9,646 | 1.29 | 0 | — |
+| money bait | Magnet | 2,942 | $16,478 | $18,814 | 1.14 | 730 | −$3.20 |
+| money bait | Fly | 5,054 | $30,324 | $47,933 | 1.58 | 2,876 | −$6.12 |
+| money bait | Bloodworm | 18,996 | $341,935 | $469,643 | 1.37 | 14,830 | −$8.61 |
+| XP bait | Shrimp | 480 | $1,920 | $2,517 | 1.31 | 0 | — |
+| XP bait | Worm | 1,627 | $7,483 | $9,646 | 1.29 | 0 | — |
+| XP bait | Lure | 7,191 | $104,268 | $0 | 0.00 | 25,681 | $4.06 |
+| XP bait | Magic Lure | 17,320 | $1,091,147 | $454,202 | 0.42 | 77,411 | $8.23 |
+
+Regular player to L60, integrated: what each bait actually did on the core's own casts (gear, buffs and stage mix included).
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-by-bait -->
+
+### XP-bait sizing
+
+The window issue behind `P-BAIT-XP-SIZING` (§2): the regular always-on XP-bait player under alternative sizings, each priced by the same rule.
+
+<!-- generated:bait-xp-sizing -->
+| XP-bait sizing | Spinner | Lure | Magic Lure | Price/cast (Spinner / Lure / Magic Lure) | L30 (12–15 h) | L40 (24–30 h) | L50 (40–45 h) | Largest speed-up | Every window | Net effect on income |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| proposed (PARAMS) | +10.0% extra-fish | +15.0% XP | +12.0% XP | $23.50 / $14.50 / $63.00 | **11.72 h** | **22.82 h** | **39.57 h** | 9.7% (L60) | **no** | −8.9% |
+| design-stage alternative | +5.0% extra-fish | +8.0% XP | +8.0% XP | $11.50 / $7.70 / $52.50 | 12.03 h | **23.87 h** | 41.13 h | 6.8% (L60) | **no** | −6.1% |
+| largest uniform scale inside every window (×0.484; a bound, not a proposal) | +4.8% extra-fish | +7.3% XP | +5.8% XP | $11.50 / $7.00 / $46.50 | 12.08 h | 24.00 h | 41.52 h | 5.5% (L60) | yes | −4.8% |
+
+Regular player, always-on XP bait, integrated. Prices follow each sizing through the same rule (K × extra XP × stage $/XP). The window bound is found by bisection (8 steps) on a uniform scale of the XP-class baits' XP effects; it is a bound for the decision, not a proposal.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-xp-sizing -->
 
 ---
 
-## 9. Sinks, Booster Packs, crates
+## 10. Booster Packs and crates
 
-**Bait is optional, not upkeep.** No stage requires bait. The largest net gain any money bait gives at a home stage is +5.8% of the cast (Shrimp, first ~1.4 h of play). Mid and late money baits give +0.1% to +3.2%. Bait belongs in the **optional/aspirational** sink category:
+**Booster Packs are valued nowhere.** `castOutcome` values fish only, and no income or progression model counts Lucky items. Under today's engine rule, luck bait raises the Lucky-item rate. The framework runs the proposed pinned rule (`P-LUCKY`: luck stats from any source raise Lucky *fish* only), which keeps Booster Packs an Easter egg with any gear or bait. Its reach covers the Founder profile too.
 
-- money baits are sinks that pay back;
-- XP baits and chase use of Strong Magnet are real sinks that buy progress or collection completion;
-- a player who never buys bait loses about 2.4% of income over the lifecycle.
-
-**Booster Packs are not valued anywhere.** `castOutcome` values fish only, and no income or progression model here counts Lucky items. Luck bait does raise the Lucky-item rate, though (`boosterPackOdds()`, normal profile):
-
-| Setup | Casts per Booster Pack | Regular play-hours | Bait spend per Booster Pack | If the Lucky-item rate is pinned |
+<!-- generated:bait-booster -->
+| Setup | Casts per Booster Pack (today's engine rule) | Regular play-hours | Bait spend per Booster Pack | Casts per Booster Pack (pinned rule, `P-LUCKY`) |
 | --- | --- | --- | --- | --- |
-| Old Rod, Ocean, no bait | 101,710 | 254 | — | 101,710 |
-| Tier 4, Swamp, no bait | 40,714 | 93 | — | 61,642 |
-| Magnet, Pond · T2 | 25,150 | 61 | $135,807 | 78,238 |
-| Strong Magnet, Swamp · T4 | 11,724 | 27 | $310,675 | 61,642 |
-| Magic Lure, Swamp · T4 | 29,018 | 67 | $1,741,099 | 61,642 |
+| no bait, Ocean · Old Rod | 101,710 | 254 | — | 101,710 |
+| no bait, Swamp · T4 | 40,714 | 93 | — | 61,642 |
+| Magnet, Pond · T2 | 25,150 | 61 | $140,837 | 78,238 |
+| Strong Magnet, Swamp · T4 | 11,724 | 27 | $334,122 | 61,642 |
+| Strong Magnet, Ocean · T4 | 11,724 | 27 | $334,122 | 61,642 |
+| Magic Lure, Swamp · T4 | 29,018 | 67 | $1,828,154 | 61,642 |
+| Founder rarity table, Swamp · T4, no bait (per draw) | 828 | — | — | 101,710 |
+| Founder rarity table, Swamp · T4, Strong Magnet (per draw) | 272 | — | — | 101,710 |
 
-- **Old Rod baseline.** Today's "~1 per 100,000" is the Old Rod figure.
-- **Strong Magnet.** It makes a Booster Pack about 9× more frequent than the Old Rod baseline: about 27 h of regular play. That is still rare, but a grinder would see one every few days. Rod luck already does part of this (Tier 4 alone: 40,714 casts).
-- **Recommendation (framework-wide, not bait-only):** pin the Lucky-item rate to the profile's unmodified table. Luck stats from rods or bait would then raise Lucky *fish* only, keeping Booster Packs an Easter egg (≥61k casts with any gear). If Booster Packs later get a deliberate source (streaks/events), that source is designed on its own.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-booster -->
 
-**Crates (`gachaBaitValue()`).** A bait slot grants 1 unit today. At the new prices that unit is worth almost nothing:
+**Crates** (`gachaBaitValue()`). A bait slot grants one unit today. At the new prices one unit is worth almost nothing:
 
-| Box | Bait units/open | Bait value today | Proposed, 1 unit | Proposed, 1 pack |
+<!-- generated:bait-gacha -->
+| Box | Bait units per open | Bait value today | Proposed, 1 unit per slot | Proposed, 1 pack per slot |
 | --- | --- | --- | --- | --- |
-| Fishing Crate | 0.96 | $377.43 | $6.88 | $68.78 |
-| Voter's Crate (legacy) | 0.15 | $109.68 | $1.37 | $13.69 |
-| Daily Box | 0.18 | $77.09 | $1.20 | $11.97 |
+| Fishing Crate | 0.96 | $377.43 | $7.01 | $70.07 |
+| Voter's Crate | 0.15 | $109.68 | $1.40 | $14.02 |
+| Daily Box | 0.18 | $77.09 | $1.22 | $12.20 |
 
-The Fishing Crate's "liquid value" was entirely bait at today's inflated prices. Recommendation for the crates owner (rods design): a bait slot grants **one pack**.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-gacha -->
+
+- The Fishing Crate's "liquid value" was almost entirely bait at today's inflated prices. The rods design redefines it as a parts-only T1 crate (`P-RODS-FISHING-CRATE`).
+- For the boxes that keep bait slots, a slot grants **one pack** (the streak design's `P-STREAK-BAIT-PACK`). How a box's bait is booked belongs to the box owner: `streak.boxEV` prices a usable pack at its pack price.
 
 ---
 
-## 10. Founder, public output, robustness
+## 11. Integration contract: bait as a system on the shared core
+
+`bait.system({ policy, model })` returns a fresh hook object on every call, and all per-run state lives in `state.sys.bait`. `integrate.run({ variant: { bait: 'cash' | 'xp' } })` adds it to the reference loop. `systemOpts.bait.model` runs an alternative sizing (XP-bait sizing only).
+
+**Policies.**
+- `'cash'` (default): the best positive-net-cash bait.
+- `'xp'`: the best XP-class bait, falling back to `'cash'`.
+- A bait name: that bait wherever it works.
+- `'none'`: a no-op.
+
+The choice is always `baitOption(stage, { goal: policy })`, so shop prices are fixed and the same as §5.
+
+| Hook | What it does |
+| --- | --- |
+| `init` | Creates `state.sys.bait`: `{ policy, units, spend, extraValue, extraXp, extraPublicXp, byBait, stages, milestones, publicMilestones }`. |
+| `modifyCast` | Looks up the stage's choice `baitOption({ biome, tier: ctx.path[input.tier] }, { goal })`, memoised per stage (`stages['Lake/t1']`). If a bait fits, it adds the bait's stats to `input.stats` (Rare Find, Trophy Chance, Luck, `xpBonus`, and Spinner's extra-fish chance as `stats.multiChance`). A starter bait adds strong access to `input.qualities`. It then pushes `{ category: 'optional', item: 'bait', perCast }`: one unit per cast, only where the bait works. |
+| `onCasts` | Records the bait's marginal effect for the step: cash, XP and public XP of the core's actual cast, minus the same cast without the bait. Other systems' changes stay in, and the outcome function is the one the core used (`castOutcome`, or the run's outcome override). Buff and Founder interactions are therefore measured, not assumed. |
+| `on('levelUp')` | Snapshots those totals at each milestone (real and public), next to the core's ledger snapshots. |
+
+**Ledgers.**
+- The core's `'fishing'` XP and cash already include the bait effect. The bait system writes **no XP or cash source**.
+- Its only ledger item is the spend `ledger.spend.optional.bait` (`P-BAIT-OPTIONAL-SINK`).
+- To split XP by source, take the bait's share from `state.sys.bait.extraXp` (or `.milestones[L].extraXp`), as Income and XP sources does. Never edit `'fishing'`.
+- The system grants no boxes and emits no `'box'` events. Bait units inside boxes are valued once, by the system that grants the box, and they do not offset bait bought per cast.
+
+**Profile.** Choice and cost are profile-independent: a Founder also uses one unit per cast. The marginal is measured on the profile's own cast.
+
+### Retired-loop parity
+
+Until 5b.4 this module also had its own lifecycle loop. `system()` reproduced that loop exactly before it was deleted; the record is kept as a constant (`RETIRED_LOOP_PARITY`):
+
+<!-- generated:bait-parity -->
+| Record | Value |
+| --- | --- |
+| Source | validateSystem() output at a83b5f0 (deleted with the private loop), commit `a83b5f0` |
+| Method | LC.simulate with system({ policy }), the retired loop's gear rule and daily XP, and a milestone probe, against the retired lifecycle(policy, archetype); every archetype x policy on the shared gear path. Compared: milestone hours as step indices, XP by source at each milestone (fishing without bait, bait, daily), bait spend, bait extra value, no-bait income, steps and the baits used. |
+| Runs | 4 archetypes × 3 policies (none, cash, xp) |
+| Milestones step-exact | 72 of 72 |
+| Largest relative difference | 0 (tolerance 0.005) |
+| Largest float gap (share of the compared total) | 1.5e-13 |
+| Baits used | identical in every run |
+| Gear-rule sensitivity (regular: largest relative change in milestone hours) | none 0.00%, cash 0.00%, xp 0.37% |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `bait.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:bait-parity -->
+
+---
+
+## 12. Founder and public output
 
 **Founder**
-- Bait consumption is profile-independent: 1 per cast.
-- Bait stats add to the Founder rarity table exactly as for normal players. The Founder's ×10 sell makes every bait wildly profitable for them, which is irrelevant: Founder is not competitive and there is no trading.
+- Bait consumption is profile-independent: one unit per cast.
+- Bait stats add to the Founder rarity table exactly as for normal players. The Founder's private sell multiplier makes every bait profitable for them. That does not matter: Founder is not competitive and there is no trading.
 - Founder's private modifiers, pity and gacha luck are untouched by this design.
-- With Strong Magnet, a Founder draw yields a Booster Pack every 272 draws (828 without bait). The pinned-item rule would hold it at the Founder base table. The Founder design should decide whether to adopt it for Founder too.
+- Luck bait on the Founder table raises the Booster Pack rate only under today's engine rule. The pinned rule holds it at the normal base rate (Booster Packs table, Founder rows).
 
 **Public output**
 - Bait is gear, not profile, so the base/final split is unaffected: public output shows base rewards that already include the bait effect.
-- The only bait-visible numbers (units used, "ran out of bait") are identical for every profile.
-- Per-fish consumption would have exposed Founder bonus draws through bait counts. Per-cast removes that tell.
-
-**Robustness to the final rods.** Checked during this design with `withGear(rods.gearPath())` on the rods module's in-progress path (a5a8945 + working tree; Tier 1 is 1.2 fish, with small fishingSpeed and sellBonus stats):
-- pack prices move 0–6%: Worm and Shrimp unchanged, Magic Lure $600 → $630;
-- `bandCheck()` still passes;
-- the XP speed-up is 9.1%, which still passes.
-
-The integrator should build bait on the final path: `require('./bait').withGear(require('./rods').gearPath())`, or `report({ gearPath })`.
+- The only bait-visible numbers (units used, "ran out of bait") are identical for every profile. Per-fish consumption would have exposed Founder bonus draws through bait counts; per-cast consumption removes that tell.
 
 ---
 
-## 11. Code touchpoints in `src/` (after approval; nothing is changed now)
+## 13. Code touchpoints in `src/` (after approval; nothing is changed now)
 
 | File | Change |
 | --- | --- |
-| `src/engine/balance.js:154` `BAIT_STATS` | Replace with `BAIT_DEFS` keyed by name: `{ stats, multiChance, grantsStrong, biomes, packSize, packPrice, levelRequirement, role }`. Bump `BALANCE_VERSION`. |
-| `src/engine/modifiers.js:103` `baitStats()` | For catalog baits, read stats **and qualities** (`grantsStrong` → `['strong']`) from `BAIT_DEFS`, not from the owned copy's cloned `capabilities`/`multiplier`. Unknown baits keep the legacy converter. |
-| `src/engine/modifiers.js:160` | `baitApplied = baitApplies ? stats : {}`: drop "XP always applies". Bait `multiChance` adds to the rod's multi-catch chance (shared stat with the rods design, clamped ≤ 1). |
-| `src/engine/cast.js:189` `baitApplies` | Biomes from `BAIT_DEFS[name].biomes` (fallback: the owned doc's `biomes` for unknown baits). |
-| `src/engine/cast.js:275` `baitAfter` | `baitApplies ? count − 1 : count` (per cast, only where it works). Add `consumed: 0 or 1` to `result.bait` (line 342). Depletion handling stays as is. |
-| `src/engine/cast.js` `drawTemplates` | (If the pinned Lucky-item rule is approved.) The item branch uses `0.2 × baseLucky / finalLucky` instead of a flat 20%. |
-| `src/commands/slash/Fish/fish.js:90` | Add warnings: "*X* has no effect in *biome* and was not used". Optionally: "*X* has no effect with your rod" (a starter bait on a strong rod). |
-| `src/components/buttons/buy-bait.js:93` | **Correctness bug, fix first:** `meetsItemRequirements` is `async` but not awaited, so the level check never blocks. Buying sells packs: `buyItem` (line 222) adds `amount × packSize` units, and the buttons (line 198) read "10 / 50 / 100 / 1,000 casts". |
-| `src/class/Utils.js:297` | Shop option text: `$packPrice per 10 casts · Works in: …`. |
-| `src/commands/slash/User/equip.js:223` | When equipping, show where the bait works and flag "no effect here". |
+| `src/engine/balance.js` `BAIT_STATS` | Replace with `BAIT_DEFS` keyed by name: `{ stats, multiChance, grantsStrong, biomes, packSize, packPrice, levelRequirement, role }`. Bump `BALANCE_VERSION`. |
+| `src/engine/modifiers.js` `baitStats()` | For catalog baits, read stats **and qualities** (`grantsStrong` → `['strong']`) from `BAIT_DEFS`, not from the owned copy's cloned `capabilities`/`multiplier`. Unknown baits keep the legacy converter. |
+| `src/engine/modifiers.js` (bait applied) | `baitApplied = baitApplies ? stats : {}`: drop "XP always applies". Bait `multiChance` adds to the rod's multi-catch chance (the shared stat, clamped to 1). |
+| `src/engine/cast.js` `baitApplies` | Biomes from `BAIT_DEFS[name].biomes` (fallback: the owned doc's `biomes` for unknown baits). |
+| `src/engine/cast.js` `baitAfter` | `baitApplies ? count − 1 : count` (per cast, only where it works). Add `consumed` (0 or 1) to `result.bait`. Depletion handling stays as is. |
+| `src/engine/cast.js` `drawTemplates` | Only if `P-LUCKY` is approved: the item branch uses the pinned share instead of a flat one (framework `luckyItemShare()`). |
+| `src/commands/slash/Fish/fish.js` | Add warnings: "*X* has no effect in *biome* and was not used". Optionally: "*X* has no effect with your rod" (a starter bait on a strong rod). |
+| `src/components/buttons/buy-bait.js` | **Correctness bug, fix first:** `meetsItemRequirements` is `async` but not awaited, so the level check never blocks. Buying sells packs: `buyItem` adds `amount × packSize` units, and the buttons are labelled in casts. |
+| `src/class/Utils.js` (shop option text) | `$packPrice per <packSize> casts · Works in: …`. |
+| `src/commands/slash/User/equip.js` | When equipping, show where the bait works and flag "no effect here". |
 | `src/commands/slash/User/fishing-stats.js` | Private view: the bait's stats, whether it applies in the current biome, cost per cast. |
 | `src/bootstrap/data/bait.js` | New price (per pack), `packSize`, capabilities (`strong` only on Shrimp/Worm), biomes, descriptions and `requirements.level`, for fresh databases. |
-| `src/bootstrap/seed.js:188` `runStep` | Add a bait catalog-field sync (see migrations). Today the seed never updates gameplay fields of existing catalog rows. |
-| `src/engine/gacha.js:218` | Bait grants `count: packSize` (coordinate with the crates owner). |
+| `src/bootstrap/seed.js` `runStep` | Add a bait catalog-field sync (see Migrations). Today the seed never updates gameplay fields of existing catalog rows. |
+| `src/engine/gacha.js` (bait grant) | Bait grants `count: packSize` (`P-STREAK-BAIT-PACK`; coordinate with the box owners). |
 
 ---
 
-## 12. Migrations (additive, idempotent)
+## 14. Migrations
+
+Additive and idempotent. `P-BAIT-LEGACY-STACKS`.
 
 **No player data is rewritten.**
 - Existing `BaitData` stacks keep their `count`. Each unit becomes one cast under the new rules.
-- The engine reads bait behaviour by name from `BAIT_DEFS`, so cloned legacy fields on owned stacks are simply ignored.
-- No refunds are proposed. A player who owns, say, 20 Magic Lures bought at $15,000 keeps 20 casts of the new Magic Lure (Coast/Swamp). A legacy stack owned below Lv 40 waits until it is usable.
+- The engine reads bait behaviour by name from `BAIT_DEFS`, so cloned legacy fields on owned stacks are ignored.
+- No refunds are proposed. A player who owns expensive legacy stacks (for example Magic Lure) keeps the same number of casts of the new bait, within its biomes. A legacy stack owned below the bait's shop level waits until it is usable.
 
-**Catalog rows only (`user: null`, the 10 bait names).** Add one idempotent sync step:
+**Catalog rows only (`user: null`, the ten bait names).** Add one idempotent sync step:
 - It writes `price` (the pack price), `packSize`, `biomes`, `capabilities`, `description` and `requirements.level`.
-- It is guarded by an additive marker (`catalogRevision: 'bait-5b.1'`) and skips rows that already carry it. Running it twice is a no-op.
+- It is guarded by an additive marker (`catalogRevision: 'bait-5b'`) and skips rows that already carry it. Running it twice is a no-op.
 - It never touches any `*Data` collection.
 - If you prefer strictly zero document updates, the shop can overlay `BAIT_DEFS` prices at read time instead (`Utils.selectionOptions`, `buy-bait.js`). The catalog then keeps stale display fields.
 
 ---
 
-## 13. Tests to add
+## 15. Tests to add
 
-1. A 3-fish cast with bait consumes **1** unit. A Founder cast with bonus draws consumes 1.
+1. A multi-fish cast with bait consumes **one** unit. A Founder cast with bonus draws consumes one.
 2. Bait outside its biomes: no stats, no XP bonus, **not consumed**. A failed cast (no catch, broken rod) consumes nothing.
-3. A legacy owned stack with cloned old fields (e.g. Worm with 4 freshwater biomes and `strong` on Fly) behaves by `BAIT_DEFS`: Worm works in River only, and Fly gives no strong access.
-4. Only Shrimp/Worm add `strong`. Strong Magnet does not.
+3. A legacy owned stack with cloned old fields (e.g. Worm with four freshwater biomes, `strong` on Fly) behaves by `BAIT_DEFS`: Worm works in River only, and Fly gives no strong access.
+4. Only Shrimp and Worm add `strong`. Strong Magnet does not.
 5. An unknown (non-catalog) bait still resolves through the legacy converter.
-6. Bait `multiChance` adds to the rod chance and is clamped (once the rods multi-catch stat exists).
-7. `buy-bait`: the level requirement blocks under-level buys (await fix). Buying N packs adds N × packSize units.
-8. The catalog sync is idempotent: run twice gives an identical catalog, and `BaitData` is untouched.
+6. Bait `multiChance` adds to the rod chance and is clamped.
+7. `buy-bait`: the level requirement blocks under-level buys (await fix). Buying N packs adds N × `packSize` units.
+8. The catalog sync is idempotent: running it twice gives an identical catalog, and `BaitData` is untouched.
 9. Depletion: the last unit clears `equippedBait` (existing path, per-cast count).
-10. Economy regression (fast, about 0.3 s): `bait.bandCheck().pass` and `bait.lifecycleSensitivity().xpBaitSpeedupCheck.pass` at the current framework version.
-11. If approved: with bait/rod luck, the Lucky-item rate equals the base-table rate (seeded statistical test on `drawTemplates`).
+10. Economy regression at the current framework version: `bait.bandCheck().pass`, `bait.lifecycleSensitivity().xpBaitSpeedupCheck.pass`, and `node scripts/economy/5b/check-shared.js` (decision records match the model, generated tables current).
+11. If `P-LUCKY` is approved: with bait or rod luck, the Lucky-item rate equals the base-table rate (seeded statistical test on `drawTemplates`).
 
 ---
 
-## 14. Risks and open points
+## 16. Risks and open points
 
-- **XP-bait window overshoot (B6)** is a decision for you (§8).
-- **Lake-entry returns are thin.** Mid-band money baits return 1.03–1.11 at Lake · T1: barely positive there. Their draw at Lake is the role, not the cash. At Pond they reach 1.5–1.6.
-- **Per-cast volume.** About 400–440 casts/h means a pack of 10 lasts about 1.5 minutes. The buy UI needs larger amounts (10–1,000 casts per click).
-- **Quests.** Magnet/Strong Magnet make "catch a Lucky" goals 2.7–3.8× faster (e.g. 5,089 → 1,465 casts at Swamp · T4). The quest design should price Lucky/Legendary quests with that in mind.
-- **Buff stacking.** A Double XP buff multiplies bait XP (the stacking rule is multiplicative across categories). This belongs to the buffs design.
+- **XP-bait windows (`P-BAIT-XP-SIZING`).** Always-on XP bait takes the regular player under the lower edge of some approved windows (Regular player). Active and grinder players go past the speed-up cap (Every archetype). This needs your decision (§2).
+- **Lake-entry returns are thin.** Mid-band money baits barely break even at Lake · T1 (Home stages). Their draw there is the role, not the cash; at Pond they pay back.
+- **Per-cast volume.** Casts are quick, so a pack is used up within minutes of play. The buy UI needs multi-pack amounts.
+- **Quests.** Luck baits make Lucky/Legendary goals much faster (Chase). The quests design prices its Lucky Fisher chase with these baits (`quests.js` reads `bait.js`).
+- **Lucky-item rule.** The chase figures and every value assume the pinned rule the framework runs (`P-LUCKY`). If it is rejected, luck bait raises the Booster Pack rate (Booster Packs table, engine column) and Lucky fish get slightly rarer.
 - **Thematic change.** Worm is River-only and Shrimp is Ocean-only. Players used to water-type rules may notice. Shop text states where each bait works.
-- **Legacy owners.** Players who paid today's prices get no refund (§12). Their units still work, better than before, within the new biome lists.
-- **Rounding.** Pack prices round to $1 (below $100) or $5. Returns after rounding are the ones reported.
-- **Dependencies.** The value of rarity stats depends on `RARITY_VALUE`/`BIOME_VALUE`, and the value of strong access on the catalog's weak/strong split. All are read at runtime, so a change regenerates prices.
-
----
-
-## 15. Framework change requests (not made; for the framework owner)
-
-1. **Export the provisional lifecycle inputs from a side-effect-free module.** These are `PROVISIONAL_PATH`, `ARCHETYPES`, `DAILY_XP_PER_LEVEL`, `purchaseHours` and `lifecycle()`. `curve.js` prints JSON on `require`, so `bait.js` mirrors them. `baselineMatchesCurveJson` guards against drift.
-2. **Split Lucky outcomes in `castOutcome`.** Expose Lucky fish vs Lucky items (`itemPerDraw`, `boosterPerDraw`), so Easter-egg exposure can be reported without calling `drawDistribution` directly.
-3. **Decide the Lucky-item rule once, for every luck source** (rods, bait, Founder). The recommendation is to pin it to the base table (§9) and mirror it in `catalog-model.js`.
-4. **Name one additive multi-catch stat** (e.g. `stats.multiChance`, summed across rod and bait, clamped ≤ 1) in the `castOutcome` contract. Rods and bait would then share it.
-5. **Add a Mountain Stream stage** (Tier 5, Lv 60) once its species ladder exists, so its bait band can be priced by the same functions.
-
----
-
-## Integration (framework 5b.3)
-
-Bait now runs as a **system on the shared lifecycle core** (`lifecycle.js`). `bait.system({ policy })` returns a fresh hook object each call, and all per-run state lives in `state.sys.bait`. `integrate.run({ variant: { bait: 'cash' | 'xp' } })` adds it to the reference loop. `lifecycle()` and `report()` still work. `report().system` carries the system's contract and `validateSystem()`.
-
-**Policies.** `'cash'` (default) picks the best positive-net-cash bait. `'xp'` picks the best XP-class bait and falls back to `'cash'`. A bait name uses that bait wherever it works. `'none'` is a no-op, used as the validation baseline. The choice is always `baitOption(stage, { goal: policy })`, so the design and prices above are unchanged.
-
-| Hook | What it does |
-| --- | --- |
-| `init` | Creates `state.sys.bait`: `{ policy, units, spend, extraValue, extraXp, extraPublicXp, byBait, stages, milestones, publicMilestones }`. |
-| `modifyCast` | Looks up `baitOption({ biome: input.biome, tier: ctx.path[input.tier] }, { goal })`, memoised per stage in `stages['Lake/t1']`. The run's gear path defaults to `F.gearPath()`; shop prices stay fixed. If a bait fits, it adds the bait's stats to `input.stats` (Rare Find, Trophy Chance, Luck, `xpBonus`, and Spinner's +10% as `stats.multiChance`). Starter baits add strong access to `input.qualities`. It then pushes `{ category: 'optional', item: 'bait', perCast }`: one unit per cast, only where the bait works (B1, B2). |
-| `onCasts` | Records the bait's marginal effect for the step: cash, XP and public XP of the core's actual cast, minus the same cast without the bait. Other systems' changes stay in, and the outcome function is the one the core used (`castOutcome`, or the run's outcome override). So Double XP/Cash windows and the Founder profile are measured, not assumed. Results go to the totals, `byBait` and `stages`. |
-| `on('levelUp')` | Snapshots those totals at each milestone (real and public) next to the core's ledger snapshots. |
-
-**Ledgers.** The core's `'fishing'` XP and cash already include the bait effect. The bait system writes **no XP or cash source**. Its only ledger item is the spend `ledger.spend.optional.bait`, an optional sink (B10, user decision 10). To split XP by source, take the bait's share from `state.sys.bait.extraXp` (or `.milestones[L].extraXp`); never edit `'fishing'`. The bait system does not grant boxes, so it emits no `'box'` events. Bait units inside boxes are valued once, by the system that grants the box, and they do not offset bait bought per cast.
-
-**Profile.** Choice and cost are profile-independent: a Founder also uses one unit per cast. The marginal is measured on the profile's own cast.
-
-**Validation** (`validateSystem()`). This runs `LC.simulate` with `system({ policy })` against `lifecycle(policy, archetype)` for all four archetypes × `'none'`, `'cash'`, `'xp'`, on the shared (rods) gear path. The baseline systems reproduce what `lifecycle()` assumed:
-- **Gear rule** (`lifecycleRods`): the next tier after saving `F.PURCHASE.saveHours` of *no-bait* stage income, from net cash after bait.
-- **Daily XP**: `LC.provisionalDaily`.
-
-The result is **exact**:
-- All 72 milestones are step-exact.
-- XP by source at every milestone (fishing without bait, bait, daily) matches, as do bait spend, bait extra value, no-bait income and the baits used.
-- Max relative difference is **0**. The largest float gap is 1.4e-13 of the compared total.
-
-Two conventions differ, and neither moves any hours:
-- **Day counting.** The core counts a level reached on a day's final step in that day; `lifecycle()` used `ceil(h / dayH)`, the next day. Hours are compared.
-- **Last daily.** The core adds one more daily XP after a mid-day stop at L60. It comes after the L60 snapshot.
-
-| Regular player (core) | L30 h | L40 h | L50 h | L60 h | Bait XP at L50 | Bait spend / no-bait income | Net effect |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| cash | 13.05 | 24.77 | 41.67 | 64.93 | 8,234 | 6.3% | +2.4% |
-| xp | 12.43 | 23.27 | 38.68 | 60.02 | 51,956 | 21.8% | −13.4% |
-
-**Which gear rule is right.** Using `LC.provisionalRods` instead would change the XP-bait player's hours by up to −1.1% (L30), and leave the cash policy and no bait unchanged. That rule saves gross income, ignoring bait spend, toward a price that grows with the bait's extra income. `lifecycle()`'s rule is the right one: a tier's price does not depend on bait use, and money spent on bait is not saved. It is also how the integrated economy works: the rods system pays a fixed assembly cost from money that has already paid for bait.
-
-Since 5b.3 the default gear path is `F.gearPath()`, the rods design (R3). The report's `gear.source` now says `'rods'`; before, it was mislabelled `'provisional'`. No bait number changed with the label.
+- **Legacy owners.** Players who paid today's prices get no refund (Migrations). Their units still work, better than before, within the new biome lists.
+- **Rounding.** Pack prices round to whole-dollar steps (`P-BAIT-PACK`). The returns reported are after rounding.
+- **Dependencies.** The value of rarity stats depends on `RARITY_VALUE`/`BIOME_VALUE`, and the value of strong access on the catalog's weak/strong split. All are read at runtime, so a change regenerates the prices.
+- **Mountain Stream** has no bait band until its species ladder exists (Roster).

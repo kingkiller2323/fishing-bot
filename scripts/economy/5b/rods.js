@@ -1,10 +1,13 @@
 // Phase 5B subsystem: RODS, CRAFTING, CRATES, REPAIRS, OLD ROD. Analysis only: nothing here touches
 // the live game, src/ or production data. Every economic number below is computed at runtime from the
-// shared framework (./framework.js). Only the design parameters in PARAMS are hand-set; prices are
-// formulas of stage income, so a framework change regenerates every figure without manual scaling.
+// shared framework (./framework.js, version 5b.4) and, for lifecycle figures, from the integrated model
+// (./integrate.js on the shared lifecycle core ./lifecycle.js). Only the design parameters in PARAMS are
+// hand-set; prices are formulas of stage income, so a framework change regenerates every figure. This
+// module never steps time itself: rods is a SYSTEM on the shared core (system()).
 //
 //   node -e "require('./scripts/economy/5b/rods.js').report()"     (returns the report object)
 //   node scripts/economy/5b/rods.js                                  (prints it as JSON)
+//   node scripts/economy/5b/render-docs.js                           (regenerates docs/economy/5b/rods.md tables)
 //
 // Exports (all pure and synchronous unless noted; no database, no randomness):
 //   PARAMS                      frozen design parameters (part levels, slot stat families, variants,
@@ -37,7 +40,7 @@
 //   verifyLegacyParity()        ASYNC: the mirror equals the real FishingRod.combineQualities on all combos
 //   legacySignature(capabilities), convertLegacyRod(storedRod, partDocs)
 //                               converter for EXISTING crafted rods (no data rewrite)
-//   evaluateAllCombos()         all 2,450 catalog part combinations under today's and the proposed rules
+//   evaluateAllCombos()         every catalog part combination under today's and the proposed rules
 //   slotBalanceFeatured()       V2 `featured` groups that make each slot type equally likely per rarity
 //   crateDefinition(t), crateDefinitions()
 //                               proposed Gacha V2 box definitions (+ price: formula of stage income)
@@ -53,24 +56,29 @@
 //   salvageValue(rarity)        cash for salvaging one part of that rarity
 //   validateCratesWithEngine(opens)
 //                               ASYNC, opt-in: real Gacha V2 openLine on an in-memory MongoDB (test
-//                               helpers, never production) vs cratesDistribution
-//   gearPath()                  integrator-facing path: per tier {tier, level, qualities, stats,
-//                               multiChance, meanFish, cooldownMs, maxDurability, repairCost,
-//                               repairCostPerFish, assembly: {price, expectedCrates, expectedCost, ...}}
-//   lifecycle(archetype, opts)  curve.js-style lifecycle on this gear path, with crates bought from net
-//                               income (checks the chosen XP curve still meets the approved targets)
-//   system(opts)                framework 5b.3: this subsystem as a lifecycle.js SYSTEM (fresh object per
-//                               call): tier assemblies as 'progression' goals, equip at the tier level,
-//                               repair upkeep, salvage refunds (see the system() comment)
-//   validateSystem()            system() on the shared core vs lifecycle() for every archetype
+//                               helpers, never production) vs cratesDistribution; ENGINE_VALIDATION is
+//                               the recorded run the doc quotes
+//   gearPath()                  the shared gear path (framework F.gearPath() reads it; R3): per tier
+//                               {tier, level, qualities, stats, multiChance, meanFish, cooldownMs,
+//                               maxDurability, repairCost, repairCostPerFish, assembly: {price, ...}}
+//   system(opts)                this subsystem as a lifecycle.js SYSTEM (fresh object per call): tier
+//                               assemblies as 'progression' goals, equip at the tier level, repair
+//                               upkeep, salvage refunds (see the system() comment); SYSTEM_DEFAULTS
+//   assemblyPlan(path, opts)    the per-tier purchases system() makes (Normal or Founder crate luck)
+//   lifecycle(archetype, opts)  the rods view of one INTEGRATED lifecycle (integrate.run; see its comment)
+//   SYSTEM_PARITY               constant record: system() vs the retired private loop (commit a83b5f0)
+//   DECISIONS                   this design's PROPOSED decisions (joined by decisions.js)
 //   report()                    every key number of docs/economy/5b/rods.md, computed (cached)
+//   markdownTables()            the generated tables of docs/economy/5b/rods.md (render-docs.js)
 const F = require('./framework');
 const LC = require('./lifecycle');
 const CATALOG = require('../../../src/bootstrap/data/rodParts');
 const { baseTable } = require('../../../src/engine/gacha');
 const { applyPity, normalize } = require('../../../src/engine/rarity');
-const { RARITIES, PROFILES } = require('../../../src/engine/balance');
+const { RARITIES, PROFILES, QUICK_FISHING_SPEED } = require('../../../src/engine/balance');
 const { resolveModifiers } = require('../../../src/engine/modifiers');
+// Today's Fishing Crate definition, snapshotted at load (validateCratesWithEngine re-registers boxes in-process).
+const LEGACY_BOXES = JSON.parse(JSON.stringify({ 'Fishing Crate': require('../../../src/engine/gachaBoxes').BOXES['Fishing Crate'] }));
 
 const deepFreeze = (o) => {
 	for (const v of Object.values(o)) if (v && typeof v === 'object') deepFreeze(v);
@@ -358,6 +366,8 @@ function legacyCombine(list) {
 	if (durability > 0) combined.add(`${durability} durability`);
 	return Array.from(combined);
 }
+/** Today's repair limit on a crafted rod (FishingRod.generateStats: maxRepairs), then it is destroyed. */
+const LEGACY_CRAFTED_MAX_REPAIRS = 3;
 /** TODAY's crafted rod (FishingRod.generateStats + resolveModifiers for a normal player). */
 function legacyCraft(parts) {
 	const list = Object.values(bySlot(parts));
@@ -369,7 +379,7 @@ function legacyCraft(parts) {
 		else if (q.includes('count')) count = parseInt(q, 10);
 	}
 	const m = resolveModifiers({ profile: NORMAL, rod: { name: 'x', type: 'customrod', capabilities }, rodParts: list.map((p) => ({ ...p })) });
-	return { capabilities, level: count * 10, fishPerCast: m.draws * m.perDraw, durability, repairCost: count * 10000, cooldownMs: m.cooldownMs };
+	return { capabilities, level: count * 10, fishPerCast: m.draws * m.perDraw, durability, repairCost: count * 10000, maxRepairs: LEGACY_CRAFTED_MAX_REPAIRS, cooldownMs: m.cooldownMs };
 }
 /** Async: every catalog combination's capabilities from the real FishingRod.combineQualities equal the mirror's. */
 async function verifyLegacyParity() {
@@ -774,7 +784,7 @@ async function validateCratesWithEngine(opens = 3000, tiers = [1, 2, 3, 4]) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Integrator-facing gear path and a lifecycle check against the approved XP-curve targets.
+// The designed gear path: the shared path every Phase 5B model uses (framework F.gearPath(); R3).
 function gearPath() {
 	const steps = [{ ...oldRod(), label: 'Old Rod', crateUnlockLevel: 0, homeBiome: 'Ocean', assembly: null, upkeepShareHome: 0, lifeHoursRegular: null }];
 	for (const t of TIERS) {
@@ -805,79 +815,40 @@ function gearPath() {
 	return steps;
 }
 
-// Shared lifecycle assumptions (framework): daily XP per level and the approved target windows.
-const DAILY_XP_PER_LEVEL = F.DAILY.xpPerLevel;
+// Approved target windows (shared framework assumption).
 const TARGETS = F.TARGET_WINDOWS;
+// Lifecycle analysis settings (not design parameters): the optional integrate.run variants whose rod
+// timing the report checks, and the stress probe's shares of fishing income spent outside the model.
+const LIFECYCLE_VARIANTS = { 'bait: cash': { bait: 'cash' }, 'bait: xp': { bait: 'xp' }, 'aquarium': { aquarium: true } };
+const STRESS_SHARES = [0.5, 0.7, 0.8, 0.9];
 
 /**
- * Hours of play to each level on this gear path. Crates for tier t are bought from Lv (crate unlock)
- * with net income (fish income - repairs - otherSpendShare x income); the rod is equipped once the
- * expected assembly cost is paid AND the player reaches the tier's level. Same XP model as curve.js.
+ * Engine check RECORD (constant): validateCratesWithEngine(8000) replays real Gacha V2 openLine decisions
+ * per crate on an in-memory MongoDB (test helpers; definitions registered in-process only; nothing
+ * persisted). The engine RNG is unseeded, so each run differs within sampling error. This is the run made
+ * at the final 5B migration (framework 5b.4, 2026-09-26; about 100 s); `exact` is the function's own
+ * round4(cratesDistribution(t).expected) at that run, and report() recomputes it so the doc flags the
+ * record as stale if a crate definition or the part catalog changes.
  */
-function lifecycle(arch, { otherSpendShare = 0, maxLevel = F.LIFECYCLE.maxLevel, steps = gearPath(), stepH = F.LIFECYCLE.stepH } = {}) {
-	const a = typeof arch === 'string' ? ARCHETYPES[arch] : arch;
-	const cache = new Map();
-	const rates = (step, biome) => {
-		const key = `${step.tier}|${biome}`;
-		if (!cache.has(key)) {
-			const h = rodHourly(step, biome, a.overheadS);
-			const upkeep = step.maxDurability ? (step.repairCost / step.maxDurability) * h.fish : 0;
-			cache.set(key, { ...h, upkeep });
-		}
-		return cache.get(key);
-	};
-	let xp = 0;
-	let h = 0;
-	let money = 0;
-	let idx = 0;
-	let progress = 0;
-	const dayH = a.minutesPerDay / 60;
-	const reached = {};
-	const upgrades = {};
-	const totals = { gross: 0, repairs: 0, crates: 0 };
-	const xpFrom = { fishing: 0, daily: 0 };
-	while (h < 5000) {
-		const L = F.levelForXp(xp);
-		const cur = steps[idx];
-		const r = rates(cur, biomeForLevel(L));
-		totals.gross += r.cash * stepH;
-		totals.repairs += r.upkeep * stepH;
-		money += (r.cash * (1 - otherSpendShare) - r.upkeep) * stepH;
-		const next = steps[idx + 1];
-		if (next && L >= next.crateUnlockLevel) {
-			const spend = Math.max(0, Math.min(money, next.assembly.expectedCost - progress));
-			progress += spend;
-			money -= spend;
-			totals.crates += spend;
-			if (progress >= next.assembly.expectedCost - 1e-6 && L >= next.level) {
-				idx++;
-				progress = 0;
-				upgrades[next.tier] = { hours: +h.toFixed(2), level: L, day: Math.ceil(h / dayH) };
-			}
-		}
-		const before = h;
-		xp += r.xp * stepH;
-		xpFrom.fishing += r.xp * stepH;
-		h += stepH;
-		if (Math.floor(h / dayH) !== Math.floor(before / dayH)) {
-			xp += DAILY_XP_PER_LEVEL * L;
-			xpFrom.daily += DAILY_XP_PER_LEVEL * L;
-		}
-		const L2 = F.levelForXp(xp);
-		// fishingXpShare: share of XP so far from fishing (the rest is curve.js's placeholder daily XP).
-		for (const T of F.LIFECYCLE.milestones) if (T <= maxLevel && !reached[T] && L2 >= T) reached[T] = { hours: +h.toFixed(2), day: Math.ceil(h / dayH), fishingXpShare: round4(xpFrom.fishing / (xpFrom.fishing + xpFrom.daily)) };
-		// Stop at maxLevel once every tier usable by then has been bought.
-		if (L2 >= maxLevel && !steps.slice(idx + 1).some((s) => s.level <= maxLevel)) break;
-	}
-	return { reached, upgrades, totals: { ...totals, repairShare: totals.repairs / totals.gross, crateShare: totals.crates / totals.gross }, hours: +h.toFixed(2) };
-}
-
-const inTarget = (reached) => Object.fromEntries(Object.entries(TARGETS).map(([L, [lo, hi]]) => [L, { hours: reached[L]?.hours ?? null, target: `${lo}-${hi}h`, ok: reached[L] ? reached[L].hours >= lo && reached[L].hours <= hi : false }]));
+const ENGINE_VALIDATION = deepFreeze({
+	opens: 8000,
+	framework: '5b.4',
+	crates: [
+		{ tier: 1, exactAtRun: 3.8735, engine: 3.8378, se: 0.0395, z: -0.9032, completions: 2084 },
+		{ tier: 2, exactAtRun: 3.7689, engine: 3.7928, se: 0.037, z: 0.6442, completions: 2109 },
+		{ tier: 3, exactAtRun: 3.6937, engine: 3.7452, se: 0.0366, z: 1.406, completions: 2135 },
+		{ tier: 4, exactAtRun: 3.6561, engine: 3.6756, se: 0.0344, z: 0.5653, completions: 2176 },
+	],
+});
 
 // ---------------------------------------------------------------------------------------------
-// Framework 5b.3: rods as a SYSTEM on the shared lifecycle core (lifecycle.js; contract in its header
-// and integrate.js). Gear purchases (tier assemblies), equipping, repair upkeep and salvage refunds.
+// Rods as a SYSTEM on the shared lifecycle core (lifecycle.js; contract in its header and in
+// integrate.js): gear purchases (tier assemblies), equipping, repair upkeep and salvage refunds. This
+// module never steps time itself; every lifecycle figure below comes from integrate.run (or
+// LC.simulate on the same reference systems) at the current framework version.
 const SYSTEM_NAME = 'rods';
+/** What the integrated model runs by default: salvage on (decision P-RODS-SALVAGE), Founder crate luck on. */
+const SYSTEM_DEFAULTS = deepFreeze({ salvage: true, founderCrates: true });
 
 /** Repair cost per durability point of a gear-path step (0 for the unbreakable Old Rod). */
 const repairPerPoint = (step) => (step && step.maxDurability && step.repairCost ? step.repairCost / step.maxDurability : 0);
@@ -889,7 +860,7 @@ const repairPerPoint = (step) => (step && step.maxDurability && step.repairCost 
  * refund for salvaging every leftover part (assembly(t).salvageRefund; for the Founder, the Normal
  * per-crate salvage value over its own expected crates).
  */
-function assemblyPlan(path, { profile = 'normal', salvage = true } = {}) {
+function assemblyPlan(path, { profile = 'normal', salvage = SYSTEM_DEFAULTS.salvage } = {}) {
 	const plan = [null];
 	for (let t = 1; t < path.length; t++) {
 		const step = path[t];
@@ -919,19 +890,16 @@ function assemblyPlan(path, { profile = 'normal', salvage = true } = {}) {
  *             expected assembly cost, available from the tier crate's unlock level (gate level); ledger
  *             item = the crate name. buy() records ownership, pays any salvage refund (cash source
  *             'salvage') and equips at once if the gate level already reaches the tier.
- *   on        'levelUp': equips the owned tier once the gate level reaches its level. Emits 'assembly'
- *             { tier, crate, crates, cost, level } on each purchase (tier crates carry no buffs, so no
- *             'box' event: the counting rule has nothing for buffs to value).
+ *   on        'levelUp': equips the owned tier once the gate level reaches its level (it fishes from the
+ *             next step). Emits 'assembly' { tier, crate, crates, cost, level } on each purchase (tier
+ *             crates carry no buffs, so no 'box' event: the counting rule has nothing for buffs to value).
  *   onCasts   repairs: spend('upkeep', 'repairs', durability used this step x the equipped tier's repair
  *             cost per durability point); the Old Rod is unbreakable (0).
- * @param {object} opts { salvage: salvage every leftover part on assembly (default true),
- *   founderCrates: price the Founder's assemblies with its crate luck (default true),
- *   equipTiming: 'levelUp' (default: the tier fishes from the step after its level is reached) |
- *   'afterCasts' (validation replay of lifecycle(): checked after each step's casts, one step later) }
+ * @param {object} opts { salvage: salvage every leftover part on assembly (default SYSTEM_DEFAULTS),
+ *   founderCrates: price the Founder's assemblies with its crate luck (default SYSTEM_DEFAULTS) }
  */
 function system(opts = {}) {
-	const { salvage = true, founderCrates = true, equipTiming = 'levelUp' } = opts;
-	if (!['levelUp', 'afterCasts'].includes(equipTiming)) throw new Error(`Unknown equipTiming ${equipTiming}`);
+	const { salvage = SYSTEM_DEFAULTS.salvage, founderCrates = SYSTEM_DEFAULTS.founderCrates } = opts;
 	const own = (state) => state.sys[SYSTEM_NAME];
 	function plan(state, ctx) {
 		const s = own(state);
@@ -942,14 +910,13 @@ function system(opts = {}) {
 		}
 		return s.plan;
 	}
-	// startH: the play clock when the new tier starts fishing (the next step's start).
-	function equip(state, ctx, startH = state.h) {
+	function equip(state, ctx) {
 		const s = own(state);
 		while (state.equippedTier < s.owned && ctx.gateLevel() >= ctx.path[state.equippedTier + 1].level) {
 			state.equippedTier++;
 			const L = state.ledger;
 			s.equips[state.equippedTier] = {
-				hours: +startH.toFixed(4), day: state.day + 1, level: ctx.gateLevel(),
+				hours: +state.h.toFixed(4), day: state.day + 1, level: ctx.gateLevel(),
 				fishingCash: L.cash.fishing || 0, repairs: L.spend.upkeep.repairs || 0, assemblies: s.spent, salvage: L.cash.salvage || 0,
 			};
 		}
@@ -979,184 +946,109 @@ function system(opts = {}) {
 		onCasts(state, ctx, { rates }) {
 			const perPoint = repairPerPoint(ctx.path[rates.tier]);
 			if (perPoint > 0 && rates.durability > 0) ctx.spend('upkeep', 'repairs', rates.durability * perPoint);
-			// onCasts runs before the core advances the clock: the new tier starts at the next step.
-			if (equipTiming === 'afterCasts') equip(state, ctx, state.h + ctx.stepH);
 		},
 		on(event, payload, state, ctx) {
-			if (event === 'levelUp' && equipTiming === 'levelUp') equip(state, ctx);
+			if (event === 'levelUp') equip(state, ctx);
 		},
 	};
 }
 
-/** Validation helper: spends `share` of each step's fishing income outside rods (lifecycle()'s otherSpendShare). */
-function otherSpendSystem(share) {
+/**
+ * Parity RECORD (a constant: the loop it compared against is deleted). Before the final Phase 5B
+ * migration this module had its own private lifecycle loop (the old rods.lifecycle(), placeholder daily
+ * XP). validateSystem() compared system() on the shared core with it; these are that function's results
+ * at commit a83b5f0 (framework 5b.4, digest d9e4938f85074918). The old loop and validateSystem() were
+ * retired afterwards: every lifecycle number now comes from the integrated model.
+ */
+const SYSTEM_PARITY = deepFreeze({
+	commit: 'a83b5f0',
+	framework: '5b.4',
+	method: 'LC.simulate with rods.system({ salvage: false }) + LC.provisionalDaily() vs the retired rods.lifecycle() (same placeholder XP model), every archetype plus regular with 30% and casual with 50% of fish income spent elsewhere; hours compared step-exact',
+	cases: 6,
+	tolerance: 0.005,
+	maxRelativeDifference: 0.0033,
+	worst: 'grinder T1 equip hours',
+	exactMilestones: '24/36',
+	maxEquipShiftSteps: 2,
+	replay: { equipTiming: 'afterCasts', exactMilestones: '36/36', maxRelativeDifference: 0, exact: true },
+	cause: 'equip timing only: the old loop equipped a tier in the purchase block of the step after its level was reached; the system equips on the levelUp event (the rod is owned and the level reached), so level-gated tiers start one step earlier. Replaying the old timing on the core was exact.',
+});
+
+/** Stress probe (not a game system): spends `share` of each step's fishing income on purchases outside the model. */
+function otherSpendProbe(share) {
 	return {
-		name: 'otherSpend',
+		name: 'otherSpendProbe',
 		onCasts(state, ctx, { rates }) {
-			if (share > 0) ctx.spend('optional', 'other', share * rates.cash);
+			if (share > 0) ctx.spend('optional', 'other (stress probe)', share * rates.cash);
 		},
 	};
 }
 
+const sumValues = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+const lifecycleCache = new Map();
 /**
- * Validation helper (runs after the daily system): lifecycle() adds the day's daily XP inside the day's
- * final step, before it records a level reached on that step, while the core records the milestone
- * after the step and adds the daily at onDayEnd. For such milestones this records the XP ledger
- * including that daily, so the fishing share of XP is compared on lifecycle()'s basis.
+ * The rods view of ONE integrated lifecycle at the current framework version. Default: integrate.run
+ * with the reference loop (rods + world + quests + streak + buffs) and `variant` (bait / aquarium /
+ * founder, see integrate.js). With `otherSpendShare` > 0: LC.simulate on the same reference systems plus
+ * a stress probe spending that share of each step's fishing income elsewhere (how much room other
+ * purchases have before a rod upgrade waits for cash). Levels are the gate level's (public for the
+ * Founder variant). Cached per arguments. Returns {
+ *   reached   { L: { hours, day, fishingXpShare } }            each milestone level
+ *   upgrades  { t: { hours, level, day, delayHours } }        hour tier t starts fishing; delay after its level
+ *   bought    { t: { hours, level, day, crates, cost, salvage } } the assembly purchase
+ *   stages    { t: { from, to, hours, income, fishing } }     income earned while levelling to tier t
+ *   totals    { income, gross (fishing), repairs, crates, salvage, repairShare (of fishing),
+ *               repairShareOfIncome, crateShare (of fishing), crateShareOfIncome, minMoney, finalMoney }
+ *   hours, days, systems }
  */
-function dayEndMilestoneProbe() {
-	return {
-		name: 'dayEndMilestoneProbe',
-		init(state) {
-			state.sys.dayEndMilestoneProbe = {};
-		},
-		onDayEnd(state, ctx) {
-			// Only a day whose session ran to the clock (not one cut short by the stop level).
-			if (Math.floor(state.h / (ctx.arch.minutesPerDay / 60)) === state.playDay) return;
-			const probe = state.sys.dayEndMilestoneProbe;
-			for (const [T, m] of Object.entries(state.milestones)) {
-				if (!(T in probe) && m.hours === +state.h.toFixed(4)) probe[T] = { ...state.ledger.xp };
-			}
-		},
-	};
-}
-
-/**
- * lifecycle()'s model on the shared core: this system (salvage off, as lifecycle() has none), the
- * provisional daily XP (curve.js placeholder) and, optionally, the other-spend share.
- */
-function coreLifecycle(arch, { otherSpendShare = 0, salvage = false, equipTiming = 'levelUp', ...simOpts } = {}) {
-	return LC.simulate({
-		archetype: arch,
-		systems: [system({ salvage, equipTiming }), LC.provisionalDaily(), otherSpendShare > 0 ? otherSpendSystem(otherSpendShare) : null, dayEndMilestoneProbe()],
-		...simOpts,
-	});
-}
-
-/**
- * One comparison of system() on the shared core with lifecycle() (same archetype and other-spend share):
- * milestone hours, the fishing share of XP, the hour each tier starts fishing, and the whole-run totals
- * (gross fish income, repairs, assemblies; lifecycle() stops once T5 is equipped at Lv 60, so the core's
- * totals are taken at its T5 equip). Hours are compared step-exact: lifecycle() reports hours rounded to
- * 0.01 h (under a third of a step), from which its step index is recovered.
- */
-function compareWithLifecycle(archetype, { otherSpendShare = 0, equipTiming = 'levelUp' } = {}) {
-	const stepH = F.LIFECYCLE.stepH;
-	const stepOf = (hours) => Math.round(hours / stepH);
-	const h4 = (k) => +(k * stepH).toFixed(4);
-	const out = { maxRel: 0, worst: null, exactMilestones: 0, milestonesCompared: 0, maxEquipSteps: 0 };
-	const note = (key, a, b) => {
-		// Float noise (different summation order) counts as equal.
-		const d = Math.abs(a - b) / Math.max(Math.abs(b), 1e-12) < 1e-9 ? 0 : Math.abs(a - b) / Math.abs(b);
-		if (d > out.maxRel) {
-			out.maxRel = d;
-			out.worst = key;
-		}
-		return round4(d);
-	};
-	const old = lifecycle(archetype, { otherSpendShare });
-	// Run the core past the stop level to the day lifecycle() ended on (it stops once T5 is equipped).
-	const days = Math.ceil(old.hours / (ARCHETYPES[archetype].minutesPerDay / 60)) + 1;
-	const core = coreLifecycle(archetype, { otherSpendShare, equipTiming, stopAtLevel: null, days });
-	const sys = core.sys[SYSTEM_NAME];
-	const milestones = {};
-	for (const T of F.LIFECYCLE.milestones) {
-		const o = old.reached[T];
-		const c = core.milestones[T];
-		if (!o || !c) {
-			milestones[T] = { old: o ? h4(stepOf(o.hours)) : null, core: c ? c.hours : null };
-			continue;
-		}
-		const x = core.sys.dayEndMilestoneProbe[T] || c.ledger.xp;
-		const share = round4((x.fishing || 0) / ((x.fishing || 0) + (x.daily || 0)));
-		const [kOld, kCore] = [stepOf(o.hours), stepOf(c.hours)];
-		out.milestonesCompared++;
-		if (kOld === kCore) out.exactMilestones++;
-		milestones[T] = {
-			old: h4(kOld), core: h4(kCore), steps: kCore - kOld, rel: note(`L${T} hours`, kCore, kOld),
-			fishingXpShare: { old: o.fishingXpShare, core: share, rel: note(`L${T} fishing XP share`, share, o.fishingXpShare) },
-		};
+function lifecycle(arch, { variant = null, otherSpendShare = 0 } = {}) {
+	const key = JSON.stringify([arch, variant, otherSpendShare]);
+	if (lifecycleCache.has(key)) return lifecycleCache.get(key);
+	const I = require('./integrate');
+	const r = otherSpendShare > 0
+		? { ...LC.simulate({ archetype: arch, systems: [...I.referenceSystems(), otherSpendProbe(otherSpendShare)] }), systems: [...I.REFERENCE, 'otherSpendProbe'] }
+		: I.run({ archetype: arch, variant: variant || {} });
+	const ms = r.gate === 'public' ? r.publicMilestones : r.milestones;
+	const s = r.sys[SYSTEM_NAME];
+	const reached = {};
+	for (const [L, m] of Object.entries(ms)) {
+		if (!/^\d+$/.test(L) || !m.ledger) continue;
+		reached[L] = { hours: m.hours, day: m.day, fishingXpShare: round4((m.ledger.xp.fishing || 0) / sumValues(m.ledger.xp)) };
 	}
-	// Hour each tier starts fishing: lifecycle() equips in a step's purchase block and reports that step's
-	// start, so its first step on the tier starts one step later.
-	const equips = {};
+	const upgrades = {};
+	for (const [t, e] of Object.entries(s.equips)) {
+		const atLevel = reached[tierLevel(Number(t))];
+		upgrades[t] = { hours: e.hours, level: e.level, day: e.day, delayHours: atLevel ? round4(e.hours - atLevel.hours) : null };
+	}
+	const stages = {};
 	for (const t of TIERS) {
-		const o = old.upgrades[t];
-		const c = sys.equips[t];
-		if (!o || !c) {
-			equips[t] = { old: o ? h4(stepOf(o.hours) + 1) : null, core: c ? c.hours : null };
-			continue;
-		}
-		const [kOld, kCore] = [stepOf(o.hours) + 1, stepOf(c.hours)];
-		out.maxEquipSteps = Math.max(out.maxEquipSteps, Math.abs(kCore - kOld));
-		equips[t] = { old: h4(kOld), core: h4(kCore), steps: kCore - kOld, rel: note(`T${t} equip hours`, kCore, kOld) };
+		const [from, to] = [ms[tierLevel(t) - 10], ms[tierLevel(t)]];
+		if (!from?.ledger || !to?.ledger) continue;
+		stages[t] = {
+			from: tierLevel(t) - 10, to: tierLevel(t), hours: to.hours - from.hours,
+			income: sumValues(to.ledger.cash) - sumValues(from.ledger.cash),
+			fishing: (to.ledger.cash.fishing || 0) - (from.ledger.cash.fishing || 0),
+		};
 	}
-	const last = sys.equips[TIERS[TIERS.length - 1]];
-	const totals = last
-		? Object.fromEntries([['gross', last.fishingCash, old.totals.gross], ['repairs', last.repairs, old.totals.repairs], ['crates', last.assemblies, old.totals.crates]].map(([k, c, o]) => [k, { old: r0(o), core: r0(c), rel: note(k, c, o) }]))
-		: null;
-	return { ...out, row: { milestones, equips, totals, repairShare: round4((core.ledger.spend.upkeep.repairs || 0) / core.ledger.cash.fishing) } };
+	const income = sumValues(r.ledger.cash);
+	const fishing = r.ledger.cash.fishing || 0;
+	const repairs = r.ledger.spend.upkeep.repairs || 0;
+	const out = {
+		archetype: typeof arch === 'string' ? arch : arch.name, variant, otherSpendShare, systems: r.systems,
+		reached, upgrades, bought: { ...s.bought }, stages,
+		totals: {
+			income, gross: fishing, repairs, crates: s.spent, salvage: r.ledger.cash.salvage || 0,
+			repairShare: repairs / fishing, repairShareOfIncome: repairs / income, crateShare: s.spent / fishing, crateShareOfIncome: s.spent / income,
+			minMoney: r.final.minMoney, finalMoney: r.final.money,
+		},
+		hours: r.hours, days: r.days,
+	};
+	lifecycleCache.set(key, out);
+	return out;
 }
 
-/**
- * Framework 5b.3 validation: system() on the shared core (with LC.provisionalDaily(), lifecycle()'s XP
- * model) vs this module's lifecycle() for every archetype, for the regular player with 30% of fish
- * income spent elsewhere and for the casual player with 50% (cash-gated tiers: T2-T5 bought late). `system` = the default system (what the integrator runs); `replay` = the same
- * system with lifecycle()'s equip timing (equipTiming 'afterCasts'), which isolates that one rule.
- */
-function validateSystem({ archetypes = Object.keys(ARCHETYPES), otherSpend = [{ archetype: 'regular', share: 0.3 }, { archetype: 'casual', share: 0.5 }], tolerance = 0.005 } = {}) {
-	const cases = [...archetypes.map((a) => ({ archetype: a, share: 0 })), ...otherSpend.map((o) => ({ archetype: o.archetype, share: o.share }))];
-	const run = (equipTiming) => {
-		const agg = { maxRel: 0, worst: null, exact: 0, compared: 0, maxEquipSteps: 0, cases: {} };
-		for (const { archetype, share } of cases) {
-			const key = share ? `${archetype}@otherSpend${share}` : archetype;
-			const c = compareWithLifecycle(archetype, { otherSpendShare: share, equipTiming });
-			if (c.maxRel > agg.maxRel) {
-				agg.maxRel = c.maxRel;
-				agg.worst = `${key} ${c.worst}`;
-			}
-			agg.exact += c.exactMilestones;
-			agg.compared += c.milestonesCompared;
-			agg.maxEquipSteps = Math.max(agg.maxEquipSteps, c.maxEquipSteps);
-			agg.cases[key] = c.row;
-		}
-		return {
-			equipTiming,
-			maxRelativeDifference: round4(agg.maxRel),
-			worst: agg.worst,
-			exactMilestones: `${agg.exact}/${agg.compared}`,
-			maxEquipShiftSteps: agg.maxEquipSteps,
-			cases: agg.cases,
-		};
-	};
-	const main = run('levelUp');
-	const replay = run('afterCasts');
-	const regularDefault = LC.simulate({ archetype: F.REFERENCE_ARCHETYPE, systems: [system(), LC.provisionalDaily()] });
-	return {
-		method: 'LC.simulate with rods.system({ salvage: false }) + LC.provisionalDaily() (+ a validation-only system spending otherSpendShare of each step\'s fish income) vs rods.lifecycle(), every archetype; hours compared step-exact',
-		matches: main.maxRelativeDifference < tolerance,
-		tolerance,
-		maxRelativeDifference: main.maxRelativeDifference,
-		worst: main.worst,
-		system: main,
-		replay: { ...replay, cases: undefined, exact: replay.maxEquipShiftSteps === 0 && replay.exactMilestones.split('/')[0] === replay.exactMilestones.split('/')[1] && replay.maxRelativeDifference < 1e-4 },
-		// The integrated default (salvage on) for the regular player, same XP model: salvage only lowers
-		// net assembly costs; every tier is level-gated, not cash-gated, so milestones are unchanged.
-		defaultRegular: {
-			milestones: LC.milestoneHours(regularDefault),
-			salvageCash: r0(regularDefault.ledger.cash.salvage || 0),
-			assemblies: r0(Object.values(regularDefault.ledger.spend.progression).reduce((a, v) => a + v, 0)),
-			repairs: r0(regularDefault.ledger.spend.upkeep.repairs || 0),
-		},
-		differences: [
-			'Equip timing (the only rule difference): lifecycle() equips a tier in the purchase block of the step AFTER its level is reached, so that step still fishes the old rod; system() equips on the levelUp event and the tier fishes from the next step. Level-gated tiers therefore start 1 step (1 min) earlier, and the extra XP can bring a later level (and so its tier) 1 more step forward; cash-gated tiers start on the same step. The core is right: the rod is owned and the level is reached. The replay (lifecycle()\'s timing on the core) isolates this rule.',
-			'Purchases: lifecycle() pours net income into crates progressively from the crate unlock level; the core buys the whole expected assembly once cash covers it. With no competing purchases both complete on the same step (cash on hand = what lifecycle() has paid in); with other systems the core\'s priorities decide (rods: progression, priority LC.PRIORITY.rod, blocking).',
-			'Totals: lifecycle() stops at the end of the step that equips T5 (at Lv 60); the core snapshot is taken when T5 starts fishing, one step earlier where T5 is level-gated.',
-			'XP decomposition: a level reached on a day\'s final step is snapshotted by the core before that day\'s daily XP (onDayEnd) and by lifecycle() after it; the comparison applies lifecycle()\'s convention (dayEndMilestoneProbe). Without it the casual L30 fishing share reads 0.5375 vs 0.5303: the same state, snapshotted either side of the daily.',
-			'Days: the core counts a level reached on a day\'s final step in that day (ceil(h/dayH) counted the next day), so hours are compared, not days.',
-		],
-	};
-}
+/** Hours to each approved window level against its window (regular player by default). */
+const inTarget = (reached) => Object.fromEntries(Object.entries(TARGETS).map(([L, [lo, hi]]) => [L, { hours: reached[L]?.hours ?? null, window: [lo, hi], ok: reached[L] ? reached[L].hours >= lo && reached[L].hours <= hi : false }]));
 
 // ---------------------------------------------------------------------------------------------
 const r0 = (x) => Math.round(x);
@@ -1189,7 +1081,7 @@ function buildReport() {
 		tier: s.tier, label: s.label,
 		byBiome: Object.fromEntries(MODELLED_BIOMES.map((b) => {
 			const o = rodOutcome(s, b);
-			const hr = F.hourly(o, 4);
+			const hr = F.hourly(o, F.DESIGN_OVERHEAD_S);
 			return [b, { fishPerCast: round4(o.fishPerCast), valuePerFish: r0(o.valuePerFish), xpPerHour: r0(hr.xp), cashPerHour: r0(hr.cash), upkeepShare: round4(upkeepShare(s, b)) }];
 		})),
 	}));
@@ -1236,7 +1128,7 @@ function buildReport() {
 	// Specialties: variants of the same slot at the same rarity, in the home biome (reference set otherwise).
 	const specialty = (rod, t) => {
 		const o = rodOutcome(rod, homeBiome(t));
-		const hr = F.hourly(o, 4);
+		const hr = F.hourly(o, F.DESIGN_OVERHEAD_S);
 		return { xp: hr.xp, cash: hr.cash, net: hr.cash * (1 - upkeepShare(rod, homeBiome(t))), giant: o.rarity.giant * o.fishPerCast, legendaryPlus: (o.rarity.legendary + o.rarity.lucky) * o.fishPerCast, jackpot: rod.jackpot3plus };
 	};
 	const specialties = [];
@@ -1318,26 +1210,64 @@ function buildReport() {
 	})();
 	const salvage = Object.fromEntries(RARITY_ORDER.map((r) => [r, salvageValue(r)]));
 
-	// Lifecycle check (regular, and every archetype), rods-only and with 30% of income spent elsewhere.
-	const life = Object.fromEntries(Object.keys(ARCHETYPES).map((k) => [k, lifecycle(k)]));
-	const lifeOther = lifecycle('regular', { otherSpendShare: 0.3 });
-	const OTHER_SPEND = [0.3, 0.4, 0.5, 0.6];
-	const delayByOtherSpend = Object.fromEntries(OTHER_SPEND.map((o) => [o, Object.fromEntries(Object.keys(ARCHETYPES).map((k) => {
-		const v = lifecycle(k, { otherSpendShare: o });
-		return [k, Object.fromEntries(TIERS.map((t) => [t, v.upgrades[t] && v.reached[tierLevel(t)] ? +(v.upgrades[t].hours - v.reached[tierLevel(t)].hours).toFixed(2) : null]))];
+	// Today's crate, Old Rod and crafted-rod rules (for Current -> Proposed), read from the catalog and engine.
+	const today = (() => {
+		const oldRodLegacy = require('../../../src/bootstrap/data/rods.js').find((x) => x.name === 'Old Rod');
+		const crateItem = require('../../../src/bootstrap/data/gacha.js').find((x) => x.name === 'Fishing Crate');
+		const baits = require('../../../src/bootstrap/data/bait.js').map((b) => ({ ...b, type: 'bait' }));
+		const def = LEGACY_BOXES['Fishing Crate'];
+		const pools = Object.fromEntries(RARITIES.map((r) => [r, [...baits, ...CATALOG].filter((x) => lower(x.rarity) === r && def.pool.types.includes(x.type))]));
+		const table = baseTable(def, pools);
+		let partShare = 0;
+		let rarePlusPart = 0;
+		for (const r of RARITIES) {
+			if (!pools[r].length) continue;
+			const share = pools[r].filter((x) => x.type !== 'bait').length / pools[r].length;
+			partShare += table[r] * share;
+			if (RARITIES.indexOf(r) >= RARITIES.indexOf('rare')) rarePlusPart += table[r] * share;
+		}
+		return {
+			oldRod: { maxDurability: oldRodLegacy.maxDurability, repairCost: oldRodLegacy.repairCost, maxRepairs: oldRodLegacy.maxRepairs },
+			fishingCrate: { price: crateItem.price, slots: def.slots, partShare: round4(partShare), rarePlusPartPerSlot: round4(rarePlusPart), duplicates: def.duplicates },
+			quickFishingSpeed: QUICK_FISHING_SPEED,
+			crafted: {
+				level: spread(combos.map((c) => c.legacy.level)), fishPerCast: spread(combos.map((c) => c.legacy.fishPerCast)),
+				durability: spread(combos.map((c) => c.legacy.durability)), repairCost: spread(combos.map((c) => c.legacy.repairCost)), maxRepairs: LEGACY_CRAFTED_MAX_REPAIRS,
+			},
+		};
+	})();
+
+	// Integrated lifecycle (current framework): every archetype on the reference loop, the bait and
+	// aquarium variants, and the other-spend stress probe.
+	const PLAYERS = Object.keys(ARCHETYPES);
+	const life = Object.fromEntries(PLAYERS.map((k) => [k, lifecycle(k)]));
+	const maxDelay = (v) => {
+		const d = TIERS.map((t) => v.upgrades[t]?.delayHours ?? null);
+		return d.includes(null) ? null : Math.max(...d);
+	};
+	const variantMaxDelay = Object.fromEntries(PLAYERS.map((k) => [k, Object.fromEntries(Object.entries(LIFECYCLE_VARIANTS).map(([name, variant]) => [name, maxDelay(lifecycle(k, { variant }))]))]));
+	const stressDelays = Object.fromEntries(PLAYERS.map((k) => [k, Object.fromEntries(STRESS_SHARES.map((sh) => {
+		const v = lifecycle(k, { otherSpendShare: sh });
+		return [sh, Object.fromEntries(TIERS.map((t) => [t, v.upgrades[t]?.delayHours ?? null]))];
 	}))]));
-	const stageHours = TIERS.map((t) => {
-		const reg = life.regular.reached;
-		const from = reg[tierLevel(t) - 10]?.hours ?? null;
-		const to = reg[tierLevel(t)]?.hours ?? null;
-		return { tier: t, stage: `Lv ${tierLevel(t) - 10}-${tierLevel(t)}`, hours: from === null || to === null ? null : +(to - from).toFixed(2) };
+	const lifeRow = (v) => ({
+		reached: v.reached, upgrades: v.upgrades,
+		bought: Object.fromEntries(Object.entries(v.bought).map(([t, b]) => [t, { hours: b.hours, level: b.level, day: b.day, crates: +b.crates.toFixed(2), cost: r0(b.cost), salvage: r0(b.salvage) }])),
+		totals: { income: r0(v.totals.income), gross: r0(v.totals.gross), repairs: r0(v.totals.repairs), crates: r0(v.totals.crates), salvage: r0(v.totals.salvage), repairShare: round4(v.totals.repairShare), repairShareOfIncome: round4(v.totals.repairShareOfIncome), crateShare: round4(v.totals.crateShare), crateShareOfIncome: round4(v.totals.crateShareOfIncome), minMoney: r0(v.totals.minMoney), finalMoney: r0(v.totals.finalMoney) },
+		maxTierDelayHours: maxDelay(v), hours: v.hours, days: v.days,
 	});
-	const stageShare = assemblies.map((a, i) => ({ tier: a.tier, assemblyShareOfStageIncome: stageHours[i].hours ? round4(a.hoursOfStageIncome / stageHours[i].hours) : null }));
+	const stageShare = TIERS.map((t, i) => {
+		const st = life.regular.stages[t];
+		const cost = assemblies[i].expectedCost;
+		return st ? { tier: t, stage: `Lv ${st.from}-${st.to}`, hours: +st.hours.toFixed(2), income: r0(st.income), fishing: r0(st.fishing), assemblyCost: r0(cost), shareOfIncome: round4(cost / st.income), shareOfFishing: round4(cost / st.fishing) } : { tier: t, stage: null };
+	});
+	const I = require('./integrate');
 
 	return {
 		...F.stamp(),
 		params: PARAMS.id,
 		curve: { ...F.CURVE },
+		today,
 		slotFamilies: Object.fromEntries(Object.entries(PARAMS.slots).map(([k, v]) => [k, v.family])),
 		slotTable,
 		gearPath: path.map((s) => ({
@@ -1350,7 +1280,7 @@ function buildReport() {
 		combos: {
 			total: combos.length,
 			meanFishHistogram: hist,
-			atCeiling: { count: ceiling, share: round4(ceiling / combos.length), ceilingMean: PARAMS.multi.ceilingMean },
+			atCeiling: { count: ceiling, share: round4(ceiling / combos.length), ceilingMean: PARAMS.multi.ceilingMean, levels: spread(combos.filter((c) => c.meanFish >= PARAMS.multi.ceilingMean - 1e-9).map((c) => c.level)) },
 			today: { fishPerCastHistogram: legacyHist, atCap15: { count: combos.filter((c) => c.legacy.fishPerCast >= 15).length, share: round4(combos.filter((c) => c.legacy.fishPerCast >= 15).length / combos.length) } },
 			perTier,
 			bestAtLevel,
@@ -1361,18 +1291,15 @@ function buildReport() {
 			rule: `repairCost(rod-piece rarity) = ${PARAMS.repair.upkeepShare} x matched-set maxDurability x its $/fish at home; unlimited repairs`,
 			byTierHome: path.slice(1).map((s) => ({ tier: s.tier, repairCost: s.repairCost, maxDurability: s.maxDurability, lifeHoursRegular: +s.lifeHoursRegular.toFixed(2), shareHome: round4(s.upkeepShareHome), repairCostInMinutesOfHomeIncome: +((s.repairCost / rodHourly(s, s.homeBiome).cash) * 60).toFixed(1) })),
 			oldRod: 'unbreakable: no upkeep, no replacement, no soft-lock',
-			// What today's Old Rod repair ($1,000 per 1,000 fish, catalog rods.js) would cost under the proposed
-			// value model, as a share of Old Rod income: the sink the unbreakable rule gives up.
-			oldRodLegacyRepairShare: (() => {
-				const legacy = require('../../../src/bootstrap/data/rods.js').find((x) => x.name === 'Old Rod');
-				return Object.fromEntries(MODELLED_BIOMES.map((b) => [b, round4(legacy.repairCost / (legacy.maxDurability * rodOutcome(oldRod(), b).valuePerFish))]));
-			})(),
+			// What today's Old Rod repair (catalog rods.js) would cost under the proposed value model, as a share
+			// of Old Rod income: the sink the unbreakable rule gives up.
+			oldRodLegacyRepairShare: Object.fromEntries(MODELLED_BIOMES.map((b) => [b, round4(today.oldRod.repairCost / (today.oldRod.maxDurability * rodOutcome(oldRod(), b).valuePerFish))])),
 		},
 		crates: crates.map((c) => ({ tier: c.tier, name: c.name, price: c.price, unlockLevel: c.shop.unlockLevel, existingItem: c.shop.existingItem, rarityTable: c.rarityTable, rarityFloor: c.rarityFloor, guaranteedSlots: c.guaranteedSlots, duplicates: c.duplicates, pity: c.pity, featured: c.pool.featured, slotOdds: c.slotOdds })),
 		assembly: assemblies.map((a) => ({ ...a, expectedCrates: +a.expectedCrates.toFixed(2), expectedCost: r0(a.expectedCost), p90Cost: r0(a.p90Cost), stageIncomePerHour: r0(a.stageIncomePerHour), hoursOfStageIncome: +a.hoursOfStageIncome.toFixed(2), p90HoursOfStageIncome: +a.p90HoursOfStageIncome.toFixed(2), expectedParts: +a.expectedParts.toFixed(1), leftoverParts: +a.leftoverParts.toFixed(1), salvageRefund: r0(a.salvageRefund), netCostAfterSalvage: r0(a.netCostAfterSalvage), salvageReturnPerCrate: round4(a.salvageReturnPerCrate) })),
-		assemblyShareOfStage: stageShare,
 		entryT1,
 		salvage,
+		engineValidation: { ...ENGINE_VALIDATION, exactNow: Object.fromEntries(ENGINE_VALIDATION.crates.map((c) => [c.tier, round4(cratesDistribution(c.tier).expected)])) },
 		legacyConverter: {
 			signatures: sigGroups.size,
 			uniqueSignatures: [...sigGroups.values()].filter((g) => g.length === 1).length,
@@ -1388,34 +1315,502 @@ function buildReport() {
 			},
 		},
 		lifecycle: {
-			method: 'curve.js XP model (daily 60 x level XP); this gear path; crates bought from net income from the crate unlock level; rod equipped when paid for and at its level',
-			regular: { ...life.regular, targets: inTarget(life.regular.reached) },
-			regularWith30pctOtherSpend: { reached: lifeOther.reached, upgrades: lifeOther.upgrades, targets: inTarget(lifeOther.reached) },
-			archetypes: Object.fromEntries(Object.entries(life).map(([k, v]) => [k, { reached: v.reached, upgrades: v.upgrades, repairShare: round4(v.totals.repairShare), crateShare: round4(v.totals.crateShare) }])),
-			// Rod upgrade delay (hours of play after reaching the tier's level) when this share of fish income
-			// goes to other purchases (permits, bait, aquarium, ...). 0 = the rod is ready at the level.
-			delayByOtherSpend,
-			stageHoursRegular: stageHours,
+			method: `integrated model at framework ${F.FRAMEWORK_VERSION}: integrate.run (${I.REFERENCE_NOTE}); variants ${Object.keys(LIFECYCLE_VARIANTS).join(', ')}; stress = the same reference systems plus a probe spending a share of each step's fishing income elsewhere`,
+			regular: { ...lifeRow(life.regular), targets: inTarget(life.regular.reached) },
+			archetypes: Object.fromEntries(PLAYERS.map((k) => [k, lifeRow(life[k])])),
+			variantMaxDelay,
+			stressDelays,
+			assemblyShareOfStage: stageShare,
 		},
-		// Framework 5b.3: system() on the shared lifecycle core reproduces lifecycle() above.
-		systemValidation: validateSystem(),
+		integration: {
+			system: SYSTEM_NAME,
+			defaults: { ...SYSTEM_DEFAULTS },
+			ledger: { cash: ['salvage'], spend: { upkeep: ['repairs'], progression: TIERS.map((t) => PARAMS.crates.tiers[t].name) } },
+			parity: SYSTEM_PARITY,
+		},
 	};
 }
 
 let reportCache = null;
-/** Every key number, computed from framework.js (synchronous; cached per process). */
+/** Every key number, computed from framework.js and the integrated model (synchronous; cached per process). */
 function report() {
 	if (!reportCache) reportCache = buildReport();
 	return reportCache;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Proposed design decisions (join decisions.js's registry). Status is only ever 'proposed': the user
+// approves. `get` reads the value this module runs; decisions.verify() checks it equals `expected`.
+const listOf = (o, f = (v) => v) => Object.entries(o).map(([k, v]) => `${k} ${f(v)}`).join(', ');
+const DECISIONS = [
+	{
+		id: 'P-RODS-TIER', status: 'proposed',
+		title: 'A crafted rod\'s tier is the tier of its highest-rarity part; the requirement it shows is that part\'s level',
+		modelled: `tierOfRarity: ${listOf(PARAMS.tierOfRarity, (t) => `T${t}`)}`,
+		alternatives: ['today: requirement 10 x the summed "N count" qualities, while bare-number draws cost no level (the level bypass)', 'tier from the rod piece alone'],
+		source: 'rods design', why: 'part rarity finally matters and no combination can bypass its level',
+		get: () => PARAMS.tierOfRarity, expected: { Common: 1, Uncommon: 1, Rare: 2, Ultra: 3, Legendary: 4, Lucky: 5 },
+	},
+	{
+		id: 'P-RODS-LEVEL-CAP', status: 'proposed',
+		title: 'Part level caps: a part works at full strength from its level; below it, it performs at the best rarity the player has unlocked',
+		modelled: `partLevel: ${listOf(PARAMS.partLevel, (L) => `Lv ${L}`)}; e.g. a Legendary part at Lv 35 performs as ${capRarity('Legendary', 35)}`,
+		alternatives: ['a strict equip gate at the tier level', 'no cap (today)'],
+		source: 'rods design', why: 'one rule covers new crafts, existing rods, jackpot parts and admin grants; parts can still be collected and crafted early',
+		get: () => ({ partLevel: PARAMS.partLevel, legendaryAtLv35: capRarity('Legendary', 35) }),
+		expected: { partLevel: { Common: 20, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 }, legendaryAtLv35: 'Rare' },
+	},
+	{
+		id: 'P-RODS-CRAFT', status: 'proposed',
+		title: 'Crafting and equipping a crafted rod needs the first-rod level; every crafted rod catches weak and strong fish',
+		modelled: `minLevel ${PARAMS.craft.minLevel}; qualities ${PARAMS.craft.qualities.join(' + ')}`,
+		alternatives: ['today: no crafting level; strong access only from part qualities (an all-Common rod is weak-only)'],
+		source: 'rods design', why: 'the first crafted rod is the Lv 20 milestone and unlocks strong fish, as the gear path assumes',
+		get: () => PARAMS.craft, expected: { minLevel: 20, qualities: ['weak', 'strong'] },
+	},
+	{
+		id: 'P-RODS-MEAN-FISH', status: 'proposed',
+		title: 'The rod piece sets mean fish per cast by rarity (framework multi-catch chain), capped at the endgame ceiling',
+		modelled: `meanFish: ${listOf(PARAMS.slots.rod.meanFish)}; ceiling ${PARAMS.multi.ceilingMean}`,
+		alternatives: ['today: draws x per-draw (4-15 fish per cast, most combinations at the 15 cap)', 'other per-rarity means inside the approved ~1.0 to 1.5-1.8 band'],
+		source: 'rods design (approved direction A-MULTICATCH; the numbers are proposed)', why: 'progression-based, probabilistic multi-catch with rare 3-5 fish jackpots; removes the 16x cliff',
+		get: () => ({ meanFish: PARAMS.slots.rod.meanFish, ceilingMean: PARAMS.multi.ceilingMean }),
+		expected: { meanFish: { Common: 1.1, Uncommon: 1.2, Rare: 1.3, Ultra: 1.5, Legendary: 1.65, Lucky: 1.8 }, ceilingMean: 1.8 },
+	},
+	{
+		id: 'P-RODS-SLOT-FAMILIES', status: 'proposed',
+		title: 'Per-slot stat families that add across parts: reel = speed + trophy; hook = Rare Find + Luck; handle = durability multiplier + sell bonus',
+		modelled: Object.entries(PARAMS.slots).map(([k, v]) => `${k}: ${v.family}`).join('; '),
+		alternatives: ['today: PART_RARITY_STATS, the same bundle for every part of a rarity, plus speed per quick part'],
+		source: 'rods design', why: 'rods differ by specialty instead of by volume',
+		get: () => ({ reel: { fishingSpeed: PARAMS.slots.reel.fishingSpeed, trophyChance: PARAMS.slots.reel.trophyChance }, hook: { rareFind: PARAMS.slots.hook.rareFind, luck: PARAMS.slots.hook.luck }, handle: { durabilityMult: PARAMS.slots.handle.durabilityMult, sellBonus: PARAMS.slots.handle.sellBonus } }),
+		expected: {
+			reel: { fishingSpeed: { Common: 0, Uncommon: 0.03, Rare: 0.05, Ultra: 0.10, Legendary: 0.15, Lucky: 0.20 }, trophyChance: { Common: 0, Uncommon: 0.05, Rare: 0.10, Ultra: 0.30, Legendary: 0.50, Lucky: 0.70 } },
+			hook: { rareFind: { Common: 0.10, Uncommon: 0.20, Rare: 0.40, Ultra: 0.60, Legendary: 0.90, Lucky: 1.20 }, luck: { Common: 0.05, Uncommon: 0.10, Rare: 0.20, Ultra: 0.40, Legendary: 0.60, Lucky: 0.80 } },
+			handle: { durabilityMult: { Common: 1.0, Uncommon: 1.1, Rare: 1.25, Ultra: 1.45, Legendary: 1.7, Lucky: 2.0 }, sellBonus: { Common: 0, Uncommon: 0, Rare: 0.02, Ultra: 0.04, Legendary: 0.06, Lucky: 0.08 } },
+		},
+	},
+	{
+		id: 'P-RODS-VARIANTS', status: 'proposed',
+		title: 'Same-slot, same-rarity catalog parts become named side-grade variants (about the same net $/h, a different emphasis)',
+		modelled: Object.entries(PARAMS.variants).map(([k, v]) => `${k}: ${v.label}`).join('; '),
+		alternatives: ['identical parts within a rarity (today, apart from legacy numbers)'],
+		source: 'rods design', why: 'collecting variants is an aspirational goal that is not pay-to-win; tilts follow each part\'s identity in today\'s catalog',
+		get: () => PARAMS.variants,
+		expected: {
+			'Fiberglass Rod Piece': { label: 'Fast action', meanDelta: 0.02, durability: 0.75 },
+			'Graphite Rod Piece': { label: 'Backbone', meanDelta: -0.02, durability: 1.5 },
+			'Centerpin Reel': { label: 'Free-spool', fishingSpeed: 1.2, trophyChance: 0.5 },
+			'Jigging Reel': { label: 'Heavy drag', fishingSpeed: 0.8, trophyChance: 2.5 },
+			'Fly Fishing Reel': { label: 'Light retrieve', fishingSpeed: 1.2, trophyChance: 0.5 },
+			'Trolling Reel': { label: 'Trolling drag', fishingSpeed: 0.8, trophyChance: 2.5 },
+			'Swimbait Hook': { label: 'Big bait', rareFind: 0.85, luck: 1.5 },
+			'Worm Hook': { label: 'Natural bait', rareFind: 1.15, luck: 0.6 },
+		},
+	},
+	{
+		id: 'P-RODS-DURABILITY', status: 'proposed',
+		title: 'Durability sized in hours of play: a matched set lasts lifeHours by rod-piece rarity; the handle multiplies it; still 1 durability per fish',
+		modelled: `lifeHours: ${listOf(PARAMS.durability.lifeHours, (h) => `${h} h`)}; rounded to ${PARAMS.durability.roundTo}`,
+		alternatives: ['today: the sum of the parts\' durability qualities'],
+		source: 'rods design', why: 'upkeep frequency is a property of play time, not an arbitrary number; a better handle means fewer repairs',
+		get: () => PARAMS.durability, expected: { lifeHours: { Common: 2.5, Uncommon: 3, Rare: 4, Ultra: 5, Legendary: 6, Lucky: 8 }, roundTo: 50 },
+	},
+	{
+		id: 'P-RODS-REPAIR', status: 'proposed',
+		title: 'Unlimited repairs for crafted rods; repair cost = a fixed share of what the matched set\'s durability earns in its home biome (by rod-piece rarity)',
+		modelled: `upkeepShare ${PARAMS.repair.upkeepShare}; maxRepairs ${PARAMS.repair.craftedMaxRepairs === null ? 'unlimited' : PARAMS.repair.craftedMaxRepairs}`,
+		alternatives: ['today: 10,000 x count, a fixed repair limit, then the rod is destroyed', 'another upkeep share'],
+		source: 'rods design (user decision 10: modest mandatory upkeep)', why: 'predictable upkeep sized to income; a forced re-purchase of a whole progression purchase is not modest',
+		get: () => PARAMS.repair, expected: { upkeepShare: 0.04, craftedMaxRepairs: null },
+	},
+	{
+		id: 'P-RODS-OLD-ROD', status: 'proposed',
+		title: 'The Old Rod is unbreakable (weak only, one fish, no stats); no free replacements',
+		modelled: `unbreakable ${PARAMS.oldRod.unbreakable}; meanFish ${PARAMS.oldRod.meanFish}; qualities ${PARAMS.oldRod.qualities.join(', ')}`,
+		alternatives: ['a cheap repair', 'today: finite durability, a paid repair and a free replacement once destroyed'],
+		source: 'rods design', why: 'ends the free-replacement loop and the $0 soft-lock; the fallback that keeps crafted-rod owners fishing must never block play',
+		get: () => PARAMS.oldRod, expected: { unbreakable: true, meanFish: 1, qualities: ['weak'] },
+	},
+	{
+		id: 'P-RODS-LEGACY-RODS', status: 'proposed',
+		title: 'Existing crafted rods: read-time converter (no data rewrite); stored max durability grandfathered; a destroyed crafted rod counts as broken',
+		modelled: 'effective max durability = max(stored, rule); state destroyed -> broken (repairable); parts resolve -> the proposed rules on the same parts',
+		alternatives: ['rescale legacy durability to the new pool through an additive condition field'],
+		source: 'rods design (user decision 13: non-destructive)', why: 'no player document is rewritten; rods lost to the old repair limit and to bug C1 come back',
+		get: () => {
+			const c = convertLegacyRod({ capabilities: [], maxDurability: 1e6, durability: 5, state: 'destroyed' });
+			return { maxDurability: c.durability.max === 1e6 ? 'stored' : 'rule', destroyedBecomes: c.state };
+		},
+		expected: { maxDurability: 'stored', destroyedBecomes: 'broken' },
+	},
+	{
+		id: 'P-RODS-CRATE-PRICE', status: 'proposed',
+		title: 'Crate prices as hours of stage income: assembling tier t\'s set costs assemblyHours[t] of the previous stage\'s income in expectation',
+		modelled: `assemblyHours: ${listOf(PARAMS.assemblyHours, (h) => `${h} h`)}; price = hours x stage income / E[crates], ${PARAMS.priceSigDigits} significant digits`,
+		alternatives: ['fixed prices', 'other hour budgets'],
+		source: 'rods design', why: 'one progression purchase per tier, bought during the stage before it; prices regenerate with any framework change',
+		get: () => ({ assemblyHours: PARAMS.assemblyHours, priceSigDigits: PARAMS.priceSigDigits }), expected: { assemblyHours: { 1: 1.25, 2: 2.5, 3: 4, 4: 6, 5: 8 }, priceSigDigits: 2 },
+	},
+	{
+		id: 'P-RODS-CRATES', status: 'proposed',
+		title: 'Tier part crates (Gacha V2): independent slots, unique duplicates, slot-balanced featured weights, rarity floors, a guaranteed slot 0, Lucky pity on T5; each unlocks one stage early',
+		modelled: TIERS.map((t) => `${PARAMS.crates.tiers[t].name} (Lv ${PARAMS.crates.tiers[t].unlockLevel}, floor ${PARAMS.crates.tiers[t].rarityFloor || 'none'}, slot 0 >= ${PARAMS.crates.tiers[t].guaranteed || 'none'}${PARAMS.crates.tiers[t].pity ? ', pity' : ''})`).join('; '),
+		alternatives: ['one crate for every tier', 'no floors or guarantees (coupon-collector tail)'],
+		source: 'rods design', why: 'a tier-appropriate set in a few crates with a bounded tail; the next tier\'s parts appear rarely as exciting, level-capped pulls',
+		get: () => PARAMS.crates,
+		expected: {
+			slots: 3, strategy: 'independent', duplicates: 'unique', balanceSlots: true,
+			tiers: {
+				1: { name: 'Fishing Crate', existing: true, unlockLevel: 10, rarityTable: { common: 50, uncommon: 47, rare: 3 }, rarityFloor: null, guaranteed: 'uncommon' },
+				2: { name: 'Pro Tackle Crate', unlockLevel: 20, rarityTable: { uncommon: 45, rare: 52, ultra: 3 }, rarityFloor: 'uncommon', guaranteed: 'rare' },
+				3: { name: 'Expert Tackle Crate', unlockLevel: 30, rarityTable: { rare: 45, ultra: 52, legendary: 3 }, rarityFloor: 'rare', guaranteed: 'ultra' },
+				4: { name: 'Master Tackle Crate', unlockLevel: 40, rarityTable: { ultra: 45, legendary: 54, lucky: 1 }, rarityFloor: 'ultra', guaranteed: 'legendary' },
+				5: { name: 'Gilded Tackle Crate', unlockLevel: 50, rarityTable: { legendary: 80, lucky: 20 }, rarityFloor: 'legendary', guaranteed: null, pity: { lucky: { counter: 'lucky', tiers: ['lucky'], softStart: 3, rampPerCast: 0.1, maxBonus: 0.5, hard: 8 } } },
+			},
+		},
+	},
+	{
+		id: 'P-RODS-FISHING-CRATE', status: 'proposed',
+		title: 'Redefine the existing Fishing Crate as the T1 part crate (parts only, no bait); owned crates open under the new definition',
+		modelled: `${crateDefinition(1).name}: pool ${crateDefinition(1).pool.types.join(', ')}`,
+		alternatives: ['keep today\'s Fishing Crate and add a separate T1 part crate'],
+		source: 'rods design', why: 'strictly better for owners (guaranteed slot, parts only); bait is priced by the bait design',
+		get: () => ({ name: crateDefinition(1).name, existing: Boolean(PARAMS.crates.tiers[1].existing), types: crateDefinition(1).pool.types }),
+		expected: { name: 'Fishing Crate', existing: true, types: ['part_rod', 'part_reel', 'part_hook', 'part_handle'] },
+	},
+	{
+		id: 'P-RODS-SALVAGE', status: 'proposed',
+		title: 'Duplicate parts salvage for cash; the integrated model salvages every leftover part on assembly (default on)',
+		modelled: `salvage = ${PARAMS.salvage.share} of one slot of the crate that guarantees the rarity (Common: ${PARAMS.salvage.commonOfUncommon} of Uncommon); system default salvage ${SYSTEM_DEFAULTS.salvage}`,
+		alternatives: ['no salvage (duplicates stay dead inventory)', 'model salvage off (the conservative case)'],
+		source: 'rods design', why: 'duplicates are never worthless, while a crate\'s full salvage stays far below its price (no arbitrage)',
+		get: () => ({ ...PARAMS.salvage, systemDefault: SYSTEM_DEFAULTS.salvage }), expected: { share: 0.25, commonOfUncommon: 0.25, systemDefault: true },
+	},
+	{
+		id: 'P-RODS-C1-REFUND', status: 'proposed',
+		title: 'Refund crafted-rod repair charges lost to bug C1 where Interaction analytics identify them',
+		modelled: 'not modelled: a one-off guarded migration keyed by Interaction id, only after approval',
+		alternatives: ['no refund'],
+		source: 'rods design', why: 'players paid for repairs that never applied',
+	},
+];
+
+// ---------------------------------------------------------------------------------------------
+// Generated doc tables: docs/economy/5b/rods.md blocks (render-docs.js). Every number comes from report().
+const mdTable = (headers, rows) => [`| ${headers.join(' | ')} |`, `| ${headers.map(() => '---').join(' | ')} |`, ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');
+const n0 = (x) => Math.round(x).toLocaleString('en-US');
+const usd = (x) => `$${n0(x)}`;
+const pct = (x, d = 1) => `${(x * 100).toFixed(d)}%`;
+/** Signed relative change of a ratio (1.015 -> +1.5%). */
+const rel = (ratio, d = 1) => {
+	const v = +((ratio - 1) * 100).toFixed(d);
+	return `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(d)}%`;
+};
+const hrs = (x, d = 2) => `${x.toFixed(d)} h`;
+const rng = (s, f) => (s.min === s.max ? f(s.min) : `${f(s.min)}–${f(s.max)}`);
+const rng3 = (s, f) => (s.min === s.max ? f(s.min) : `${f(s.min)}–${f(s.median)}–${f(s.max)}`);
+const minMax = (arr, f) => rng({ min: Math.min(...arr), max: Math.max(...arr) }, f);
+const tierName = (t) => (t === 0 ? 'Old Rod' : `T${t}`);
+const tilt = (v) => [
+	v.meanDelta !== undefined && `${v.meanDelta > 0 ? '+' : '−'}${Math.abs(v.meanDelta)} fish`, v.durability && `×${v.durability} life`,
+	v.fishingSpeed && `speed ×${v.fishingSpeed}`, v.trophyChance && `trophy ×${v.trophyChance}`, v.rareFind && `Rare Find ×${v.rareFind}`, v.luck && `Luck ×${v.luck}`,
+].filter(Boolean).join(', ');
+/** 'Uncommon set', or 'Lucky rod + Legendary reel/hook/handle' when the catalog lacks a rarity in a slot. */
+const setName = (set) => {
+	const groups = [...new Set(Object.values(set).map((p) => p.rarity))].map((r) => `${r} ${Object.keys(set).filter((k) => set[k].rarity === r).join('/')}`);
+	return groups.length === 1 ? `${Object.values(set)[0].rarity} set` : groups.join(' + ');
+};
+const statsLine = (s) => ['rareFind', 'luck', 'trophyChance', 'fishingSpeed', 'sellBonus'].map((k) => Math.round((s[k] || 0) * 100)).join(' / ') + '%';
+
+function markdownTables() {
+	const R = report();
+	const gp = R.gearPath;
+	const refs = gp.slice(1);
+	const asm = R.assembly;
+	const L = R.lifecycle;
+	const reg = L.regular;
+	const PLAYERS = Object.keys(L.archetypes);
+	const out = {};
+
+	// Headline figures for the summary.
+	const ceilingLv = R.combos.atCeiling.levels;
+	const regWindows = Object.entries(reg.targets);
+	const allDelays = [...PLAYERS.map((k) => L.archetypes[k].maxTierDelayHours), ...PLAYERS.flatMap((k) => Object.values(L.variantMaxDelay[k]))];
+	out['rods-headline'] = mdTable(['Figure', 'Value', 'Detail'], [
+		['Reference sets, mean fish per cast (T1–T5)', refs.map((s) => s.meanFish.toFixed(2)).join(' / '), 'Gear path'],
+		['Reference sets, casts landing 3+ fish', `${pct(refs[0].jackpot3plus)} → ${pct(refs[refs.length - 1].jackpot3plus)}`, 'Gear path'],
+		['Combinations at the fish cap', `today ${pct(R.combos.today.atCap15.share)} (15 fish); proposed ${pct(R.combos.atCeiling.share)} (${R.combos.atCeiling.ceilingMean} ceiling, Lv ${rng(ceilingLv, (x) => x)} only)`, 'All combinations'],
+		['Best rod usable at Lv 20 / Lv 30', `today ${R.combos.bestAtLevel[20].todayFishPerCast} / ${R.combos.bestAtLevel[30].todayFishPerCast} fish; proposed ${R.combos.bestAtLevel[20].proposedMeanFish.toFixed(2)} / ${R.combos.bestAtLevel[30].proposedMeanFish.toFixed(2)}`, 'No bypass'],
+		['Mandatory upkeep in the home biome', minMax(refs.map((s) => s.upkeepShareHome), (x) => pct(x)), 'Upkeep'],
+		['Repairs over the whole lifecycle (integrated)', `${minMax(PLAYERS.map((k) => L.archetypes[k].totals.repairShare), (x) => pct(x))} of fishing income, every archetype`, 'Integrated lifecycle'],
+		['Assembly cost of a tier set', `${asm.map((a) => a.hoursOfStageIncome.toFixed(2)).join(' / ')} h of the previous stage's income`, 'Assembly'],
+		['Assembly share of the income the regular player earns in the stage (integrated)', minMax(L.assemblyShareOfStage.filter((s) => s.stage).map((s) => s.shareOfIncome), (x) => pct(x)), 'Affordability'],
+		['Full-crate salvage return', `at most ${pct(Math.max(...asm.map((a) => a.salvageReturnPerCrate)))} of the crate price`, 'Salvage'],
+		['Regular player (integrated, framework)', `${regWindows.map(([lv, w]) => `L${lv} ${hrs(w.hours)}`).join(', ')}; ${regWindows.every(([, w]) => w.ok) ? 'every approved window met' : 'a window is MISSED'}`, 'Integrated lifecycle'],
+		['Rod upgrades waiting for cash (integrated: every archetype, reference loop and bait/aquarium variants)', allDelays.every((d) => d === 0) ? 'none: every tier fishes from the step its level is reached' : `up to ${hrs(Math.max(...allDelays.filter((d) => d !== null)))}`, 'Affordability'],
+	]);
+
+	// Current -> Proposed.
+	const T = R.today;
+	const hist = Object.entries(R.combos.meanFishHistogram).sort((a, b) => Number(a[0]) - Number(b[0]));
+	const specialtyNet = Math.max(...R.specialties.map((s) => Math.abs(s.netCashVsBalanced - 1)));
+	const crateRow = (t) => `${R.crates[t - 1].name} (T${t}) ${usd(R.crates[t - 1].price)}`;
+	out['rods-current-proposed'] = mdTable(['Item', 'Current', 'Proposed', 'Rationale'], [
+		['Fish per cast (crafted)', `draws × per-draw: ${rng(T.crafted.fishPerCast, (x) => x)}. **${n0(R.combos.today.atCap15.count)} of ${n0(R.combos.total)} combinations (${pct(R.combos.today.atCap15.share)}) at the 15-fish cap**`, `The rod piece sets the mean: ${hist.map(([m]) => m).join(', ')} (variants included), on the framework chained multi-catch. **${n0(R.combos.atCeiling.count)} combinations (${pct(R.combos.atCeiling.share)}) at the ${R.combos.atCeiling.ceilingMean} ceiling**, all Lv ${rng(ceilingLv, (x) => x)}`, 'Approved direction (A-MULTICATCH). Removes the cliff.'],
+		['Level requirement', `10 × Σ "N count" (Lv ${rng(T.crafted.level, (x) => x)}). Bare-number draws cost no level: the best rod usable at Lv 20 lands ${R.combos.bestAtLevel[20].todayFishPerCast} fish, at Lv 30 ${R.combos.bestAtLevel[30].todayFishPerCast}`, `The highest part level (${listOf(PARAMS.partLevel, (x) => `Lv ${x}`)}); tier = that part's tier. Crafting and equipping need Lv ${PARAMS.craft.minLevel}. **Level cap:** a part performs at the best rarity the player has unlocked`, 'Part rarity matters and nothing bypasses its level. Existing rods need no gate or data change.'],
+		['Part stats', `\`PART_RARITY_STATS\`: the same bundle for every part of a rarity, summed; +${pct(T.quickFishingSpeed, 0)} speed per \`quick\``, 'Each slot has its own stat family, scaled by rarity and summed (slot table)', 'Rods differ by specialty, not volume.'],
+		['Same-rarity parts', 'Identical apart from legacy numbers', `${Object.keys(PARAMS.variants).length} named **side-grade variants**: net $/h within ±${(specialtyNet * 100).toFixed(1)}% of the balanced part (specialties table)`, 'Collecting variants is aspirational, not pay-to-win.'],
+		['Strong access', 'Union of part qualities: an all-Common rod is weak-only', `Every crafted rod catches ${PARAMS.craft.qualities.join(' + ')}`, 'The first crafted rod unlocks strong fish, as the gear path assumes.'],
+		['Durability', `Sum of part durabilities: ${rng(T.crafted.durability, n0)}`, `Rod-piece base × handle multiplier × variant. A matched set lasts ${minMax(Object.values(PARAMS.durability.lifeHours), (x) => x)} h of regular play (reference sets: ${refs.map((s) => n0(s.maxDurability)).join(' / ')})`, 'Upkeep is sized in hours of play.'],
+		['Repair cost', `10,000 × Σcount (${rng(T.crafted.repairCost, usd)}); ${T.crafted.maxRepairs} repairs, then destroyed. **Crafted-rod repair is broken (C1).**`, `By rod-piece rarity: ${R.slotTable.map((s) => usd(s.rod.repairCost)).join(' / ')} (Common → Lucky): ${pct(PARAMS.repair.upkeepShare, 0)} of what the matched set's durability earns at home. **Unlimited repairs.** A legacy \`destroyed\` crafted rod counts as broken`, 'Modest, predictable upkeep (decision 10); no forced re-purchase.'],
+		['Old Rod', `${n0(T.oldRod.maxDurability)} durability, ${usd(T.oldRod.repairCost)} repair, free replacement once destroyed; soft-lock at $0`, `**Unbreakable.** ${PARAMS.oldRod.qualities.map((q) => q[0].toUpperCase() + q.slice(1)).join(', ')} only, ${PARAMS.oldRod.meanFish.toFixed(1)} fish, no stats`, `Removes the free-replacement exploit, the soft-lock and a sink worth ${minMax(Object.values(R.upkeep.oldRodLegacyRepairShare), (x) => pct(x))} of Old Rod income.`],
+		['Fishing Crate', `${usd(T.fishingCrate.price)}; ${pct(T.fishingCrate.partShare, 0)} parts / ${pct(1 - T.fishingCrate.partShare, 0)} bait per slot; legacy table (a Rare+ part in ${pct(T.fishingCrate.rarePlusPartPerSlot)} of slots); duplicates \`${T.fishingCrate.duplicates}\``, `**T1 crate, ${usd(R.crates[0].price)}** (formula). Parts only, slot-balanced, slot 0 ≥ ${PARAMS.crates.tiers[1].guaranteed}, \`${PARAMS.crates.duplicates}\`; unlocks at Lv ${PARAMS.crates.tiers[1].unlockLevel}`, 'A progression purchase priced from stage income.'],
+		['Higher crates', 'none', `${[2, 3, 4, 5].map(crateRow).join(', ')}; T5 has pity. All formulas`, 'One progression purchase per tier, bought during the stage before it.'],
+		['Duplicate parts', 'Dead inventory', `**Salvage for cash** (salvage table); a crate's full salvage returns at most ${pct(Math.max(...asm.map((a) => a.salvageReturnPerCrate)))} of its price`, 'Duplicates are never worthless; no arbitrage.'],
+		['Existing crafted rods', 'Legacy capabilities drive draws and per-draw', 'Read-time converter: parts resolve, so the new rules apply to the same parts; stored durability grandfathered; no data rewrite', 'Non-destructive (decision 13).'],
+	]);
+
+	// Slot families.
+	out['rods-slots'] = mdTable(['Part rarity', 'Full effect at', 'Tier', 'Rod piece: mean fish (chance of +1)', 'Reel: Speed / Trophy', 'Hook: Rare Find / Luck', 'Handle: Durability × / Sell', 'Rod-piece durability base', 'Repair cost'], R.slotTable.map((s) => [
+		s.rarity, `Lv ${s.level}`, `T${s.tier}`, `${s.rod.meanFish.toFixed(2)} (${pct(s.rod.multiChance)})`,
+		`+${pct(s.reel.fishingSpeed, 0)} / +${pct(s.reel.trophyChance, 0)}`, `+${pct(s.hook.rareFind, 0)} / +${pct(s.hook.luck, 0)}`,
+		`×${s.handle.durabilityMult.toFixed(2)} / +${pct(s.handle.sellBonus, 0)}`, n0(s.rod.baseDurability), usd(s.rod.repairCost),
+	]));
+
+	// Specialties.
+	const statLabel = { fishingSpeed: 'Speed', rareFind: 'Rare Find', trophyChance: 'Trophy', luck: 'Luck', sellBonus: 'Sell' };
+	const sv = Object.entries(R.statValue).filter(([k]) => k !== 'biome');
+	out['rods-specialties'] = [
+		`Marginal value of each stat on the T3 reference set in ${R.statValue.biome} (\`report().statValue\`):`,
+		'',
+		mdTable(['Stat change', 'XP/h', '$/h'], sv.map(([k, v]) => {
+			const [stat, step] = k.split(' ');
+			return [`${statLabel[stat]} ${step}`, rel(1 + v.xp, 2), rel(1 + v.cash, 2)];
+		})),
+		'',
+		'Each variant against the balanced part of the same rarity, in that tier\'s home biome (`report().specialties`):',
+		'',
+		mdTable(['Part', 'Rarity', 'Variant', 'Biome', 'XP/h', '$/h', 'Net $/h after repairs', 'Giants', 'Legendary+', 'Rod life'], R.specialties.map((s) => [
+			s.part, s.rarity, `${s.variant} (${tilt(PARAMS.variants[s.part])})`, s.biome, rel(s.xpVsBalanced), rel(s.cashVsBalanced), rel(s.netCashVsBalanced),
+			rel(s.giantsVsBalanced), rel(s.legendaryPlusVsBalanced), Math.abs(s.lifeVsBalanced - 1) < 1e-9 ? '—' : rel(s.lifeVsBalanced),
+		])),
+	].join('\n');
+
+	// All combinations.
+	const counts = hist.map(([, c]) => c);
+	const todayHist = Object.entries(R.combos.today.fishPerCastHistogram).sort((a, b) => Number(a[0]) - Number(b[0]));
+	const pt = R.combos.perTier;
+	out['rods-combos'] = [
+		mdTable(['', 'Mean fish per cast (combinations)'], [
+			['Proposed', counts.every((c) => c === counts[0]) ? `${hist.map(([m]) => m).join(', ')} (${n0(counts[0])} each)` : hist.map(([m, c]) => `${m} (${n0(c)})`).join(', ')],
+			['Today', todayHist.map(([m, c]) => `${m} (${n0(c)})`).join(', ')],
+		]),
+		'',
+		mdTable(['Tier', 'Combos', 'Level', 'Home biome', 'Fish/cast (min–median–max)', 'XP/h', '$/h', '$/h vs reference set', 'Life (h, regular)', 'Upkeep at home', 'Today: level / fish per cast'], TIERS.map((t) => {
+			const p = pt[t];
+			return [`T${t}`, n0(p.combos), p.level, p.homeBiome, rng3(p.meanFish, (x) => x.toFixed(2)), rng(p.xpPerHour, n0), rng(p.cashPerHour, n0), rng(p.cashVsReference, (x) => pct(x, 0)), rng(p.lifeHoursRegular, (x) => x.toFixed(2)), rng(p.upkeepShareHome, (x) => pct(x)), `Lv ${rng(p.legacyLevel, (x) => x)} / ${rng(p.legacyFishPerCast, (x) => x)}`];
+		})),
+		'',
+		'Stat spread (min–max over each tier\'s combinations):',
+		'',
+		mdTable(['Tier', 'Rare Find', 'Luck', 'Trophy', 'Speed', 'Sell', 'P(3+ fish)'], TIERS.map((t) => {
+			const p = pt[t];
+			const f = (x) => String(+x.toFixed(3));
+			return [`T${t}`, rng(p.rareFind, f), rng(p.luck, f), rng(p.trophyChance, f), rng(p.fishingSpeed, f), rng(p.sellBonus, f), rng(p.jackpot3plus, (x) => pct(x))];
+		})),
+		'',
+		`- **Mixed rods are weaker than matched ones:** the weakest T4 combination earns ${pct(pt[4].cashVsReference.min, 0)} of the full Legendary set's $/h.`,
+		'- **No bypass** (`report().combos.bestAtLevel`): the best rod usable at each level.',
+		'',
+		mdTable(['Level', 'Today (fish per cast)', 'Proposed (mean fish)', 'Proposed best $/h (that level\'s biome)'], Object.entries(R.combos.bestAtLevel).map(([lv, b]) => [`Lv ${lv}`, b.todayFishPerCast, b.proposedMeanFish.toFixed(2), usd(b.proposedBestCashPerHour)])),
+	].join('\n');
+
+	// Gear path and hourly rates.
+	const biomes = Object.keys(R.rates[0].byBiome);
+	out['rods-gear-path'] = [
+		mdTable(['Step', 'Level', 'Crate unlock', 'Home biome', 'Fish/cast', 'P(3+)', 'P(5)', 'Cooldown', 'Rare Find / Luck / Trophy / Speed / Sell', 'Durability (h, regular)', 'Repair', 'Upkeep at home'], gp.map((s) => [
+			s.tier === 0 ? 'Old Rod' : `${tierName(s.tier)} ${setName(referenceSet(s.tier))}`, s.level, s.tier === 0 ? '—' : `Lv ${s.crateUnlockLevel}`, s.homeBiome, s.meanFish.toFixed(2), pct(s.jackpot3plus), pct(s.jackpot5, 2), `${(s.cooldownMs / 1000).toFixed(2)} s`,
+			s.tier === 0 ? 'none' : statsLine(s.stats), s.maxDurability ? `${n0(s.maxDurability)} (${hrs(s.lifeHoursRegular)})` : 'unbreakable', s.repairCost ? usd(s.repairCost) : '—', s.tier === 0 ? '—' : pct(s.upkeepShareHome),
+		])),
+		'',
+		`Hourly rates by biome (\`report().rates\`, normal profile, ${F.DESIGN_OVERHEAD_S} s overhead; **bold** = the tier's home biome):`,
+		'',
+		mdTable(['Step', 'XP/h', ...biomes.map((b) => `${b} $/h`)], R.rates.map((r) => {
+			const xp = Object.values(r.byBiome).map((x) => x.xpPerHour);
+			return [tierName(r.tier), minMax(xp, n0), ...biomes.map((b) => (gp[r.tier].homeBiome === b && r.tier > 0 ? `**${n0(r.byBiome[b].cashPerHour)}**` : n0(r.byBiome[b].cashPerHour)))];
+		})),
+	].join('\n');
+
+	// Upkeep.
+	const bIdx = (b) => biomes.indexOf(b);
+	const belowHome = refs.map((s) => R.rates[s.tier].byBiome[biomes[bIdx(s.homeBiome) - 1]].upkeepShare);
+	const oceanMax = Math.max(...refs.map((s) => R.rates[s.tier].byBiome.Ocean.upkeepShare));
+	const t4Ocean = R.rates[4].byBiome.Ocean;
+	out['rods-upkeep'] = [
+		mdTable(['Reference set', 'Repair', 'Every (regular play)', 'Repair = minutes of home income', ...biomes], R.upkeep.byTierHome.map((u) => [
+			`T${u.tier}`, usd(u.repairCost), hrs(u.lifeHoursRegular), u.repairCostInMinutesOfHomeIncome.toFixed(1),
+			...biomes.map((b) => (gp[u.tier].homeBiome === b ? `**${pct(R.rates[u.tier].byBiome[b].upkeepShare)}**` : pct(R.rates[u.tier].byBiome[b].upkeepShare))),
+		])),
+		'',
+		`- **One biome below home:** ${minMax(belowHome, (x) => pct(x))}. **High gear in Ocean:** up to ${pct(oceanMax)} of gross income; a T4 rod in Ocean still nets ${usd(t4Ocean.cashPerHour * (1 - t4Ocean.upkeepShare))}/h, ${((t4Ocean.cashPerHour * (1 - t4Ocean.upkeepShare)) / R.rates[0].byBiome.Ocean.cashPerHour).toFixed(1)}× the Old Rod (which costs nothing there).`,
+		`- **What the unbreakable Old Rod gives up:** today's repair (${usd(T.oldRod.repairCost)} per ${n0(T.oldRod.maxDurability)} fish) as a share of Old Rod income under the proposed value model: ${biomes.map((b) => `${b} ${pct(R.upkeep.oldRodLegacyRepairShare[b])}`).join(', ')}.`,
+	].join('\n');
+
+	// Crates.
+	const featured = R.crates[0].featured;
+	const pityText = (p) => (p ? Object.entries(p).map(([k, v]) => `${k}: soft ${v.softStart}, +${v.rampPerCast}/open, max +${v.maxBonus}, hard ${v.hard}`).join('; ') : '—');
+	const above = (t) => (t < TIERS.length ? lower(PARAMS.referenceRarity[t + 1]) : null);
+	out['rods-crates'] = [
+		`Every crate: ${PARAMS.crates.slots} slots, \`${PARAMS.crates.strategy}\` rolls, \`duplicates: '${PARAMS.crates.duplicates}'\`, a pool of \`types: [${Object.values(SLOTS).join(', ')}]\` with \`fish: false\`.`,
+		'',
+		`Slot-balancing \`featured\` groups (\`slotBalanceFeatured()\`): ${featured.map((g) => `**weight ${g.weight}:** ${g.names.join(', ')}`).join('; ')}.`,
+		'',
+		mdTable(['Tier', 'Crate', 'Unlock (shop)', 'rarityTable', 'rarityFloor', 'guaranteedSlots', 'Pity', 'Price'], R.crates.map((c) => [
+			`T${c.tier}`, `${c.name}${c.existingItem ? ' (existing item, redefined)' : ' (new)'}`, `Lv ${c.unlockLevel}`,
+			Object.entries(c.rarityTable).filter(([, w]) => w > 0).map(([r, w]) => `${r} ${w}`).join(', '), c.rarityFloor || '—',
+			c.guaranteedSlots.length ? c.guaranteedSlots.map((g) => `slot ${g.slot} ≥ ${g.minRarity}`).join(', ') : '—', pityText(c.pity), `**${usd(c.price)}**`,
+		])),
+		'',
+		'Chance per crate slot of a part above the tier\'s reference rarity (`crateSlotOdds`; T5 has none above it):',
+		'',
+		mdTable(['Crate', 'Rarity', 'Slot 0', 'Slot 1', 'Slot 2'], R.crates.filter((c) => above(c.tier)).map((c) => [c.name, above(c.tier), ...c.slotOdds.map((s) => pct(s.rarity[above(c.tier)] || 0))])),
+	].join('\n');
+
+	// Assembly.
+	const e1 = R.entryT1;
+	out['rods-assembly'] = [
+		mdTable(['Tier', 'Crate', 'Price', 'Stage before (biome, $/h)', 'Needs', 'E[crates]', 'Median', 'P90', 'E[cost]', 'Hours of stage income (P90)', 'Leftover parts', 'Salvage refund', 'Net after salvage'], asm.map((a) => {
+			const pity = R.crates[a.tier - 1].pity;
+			return [`T${a.tier}`, a.crate, usd(a.price), `${a.stageBiome}, ${usd(a.stageIncomePerHour)}`, a.needs.length === 4 && new Set(a.needs.map((x) => x.split(' ')[0])).size === 1 ? `4 × ${a.needs[0].split(' ')[0]}` : a.needs.join(', '),
+				a.expectedCrates.toFixed(2), a.medianCrates, `${a.p90Crates}${pity ? ` (hard pity: ${Object.values(pity)[0].hard})` : ''}`, usd(a.expectedCost), `${a.hoursOfStageIncome.toFixed(2)} (${a.p90HoursOfStageIncome.toFixed(2)})`,
+				a.leftoverParts.toFixed(1), usd(a.salvageRefund), usd(a.netCostAfterSalvage)];
+		})),
+		'',
+		`- **Budget T1** (a Common-or-better part in every slot, ${e1.meanFish.toFixed(2)} fish): ${e1.expectedCrates.toFixed(2)} crates (P90 ${e1.p90Crates}), ${usd(e1.expectedCost)}, ${e1.hoursOfStageIncome.toFixed(2)} h of stage income.`,
+		`- **Totals (T1–T5):** ${usd(asm.reduce((s, a) => s + a.expectedCost, 0))} of expected assemblies; salvaging every leftover returns ${usd(asm.reduce((s, a) => s + a.salvageRefund, 0))}.`,
+	].join('\n');
+
+	// Engine validation (recorded run).
+	const ev = R.engineValidation;
+	out['rods-engine-validation'] = [
+		mdTable(['Crate', 'Exact E[crates] (live)', 'Exact at the run', 'Engine mean ± SE', 'z', 'Completed sets'], ev.crates.map((c) => [
+			PARAMS.crates.tiers[c.tier].name, ev.exactNow[c.tier].toFixed(4), c.exactAtRun.toFixed(4), `${c.engine.toFixed(4)} ± ${c.se.toFixed(4)}`, (c.z < 0 ? '−' : '') + Math.abs(c.z).toFixed(2), n0(c.completions),
+		])),
+		'',
+		`Recorded run: ${ev.opens.toLocaleString('en-US')} opens per crate at framework ${ev.framework}; largest |z| ${Math.max(...ev.crates.map((c) => Math.abs(c.z))).toFixed(2)}. ${ev.crates.every((c) => Math.abs(ev.exactNow[c.tier] - c.exactAtRun) < 1e-4) ? 'The live exact values equal the values at the run, so the recorded engine sample still applies.' : '**The live exact values differ from the values at the run: rerun validateCratesWithEngine().**'}`,
+	].join('\n');
+
+	// Salvage.
+	out['rods-salvage'] = [
+		mdTable(['Rarity', ...RARITY_ORDER], [['Salvage value', ...RARITY_ORDER.map((r) => usd(R.salvage[r]))]]),
+		'',
+		mdTable(['Tier crate', 'Full-crate salvage (share of price)', 'Salvage refund per assembly', 'Net assembly cost reduction'], asm.map((a) => [`T${a.tier} ${a.crate}`, pct(a.salvageReturnPerCrate), usd(a.salvageRefund), pct(a.salvageRefund / a.expectedCost)])),
+	].join('\n');
+
+	// Legacy converter.
+	const lc = R.legacyConverter;
+	const S = lc.samples;
+	out['rods-converter'] = [
+		mdTable(['Converter calibration (all combinations)', 'Value'], [
+			['Legacy fingerprints / unique', `${n0(lc.signatures)} / ${n0(lc.uniqueSignatures)}`],
+			['Path B tier recovered exactly / lower / higher', `${pct(lc.signatureTierExact)} / ${pct(lc.signatureTierUnder)} / ${pct(lc.signatureTierOver)}`],
+			['Path B power over-estimated', pct(lc.signaturePowerOver)],
+			['Legacy max durability ÷ proposed (min–median–max)', rng3(lc.grandfathered.durabilityRatio, (x) => `${x}×`)],
+			['Upkeep at home with grandfathered durability (min–median–max)', rng3(lc.grandfathered.upkeepShareHome, (x) => pct(x))],
+		]),
+		'',
+		`Worked example (\`report().legacyConverter.samples\`): today's rod from ${S.stored.parts.join(' + ')}.`,
+		'',
+		mdTable(['', 'Today (stored)', `Proposed (Path A${S.pathA.tier === S.pathB.tier && S.pathA.meanFish === S.pathB.meanFish ? ' and Path B agree' : ''})`], [
+			['Capabilities', `\`${JSON.stringify(S.stored.capabilities)}\``, 'unchanged (read only)'],
+			['Level requirement', `Lv ${S.stored.legacyLevel}`, `Lv ${S.pathA.level} (T${S.pathA.tier})`],
+			['Fish per cast', S.stored.legacyFishPerCast, S.pathA.meanFish.toFixed(2)],
+			['Stats', 'none beyond the capabilities', `Rare Find ${pct(S.pathA.stats.rareFind, 0)}, Luck ${pct(S.pathA.stats.luck, 0)}, Trophy ${pct(S.pathA.stats.trophyChance, 0)}, Speed ${pct(S.pathA.stats.fishingSpeed, 0)}, Sell ${pct(S.pathA.stats.sellBonus, 0)}`],
+			['Durability', `${S.stored.durability}, \`${S.stored.state}\``, `kept (${n0(S.pathA.durability.max)} max), \`${S.pathA.state}\` and repairable`],
+			['Repair', `${usd(S.stored.legacyRepairCost)}, max ${T.crafted.maxRepairs}`, `${usd(S.pathA.repairCost)}, ${S.pathA.repairs}`],
+		]),
+		'',
+		`Level cap example: a Lv ${S.levelCap.playerLevel} player with a ${S.levelCap.rod} gets a ${Object.values(S.levelCap.performsAs)[0]}-set rod (${S.levelCap.meanFish.toFixed(2)} fish, ${statsLine(S.levelCap.stats)} Rare Find / Luck / Trophy / Speed / Sell); the rod still shows Lv ${S.levelCap.requirementShown}.`,
+	].join('\n');
+
+	// Integrated lifecycle.
+	const cell = (v, lv) => (v.reached[lv] ? `${hrs(v.reached[lv].hours)} (d${v.reached[lv].day})` : '—');
+	const milestoneLevels = Object.keys(reg.reached).map(Number).sort((a, b) => a - b);
+	const tierAtLevel = Object.fromEntries(TIERS.map((t) => [tierLevel(t), t]));
+	out['rods-lifecycle'] = [
+		mdTable(['Player', ...milestoneLevels.map((lv) => `Lv ${lv}${tierAtLevel[lv] ? ` (T${tierAtLevel[lv]})` : ''}`), 'Tier start after its level', 'Repairs / fishing income', 'Repairs / all income', 'Assemblies / all income', 'Salvage cash', 'Cash held at the stop (share of all income)'], PLAYERS.map((k) => {
+			const v = L.archetypes[k];
+			return [k === F.REFERENCE_ARCHETYPE ? `**${k}**` : k, ...milestoneLevels.map((lv) => cell(v, lv)), v.maxTierDelayHours === 0 ? '0 h (every tier)' : v.maxTierDelayHours === null ? 'a tier not reached' : `up to ${hrs(v.maxTierDelayHours)}`,
+				pct(v.totals.repairShare), pct(v.totals.repairShareOfIncome), pct(v.totals.crateShareOfIncome), usd(v.totals.salvage), `${usd(v.totals.finalMoney)} (${pct(v.totals.finalMoney / v.totals.income, 0)})`];
+		})),
+		'',
+		mdTable(['Regular player', ...regWindows.map(([lv]) => `Lv ${lv}`)], [
+			['Approved window', ...regWindows.map(([, w]) => `${w.window[0]}–${w.window[1]} h`)],
+			[`Integrated (framework ${R.frameworkVersion}, quartic ${R.curve.quartic})`, ...regWindows.map(([, w]) => `${hrs(w.hours)} ${w.ok ? '(in)' : '**(OUT)**'}`)],
+		]),
+	].join('\n');
+
+	// Affordability.
+	const delayCell = (d) => {
+		const late = TIERS.filter((t) => d[t] === null || d[t] > 0);
+		return late.length ? late.map((t) => (d[t] === null ? `T${t} after Lv ${F.LIFECYCLE.maxLevel}` : `T${t} +${d[t].toFixed(1)} h`)).join(', ') : 'none';
+	};
+	const shares = Object.keys(L.stressDelays[PLAYERS[0]]);
+	const variants = Object.keys(L.variantMaxDelay[PLAYERS[0]]);
+	out['rods-affordability'] = [
+		mdTable(['Tier', 'Stage (regular)', 'Hours in stage', 'Income earned in the stage (all sources)', 'of which fishing', 'E[assembly cost]', 'Share of stage income', 'Share of stage fishing income'], L.assemblyShareOfStage.filter((s) => s.stage).map((s) => [
+			`T${s.tier}`, s.stage, hrs(s.hours), usd(s.income), usd(s.fishing), usd(s.assemblyCost), pct(s.shareOfIncome), pct(s.shareOfFishing),
+		])),
+		'',
+		'When each assembly is bought (integrated reference loop; hours of play, gate level) and when the tier starts fishing:',
+		'',
+		mdTable(['Player', ...TIERS.map((t) => `T${t} bought → fishing`)], PLAYERS.map((k) => {
+			const v = L.archetypes[k];
+			return [k, ...TIERS.map((t) => (v.bought[t] && v.upgrades[t] ? `${hrs(v.bought[t].hours)} (Lv ${v.bought[t].level}) → ${hrs(v.upgrades[t].hours)}` : '—'))];
+		})),
+		'',
+		'Longest wait between reaching a tier\'s level and fishing it, with the optional variants (integrate.run `variant`, every other system as in the reference loop):',
+		'',
+		mdTable(['Player', ...variants], PLAYERS.map((k) => [k, ...variants.map((n) => {
+			const d = L.variantMaxDelay[k][n];
+			return d === null ? 'a tier not reached' : d === 0 ? 'none' : hrs(d);
+		})])),
+		'',
+		'Stress probe: the reference loop plus a share of every step\'s fishing income spent on purchases outside the model; rod upgrades that then wait for cash:',
+		'',
+		mdTable(['Player', ...shares.map((s) => `${pct(Number(s), 0)} of fishing income`)], PLAYERS.map((k) => [k, ...shares.map((s) => delayCell(L.stressDelays[k][s]))])),
+	].join('\n');
+
+	// Parity record.
+	const P = R.integration.parity;
+	out['rods-parity'] = mdTable(['Parity record (constant; the old loop is deleted)', 'Value'], [
+		['Source', `\`validateSystem()\` at commit ${P.commit} (framework ${P.framework})`],
+		['Method', P.method],
+		['Cases', P.cases],
+		['Max relative difference (tolerance)', `${pct(P.maxRelativeDifference, 2)} (${pct(P.tolerance, 1)}); worst: ${P.worst}`],
+		['Milestones on the same step', P.exactMilestones],
+		['Largest tier-start shift', `${P.maxEquipShiftSteps} steps`],
+		['Replay with the old equip timing', `${P.replay.exactMilestones} milestones, max difference ${pct(P.replay.maxRelativeDifference, 0)}: ${P.replay.exact ? 'exact' : 'not exact'}`],
+		['Cause of every difference', P.cause],
+	]);
+
+	// Decisions for approval.
+	out['rods-decisions'] = mdTable(['ID', 'Proposed decision', 'Modelled', 'Alternatives', 'Why', 'Record = model'], DECISIONS.map((d) => [
+		`\`${d.id}\``, d.title, typeof d.modelled === 'string' ? d.modelled : `\`${JSON.stringify(d.modelled)}\``, d.alternatives.join('; '), d.why,
+		d.get ? (JSON.stringify(d.get()) === JSON.stringify(d.expected) ? 'yes' : '**NO**') : 'n/a (not a model value)',
+	]).map((row) => row.map((c) => String(c).replace(/\|/g, '\\|')))) + `\n\nStatus of every entry: \`${[...new Set(DECISIONS.map((d) => d.status))].join(', ')}\`. Only the user approves; \`decisions.js\` joins these to the Phase 5B registry and \`check-shared.js\` verifies each record against the model.`;
+
+	return out;
+}
+
 module.exports = {
-	PARAMS, RARITY_ORDER, SLOTS, CATALOG, ARCHETYPES, TARGETS,
+	PARAMS, RARITY_ORDER, SLOTS, CATALOG, ARCHETYPES, TARGETS, SYSTEM_DEFAULTS, SYSTEM_PARITY, ENGINE_VALIDATION, DECISIONS,
 	tierLevel, homeBiome, stageBiome, capRarity, partProfile, matchedSet, referenceSet, performance, craftRod, oldRod,
 	rodOutcome, rodHourly, upkeepShare, baseDurability, repairCostFor,
 	legacyCombine, legacyCraft, verifyLegacyParity, legacySignature, convertLegacyRod, evaluateAllCombos,
 	crateDefinition, crateDefinitions, crateSlotOdds, openOutcomes, cratesDistribution, validateCratesWithEngine, cratePrice, stageIncome, assembly, salvageValue, slotBalanceFeatured,
-	gearPath, lifecycle, system, validateSystem, report,
+	gearPath, assemblyPlan, lifecycle, system, report, markdownTables,
 };
 
 if (require.main === module) {

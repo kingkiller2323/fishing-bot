@@ -1,94 +1,60 @@
-// Phase 5B subsystem: WORLD. Biome income ladder, biome PERMITS, Mountain Stream (Lv 60, the first
-// expansion biome) and the post-50 curve. ANALYSIS ONLY: nothing here touches the live game, src/ or
-// production data.
+// Phase 5B subsystem: WORLD. Biome income ladder, biome PERMITS, Mountain Stream (the first expansion biome)
+// and the post-50 curve. ANALYSIS ONLY: nothing here touches the live game, src/ or production data.
 //
-// Every economic number is computed at runtime from the shared framework (./framework.js, which
-// re-exports assumptions.js): archetypes, reference archetype, lifecycle step/milestones, daily XP,
-// biome levels/order, gear path, curve, value model and multi-catch all come from F and are never copied
-// here. Rod progression costs and upkeep come from ./rods.js (assembly(), crate unlock levels, repair
-// cost / durability of the reference sets); rods.js is NEVER read as a gear source (R3): income and XP
-// always come from F.gearPath() (since 5b.3 that IS the designed rods path, through the framework). Only the
-// design parameters in PARAMS are hand-set, and permit prices are a formula of expected stage income, so a
-// framework version bump regenerates every figure.
+// Framework 5b.4. The world is a SYSTEM on the shared lifecycle core (lifecycle.js): integrate.js composes
+// system() as 'world' in the REFERENCE core loop (rods + world + quests + streak + buffs). This module steps no
+// time itself: every lifecycle-derived number (stage hours and so permit prices, time to afford, budget, level
+// times, the 50 -> 60 stage) comes from integrate.run / lifecycle.simulate with the designed systems (CONFIGS).
+// Per-cast figures (value ladder, Mountain Stream ladder) come from F.castOutcome / F.hourly. Shared values come
+// from ./framework.js (which re-exports assumptions.js) and are never copied here; the only hand-set numbers are
+// the design parameters in PARAMS. Every number table of docs/economy/5b/world.md is generated from
+// markdownTables() by render-docs.js.
 //
-//   node -e "require('./scripts/economy/5b/world.js').report()"      (returns the report object)
-//   node scripts/economy/5b/world.js                                   (prints it as JSON)
+//   node scripts/economy/5b/world.js                 (prints report() as JSON)
+//   node scripts/economy/5b/render-docs.js           (regenerates the doc's tables)
 //
 // Exports (pure and synchronous; no database, no randomness):
-//   PARAMS                   frozen design parameters: permit price rule (stage share), purchase schedule,
-//                            time-to-afford target, Mountain Stream species ladder, expansion sketch
-//   gearStep(step)           a gear-path step as castOutcome input ({qualities, stats, multiChance})
-//   biomeOutcome(biome, step), biomeHourly(biome, step, overheadS)
-//                            F.castOutcome / F.hourly for any biome incl. the PROPOSED Mountain Stream
-//                            ladder (live biomes go straight to F; Mountain Stream uses ladderOutcome)
-//   valueTable(path)         $/fish, $/h, XP/h per live biome for every step of a gear path (weak-only
-//                            and weak+strong access), plus strong premium per biome
-//   monotonicity(path)       checks: income rises with biome at every tier, and with tier in every biome
-//   stageLadder(path)        "home" income per biome (the tier typically held there) and step ratios
-//   ladderSpecies(), currentMountainStream(), liveSpecies(biome)
-//                            species lists in catalog shape (proposed Mountain Stream ladder, today's 3
-//                            salmon, a live biome's catalog fish) with their framework expected value
-//   ladderDraw(species, qualities, table, {weather})
-//                            per-draw distribution over a species list: exact mirror of
-//                            lib/catalog-model.drawDistribution (checked by mirrorParity())
-//   ladderOutcome(species, g, {weather})
-//                            F.castOutcome over a species list (same aggregation as the framework)
-//   engineCatch(species, qualities, table, {weather})
-//                            probability that one draw lands a catch / a fish in the REAL engine (re-rolls,
-//                            fallback, NO_CATCH): exact for biomes without a year-round fallback species
-//   mirrorParity()           ladderOutcome == F.castOutcome for every live biome x gear step (max rel. error)
-//   mountainStream()         proposed ladder summary: counts, per-weather premium, $/fish and $/h by tier,
-//                            step over Swamp, BIOME_VALUE rule (band check, requested value), today's
-//                            3-salmon biome in the real engine
-//   lifecycle(archetype, opts)
-//                            curve.js-style lifecycle (same XP stepping) with rods bought on schedule from
-//                            rods.assembly() costs, permits bought when due, biome = highest biome with
-//                            level AND permit. opts: { permits, prices, schedule 'rod-first'|'permit-first',
-//                            purchase 'rods'|'curve', otherSpendShare, extraCashPerDay(L, rates, arch),
-//                            maxLevel, path, expansion (Mountain Stream live), grandfathered }
-//   referenceStages({path}) stage hours / $ per h / expected earnings of the reference player per biome
-//   permitPrice(biome, {share, path})
-//                            INTEGRATOR ENTRY POINT: one-time permit price for a biome (0 for Ocean);
-//                            share/path overrides are for sensitivity only
-//   permitTable()            INTEGRATOR ENTRY POINT: every permit with its formula inputs, payback, and
-//                            simulated time-to-afford per archetype (lifecycle delay and standalone hours)
-//   timeToAfford(opts)       per archetype and permit: level reached, permit bought, delay (h, sessions)
-//   shareSweep()             max permit delay per archetype for alternative stage shares
-//   budget()                 lifecycle spend split (upkeep / rods / permits / saved) per archetype
+//   PARAMS                   frozen design parameters: permit price rule (stage share), time-to-afford target,
+//                            sensitivity sets, Mountain Stream species ladder, expansion sketch
+//   DECISIONS                this design's PROPOSED decisions (decisions.js shape; joined into its registry)
+//   system(opts)             the world as a lifecycle.js system (integrate.js 'world'): canFish = permit held
+//                            (live biomes only), goals = permits due by gate level ('progression')
+//   permitPriority(biome, state, ctx)
+//                            the design's due-level purchase order against the pending rod tier
+//   permitSummary(result)    per permit from any simulate() result that ran system(): level reached, bought,
+//                            delay (hours, sessions), money held at the level / price
+//   CONFIGS, lifecycle(archetype, opts)
+//                            one integrated lifecycle with the world system (reference loop or a stress
+//                            configuration); returns the simulate() result, permitSummary() and rod equip times
+//   referenceStages()        the reference player's stages (integrated, no permits): hours, stage $/h, earnings
+//   permitPrice(biome, {share}), permitPriceMap(share)
+//                            INTEGRATOR ENTRY POINT: one-time permit prices (0 for Ocean)
+//   permitTable()            every permit: formula inputs, price, payback, standalone and integrated time to afford
+//   timeToAfford({config, share}), sensitivity(), shareSweep(), budget(), levelTimes()
 //   accessibleBiomes(level, permits, {biomes}), canFish(level, permits, biome)
-//                            the access rule the engine will use: level (gate level) AND permit
+//                            the access rule the engine will use: gate level AND permit
 //   grandfatheredPermits(user, {now})
 //                            additive migration rule: permits a legacy account receives (pure)
-//   postFifty()              L50 -> L60 hours/days per archetype, per-level hours, the 50-60 stage budget,
-//                            and post-60 pacing with Mountain Stream live (sketch to Lv 100)
+//   gearStep, biomeOutcome, biomeHourly, valueTable, monotonicity, stageLadder
+//                            the value model per biome and gear step (F.castOutcome; Mountain Stream via the ladder)
+//   ladderSpecies, currentMountainStream, liveSpecies, ladderDraw, ladderOutcome, engineCatch, mirrorParity,
+//   mountainStream()         the proposed Mountain Stream ladder, today's 3-salmon biome in the real engine, and
+//                            the BIOME_VALUE band check (decisions.js P-MS-VALUE)
+//   postFifty()              L50 -> L60 on the integrated core; post-60 sketch from F.xpForLevel and the
+//                            integrated XP rate (outside the integrated model: Mountain Stream is not live)
 //   expansionSketch()        Deep Sea / Arctic / Abyss placement (indicative levels, value, permit)
-//   replicationCheck()       lifecycle(purchase 'curve', no permits, F.PROVISIONAL_GEAR_PATH) reproduces
-//                            docs/economy/5b/curve.json
-//   system(opts)             SHARED LIFECYCLE CORE (framework 5b.3; integrate.js 'world'): a fresh lifecycle.js
-//                            system per call: canFish = permit held (live biomes only), goals = permits due
-//                            by gate level ('progression', item 'permit:<biome>'). opts: { permits, prices,
-//                            schedule, priority, expansion, grandfatheredLevel, grandfathered }
-//   permitPriority(biome, state, ctx), permitSavings(state, ctx, priority)
-//                            the design's due-level purchase order against rods; money kept for the next permit
-//   permitSummary(result)    time to afford per permit from an LC.simulate() result that ran system()
-//   scheduledRodsBaseline()  VALIDATION ONLY: lifecycle()'s rod purchases and repairs as a lifecycle.js system
-//   validateSystem()         system() on the core vs lifecycle() for every archetype and configuration, permit
-//                            prices from the core's stage hours, curve.json replication (cached)
 //   today()                  today's measured Old Rod $/fish per biome (docs/economy/measurements.json)
-//   checks()                 design-target checks (pass/fail; the Mountain Stream value check is
-//                            non-blocking and raises a framework change request when it misses)
-//   report()                 every key number of docs/economy/5b/world.md, computed (cached), with
-//                            ...F.stamp() and report().integration (the system contract + validateSystem()).
+//   checks(), report(), markdownTables()
+//   RETIRED_LOOP_PARITY      the recorded parity of system() with the deleted private loop (commit a83b5f0)
 const F = require('./framework');
-// The shared lifecycle core (framework 5b.3): system() plugs the world into it.
+// The shared lifecycle core and the integrator (the only way this module runs a lifecycle).
 const LC = require('./lifecycle');
-// Rod PRICES and UPKEEP only (never a gear source; R3): assembly(t), crate unlock levels, craftRod(
-// referenceSet(t)).repairCost / maxDurability; system() for the informational composition in validateSystem().
-const rods = require('./rods');
+const I = require('./integrate');
 const { FISH, ENV, LUCKY_ITEMS, LUCKY_ITEM_SHARE, drawDistribution } = require('../lib/catalog-model');
 const { RARITIES, levelForXp: legacyLevelForXp } = require('../../../src/engine/balance');
 const { MAX_DRAW_ATTEMPTS } = require('../../../src/engine/cast');
-const CURVE_JSON = require('../../../docs/economy/5b/curve.json');
+// R1's authoritative record (curve.js integrated): checks() confirms the reference loop still reproduces it.
+const CURVE_INTEGRATED = require('../../../docs/economy/5b/curve-integrated.json');
 const MEASUREMENTS = require('../../../docs/economy/measurements.json');
 
 const deepFreeze = (o) => {
@@ -104,9 +70,9 @@ const PARAMS = deepFreeze({
 		// PRICE RULE (permitPrice): permit(k) = stageShare x E(k), rounded to priceSigDigits significant
 		// digits, where E(k) is the expected fish income of the reference player (F.REFERENCE_ARCHETYPE)
 		// over the stage before biome k: the hours of play from the previous biome's level to biome k's
-		// level (lifecycle() with no permits) x the $/h of the previous biome with the gear typically held
-		// there (F.typicalTier), at the reference cadence. Equivalently: H(k) = stageShare x stage hours of
-		// the income the player is earning right before the level.
+		// level (the integrated reference loop without permits: referenceStages()) x the $/h of the previous
+		// biome with the gear typically held there (F.typicalTier), at the reference cadence. Equivalently:
+		// H(k) = stageShare x stage hours of the income the player is earning right before the level.
 		stageShare: 0.1,
 		priceSigDigits: 2,
 		// Biomes that never need a permit (the starting biome).
@@ -116,14 +82,15 @@ const PARAMS = deepFreeze({
 		// previous biome's permit (each is an independent milestone).
 		requiresPrevious: false,
 	},
-	// Purchase schedule of the lifecycle model. Goals (the next rod tier from its crate unlock level, the
-	// next permit from the previous biome's level) are funded in order of the level they are due at; on a
-	// tie the rod goes first ('rod-first', conservative for permits). 'permit-first' is reported as the
-	// alternative so the rod delay it would cause is visible.
+	// Purchase order of a permit against the pending rod tier on the shared core (permitPriority()): goals
+	// are funded in order of the level they are due at (a permit at its biome's level, a rod tier at its
+	// tier level); on a tie the rod goes first ('rod-first', conservative for permits). 'permit-first' is
+	// reported as the alternative (CONFIGS.permitFirst).
 	schedule: { tieBreak: 'rod-first' },
 	// Time-to-afford design target: the permit is owned within this many of the archetype's daily
-	// sessions (F.ARCHETYPES[a].minutesPerDay) after the level is reached, with rods bought on schedule
-	// and fish income only (no quest/streak cash, no bait).
+	// sessions (F.ARCHETYPES[a].minutesPerDay) after the level is reached, with rods bought by
+	// rods.system(). checks() holds it on the integrated reference loop AND on fish income alone (quests,
+	// streak and buffs excluded), with and without other spending (CONFIGS).
 	targets: { maxDelaySessions: 1, referenceMaxDelaySessions: 0 },
 	sensitivity: {
 		shareSweep: [0.06, 0.08, 0.1, 0.12, 0.15, 0.2],
@@ -169,7 +136,8 @@ const PARAMS = deepFreeze({
 		// BIOME_VALUE rule: Mountain Stream's same-tier income step over Swamp (endgame tier) must not be an
 		// outlier of the live ladder: it must lie inside [min, max] of the live same-tier steps after the
 		// starter jump (River->Lake ... Coast->Swamp). Otherwise a framework change is requested for the value
-		// that puts it at their mean: round(BIOME_VALUE x mean / actual) ($/h is linear in BIOME_VALUE).
+		// that puts it at their mean: round(BIOME_VALUE x mean / actual) ($/h is linear in BIOME_VALUE). Applied
+		// at 5b.3 (143 -> 149); the value itself is the framework-level proposal decisions.js P-MS-VALUE.
 		valueRule: 'inside the live late-ladder same-tier step band; request the mean-step value otherwise',
 	},
 	// Post-60 world (sketch only; nothing is designed or implemented). Levels are indicative placements
@@ -180,8 +148,7 @@ const PARAMS = deepFreeze({
 		{ biome: 'Abyss', level: 90, water: 'saltwater', identity: 'endgame, luck-driven; highest value and highest costs' },
 	],
 	priceSigDigits: 2,
-	// Lifecycle safety cap (hours of play) and the post-60 sketch horizon.
-	hoursCap: 20000,
+	// The post-60 sketch horizon (postFifty(), outside the integrated model).
 	sketchMaxLevel: 100,
 });
 
@@ -200,6 +167,17 @@ const sessionH = (a) => arch(a).minutesPerDay / 60;
 const prevBiome = (b) => F.BIOME_ORDER[F.BIOME_ORDER.indexOf(b) - 1] ?? null;
 const isFree = (b) => PARAMS.permits.free.includes(b);
 const PERMIT_BIOMES = F.BIOME_ORDER.filter((b) => !isFree(b));
+// The world system's name (integrate.js registry key) and its ledger spend item per permit.
+const SYSTEM_NAME = 'world';
+const permitItem = (biome) => `permit:${biome}`;
+
+// Markdown formatting (markdownTables()).
+const fmtNum = (x, d = 0) => (x === null || x === undefined || !Number.isFinite(x) ? '—' : Number(x).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }));
+const fmtMoney = (x) => (x === null || x === undefined ? '—' : `$${fmtNum(x)}`);
+const fmtPct = (x, d = 1) => (x === null || x === undefined ? '—' : `${(x * 100).toFixed(d)}%`);
+const fmtX = (x, d = 2) => (x === null || x === undefined || !Number.isFinite(x) ? '—' : `×${x.toFixed(d)}`);
+const fmtH = (x, d = 2) => (x === null || x === undefined ? '—' : Number.isFinite(x) ? `${x.toFixed(d)} h` : 'not bought');
+const mdTable = (head, rows) => [`| ${head.join(' | ')} |`, `| ${head.map(() => '---').join(' | ')} |`, ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');
 
 /** A gear-path step as castOutcome input. Provisional steps carry meanFish only; rods steps carry multiChance. */
 const gearStep = (step) => ({ qualities: step.qualities, stats: step.stats, multiChance: step.multiChance ?? F.chanceForMean(step.meanFish) });
@@ -475,247 +453,177 @@ function stageLadder(path = F.gearPath(), biomes = [...F.LIVE_BIOMES, MS]) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Rod progression costs and upkeep (rods.js prices; never its gear path).
-const rodCostCache = new Map();
-const rodCost = (tier) => {
-	if (!rodCostCache.has(tier)) rodCostCache.set(tier, rods.assembly(tier).expectedCost);
-	return rodCostCache.get(tier);
-};
-const rodUnlock = (tier) => rods.PARAMS.crates.tiers[tier].unlockLevel;
-const upkeepCache = new Map();
-/** Repair $ per fish of the tier's reference set (0 for the unbreakable Old Rod). */
-function upkeepPerFish(tier) {
-	if (!tier) return 0;
-	if (!upkeepCache.has(tier)) {
-		const rod = rods.craftRod(rods.referenceSet(tier));
-		upkeepCache.set(tier, rod.repairCost / rod.maxDurability);
-	}
-	return upkeepCache.get(tier);
-}
+// Rod figures read from the shared gear path (F.gearPath(), the rods design since 5b.3): the expected assembly
+// cost of a tier and the repair $ per fish of its reference set (0 for the unbreakable Old Rod).
+const assemblyCost = (step) => step?.assembly?.expectedCost ?? null;
+const upkeepPerFish = (step) => (step && step.maxDurability && step.repairCost ? step.repairCost / step.maxDurability : 0);
 
 // ---------------------------------------------------------------------------------------------
-// Lifecycle: the curve.js XP stepping (F.LIFECYCLE.stepH, F.DAILY.xpPerLevel x level at each day
-// boundary), with money: fish income - rod upkeep - other spend, rods bought on schedule and permits.
-const rateCache = new Map();
-function rates(biome, step, overheadS) {
-	const key = `${biome}|${step.tier}|${JSON.stringify(gearStep(step))}|${overheadS}`;
-	if (!rateCache.has(key)) {
-		const h = biomeHourly(biome, step, overheadS);
-		rateCache.set(key, { ...h, upkeep: upkeepPerFish(step.tier) * h.fish });
-	}
-	return rateCache.get(key);
+// The world on the INTEGRATED lifecycle. Every run below composes integrate.js systems on the shared core;
+// nothing in this module steps time.
+
+/** Stress only (not a design): spends `share` of each step's fish income outside the modelled systems. */
+function otherSpendSystem(share) {
+	return {
+		name: 'otherSpend',
+		onCasts(state, ctx, { rates }) {
+			if (share > 0) ctx.spend('optional', 'otherSpend', share * rates.cash);
+		},
+	};
 }
 
-function lifecycle(archetype, opts = {}) {
-	const a = arch(archetype);
-	const {
-		permits = true,
-		prices = null,
-		schedule = PARAMS.schedule.tieBreak,
-		purchase = 'rods',
-		otherSpendShare = 0,
-		extraCashPerDay = null,
-		maxLevel = F.LIFECYCLE.maxLevel,
-		stepH = F.LIFECYCLE.stepH,
-		path = F.gearPath(),
-		expansion = false,
-		grandfathered = [],
-	} = opts;
-	const biomes = expansion ? F.BIOME_ORDER : F.LIVE_BIOMES;
-	const priceOf = permits ? (prices || permitPriceMap()) : null;
-	const owned = new Set(permits ? [...PARAMS.permits.free, ...grandfathered] : biomes);
-	const queue = biomes.filter((b) => !owned.has(b));
-	const dayH = a.minutesPerDay / 60;
-	let xp = 0;
-	let h = 0;
-	let money = 0;
-	let idx = 0;
-	let progress = 0;
-	let saving = 0;
-	let lastLevel = 1;
-	const levelAt = {};
-	const permitLog = {};
-	const rodLog = {};
-	const totals = { gross: 0, upkeep: 0, rods: 0, permits: 0, other: 0, extra: 0, xpFishing: 0, xpDaily: 0 };
-	const band = (L) => [...F.BIOME_ORDER].reverse().find((b) => L >= F.BIOME_LEVEL[b]);
-	const stageGross = {};
-	const moneyAtLevel = {};
-	const affordableAt = {};
-	// Ledger totals and money at the end of each play day (validateSystem() compares them with the core).
-	const dayEnds = [];
-	// Still waiting for a permit or a rod tier that is due by maxLevel (the run continues until bought).
-	const pending = () => (priceOf ? queue.some((b) => !owned.has(b) && F.BIOME_LEVEL[b] <= maxLevel) : false)
-		|| (purchase === 'rods' && path.slice(idx + 1).some((s) => s.level <= maxLevel));
-	while (h < PARAMS.hoursCap) {
-		const L = F.levelForXp(xp);
-		const cur = path[idx];
-		const biome = [...biomes].reverse().find((b) => L >= F.BIOME_LEVEL[b] && owned.has(b));
-		const r = rates(biome, cur, a.overheadS);
-		const income = r.cash * stepH;
-		totals.gross += income;
-		totals.upkeep += r.upkeep * stepH;
-		totals.other += income * otherSpendShare;
-		stageGross[band(L)] = (stageGross[band(L)] || 0) + income;
-		money += income * (1 - otherSpendShare) - r.upkeep * stepH;
-		const next = path[idx + 1];
-		if (purchase === 'curve') {
-			// curve.js: save F.PURCHASE.saveHours of current income after reaching the tier's level.
-			if (next && L >= next.level) {
-				saving += r.cash * stepH;
-				if (saving >= r.cash * F.PURCHASE.saveHours) {
-					idx++;
-					saving = 0;
-					rodLog[next.tier] = { equippedH: h, level: L };
-				}
-			}
+const FISH_ONLY = ['quests', 'streak', 'buffs'];
+/** The integrated configurations the report runs (lifecycle()'s `config`). */
+const CONFIGS = deepFreeze({
+	reference: { label: 'Reference loop (rods + world + quests + streak + buffs), rod first on a tie', exclude: [] },
+	permitFirst: { label: 'Reference loop, permit first on a tie', exclude: [], world: { schedule: 'permit-first' } },
+	withSinks: { label: 'Reference loop + the designed optional sinks (cash bait, aquarium)', exclude: [], variant: { bait: 'cash', aquarium: true } },
+	fishOnly: { label: 'Fish income only (quests, streak and buffs excluded)', exclude: FISH_ONLY },
+	...Object.fromEntries(PARAMS.sensitivity.otherSpendShares.map((s) => [`fishOnlyOther${s}`, {
+		label: `Fish income only, ${fmtPct(s, 0)} of it spent elsewhere as earned`, exclude: FISH_ONLY, otherSpendShare: s,
+	}])),
+});
+/** The harshest configuration: fish income only with the largest other-spend share. */
+const STRESS = `fishOnlyOther${Math.max(...PARAMS.sensitivity.otherSpendShares)}`;
+/** Runs stop one level past the last permit's level, so a permit bought after that level's session is measured. */
+const HORIZON = F.LIFECYCLE.maxLevel + 1;
+const allLevels = (to) => Array.from({ length: to }, (_, i) => i + 1);
+
+const runCache = new Map();
+/** One cached integrated run: the configuration's systems (integrate.js) with these world options. */
+function integratedRun(archetype, { config = 'reference', world = {}, stopAtLevel = HORIZON } = {}) {
+	const cfg = CONFIGS[config];
+	if (!cfg) throw new Error(`world: unknown configuration ${config}`);
+	const worldOpts = { ...(cfg.world || {}), ...world };
+	const key = JSON.stringify([archetype, config, worldOpts, stopAtLevel]);
+	if (!runCache.has(key)) {
+		// Every level is a milestone: per-level hours and the money held on reaching each biome's level.
+		const common = { archetype, stopAtLevel, milestones: allLevels(stopAtLevel) };
+		let result;
+		if (cfg.otherSpendShare) {
+			// integrate.run composes registered systems only: the same composition plus the stress system.
+			const systems = I.REFERENCE.filter((n) => !cfg.exclude.includes(n)).map((n) => I.systemOf(n, n === SYSTEM_NAME ? worldOpts : {}));
+			result = { ...LC.simulate({ ...common, systems: [...systems, otherSpendSystem(cfg.otherSpendShare)] }), systems: [...I.REFERENCE.filter((n) => !cfg.exclude.includes(n)), 'otherSpend'], ...F.stamp() };
 		}
 		else {
-			const goals = [];
-			if (next && L >= rodUnlock(next.tier)) goals.push({ kind: 'rod', due: next.level });
-			const np = priceOf ? queue.find((b) => !owned.has(b)) : null;
-			if (np && L >= F.BIOME_LEVEL[prevBiome(np)]) goals.push({ kind: 'permit', due: F.BIOME_LEVEL[np], biome: np });
-			const first = schedule === 'permit-first' ? 'permit' : 'rod';
-			goals.sort((x, y) => x.due - y.due || (x.kind === first ? -1 : 1));
-			let avail = money;
-			for (const g of goals) {
-				if (g.kind === 'rod') {
-					const pay = Math.max(0, Math.min(avail, rodCost(next.tier) - progress));
-					progress += pay;
-					money -= pay;
-					avail -= pay;
-					totals.rods += pay;
-				}
-				else if (L >= g.due && avail >= priceOf[g.biome]) {
-					if (moneyAtLevel[g.biome] === undefined) moneyAtLevel[g.biome] = avail;
-					if (affordableAt[g.biome] === undefined) affordableAt[g.biome] = h;
-					money -= priceOf[g.biome];
-					avail -= priceOf[g.biome];
-					totals.permits += priceOf[g.biome];
-					owned.add(g.biome);
-					permitLog[g.biome] = { boughtH: h, level: L };
-				}
-				else {
-					if (L >= g.due && moneyAtLevel[g.biome] === undefined) moneyAtLevel[g.biome] = avail;
-					// First moment the money set aside after earlier-due goals covers the permit.
-					if (avail >= priceOf[g.biome] && affordableAt[g.biome] === undefined) affordableAt[g.biome] = h;
-					avail -= Math.min(avail, priceOf[g.biome]);
-				}
-			}
-			if (next && progress >= rodCost(next.tier) - 1e-6 && L >= next.level) {
-				idx++;
-				progress = 0;
-				rodLog[next.tier] = { equippedH: h, level: L };
-			}
+			result = I.run({ ...common, exclude: cfg.exclude, variant: cfg.variant || {}, systemOpts: { [SYSTEM_NAME]: worldOpts } });
 		}
-		xp += r.xp * stepH;
-		totals.xpFishing += r.xp * stepH;
-		const before = h;
-		h += stepH;
-		if (Math.floor(h / dayH) !== Math.floor(before / dayH)) {
-			xp += F.DAILY.xpPerLevel * L;
-			totals.xpDaily += F.DAILY.xpPerLevel * L;
-			if (extraCashPerDay) {
-				const c = extraCashPerDay(L, r, a);
-				money += c;
-				totals.extra += c;
-			}
-			dayEnds.push({ day: Math.floor(h / dayH), h, ...totals, money });
-		}
-		const L2 = F.levelForXp(xp);
-		for (let k = lastLevel + 1; k <= L2; k++) levelAt[k] = h;
-		lastLevel = Math.max(lastLevel, L2);
-		if (L2 >= maxLevel && (purchase === 'curve' || !pending())) break;
+		runCache.set(key, result);
 	}
-	const day = (x) => Math.max(1, Math.ceil(x / dayH - 1e-9));
-	const at = (L) => (L <= 1 ? 0 : levelAt[L]);
-	const permitsOut = Object.fromEntries(queue.filter((b) => F.BIOME_LEVEL[b] <= maxLevel).map((b) => {
-		const reachedH = at(F.BIOME_LEVEL[b]);
-		const bought = permitLog[b];
-		const delayH = bought && reachedH !== undefined ? Math.max(0, bought.boughtH - reachedH) : null;
-		return [b, {
-			level: F.BIOME_LEVEL[b], price: priceOf ? priceOf[b] : 0,
-			reachedH: reachedH === undefined ? null : round(reachedH), reachedDay: reachedH === undefined ? null : day(reachedH),
-			boughtH: bought ? round(bought.boughtH) : null, boughtDay: bought ? day(bought.boughtH) : null,
-			delayH: delayH === null ? null : round(delayH), delaySessions: delayH === null ? null : round(delayH / dayH),
-			coverageAtLevel: moneyAtLevel[b] === undefined || !priceOf ? null : round(moneyAtLevel[b] / priceOf[b]),
-			// Hours of play before the level at which the set-aside money first covered the price (0 = only at
-			// the level or later; see delayH).
-			affordableBeforeLevelH: affordableAt[b] === undefined || reachedH === undefined ? null : round(Math.max(0, reachedH - affordableAt[b])),
+	return runCache.get(key);
+}
+
+/**
+ * Rod tiers in a run: the loop's non-permit 'progression' purchases are rods.system()'s tier assemblies, in tier
+ * order; a tier fishes from max(its purchase, reaching its level). Read from the core's purchase log and
+ * milestones only (no rods internals).
+ */
+function rodEquips(result, path = F.gearPath()) {
+	const buys = result.purchases.filter((p) => p.category === 'progression' && !p.id.startsWith(permitItem('')));
+	return Object.fromEntries(path.slice(1).map((step, i) => {
+		const buy = buys[i] || null;
+		const at = result.milestones[step.level] || null;
+		return [step.tier, {
+			level: step.level, purchasedH: buy ? buy.hours : null, cost: buy ? r0(buy.cost) : null,
+			equippedH: buy && at ? round(Math.max(buy.hours, at.hours), 4) : null,
 		}];
 	}));
-	const rodsOut = Object.fromEntries(path.slice(1).filter((s) => s.level <= maxLevel).map((s) => {
-		const reachedH = at(s.level);
-		const eq = rodLog[s.tier];
-		const delayH = eq && reachedH !== undefined ? Math.max(0, eq.equippedH - reachedH) : null;
-		return [s.tier, { level: s.level, equippedH: eq ? round(eq.equippedH) : null, delayH: delayH === null ? null : round(delayH), delaySessions: delayH === null ? null : round(delayH / dayH) }];
-	}));
-	const marks = new Set([...F.LIFECYCLE.milestones, ...Object.values(F.BIOME_LEVEL), ...PARAMS.expansions.map((e) => e.level), PARAMS.sketchMaxLevel]);
-	const reached = Object.fromEntries(Object.keys(levelAt).map(Number).filter((L) => marks.has(L)).map((L) => [L, { hours: round(levelAt[L]), day: day(levelAt[L]) }]));
-	return { reached, levelAt, permits: permitsOut, rods: rodsOut, totals, stageGross, moneyEnd: money, hours: round(h), dayEnds, log: { permits: permitLog, rods: rodLog } };
+}
+
+/**
+ * One player's lifecycle with the world system on the shared core.
+ * opts: { config (a CONFIGS key, default 'reference'), permits (default true; false = every live biome open at its
+ *   level: the reference-stage model), share (price the permits at this stage share), prices (default
+ *   permitPriceMap(share)), expansion (default true: the Mountain Stream permit is offered at its level; the core
+ *   never fishes it), grandfatheredLevel, stopAtLevel (default HORIZON) }
+ * Returns { result, reached { level: { hours, day } }, permits (permitSummary()), rods (rodEquips()) }.
+ */
+function lifecycle(archetype, opts = {}) {
+	const { config = 'reference', permits = true, share = PARAMS.permits.stageShare, prices = null, expansion = true, grandfatheredLevel = null, stopAtLevel = HORIZON } = opts;
+	const world = permits
+		? { prices: prices || permitPriceMap(share), expansion, ...(grandfatheredLevel === null ? {} : { grandfatheredLevel }) }
+		: { permits: false };
+	const result = integratedRun(archetype, { config, world, stopAtLevel });
+	const reached = Object.fromEntries(Object.entries(result.milestones).filter(([L]) => /^\d+$/.test(L)).map(([L, m]) => [L, { hours: m.hours, day: m.day }]));
+	return { result, reached, permits: permitSummary(result), rods: rodEquips(result) };
 }
 
 // ---------------------------------------------------------------------------------------------
 // Permits.
-const pathKey = (path) => JSON.stringify(path.map((s) => [s.tier, s.level, gearStep(s)]));
-const refCache = new Map();
+let stagesCache = null;
 /**
- * The reference player's stages on a gear path (default F.gearPath()): hours of play per stage (lifecycle
- * without permits) and the stage's $/h (previous biome, typical tier there, reference cadence).
+ * The reference player's (F.REFERENCE_ARCHETYPE) stages on the integrated reference loop without permits (every
+ * live biome open at its level): hours of play from the previous biome's level to this biome's level, and the
+ * stage's $/h (the previous biome with the tier typically held there, F.typicalTier, at the reference cadence).
+ * integratedFishIncome is the fish income the integrated run actually earned in the stage (a cross-check of E(k)).
  */
-function referenceStages({ path = F.gearPath() } = {}) {
-	const key = pathKey(path);
-	if (!refCache.has(key)) {
+function referenceStages() {
+	if (!stagesCache) {
 		const ref = F.REFERENCE_ARCHETYPE;
-		const life = lifecycle(ref, { permits: false, path });
-		const at = (L) => (L <= 1 ? 0 : life.levelAt[L]);
-		refCache.set(key, Object.fromEntries(PERMIT_BIOMES.map((b) => {
+		const m = lifecycle(ref, { permits: false, stopAtLevel: F.LIFECYCLE.maxLevel }).result.milestones;
+		const at = (L) => (L <= 1 ? 0 : m[L]?.hours);
+		const fishCash = (L) => (L <= 1 ? 0 : m[L]?.ledger.cash.fishing ?? 0);
+		stagesCache = Object.fromEntries(PERMIT_BIOMES.map((b) => {
 			const pb = prevBiome(b);
-			const step = F.typicalTier(pb, path);
+			const [lo, hi] = [F.BIOME_LEVEL[pb], F.BIOME_LEVEL[b]];
+			if (at(lo) === undefined || at(hi) === undefined) throw new Error(`referenceStages: the reference run does not reach Lv ${hi}`);
+			const step = F.typicalTier(pb);
 			const perHour = biomeHourly(pb, step, F.ARCHETYPES[ref].overheadS).cash;
-			const hours = at(F.BIOME_LEVEL[b]) - at(F.BIOME_LEVEL[pb]);
+			const hours = at(hi) - at(lo);
 			return [b, {
-				biome: b, level: F.BIOME_LEVEL[b], stageBiome: pb, stageLevels: [F.BIOME_LEVEL[pb], F.BIOME_LEVEL[b]], stageTier: step.tier,
+				biome: b, level: hi, stageBiome: pb, stageLevels: [lo, hi], stageTier: step.tier,
 				stageHours: hours, stageCashPerHour: perHour, expectedEarnings: hours * perHour,
-				lifecycleStageGross: life.stageGross[pb] ?? null,
+				integratedFishIncome: fishCash(hi) - fishCash(lo),
 			}];
-		})));
+		}));
 	}
-	return refCache.get(key);
+	return stagesCache;
 }
 
-/** One-time permit price for a biome (0 for a free biome). opts: { share, path } (sensitivity only). */
-function permitPrice(biome, { share = PARAMS.permits.stageShare, path = F.gearPath() } = {}) {
+/** One-time permit price for a biome (0 for a free biome). opts: { share } (sensitivity only). */
+function permitPrice(biome, { share = PARAMS.permits.stageShare } = {}) {
 	if (isFree(biome)) return 0;
-	const s = referenceStages({ path })[biome];
+	const s = referenceStages()[biome];
 	if (!s) throw new Error(`permitPrice: unknown biome ${biome}`);
 	return nicePrice(share * s.expectedEarnings);
 }
 const priceMapCache = new Map();
-function permitPriceMap(share = PARAMS.permits.stageShare, path = F.gearPath()) {
-	const key = `${share}|${pathKey(path)}`;
-	if (!priceMapCache.has(key)) priceMapCache.set(key, Object.fromEntries(PERMIT_BIOMES.map((b) => [b, permitPrice(b, { share, path })])));
-	return priceMapCache.get(key);
+/** Every permit's price at a stage share (default PARAMS.permits.stageShare). */
+function permitPriceMap(share = PARAMS.permits.stageShare) {
+	if (!priceMapCache.has(share)) priceMapCache.set(share, Object.fromEntries(PERMIT_BIOMES.map((b) => [b, permitPrice(b, { share })])));
+	return priceMapCache.get(share);
 }
 
-const lifeCache = new Map();
-function cachedLifecycle(a, opts = {}) {
-	const key = `${a}|${JSON.stringify(opts)}`;
-	if (!lifeCache.has(key)) lifeCache.set(key, lifecycle(a, opts));
-	return lifeCache.get(key);
-}
+const maxOf = (xs) => xs.reduce((m, x) => Math.max(m, x ?? Infinity), 0);
+const minOf = (xs) => xs.reduce((m, x) => Math.min(m, x ?? Infinity), Infinity);
 
-/** Per archetype and permit: level reached, permit bought, delay in hours and sessions (lifecycle). */
-function timeToAfford({ schedule = PARAMS.schedule.tieBreak, otherSpendShare = 0, share = PARAMS.permits.stageShare, expansion = true } = {}) {
-	const prices = permitPriceMap(share);
+/**
+ * Per archetype and permit (integrated): level reached, permit bought, delay (hours, sessions), money held at the
+ * level / price, and (withRods) each rod tier's equip delay against the same configuration without permits.
+ * A permit not bought by the end of the run counts as an infinite delay.
+ */
+function timeToAfford({ config = 'reference', share = PARAMS.permits.stageShare, withRods = true } = {}) {
 	return Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
-		const life = cachedLifecycle(a, { schedule, otherSpendShare, prices, expansion });
-		const noPermit = cachedLifecycle(a, { permits: false, otherSpendShare, expansion });
-		const rodDelayVsNoPermits = Object.fromEntries(Object.entries(life.rods).map(([t, v]) => [t, v.equippedH === null || noPermit.rods[t].equippedH === null ? null : round(v.equippedH - noPermit.rods[t].equippedH)]));
-		return [a, { sessionHours: round(sessionH(a), 3), permits: life.permits, rods: life.rods, rodDelayVsNoPermits, maxDelaySessions: Math.max(0, ...Object.values(life.permits).map((p) => p.delaySessions ?? Infinity)) }];
+		const life = lifecycle(a, { config, share });
+		const none = withRods ? lifecycle(a, { config, permits: false }) : null;
+		const rodDelayVsNoPermits = none ? Object.fromEntries(Object.entries(life.rods).map(([t, v]) => {
+			const base = none.rods[t].equippedH;
+			return [t, v.equippedH === null || base === null ? null : round(v.equippedH - base, 4)];
+		})) : null;
+		const permits = Object.values(life.permits);
+		return [a, {
+			sessionHours: round(sessionH(a), 3),
+			permits: life.permits,
+			rods: life.rods,
+			rodDelayVsNoPermits,
+			maxDelaySessions: maxOf(permits.map((p) => p.delaySessions)),
+			minCoverage: minOf(permits.map((p) => p.coverageAtLevel)),
+			maxRodDelayH: rodDelayVsNoPermits ? maxOf(Object.values(rodDelayVsNoPermits)) : null,
+		}];
 	}));
 }
 
-/** Every permit: formula inputs, price, payback, time-to-afford (standalone and lifecycle) per archetype. */
+/** Every permit: formula inputs, price, payback, standalone time to afford, integrated time to afford. */
 function permitTable() {
 	const stages = referenceStages();
 	const tta = timeToAfford();
@@ -734,15 +642,18 @@ function permitTable() {
 			stageHoursReference: round(s.stageHours),
 			stageCashPerHourReference: r0(s.stageCashPerHour),
 			stageEarningsReference: r0(s.expectedEarnings),
+			integratedStageFishIncome: r0(s.integratedFishIncome),
 			share: PARAMS.permits.stageShare,
 			price,
 			priceHoursOfStageIncome: round(price / s.stageCashPerHour),
 			gainPerHourWithGearAtLevel: r0(gain),
 			gearAtLevel: gear.tier,
 			paybackHours: round(price / gain),
+			// From $0 at the archetype's own cadence, net of repairs, fishing the stage biome with its typical tier.
 			standaloneHoursToAfford: Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
-				const r = rates(s.stageBiome, F.typicalTier(s.stageBiome), F.ARCHETYPES[a].overheadS);
-				const hrs = price / (r.cash - r.upkeep);
+				const step = F.typicalTier(s.stageBiome);
+				const h = biomeHourly(s.stageBiome, step, F.ARCHETYPES[a].overheadS);
+				const hrs = price / (h.cash - upkeepPerFish(step) * h.fish);
 				return [a, { hours: round(hrs), sessions: round(hrs / sessionH(a)) }];
 			})),
 			lifecycle: Object.fromEntries(Object.entries(tta).map(([a, v]) => [a, v.permits[b]])),
@@ -750,35 +661,87 @@ function permitTable() {
 	});
 }
 
-/** Max permit delay (sessions) per archetype for alternative stage shares. */
+/** Every configuration (CONFIGS) per archetype: worst permit delay, lowest coverage at the level, worst rod delay. */
+function sensitivity() {
+	return Object.fromEntries(Object.entries(CONFIGS).map(([config, c]) => {
+		const tta = timeToAfford({ config });
+		return [config, {
+			label: c.label,
+			archetypes: Object.fromEntries(Object.entries(tta).map(([a, v]) => [a, { maxDelaySessions: v.maxDelaySessions, minCoverage: v.minCoverage, maxRodDelayH: v.maxRodDelayH }])),
+			maxDelaySessions: maxOf(Object.values(tta).map((v) => v.maxDelaySessions)),
+			minCoverage: minOf(Object.values(tta).map((v) => v.minCoverage)),
+			maxRodDelayH: maxOf(Object.values(tta).map((v) => v.maxRodDelayH)),
+		}];
+	}));
+}
+
+/** Alternative stage shares: prices and, per archetype, worst delay and lowest coverage (reference and STRESS). */
 function shareSweep() {
 	return PARAMS.sensitivity.shareSweep.map((share) => {
-		const t = timeToAfford({ share });
-		return {
-			share,
-			prices: permitPriceMap(share),
-			maxDelaySessions: Object.fromEntries(Object.entries(t).map(([a, v]) => [a, v.maxDelaySessions])),
-			maxRodDelayHoursVsNoPermits: Object.fromEntries(Object.entries(t).map(([a, v]) => [a, Math.max(0, ...Object.values(v.rodDelayVsNoPermits).filter((x) => x !== null))])),
-		};
+		const out = { share, prices: permitPriceMap(share) };
+		for (const config of ['reference', STRESS]) {
+			const t = timeToAfford({ config, share, withRods: false });
+			out[config] = {
+				maxDelaySessions: Object.fromEntries(Object.entries(t).map(([a, v]) => [a, v.maxDelaySessions])),
+				minCoverage: minOf(Object.values(t).map((v) => v.minCoverage)),
+			};
+		}
+		return out;
 	});
 }
 
-/** Lifecycle spend split per archetype to Lv F.LIFECYCLE.maxLevel (Mountain Stream live at its level). */
-function budget({ otherSpendShare = 0 } = {}) {
+/**
+ * Where income goes per archetype on the integrated reference loop to Lv F.LIFECYCLE.maxLevel (the R1 economy:
+ * integrate.run defaults; the Mountain Stream permit belongs to the expansion and is not offered).
+ */
+function budget() {
 	return Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
-		const life = cachedLifecycle(a, { otherSpendShare, prices: permitPriceMap(), expansion: true });
-		const t = life.totals;
+		const { result } = lifecycle(a, { expansion: false, stopAtLevel: F.LIFECYCLE.maxLevel });
+		const s = I.sinkSummary(result);
+		const prog = result.ledger.spend.progression;
+		const permits = Object.entries(prog).filter(([k]) => k.startsWith(permitItem(''))).reduce((t, [, v]) => t + v, 0);
+		const progression = Object.values(prog).reduce((t, v) => t + v, 0);
+		const other = Object.entries(s.byCategory).filter(([c]) => !['upkeep', 'progression'].includes(c)).reduce((t, [, v]) => t + v.total, 0);
 		return [a, {
-			grossFishIncome: r0(t.gross),
-			upkeepShare: round(t.upkeep / t.gross, 4),
-			rodsShare: round(t.rods / t.gross, 4),
-			permitsShare: round(t.permits / t.gross, 4),
-			otherShare: round(t.other / t.gross, 4),
-			savedShare: round(life.moneyEnd / t.gross, 4),
-			moneyAtEnd: r0(life.moneyEnd),
-			hours: life.hours,
+			income: s.income,
+			fishingShare: round((result.ledger.cash.fishing || 0) / s.income, 4),
+			upkeepShare: s.byCategory.upkeep.share,
+			rodsShare: round((progression - permits) / s.income, 4),
+			permitsShare: round(permits / s.income, 4),
+			permitsShareOfFishIncome: round(permits / (result.ledger.cash.fishing || 1), 4),
+			otherShare: round(other / s.income, 4),
+			savedShare: s.savedShare,
+			saved: s.saved,
+			hours: result.hours,
+			minMoney: r0(result.final.minMoney),
+			blockedHours: result.final.blockedHours,
 		}];
 	}));
+}
+
+/**
+ * Level times on the reference loop with and without permits (every archetype), and the regular player's hours
+ * against R1's record (docs/economy/5b/curve-integrated.json).
+ */
+function levelTimes() {
+	const levels = F.LIFECYCLE.milestones;
+	const archetypes = Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
+		const w = lifecycle(a).reached;
+		const wo = lifecycle(a, { permits: false }).reached;
+		return [a, {
+			with: Object.fromEntries(levels.map((L) => [L, w[L] ? round(w[L].hours) : null])),
+			without: Object.fromEntries(levels.map((L) => [L, wo[L] ? round(wo[L].hours) : null])),
+			maxAbsDiffH: maxOf(levels.map((L) => (w[L] && wo[L] ? Math.abs(w[L].hours - wo[L].hours) : null))),
+		}];
+	}));
+	const reg = archetypes[F.REFERENCE_ARCHETYPE].with;
+	const record = CURVE_INTEGRATED.framework?.regular || {};
+	const recordDiff = maxOf(Object.keys(record).map((L) => (reg[L] === undefined || reg[L] === null ? null : Math.abs(reg[L] - record[L]))));
+	return {
+		levels, archetypes,
+		maxAbsDiffH: maxOf(Object.values(archetypes).map((v) => v.maxAbsDiffH)),
+		r1Record: { file: 'docs/economy/5b/curve-integrated.json', quartic: CURVE_INTEGRATED.chosen, sharedDigest: CURVE_INTEGRATED.sharedDigest, regular: record, maxAbsDiffH: round(recordDiff, 4) },
+	};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -803,7 +766,7 @@ function grandfatheredPermits(user, { now = new Date(0) } = {}) {
 	return biomes.map((biome) => ({ biome, source: 'grandfathered', acquiredAt: now, pricePaid: 0 }));
 }
 
-/** Legacy accounts used as migration examples (report().migration) and by the grandfathered validation run. */
+/** Legacy accounts used as migration examples (report().migration and DECISIONS P-WORLD-GRANDFATHER). */
 const MIGRATION_EXAMPLES = deepFreeze([
 	{ user: { level: 34, xp: 118000, currentBiome: 'pond' } },
 	{ user: { level: 7, xp: 5200, currentBiome: 'ocean' } },
@@ -813,9 +776,10 @@ const MIGRATION_EXAMPLES = deepFreeze([
 ]);
 
 // ---------------------------------------------------------------------------------------------
-// Shared lifecycle core (framework 5b.3): the world as a lifecycle.js SYSTEM (integrate.js 'world').
+// The world as a SYSTEM on the shared lifecycle core (lifecycle.js; integrate.js composes it as 'world' in the
+// REFERENCE core loop):
 //
-//   LC.simulate({ archetype, systems: [rods.system(), world.system(), ...] })
+//   integrate.run({ archetype })   or   LC.simulate({ archetype, systems: [..., world.system(), ...] })
 //
 // Hooks (all per-run state in state.sys.world; system() returns a fresh object each call):
 //   init         permits held from the start: the free biome (Ocean) and grandfathered permits
@@ -823,19 +787,17 @@ const MIGRATION_EXAMPLES = deepFreeze([
 //                biome names or grandfatheredPermits() records)
 //   canFish      a LIVE biome whose permit is held (every live biome with opts.permits false). Mountain Stream
 //                stays out of the live biomes: the core never fishes it (its proposed ladder is priced by
-//                mountainStream() / postFifty(), not by castOutcome)
+//                mountainStream(), and the post-60 sketch by postFifty(), not by the core)
 //   goals        one 'progression' goal per unowned permit whose level the gate level has reached: item
 //                'permit:<biome>', cost = its price (permitPriceMap(), or opts.prices), priority from
-//                permitPriority() (due-level order against the rod purchases, PARAMS.schedule); a permit the
+//                permitPriority() (due-level order against the pending rod tier, PARAMS.schedule); a permit the
 //                player cannot afford yet blocks the goals after it (the core's default for 'progression')
 //   on           'levelUp' of the gate kind (real, or public under the Founder's public gate) records when each
 //                biome's level is reached (time to afford: permitSummary())
 //   onDayStart / onDayEnd
-//                flag purchases made by the core's end-of-day purchase pass
+//                flag purchases made by the core's end-of-day purchase pass (labelled at the session's end)
 // Ledger: no XP or cash source (the world grants nothing); spend items 'permit:<biome>' ('progression').
 
-const SYSTEM_NAME = 'world';
-const permitItem = (biome) => `permit:${biome}`;
 const gateKind = (ctx) => (ctx.gate === 'public' ? 'public' : 'real');
 
 /**
@@ -857,23 +819,6 @@ function permitPriority(biome, state, ctx) {
 }
 
 /**
- * Money the player keeps aside for the next permit before its level ("money can be saved earlier"): the price
- * of the first unowned permit while the gate level is inside its saving window (the previous biome's level up
- * to its own), when that permit ranks before `priority`. The core has no saving primitive, so a system whose
- * purchases should respect it passes this as their goals' `reserve` (lifecycle() funded goals this way; under
- * 'rod-first' it is 0 for rod purchases).
- */
-function permitSavings(state, ctx, priority) {
-	const w = state.sys[SYSTEM_NAME];
-	if (!w || !w.permits) return 0;
-	const b = w.offered.find((x) => !w.held[x]);
-	if (!b) return 0;
-	const L = ctx.gateLevel();
-	if (L >= F.BIOME_LEVEL[b] || L < F.BIOME_LEVEL[prevBiome(b)]) return 0;
-	return permitPriority(b, state, ctx) < priority ? w.prices[b] : 0;
-}
-
-/**
  * The world as a lifecycle.js system. opts: { permits (default true; false = every live biome open at its
  * level: the reference-stage model), prices (default permitPriceMap()), schedule ('rod-first' |
  * 'permit-first', default PARAMS.schedule.tieBreak), priority (a fixed base priority instead of the due-level
@@ -890,6 +835,7 @@ function system(opts = {}) {
 		grandfatheredLevel = null,
 		grandfathered = [],
 	} = opts;
+	if (!['rod-first', 'permit-first'].includes(schedule)) throw new Error(`world.system: unknown schedule ${schedule}`);
 	const offered = (expansion ? F.BIOME_ORDER : F.LIVE_BIOMES).filter((b) => !isFree(b));
 	const markReached = (state, ctx) => {
 		const w = state.sys[SYSTEM_NAME];
@@ -928,8 +874,8 @@ function system(opts = {}) {
 				buy(st, c) {
 					st.sys[SYSTEM_NAME].held[b] = {
 						source: 'purchased', price: w.prices[b], hours: st.h,
-						// Start of the step whose purchase pass bought it (lifecycle()'s convention); the end-of-day
-						// pass buys before the next step, at st.h.
+						// The core's purchase pass runs after a step's casts: the permit is labelled with the start of
+						// that step (the first moment the player could buy it); the end-of-day pass labels at st.h.
 						boughtH: w.dayEnd ? st.h : st.h - c.stepH,
 						day: st.day + 1, level: c.gateLevel(), atDayEnd: w.dayEnd,
 					};
@@ -950,13 +896,15 @@ function system(opts = {}) {
 
 /**
  * Permit time to afford from a lifecycle.js result that ran system(): per offered permit, its price, when the
- * gate level reached its level and when it was held (lifecycle()'s conventions: boughtH is the start of the
- * buying step; delay = max(0, boughtH - reachedH); sessions = delay / the archetype's daily session).
+ * gate level reached its level and when it was held (boughtH is the start of the buying step; delay =
+ * max(0, boughtH - reachedH); sessions = delay / the archetype's daily session), and coverageAtLevel = the money
+ * held on reaching the level / the price (from the gate kind's milestone snapshot, when that level was recorded).
  */
 function permitSummary(result) {
 	const w = result.sys[SYSTEM_NAME];
 	if (!w || !w.permits) return null;
 	const dayH = result.archetype.minutesPerDay ? result.archetype.minutesPerDay / 60 : null;
+	const snapshots = result.gate === 'public' ? result.publicMilestones : result.milestones;
 	return Object.fromEntries(w.offered.map((b) => {
 		const reached = w.reached[b] || null;
 		const held = w.held[b] || null;
@@ -964,328 +912,25 @@ function permitSummary(result) {
 		let delayH = null;
 		if (held && !purchased) delayH = 0;
 		else if (purchased && reached) delayH = Math.max(0, held.boughtH - reached.hours);
+		const atLevel = snapshots?.[F.BIOME_LEVEL[b]];
 		return [b, {
 			level: F.BIOME_LEVEL[b], price: w.prices[b], source: held ? held.source : null,
 			reachedH: reached ? round(reached.hours, 4) : null, reachedDay: reached ? reached.day : null,
 			boughtH: purchased ? round(held.boughtH, 4) : null, boughtDay: purchased ? held.day : null,
 			delayH: delayH === null ? null : round(delayH, 4),
 			delaySessions: delayH === null || !dayH ? null : round(delayH / dayH, 4),
+			coverageAtLevel: atLevel && w.prices[b] > 0 ? round(atLevel.money / w.prices[b]) : null,
 		}];
 	}));
 }
 
 // ---------------------------------------------------------------------------------------------
-// Validation baselines: lifecycle()'s other assumptions as lifecycle.js systems. They are NOT designs and only
-// validateSystem() uses them; the integrated economy uses rods.system() and the designed daily systems.
-const BASELINE_RODS = 'scheduledRods';
+// Mountain Stream (not live: priced per cast through the ladder mirror, never fished by the core).
 /**
- * lifecycle()'s rods: the next tier's expected assembly cost (rodCost) is paid in instalments from its crate
- * unlock level (rodUnlock) at LC.PRIORITY.rod, keeping permitSavings() aside; the tier is equipped once paid
- * and at its level; repairs = upkeepPerFish(tier) x fish ('upkeep'). An instalment is whatever money is left
- * when its turn comes in the purchase pass, so the goal costs 0, never blocks, and buy() spends the instalment.
- * lifecycle()'s step order is kept exactly: its goal list is fixed at the start of a step's purchase pass (so
- * the saving is read in goals(), before an earlier permit of the same pass is bought), and a tier equipped in
- * a step starts the next tier's instalments in the following step.
+ * The proposed ladder: counts, per-weather premium, $/fish and $/h by tier, step over Swamp, the BIOME_VALUE band
+ * rule (PARAMS.mountainStream.valueRule; the value itself is decisions.js P-MS-VALUE), today's 3-salmon biome in
+ * the real engine.
  */
-function scheduledRodsBaseline() {
-	const equip = (state, ctx, atH) => {
-		const s = state.sys[BASELINE_RODS];
-		const next = ctx.path[state.equippedTier + 1];
-		if (next && s.progress >= rodCost(next.tier) - 1e-6 && ctx.gateLevel() >= next.level) {
-			state.equippedTier++;
-			s.progress = 0;
-			s.equipped[next.tier] = atH;
-			return true;
-		}
-		return false;
-	};
-	return {
-		name: BASELINE_RODS,
-		init(state) {
-			state.sys[BASELINE_RODS] = { progress: 0, equipped: {}, dayEnd: false, skipPass: false };
-		},
-		onDayStart(state) {
-			state.sys[BASELINE_RODS].dayEnd = false;
-		},
-		onDayEnd(state) {
-			state.sys[BASELINE_RODS].dayEnd = true;
-		},
-		onCasts(state, ctx, step) {
-			const perFish = upkeepPerFish(step.rates.tier);
-			if (perFish > 0) ctx.spend('upkeep', 'rodRepair', perFish * step.fish);
-			// A tier paid earlier is equipped in the first step at its level (labelled with the step's start,
-			// state.h); lifecycle() equipped it after that step's goals, so the next tier waits one pass.
-			if (equip(state, ctx, state.h)) state.sys[BASELINE_RODS].skipPass = true;
-		},
-		goals(state, ctx) {
-			const s = state.sys[BASELINE_RODS];
-			if (s.skipPass) {
-				s.skipPass = false;
-				return [];
-			}
-			const next = ctx.path[state.equippedTier + 1];
-			if (!next || ctx.gateLevel() < rodUnlock(next.tier) || s.progress >= rodCost(next.tier) - 1e-6) return [];
-			const item = `rodAssembly:t${next.tier}`;
-			const reserve = permitSavings(state, ctx, LC.PRIORITY.rod);
-			return [{
-				id: item, item, category: 'progression', cost: 0, blocking: false, priority: LC.PRIORITY.rod,
-				buy(st, c) {
-					const pay = Math.max(0, Math.min(st.money - reserve, rodCost(next.tier) - s.progress));
-					if (pay > 0) c.spend('progression', item, pay);
-					s.progress += pay;
-					equip(st, c, s.dayEnd ? st.h : st.h - c.stepH);
-				},
-			}];
-		},
-	};
-}
-
-/** lifecycle()'s otherSpendShare: that share of fish income is spent elsewhere as it is earned ('optional'). */
-function otherSpendBaseline(share) {
-	return {
-		name: 'otherSpend',
-		onCasts(state, ctx, step) {
-			ctx.spend('optional', 'otherSpend', share * step.rates.cash);
-		},
-	};
-}
-
-/** lifecycle.js ledger in lifecycle()'s `totals` terms. */
-function coreTotals(ledger) {
-	const sum = (o, keep = () => true) => Object.entries(o || {}).filter(([k]) => keep(k)).reduce((s, [, v]) => s + v, 0);
-	return {
-		gross: ledger.cash.fishing || 0,
-		upkeep: sum(ledger.spend.upkeep),
-		rods: sum(ledger.spend.progression, (k) => k.startsWith('rodAssembly:')),
-		permits: sum(ledger.spend.progression, (k) => k.startsWith('permit:')),
-		other: sum(ledger.spend.optional),
-		xpFishing: ledger.xp.fishing || 0,
-		xpDaily: ledger.xp.daily || 0,
-	};
-}
-
-/** Records the ledger at the end of each play day, after every other system's onDayEnd (list it last). */
-function dayEndRecorder() {
-	return {
-		name: 'dayEnds',
-		init(state) {
-			state.sys.dayEnds = [];
-		},
-		onDayEnd(state) {
-			state.sys.dayEnds.push({ day: state.playDay + 1, h: state.h, ...coreTotals(state.ledger), money: state.money });
-		},
-	};
-}
-
-const LEDGER_KEYS = ['gross', 'upkeep', 'rods', 'permits', 'other', 'xpFishing', 'xpDaily', 'money'];
-const EVENT_KINDS = ['permitBoughtH', 'rodEquippedH'];
-function relDiff(a, b, floor = 0) {
-	if (a === null && b === null) return 0;
-	if (a === null || b === null) return Infinity;
-	const d = Math.abs(a - b);
-	return d === 0 ? 0 : d / Math.max(Math.abs(a), Math.abs(b), floor, 1e-12);
-}
-
-/**
- * One lifecycle() run against one core run: level hours (every milestone), permit purchase and rod equip
- * times (lifecycle()'s start-of-step labels), and the ledger at the end of each play day on which a milestone
- * was reached (both loops snapshot the same instant: after that day's last step and daily XP). Money is
- * compared relative to the larger balance or the gross fish income so far (a balance near $0 while rods are
- * paid in instalments would otherwise turn a cent into 100%).
- */
-function compareRuns(old, core, { kinds = null } = {}) {
-	const rows = [];
-	const add = (kind, key, a, b, floor = 0) => {
-		if (!kinds || kinds.includes(kind.split('.')[0])) rows.push({ kind, key, old: a, core: b, rel: relDiff(a, b, floor) });
-	};
-	for (const L of F.LIFECYCLE.milestones) add('levelHours', L, old.levelAt[L] ?? null, core.milestones[L]?.hours ?? null);
-	const held = core.sys[SYSTEM_NAME]?.held || {};
-	for (const [b, p] of Object.entries(old.log.permits)) add('permitBoughtH', b, p.boughtH, held[b]?.boughtH ?? null);
-	const equipped = core.sys[BASELINE_RODS]?.equipped || {};
-	for (const [t, e] of Object.entries(old.log.rods)) add('rodEquippedH', Number(t), e.equippedH, equipped[t] ?? null);
-	const coreDays = new Map((core.sys.dayEnds || []).map((d) => [d.day, d]));
-	const days = [...new Set(F.LIFECYCLE.milestones.map((L) => old.dayEnds.find((d) => old.levelAt[L] !== undefined && d.h >= old.levelAt[L] - 1e-9)?.day).filter(Boolean))];
-	for (const day of days) {
-		const o = old.dayEnds.find((d) => d.day === day);
-		const c = coreDays.get(day) || null;
-		for (const k of LEDGER_KEYS) add(`ledger.${k}`, day, o[k], c ? c[k] : null, k === 'money' ? o.gross : 0);
-	}
-	const byKind = {};
-	for (const r of rows) byKind[r.kind] = Math.max(byKind[r.kind] ?? 0, r.rel);
-	const found = rows.filter((r) => EVENT_KINDS.includes(r.kind) && r.old !== null && r.core !== null);
-	const missing = rows.filter((r) => r.rel === Infinity).map((r) => `${r.kind} ${r.key}`);
-	const worst = rows.filter((r) => r.rel !== Infinity).reduce((w, r) => (!w || r.rel > w.rel ? r : w), null);
-	const maxRel = missing.length ? 1 : Math.max(0, ...rows.map((r) => r.rel));
-	return {
-		compared: rows.length,
-		maxRelativeDifference: maxRel,
-		byKind: Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, v === Infinity ? 'missing' : v])),
-		maxEventDifferenceSteps: Math.max(0, ...found.map((r) => Math.round(Math.abs(r.old - r.core) / F.LIFECYCLE.stepH))),
-		worst: worst && worst.rel > 0 ? { kind: worst.kind, key: worst.key, old: worst.old, core: worst.core, rel: worst.rel } : null,
-		missing,
-	};
-}
-
-/** The world system on the core with lifecycle()'s baselines (rods on schedule, provisional daily XP). */
-function coreRun(archetype, sysOpts, { otherSpendShare = 0, days } = {}) {
-	const systems = [scheduledRodsBaseline(), otherSpendShare ? otherSpendBaseline(otherSpendShare) : null, LC.provisionalDaily(), system(sysOpts), dayEndRecorder()];
-	return LC.simulate({ archetype, systems, days, stopAtLevel: null });
-}
-
-/**
- * validateSystem(): the world SYSTEM on the shared lifecycle core reproduces this module's lifecycle() for every
- * archetype, in every configuration the report uses (design time to afford, permit-first, other spend,
- * grandfathered, no permits), plus the curve.json replication (provisional model) and the permit prices
- * recomputed from the core's reference stage hours. Baselines: scheduledRodsBaseline() (lifecycle()'s rod
- * purchases and repairs), LC.provisionalDaily() (its daily XP), otherSpendBaseline() (its other-spend share).
- */
-function computeValidation() {
-	const prices = permitPriceMap();
-	const gfLevel = MIGRATION_EXAMPLES[0].user.level;
-	const gfBiomes = F.LIVE_BIOMES.filter((b) => !isFree(b) && gfLevel >= F.BIOME_LEVEL[b]);
-	const share = PARAMS.sensitivity.otherSpendShares[0];
-	const design = (o = {}) => ({ schedule: PARAMS.schedule.tieBreak, otherSpendShare: 0, prices, expansion: true, ...o });
-	const configs = [
-		{ key: 'design', note: 'timeToAfford() / permitTable() / checks(): rod-first, Mountain Stream permit offered at its level', old: design(), sys: { prices, expansion: true } },
-		{ key: 'permitFirst', note: 'scheduleComparison: permit-first (a not-yet-due permit reserves its price ahead of the rod)', old: design({ schedule: 'permit-first' }), sys: { schedule: 'permit-first', prices, expansion: true } },
-		{ key: `otherSpend${share}`, note: `otherSpend: ${share} of fish income spent elsewhere (non-zero permit delays for casual)`, old: design({ otherSpendShare: share }), sys: { prices, expansion: true }, otherSpendShare: share },
-		{ key: 'grandfathered', note: `a legacy Lv ${gfLevel} account starting with ${gfBiomes.join(', ')} (grandfatheredLevel)`, old: design({ grandfathered: gfBiomes }), sys: { grandfatheredLevel: gfLevel, prices, expansion: true } },
-		{ key: 'noPermits', note: 'referenceStages(): every live biome open at its level (the permit price basis)', old: { permits: false }, sys: { permits: false } },
-	];
-	const archetypes = Object.keys(F.ARCHETYPES);
-	const runs = {};
-	const results = Object.fromEntries(configs.map((cfg) => [cfg.key, {
-		note: cfg.note,
-		archetypes: Object.fromEntries(archetypes.map((a) => {
-			const old = cachedLifecycle(a, cfg.old);
-			const dayH = sessionH(a);
-			const core = coreRun(a, cfg.sys, { otherSpendShare: cfg.otherSpendShare || 0, days: Math.ceil(old.hours / dayH) + 1 });
-			runs[`${cfg.key}|${a}`] = { old, core };
-			return [a, compareRuns(old, core)];
-		})),
-	}]));
-	for (const r of Object.values(results)) r.maxRelativeDifference = Math.max(...Object.values(r.archetypes).map((x) => x.maxRelativeDifference));
-
-	// Time to afford through the core (design configuration) against lifecycle()'s (the checks() target).
-	const timeToAffordCore = Object.fromEntries(archetypes.map((a) => {
-		const { old, core } = runs[`design|${a}`];
-		const summary = permitSummary(core);
-		return [a, {
-			maxDelaySessions: { core: Math.max(0, ...Object.values(summary).map((p) => p.delaySessions ?? Infinity)), old: Math.max(0, ...Object.values(old.permits).map((p) => p.delaySessions ?? Infinity)) },
-			delayH: Object.fromEntries(Object.entries(summary).map(([b, p]) => [b, { core: p.delayH, old: old.permits[b]?.delayH ?? null }])),
-			boughtAtDayEnd: Object.entries(core.sys[SYSTEM_NAME].held).filter(([, p]) => p.atDayEnd).map(([b]) => b),
-		}];
-	}));
-
-	// Permit prices recomputed from the core's reference stage hours (regular, no permits).
-	const ref = runs[`noPermits|${F.REFERENCE_ARCHETYPE}`].core;
-	const at = (L) => (L <= 1 ? 0 : ref.milestones[L]?.hours ?? null);
-	const pricesFromCore = Object.fromEntries(PERMIT_BIOMES.map((b) => {
-		const pb = prevBiome(b);
-		const perHour = biomeHourly(pb, F.typicalTier(pb), F.ARCHETYPES[F.REFERENCE_ARCHETYPE].overheadS).cash;
-		return [b, { lifecycle: prices[b], core: nicePrice(PARAMS.permits.stageShare * (at(F.BIOME_LEVEL[b]) - at(F.BIOME_LEVEL[pb])) * perHour) }];
-	}));
-
-	// curve.json replication on the core: provisional path, LC.provisionalRods + LC.provisionalDaily, no permits.
-	const provOld = lifecycle(F.REFERENCE_ARCHETYPE, { permits: false, purchase: 'curve', path: F.PROVISIONAL_GEAR_PATH });
-	const provCore = LC.simulate({ archetype: F.REFERENCE_ARCHETYPE, systems: [LC.provisionalRods(), LC.provisionalDaily(), system({ permits: false })], gearPath: F.PROVISIONAL_GEAR_PATH });
-	const expected = CURVE_JSON.best.regular;
-	const replication = {
-		vsLifecycle: compareRuns(provOld, provCore, { kinds: ['levelHours'] }),
-		vsCurveJson: {
-			expected,
-			core: Object.fromEntries(Object.keys(expected).map((L) => [L, provCore.milestones[L] ? round(provCore.milestones[L].hours) : null])),
-			maxAbsHours: Math.max(...Object.keys(expected).map((L) => Math.abs((provCore.milestones[L]?.hours ?? Infinity) - expected[L]))),
-		},
-	};
-	replication.vsCurveJson.ok = replication.vsCurveJson.maxAbsHours <= 0.011;
-
-	const maxRel = Math.max(replication.vsLifecycle.maxRelativeDifference, ...Object.values(results).map((r) => r.maxRelativeDifference));
-	const pricesIdentical = Object.values(pricesFromCore).every((p) => p.core === p.lifecycle);
-	return {
-		method: 'LC.simulate with world.system() + validation baselines (scheduledRodsBaseline: lifecycle()\'s rods on schedule and repairs; LC.provisionalDaily: its daily XP; otherSpendBaseline) vs world.lifecycle(), every archetype, run to the end of lifecycle()\'s last day; compared: hours to every milestone level, permit purchase and rod equip times (start-of-step labels), and the ledger (gross fish $, repairs, rods, permits, other spend, fishing/daily XP, money) at the end of each play day that reached a milestone',
-		maxRelativeDifference: maxRel,
-		ok: maxRel < 0.005 && pricesIdentical && replication.vsCurveJson.ok,
-		configs: results,
-		timeToAffordCore,
-		pricesFromCore: { identical: pricesIdentical, prices: pricesFromCore },
-		replication,
-		conventions: [
-			'Hours, not days: the core counts a level reached on a day\'s last step in that day (ceil(h / dayH) counted the next).',
-			'Purchases: the core runs a purchase pass after every step (as lifecycle() did, after the step\'s income) and one more at the end of each day (after the daily XP); a permit or instalment that pass makes is bought before the next day\'s first step instead of after it. lifecycle() labels a purchase with the start of its step, so the times agree; only that one step of income differs (the core rule is the right one: the player holds the money and level at the end of the session).',
-			'The core snapshots a milestone inside the step (before the day-end daily XP), lifecycle() after the daily XP: ledgers are compared at day ends, where both loops snapshot the same instant.',
-		],
-		withRodsSystem: withRodsSystem(prices),
-	};
-}
-
-let validationCache = null;
-/** validateSystem() (see computeValidation), computed once per process like report(). */
-function validateSystem() {
-	if (!validationCache) validationCache = computeValidation();
-	return validationCache;
-}
-
-/** report().integration: the world SYSTEM's contract (framework 5b.3) and its validation. */
-function integrationSection() {
-	return {
-		framework: `${F.FRAMEWORK_VERSION} shared lifecycle core (lifecycle.js); integrate.js system '${SYSTEM_NAME}' (REFERENCE core loop)`,
-		system: {
-			options: {
-				permits: 'default true; false = every live biome open at its level (the reference-stage model behind permitPrice())',
-				prices: 'default permitPriceMap()',
-				schedule: `'rod-first' | 'permit-first' (default PARAMS.schedule.tieBreak '${PARAMS.schedule.tieBreak}')`,
-				priority: 'a fixed base priority instead of the due-level order (sensitivity)',
-				expansion: 'also offer the Mountain Stream permit at its level (it is still never fished)',
-				grandfatheredLevel: 'permits held from the start for every live non-free biome at or below this level',
-				grandfathered: 'biome names or grandfatheredPermits(user) records held from the start',
-			},
-			hooks: {
-				init: 'state.sys.world: permits held (free Ocean, grandfathered), prices, levels reached, purchases',
-				canFish: 'a live biome whose permit is held; Mountain Stream stays out of the live biomes (never fished)',
-				goals: `one 'progression' goal per unowned permit whose level the gate level has reached (item 'permit:<biome>'); priority LC.PRIORITY.permit (${LC.PRIORITY.permit}) when due before the pending rod tier (or tied under 'permit-first'), else LC.PRIORITY.rod + 1 (${LC.PRIORITY.rod + 1}): the design's due-level order, rod first on a tie; blocking while unaffordable`,
-				on: '\'levelUp\' of the gate kind (public under the Founder\'s public gate) records when each biome level is reached',
-				onDayStart: 'clears the end-of-day purchase flag',
-				onDayEnd: 'flags purchases made by the core\'s end-of-day purchase pass',
-			},
-			ledger: {
-				xpSources: [], cashSources: [],
-				spend: { progression: F.LIVE_BIOMES.filter((b) => !isFree(b)).map(permitItem), progressionWithExpansion: [permitItem(MS)] },
-			},
-			helpers: {
-				permitSummary: 'time to afford per permit from a simulate() result (reached, bought, delay in hours and sessions)',
-				permitSavings: 'money kept aside for the next permit ahead of a goal priority, for a system that honours permit savings through `reserve` (0 for rods under rod-first)',
-			},
-		},
-		validation: validateSystem(),
-	};
-}
-
-/**
- * Informational (not part of the validation): the integration configuration, system() (live permits) with
- * rods.system() instead of the baseline, provisional daily XP, to Lv F.LIFECYCLE.maxLevel.
- */
-function withRodsSystem(prices) {
-	if (typeof rods.system !== 'function') return { skipped: 'rods.system() is not exported yet' };
-	try {
-		return Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
-			const r = LC.simulate({ archetype: a, systems: [rods.system(), LC.provisionalDaily(), system({ prices })] });
-			const summary = permitSummary(r);
-			const reached = Object.entries(summary).filter(([, p]) => p.reachedH !== null);
-			return [a, {
-				maxDelaySessions: Math.max(0, ...reached.filter(([, p]) => p.delaySessions !== null).map(([, p]) => p.delaySessions)),
-				notBought: reached.filter(([, p]) => p.delayH === null).map(([b]) => b),
-				permits: summary,
-			}];
-		}));
-	}
-	catch (e) {
-		return { error: e.message };
-	}
-}
-
-// ---------------------------------------------------------------------------------------------
-// Mountain Stream and the post-50 world.
 function mountainStream(path = F.gearPath()) {
 	const species = ladderSpecies();
 	const counts = {};
@@ -1322,9 +967,11 @@ function mountainStream(path = F.gearPath()) {
 	const implied = (F.BIOME_VALUE[MS] * target) / actual;
 	const inBand = actual >= Math.min(...lateSteps) && actual <= Math.max(...lateSteps);
 	const requested = inBand ? null : Math.round(implied);
-	// Every Mountain Stream value is proportional to its BIOME_VALUE, so figures at the requested value are
-	// the framework figures scaled by requested / current (shown for the decision; F stays authoritative).
+	// Every Mountain Stream value is proportional to its BIOME_VALUE, so figures at another value are the
+	// framework figures scaled by value / current (shown for the decision; F stays authoritative).
 	const scale = requested ? requested / F.BIOME_VALUE[MS] : 1;
+	const alternative = require('./decisions').DECISIONS.find((d) => d.id === 'P-MS-VALUE')?.alternatives?.[0] ?? null;
+	const homeStep = F.hourly(biomeOutcome(MS, top)).cash / F.hourly(biomeOutcome('Swamp', F.typicalTier('Swamp', path))).cash;
 	const current = currentMountainStream();
 	const table = F.castOutcome({ ...gearStep(top), biome: F.BIOME_ORDER[0] }).table;
 	const curWeak = engineCatch(current, ['weak'], F.castOutcome({ ...gearStep(path[0]), biome: F.BIOME_ORDER[0] }).table);
@@ -1346,6 +993,13 @@ function mountainStream(path = F.gearPath()) {
 			band: [round(Math.min(...lateSteps), 3), round(Math.max(...lateSteps), 3)],
 			inBand,
 			impliedBiomeValue: round(implied, 1),
+			homeStepOverSwamp: round(homeStep, 3),
+			atAlternative: typeof alternative === 'number' ? {
+				biomeValue: alternative,
+				stepOverSwamp: round((actual * alternative) / F.BIOME_VALUE[MS], 3),
+				inBand: (actual * alternative) / F.BIOME_VALUE[MS] >= Math.min(...lateSteps) && (actual * alternative) / F.BIOME_VALUE[MS] <= Math.max(...lateSteps),
+				homeStepOverSwamp: round((homeStep * alternative) / F.BIOME_VALUE[MS], 3),
+			} : null,
 			requestedBiomeValue: requested,
 			atRequested: requested ? {
 				stepOverSwamp: round(actual * scale, 3),
@@ -1367,100 +1021,104 @@ function mountainStream(path = F.gearPath()) {
 	};
 }
 
+// ---------------------------------------------------------------------------------------------
+// The post-50 curve.
+let postFiftyCache = null;
 /**
- * The post-50 curve: Swamp's level (50) -> Mountain Stream's level (60) per archetype, per-level hours around
- * it, what the reference player buys in that stage, and post-60 pacing with Mountain Stream live and no
- * further gear tier (a sketch up to PARAMS.sketchMaxLevel; an upper bound on post-60 stage lengths).
+ * Lv 50 (the last live biome) -> Lv 60 (Mountain Stream's level) on the integrated reference loop per archetype,
+ * the reference player's per-level hours and stage lengths, and the stage before Mountain Stream.
+ * POST-60 IS OUTSIDE THE INTEGRATED MODEL (Mountain Stream is not live; nothing past 60 is designed). Its sketch
+ * spans are curve-based: (F.xpForLevel(y) - F.xpForLevel(x)) / the archetype's integrated XP rate, i.e. its XP per
+ * hour of play over the L50 -> L60 stage (every source), with the fishing part raised by the endgame tier's fishing
+ * XP gain (the tier held from Lv 60 on; fishing XP per cast is biome-independent: monotonicity()).
  */
 function postFifty() {
-	const prices = permitPriceMap();
+	if (postFiftyCache) return postFiftyCache;
+	const path = F.gearPath();
 	const lastLive = F.LIVE_BIOMES[F.LIVE_BIOMES.length - 1];
 	const from = F.BIOME_LEVEL[lastLive];
-	const marks = [from, F.BIOME_LEVEL[MS], ...PARAMS.expansions.map((e) => e.level), PARAMS.sketchMaxLevel];
-	const sketch = Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => [a, cachedLifecycle(a, { prices, expansion: true, maxLevel: PARAMS.sketchMaxLevel })]));
-	const at = (life, L) => (L <= 1 ? 0 : life.levelAt[L]);
-	const archetypes = Object.fromEntries(Object.entries(sketch).map(([a, life]) => {
+	const to = F.BIOME_LEVEL[MS];
+	const endTier = path.find((s) => s.level === to) || path[path.length - 1];
+	const stageTier = F.tierAt(from, path);
+	const sketchLevels = [to, ...PARAMS.expansions.map((e) => e.level), PARAMS.sketchMaxLevel];
+	const xpTotal = (snap) => Object.values(snap.ledger.xp).reduce((t, v) => t + v, 0);
+	const archetypes = Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
+		const life = lifecycle(a);
+		const m = life.result.milestones;
+		if (!m[from] || !m[to]) throw new Error(`postFifty: ${a} does not reach Lv ${to}`);
+		const endEquip = life.rods[endTier.tier]?.equippedH ?? null;
 		const dayH = sessionH(a);
-		const reach = Object.fromEntries(marks.slice(0, 2).map((L) => [`L${L}`, { hours: round(at(life, L)), day: Math.ceil(at(life, L) / dayH) }]));
-		const spans = Object.fromEntries(marks.slice(1).map((y, i) => {
-			const x = marks[i];
-			return [`L${x}-L${y}`, { hours: round(at(life, y) - at(life, x)), days: round((at(life, y) - at(life, x)) / dayH, 1) }];
-		}));
-		return [a, { reach, spans }];
+		const hours = m[to].hours - m[from].hours;
+		const xp = xpTotal(m[to]) - xpTotal(m[from]);
+		const fishingShare = ((m[to].ledger.xp.fishing || 0) - (m[from].ledger.xp.fishing || 0)) / xp;
+		const oh = F.ARCHETYPES[a].overheadS;
+		const gain = biomeHourly(lastLive, endTier, oh).xp / biomeHourly(lastLive, stageTier, oh).xp;
+		const rate = xp / hours;
+		const post60Rate = rate * (fishingShare * gain + (1 - fishingShare));
+		const sketch = sketchLevels.slice(1).map((y, i) => {
+			const x = sketchLevels[i];
+			const h = (F.xpForLevel(y) - F.xpForLevel(x)) / post60Rate;
+			return { from: x, to: y, hours: round(h), days: round(h / dayH, 1) };
+		});
+		return [a, {
+			reach: { [from]: { hours: round(m[from].hours), day: m[from].day }, [to]: { hours: round(m[to].hours), day: m[to].day } },
+			stage: { hours: round(hours), days: round(hours / dayH, 1) },
+			// The endgame tier fishes from max(its purchase, reaching its level): hours after reaching Lv `to`.
+			endTierEquipDelayH: endEquip === null ? null : round(Math.max(0, endEquip - m[to].hours), 4),
+			xpRate: { stage: r0(rate), fishingShare: round(fishingShare, 3), endTierFishingGain: round(gain, 3), post60: r0(post60Rate) },
+			sketch,
+		}];
 	}));
-	const reg = sketch[F.REFERENCE_ARCHETYPE];
+	const regM = lifecycle(F.REFERENCE_ARCHETYPE).result.milestones;
 	const perLevel = {};
-	for (let L = from - 5; L <= F.BIOME_LEVEL[MS] + 10; L++) perLevel[L] = round(at(reg, L) - at(reg, L - 1), 3);
-	// The stage before Mountain Stream for the reference player: what they buy while fishing the last live
-	// biome with its typical tier.
+	for (let L = from - 5; L <= to; L++) perLevel[L] = round(regM[L].hours - regM[L - 1].hours, 3);
+	const bounds = [0, ...[...new Set(Object.values(F.BIOME_LEVEL))].filter((L) => L > 0 && L <= to).sort((x, y) => x - y)];
+	const integratedStages = bounds.slice(1).map((L, i) => ({ stage: `${bounds[i]}-${L}`, hours: round(regM[L].hours - (bounds[i] ? regM[bounds[i]].hours : 0)), source: 'integrated' }));
+	const sketchStages = archetypes[F.REFERENCE_ARCHETYPE].sketch.map((s) => ({ stage: `${s.from}-${s.to}`, hours: s.hours, source: 'curve-based sketch' }));
+	const stages = [...integratedStages, ...sketchStages].map((x, i, arr) => ({ ...x, ratio: i ? round(x.hours / arr[i - 1].hours, 3) : null }));
 	const stage = referenceStages()[MS];
-	const endTier = F.gearPath().find((s) => s.level === F.BIOME_LEVEL[MS]);
-	const endCost = endTier ? rodCost(endTier.tier) : null;
-	// Stage-length growth: hours per 10-level stage (biome levels, then the sketch placements).
-	const levels = [...new Set([...Object.values(F.BIOME_LEVEL).filter((L) => L > 0), ...PARAMS.expansions.map((e) => e.level), PARAMS.sketchMaxLevel])].sort((x, y) => x - y);
-	const stages = levels.map((L, i) => {
-		const lo = i ? levels[i - 1] : 0;
-		return { stage: `${lo}-${L}`, hours: round(at(reg, L) - at(reg, lo)) };
-	}).map((x, i, arr) => ({ ...x, ratio: i ? round(x.hours / arr[i - 1].hours, 3) : null }));
-	const path = F.gearPath();
-	const top = path[path.length - 1];
-	const prevTop = path[path.length - 2];
-	const xpHour = (step) => biomeHourly(MS, step, F.ARCHETYPES[F.REFERENCE_ARCHETYPE].overheadS).xp;
-	return {
-		curve: { base: F.CURVE.base, quartic: F.CURVE.quartic, xpAt: Object.fromEntries(marks.map((L) => [L, r0(F.xpForLevel(L))])) },
-		marks,
+	const endCost = assemblyCost(endTier);
+	const xpHour = (step) => biomeHourly(lastLive, step, F.ARCHETYPES[F.REFERENCE_ARCHETYPE].overheadS).xp;
+	postFiftyCache = {
+		curve: { base: F.CURVE.base, quartic: F.CURVE.quartic, xpAt: Object.fromEntries([from, ...sketchLevels].map((L) => [L, r0(F.xpForLevel(L))])) },
+		from, to, sketchLevels,
 		archetypes,
 		perLevelHoursReference: perLevel,
 		stageHoursReference: stages,
 		stageBeforeMountainStream: {
 			biome: stage.stageBiome, tier: stage.stageTier, hours: round(stage.stageHours), cashPerHour: r0(stage.stageCashPerHour), earnings: r0(stage.expectedEarnings),
-			endgameTier: endTier ? endTier.tier : null,
-			endgameTierAssembly: endCost === null ? null : r0(endCost), endgameTierShareOfStage: endCost === null ? null : round(endCost / stage.expectedEarnings, 4),
+			endgameTier: endTier.tier, endgameTierAssembly: endCost === null ? null : r0(endCost), endgameTierShareOfStage: endCost === null ? null : round(endCost / stage.expectedEarnings, 4),
 			permit: permitPrice(MS), permitShareOfStage: round(permitPrice(MS) / stage.expectedEarnings, 4),
 		},
-		// XP/h at the reference cadence: the endgame tier over the tier before it (no tier beyond it is modelled).
-		xpPerHourReference: { [`tier${prevTop.tier}`]: r0(xpHour(prevTop)), [`tier${top.tier}`]: r0(xpHour(top)), gain: round(xpHour(top) / xpHour(prevTop), 3) },
+		// Fishing XP/h at the reference cadence: the endgame tier over the tier held in the 50 -> 60 stage.
+		xpPerHourReference: { stageTier: stageTier.tier, endTier: endTier.tier, stage: r0(xpHour(stageTier)), end: r0(xpHour(endTier)), gain: round(xpHour(endTier) / xpHour(stageTier), 3) },
 	};
+	return postFiftyCache;
 }
 
-/** Deep Sea / Arctic / Abyss: indicative placement, value continuation and permit (not designed). */
+/** Deep Sea / Arctic / Abyss: indicative placement, value continuation and permit (not designed; curve-based). */
 function expansionSketch() {
 	const bv = F.BIOME_VALUE;
 	const live = [...F.LIVE_BIOMES, MS];
 	// Geometric continuation of the last three BIOME_VALUE steps.
 	const k = 3;
-	const step = (bv[live[live.length - 1]] / bv[live[live.length - 1 - k]]) ** (1 / k);
-	const reg = cachedLifecycle(F.REFERENCE_ARCHETYPE, { prices: permitPriceMap(), expansion: true, maxLevel: PARAMS.sketchMaxLevel });
+	const valueStep = (bv[live[live.length - 1]] / bv[live[live.length - 1 - k]]) ** (1 / k);
+	const sketch = postFifty().archetypes[F.REFERENCE_ARCHETYPE].sketch;
+	const path = F.gearPath();
+	const msRate = biomeHourly(MS, path[path.length - 1]).cash;
 	let prevValue = bv[MS];
-	let prevLevel = F.BIOME_LEVEL[MS];
-	const top = F.gearPath()[F.gearPath().length - 1];
-	const msRate = biomeHourly(MS, top).cash;
 	return {
-		valueStep: round(step, 3),
+		valueStep: round(valueStep, 3),
 		biomes: PARAMS.expansions.map((e) => {
-			const value = prevValue * step;
-			const hours = reg.levelAt[e.level] - reg.levelAt[prevLevel];
-			// Indicative permit: same rule, the stage before it fished in the previous biome with the endgame tier.
+			const value = prevValue * valueStep;
+			const before = sketch.find((x) => x.to === e.level) || null;
+			// Indicative permit: the same rule, the stage before it fished in the previous biome with the endgame tier.
 			const prevRate = msRate * (prevValue / bv[MS]);
-			const out = { ...e, indicativeBiomeValue: r0(value), stageHoursReference: round(hours), indicativePermit: nicePrice(PARAMS.permits.stageShare * hours * prevRate) };
+			const out = { ...e, indicativeBiomeValue: r0(value), stageHoursReference: before ? before.hours : null, indicativePermit: before ? nicePrice(PARAMS.permits.stageShare * before.hours * prevRate) : null };
 			prevValue = value;
-			prevLevel = e.level;
 			return out;
 		}),
 	};
-}
-
-/**
- * lifecycle(purchase 'curve', no permits) reproduces docs/economy/5b/curve.json (regular player). curve.json
- * is the provisional-model fit, so this runs on F.PROVISIONAL_GEAR_PATH (F.gearPath() is the rods path
- * since the 5b.3 R3 cutover).
- */
-function replicationCheck() {
-	const life = lifecycle(F.REFERENCE_ARCHETYPE, { permits: false, purchase: 'curve', path: F.PROVISIONAL_GEAR_PATH });
-	const expected = CURVE_JSON.best.regular;
-	const got = Object.fromEntries(Object.keys(expected).map((L) => [L, life.reached[L]?.hours ?? null]));
-	const maxAbs = Math.max(...Object.keys(expected).map((L) => Math.abs((got[L] ?? Infinity) - expected[L])));
-	return { expected, got, maxAbsHours: round(maxAbs, 4), ok: maxAbs <= 0.011 && CURVE_JSON.chosen === F.CURVE.quartic };
 }
 
 /** Today's measured (real engine, BALANCE_VERSION 3.2.0) Old Rod $/fish per biome. */
@@ -1473,70 +1131,201 @@ function today() {
 
 /** Target checks (pass/fail). */
 function checks() {
-	const tta = timeToAfford();
-	const ref = F.REFERENCE_ARCHETYPE;
 	const out = [];
-	for (const [a, v] of Object.entries(tta)) {
-		const limit = a === ref ? PARAMS.targets.referenceMaxDelaySessions : PARAMS.targets.maxDelaySessions;
-		out.push({ check: `${a}: every permit owned within ${limit} session(s) of reaching its level (rods on schedule, fish income only)`, value: v.maxDelaySessions, ok: v.maxDelaySessions <= limit + 1e-9 });
-		const rodDelay = Math.max(0, ...Object.values(v.rodDelayVsNoPermits).filter((x) => x !== null));
-		out.push({ check: `${a}: permits delay no rod tier by more than one session`, value: rodDelay, ok: rodDelay <= sessionH(a) + 1e-9 });
+	const ref = F.REFERENCE_ARCHETYPE;
+	const limit = (a) => (a === ref ? PARAMS.targets.referenceMaxDelaySessions : PARAMS.targets.maxDelaySessions);
+	const sens = sensitivity();
+	for (const config of ['reference', 'fishOnly', STRESS]) {
+		const s = sens[config];
+		const per = Object.entries(s.archetypes);
+		out.push({
+			check: `${s.label}: every permit owned within the target after reaching its level (reference player ${PARAMS.targets.referenceMaxDelaySessions} sessions, others ${PARAMS.targets.maxDelaySessions})`,
+			value: Object.fromEntries(per.map(([a, v]) => [a, v.maxDelaySessions])),
+			ok: per.every(([a, v]) => v.maxDelaySessions <= limit(a) + 1e-9),
+		});
+		out.push({
+			check: `${s.label}: permits delay no rod tier by more than one session`,
+			value: Object.fromEntries(per.map(([a, v]) => [a, v.maxRodDelayH])),
+			ok: per.every(([a, v]) => v.maxRodDelayH <= sessionH(a) + 1e-9),
+		});
 	}
+	const lt = levelTimes();
+	out.push({ check: 'permits change no level time (reference loop, every archetype, every milestone)', value: lt.maxAbsDiffH, ok: lt.maxAbsDiffH < 1e-9 });
+	out.push({ check: 'the reference loop at these permit prices reproduces R1\'s record (curve-integrated.json, regular, to its 2 decimals)', value: lt.r1Record.maxAbsDiffH, ok: lt.r1Record.maxAbsDiffH <= 0.005 + 1e-9 && lt.r1Record.quartic === F.CURVE.quartic });
+	const spend = Object.values(budget());
+	out.push({ check: 'reference loop to the last milestone: never blocked, never below $0 (every archetype)', value: { blockedHours: maxOf(spend.map((v) => v.blockedHours)), minMoney: minOf(spend.map((v) => v.minMoney)) }, ok: spend.every((v) => v.blockedHours === 0 && v.minMoney >= 0) });
 	const mono = monotonicity();
 	out.push({ check: 'income rises with biome at every tier and access level (F.gearPath())', value: mono.minBiomeStepRatio, ok: mono.ok });
 	const prices = PERMIT_BIOMES.map((b) => permitPrice(b));
 	out.push({ check: 'permit prices rise with biome level', value: prices, ok: prices.every((p, i) => i === 0 || p > prices[i - 1]) });
 	const ms = mountainStream();
-	out.push({ check: 'Mountain Stream same-tier step over Swamp inside the live late-ladder band (non-blocking: a miss raises a BIOME_VALUE framework change request)', value: { step: ms.valueCheck.actualStep, band: ms.valueCheck.band, requested: ms.valueCheck.requestedBiomeValue }, ok: ms.valueCheck.inBand, blocking: false });
-	out.push({ check: 'Mountain Stream: every weather has a premium Ultra and a catch', value: ms.perWeatherAtTopTier.map((w) => w.premiumUltra.length), ok: ms.perWeatherAtTopTier.every((w) => w.premiumUltra.length === 1 && w.catchProbability > 0.999) });
+	out.push({ check: 'Mountain Stream same-tier step over Swamp inside the live late-ladder band (at the modelled BIOME_VALUE, P-MS-VALUE)', value: { step: ms.valueCheck.actualStep, band: ms.valueCheck.band }, ok: ms.valueCheck.inBand });
+	out.push({ check: 'Mountain Stream: every weather has one premium Ultra and a certain catch', value: ms.perWeatherAtTopTier.map((x) => x.premiumUltra.length), ok: ms.perWeatherAtTopTier.every((x) => x.premiumUltra.length === 1 && x.catchProbability > 0.999) });
 	const parity = mirrorParity();
 	out.push({ check: 'ladder mirror equals F.castOutcome on every live biome', value: parity.maxRelativeError, ok: parity.ok });
-	const rep = replicationCheck();
-	out.push({ check: 'lifecycle reproduces curve.json (regular, curve purchase model)', value: rep.maxAbsHours, ok: rep.ok });
-	const v = validateSystem();
-	out.push({ check: 'world.system() on the shared lifecycle core reproduces lifecycle() (every archetype and configuration, < 0.5%), permit prices and curve.json', value: v.maxRelativeDifference, ok: v.ok });
 	return out;
 }
 
 // ---------------------------------------------------------------------------------------------
-function questCashSensitivity() {
-	// Sensitivity only: quests.js is an in-flight design. Its cash reaches the player once per day on top of
-	// fish income (XP model unchanged). Skipped with a note if its entry point is unavailable.
-	let quests;
-	try {
-		quests = require('./quests');
-	}
-	catch (e) {
-		return { skipped: `quests.js not loadable: ${e.message}` };
-	}
-	if (typeof quests.questIncome !== 'function') return { skipped: 'quests.questIncome() not exported' };
-	const prices = permitPriceMap();
-	const extraCashPerDay = (L, r, a) => {
-		const dayH = a.minutesPerDay / 60;
-		return quests.questIncome(L, r.fish * dayH, dayH).cash;
+// Integration contract and the retired loop's parity record.
+
+/**
+ * RETIRED at the 5b.4 migration: world.lifecycle()'s private stepping loop (curve.js-style XP with the provisional
+ * daily XP, rods paid on schedule, permits). Before it was deleted, validateSystem() compared system() on the
+ * shared core (plus baselines replaying the loop's rods, daily XP and other spend) with it for every archetype in
+ * five configurations. The loop no longer exists to recompute this; the values below are that output.
+ */
+const RETIRED_LOOP_PARITY = deepFreeze({
+	commit: 'a83b5f0',
+	check: 'validateSystem(): system() on the shared core vs the private loop; 4 archetypes x 5 configurations (design, permit-first, 15% other spend, grandfathered Lv 34, no permits): level hours, permit and rod times, ledgers at milestone day ends',
+	maxRelativeDifference: 0.0000263,
+	recorded: 'the a83b5f0 commit message records world 0.03% (a framework 5b.3 run); the a83b5f0 code re-run at 5b.4 just before the deletion gave 0.0026%',
+	timeToAffordIdentical: true,
+	pricesFromCoreIdentical: true,
+	remainingDifference: 'the core buys in an end-of-day pass after the daily XP, the loop after the next step: one step of income, the core rule is the right one',
+});
+
+function integrationSection() {
+	return {
+		framework: `${F.FRAMEWORK_VERSION} shared lifecycle core (lifecycle.js); integrate.js system '${SYSTEM_NAME}' in the REFERENCE core loop (${I.REFERENCE.join(', ')})`,
+		system: {
+			options: {
+				permits: 'default true; false = every live biome open at its level (the reference-stage model behind permitPrice())',
+				prices: 'default permitPriceMap()',
+				schedule: `'rod-first' | 'permit-first' (default PARAMS.schedule.tieBreak '${PARAMS.schedule.tieBreak}')`,
+				priority: 'a fixed base priority instead of the due-level order (sensitivity)',
+				expansion: 'also offer the Mountain Stream permit at its level (it is still never fished)',
+				grandfatheredLevel: 'permits held from the start for every live non-free biome at or below this level',
+				grandfathered: 'biome names or grandfatheredPermits(user) records held from the start',
+			},
+			hooks: {
+				init: 'state.sys.world: permits held (free Ocean, grandfathered), prices, levels reached, purchases',
+				canFish: 'a live biome whose permit is held; Mountain Stream stays out of the live biomes (never fished)',
+				goals: 'one \'progression\' goal per unowned permit whose level the gate level has reached (item \'permit:<biome>\'); priority LC.PRIORITY.permit when due before the pending rod tier (or tied under \'permit-first\'), else LC.PRIORITY.rod + 1; blocking while unaffordable',
+				on: '\'levelUp\' of the gate kind (public under the Founder\'s public gate) records when each biome level is reached',
+				onDayStart: 'clears the end-of-day purchase flag',
+				onDayEnd: 'flags purchases made by the core\'s end-of-day purchase pass',
+			},
+			ledger: { xpSources: [], cashSources: [], spend: { progression: F.LIVE_BIOMES.filter((b) => !isFree(b)).map(permitItem), progressionWithExpansion: [permitItem(MS)] } },
+			helpers: {
+				permitSummary: 'time to afford per permit from a simulate() result (reached, bought, delay in hours and sessions, money held at the level / price)',
+				lifecycle: 'one integrated run of a CONFIGS configuration with the world system (reference loop or stress)',
+			},
+		},
+		configs: Object.fromEntries(Object.entries(CONFIGS).map(([k, c]) => [k, c.label])),
+		retiredLoopParity: RETIRED_LOOP_PARITY,
 	};
-	return Object.fromEntries([0, ...PARAMS.sensitivity.otherSpendShares].map((otherSpendShare) => [otherSpendShare, Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
-		const life = lifecycle(a, { prices, expansion: true, extraCashPerDay, otherSpendShare });
-		return [a, {
-			maxDelaySessions: Math.max(0, ...Object.values(life.permits).map((p) => p.delaySessions ?? Infinity)),
-			questCashShareOfIncome: round(life.totals.extra / (life.totals.extra + life.totals.gross), 4),
-			minCoverageAtLevel: Math.min(...Object.values(life.permits).map((p) => p.coverageAtLevel ?? Infinity)),
-		}];
-	}))]));
 }
 
+// ---------------------------------------------------------------------------------------------
+// Decisions for the user's approval (decisions.js shape; status 'proposed' only: only the user approves).
+const DECISIONS = [
+	{
+		id: 'P-WORLD-PERMIT-SHARE', status: 'proposed',
+		title: 'Permit price = a stage share of the reference player\'s expected fish income in the stage before the biome (H(k) = share x stage hours of the income earned just before the level), rounded to significant digits',
+		modelled: `stageShare ${PARAMS.permits.stageShare}, ${PARAMS.priceSigDigits} significant digits (permitPrice(); stage hours from the integrated reference loop without permits)`,
+		alternatives: [`another share (shareSweep: ${PARAMS.sensitivity.shareSweep.join(', ')})`, 'a flat number of hours of income per permit (punitive early, trivial late)', 'hand-set prices'],
+		source: 'world design',
+		why: 'scales with both stage length and stage income, so the permit reads as the same milestone at every biome and regenerates with the framework',
+		get: () => ({ stageShare: PARAMS.permits.stageShare, sigDigits: PARAMS.priceSigDigits }),
+		expected: { stageShare: 0.1, sigDigits: 2 },
+	},
+	{
+		id: 'P-WORLD-PERMIT-PRICES', status: 'proposed',
+		title: 'The resulting permit prices (framework 5b.4, integrated reference stage hours)',
+		modelled: 'permitPriceMap()',
+		alternatives: ['re-derive at a later framework version before baking into balance.js', 'prices at another share (shareSweep)'],
+		source: 'world design',
+		why: 'the formula\'s output at the final framework; the engine bakes these constants (a test asserts they equal permitPriceMap())',
+		get: () => permitPriceMap(),
+		expected: { River: 1000, Lake: 6200, Pond: 23000, Coast: 62000, Swamp: 160000, 'Mountain Stream': 380000 },
+	},
+	{
+		id: 'P-WORLD-PERMIT-RULES', status: 'proposed',
+		title: 'Permits: Ocean free; one-time, account-bound, never expire, not consumed, not refundable; no chain (a permit does not require the previous one); bought once the gate level reaches the biome; one price for everyone (the Founder pays it from final cash); a progression purchase, not upkeep',
+		modelled: `free ${JSON.stringify(PARAMS.permits.free)}, requiresPrevious ${PARAMS.permits.requiresPrevious} (system(), accessibleBiomes())`,
+		alternatives: ['a sequential chain (Pond requires Lake)', 'permits that expire or recur (upkeep)'],
+		source: 'world design (user decision 3: a milestone purchase alongside the level)',
+		why: 'a milestone, never a second wall: a player who does not buy keeps fishing the biome below and keeps their money',
+		get: () => ({ free: PARAMS.permits.free, requiresPrevious: PARAMS.permits.requiresPrevious }),
+		expected: { free: ['Ocean'], requiresPrevious: false },
+	},
+	{
+		id: 'P-WORLD-AFFORD-TARGET', status: 'proposed',
+		title: 'Time-to-afford target: every permit owned within this many daily sessions of reaching its level (the reference player: at the level), with rods bought on schedule, on the reference loop and on fish income alone',
+		modelled: `maxDelaySessions ${PARAMS.targets.maxDelaySessions}, referenceMaxDelaySessions ${PARAMS.targets.referenceMaxDelaySessions} (checks())`,
+		alternatives: ['a looser target (a permit may take a few sessions to save for)'],
+		source: 'world design',
+		why: 'the permit is announced at level-up and should be affordable then; a real wait would read as a second level gate',
+		get: () => PARAMS.targets,
+		expected: { maxDelaySessions: 1, referenceMaxDelaySessions: 0 },
+	},
+	{
+		id: 'P-WORLD-GRANDFATHER', status: 'proposed',
+		title: 'Grandfathering: an account with no permits field receives a grandfathered permit for every live biome at or below max(stored level, today\'s levelForXp(xp)) plus its current biome; an account that has the field (even empty) is untouched',
+		modelled: 'grandfatheredPermits(user) on the migration examples',
+		alternatives: ['level only (without the current biome)', 'no grandfathering (everyone buys)'],
+		source: 'world design (user decision 3)',
+		why: 'nobody loses access or is moved out of the water they are standing in; levels never drop, so today\'s level is the most generous correct basis; additive and idempotent',
+		get: () => MIGRATION_EXAMPLES.map((x) => {
+			const g = grandfatheredPermits(x.user);
+			return g === null ? null : g.map((p) => p.biome);
+		}),
+		expected: [['River', 'Lake', 'Pond'], [], ['River', 'Lake', 'Pond', 'Coast', 'Swamp'], ['River', 'Lake'], null],
+	},
+	{
+		id: 'P-WORLD-MS-LADDER', status: 'proposed',
+		title: 'Mountain Stream is the first expansion biome at its shared level: a freshwater ladder where the weather decides the premium (one strong Ultra salmon per weather: the three existing salmon unchanged plus two new), every rarity with year-round species; not live until approved and seeded',
+		modelled: 'PARAMS.mountainStream.ladder (mountainStream())',
+		alternatives: ['keep today\'s three weather-exclusive salmon only (NO_CATCH on most casts)', 'a rarity-weighted premium instead of the weather'],
+		source: 'world design (user decision 11)',
+		why: 'no weather is dead or a farm; the forecast decides which premium salmon can be caught (collections, quests, aquarium); the draw model is exact because a fallback species always exists',
+		get: () => {
+			const s = ladderSpecies();
+			return { level: F.BIOME_LEVEL[MS], species: s.length, newSpecies: s.filter((x) => !x.existing).length, weatherPremium: PARAMS.mountainStream.ladder.filter((x) => x.weather).map((x) => `${x.name}:${x.weather}`) };
+		},
+		expected: { level: 60, species: 25, newSpecies: 22, weatherPremium: ['Flashfin Salmon:Rainy', 'Shrouded Salmon:Cloudy', 'Zephyr Salmon:Windy', 'Sunrun Salmon:Sunny', 'Snowmelt Salmon:Snowy'] },
+	},
+	{
+		id: 'P-WORLD-MS-WEAK-LADDER', status: 'proposed',
+		title: 'Mountain Stream keeps a weak species at every rarity, so the Old Rod (the safety net) still catches the weak ladder; the premium fish need a crafted rod',
+		modelled: 'weak species per rarity in PARAMS.mountainStream.ladder',
+		alternatives: ['a strong-only biome (the Old Rod catches nothing there)'],
+		source: 'world design',
+		why: 'the safety net holds in every biome; a generous Old Rod at the endgame costs nothing',
+		get: () => Object.fromEntries(RARITIES.map((r) => [r, PARAMS.mountainStream.ladder.filter((x) => x.rarity === r && x.quality === 'weak').length])),
+		expected: { common: 2, uncommon: 2, rare: 2, ultra: 1, giant: 1, legendary: 1, lucky: 1 },
+	},
+	{
+		id: 'P-WORLD-POST50', status: 'proposed',
+		title: 'Post-50 outline: the 50 -> 60 stage buys the endgame rod tier and the Mountain Stream permit; later expansions one biome per 10-level stage (sketch only, not designed), each to arrive with its own gear tier and aspirational sinks',
+		modelled: 'PARAMS.expansions (postFifty(), expansionSketch(); outside the integrated model)',
+		alternatives: ['no post-60 content plan yet', 'other placements'],
+		source: 'world design',
+		why: 'every stage stays anchored to a new place and each permit stays a milestone; no curve change is needed for Mountain Stream',
+		get: () => PARAMS.expansions.map((e) => [e.biome, e.level]),
+		expected: [['Deep Sea', 70], ['Arctic', 80], ['Abyss', 90]],
+	},
+	{
+		id: 'P-WORLD-L60-WINDOW', status: 'proposed',
+		title: 'Optional: add a Lv 60 target window for the regular player so R1 also guards the Mountain Stream stage (the range is the user\'s call; the integrated Lv 60 time is in the post-50 table)',
+		modelled: 'not modelled: F.TARGET_WINDOWS has no Lv 60 entry',
+		alternatives: ['no Lv 60 window (today)'],
+		source: 'world design',
+		why: 'the 50 -> 60 stage is the longest; a window would stop a later change from stretching it unnoticed',
+	},
+];
+
+// ---------------------------------------------------------------------------------------------
+// Report.
 function buildReport() {
 	const path = F.gearPath();
-	const table = permitTable();
-	const sched = Object.fromEntries(['rod-first', 'permit-first'].map((s) => [s, timeToAfford({ schedule: s })]));
-	const other = Object.fromEntries(PARAMS.sensitivity.otherSpendShares.map((o) => [o, Object.fromEntries(Object.entries(timeToAfford({ otherSpendShare: o })).map(([a, v]) => [a, { maxDelaySessions: v.maxDelaySessions, delaysH: Object.fromEntries(Object.entries(v.permits).map(([b, p]) => [b, p.delayH])), rodDelayVsNoPermitsH: v.rodDelayVsNoPermits }]))]));
-	const noPermitRef = cachedLifecycle(F.REFERENCE_ARCHETYPE, { permits: false });
-	const withPermitRef = cachedLifecycle(F.REFERENCE_ARCHETYPE, { prices: permitPriceMap(), expansion: true });
 	return {
 		...F.stamp(),
 		gearPathSource: F.GEAR_PATH_SOURCE,
-		method: `exact analytic model (framework ${F.FRAMEWORK_VERSION}); income from F.gearPath() (${F.GEAR_PATH_SOURCE}); curve.js XP stepping (daily ${F.DAILY.xpPerLevel} x level); rods bought from rods.assembly() expected costs from their crate unlock level; upkeep = rods repair $/fish; permits funded by due level (${PARAMS.schedule.tieBreak} on ties); fish income only`,
+		method: `framework ${F.FRAMEWORK_VERSION}: per-cast figures from F.castOutcome / F.hourly on F.gearPath() (${F.GEAR_PATH_SOURCE}); lifecycle figures from the shared core (${I.REFERENCE_NOTE}; stress configurations in CONFIGS); post-60 curve-based (outside the integrated model)`,
 		params: PARAMS,
+		configs: Object.fromEntries(Object.entries(CONFIGS).map(([k, c]) => [k, c.label])),
 		today: { oldRodValuePerFish: today() },
 		valueModel: {
 			table: valueTable(path),
@@ -1545,14 +1334,13 @@ function buildReport() {
 			oldRodValuePerFish: Object.fromEntries(F.LIVE_BIOMES.map((b) => [b, round(biomeOutcome(b, path[0]).valuePerFish, 1)])),
 		},
 		permits: {
-			formula: `permit(k) = nicePrice(${PARAMS.permits.stageShare} x stageHours(ref, level(k-1) -> level(k)) x $/h(biome k-1, F.typicalTier(k-1), ref cadence))`,
-			table,
+			formula: `permit(k) = nicePrice(${PARAMS.permits.stageShare} x stageHours(ref, level(k-1) -> level(k); integrated, no permits) x $/h(biome k-1, F.typicalTier(k-1), ref cadence))`,
+			prices: permitPriceMap(),
+			table: permitTable(),
 			referenceStages: referenceStages(),
-			scheduleComparison: Object.fromEntries(Object.entries(sched).map(([s, v]) => [s, Object.fromEntries(Object.entries(v).map(([a, x]) => [a, { maxDelaySessions: x.maxDelaySessions, rodDelayVsNoPermits: x.rodDelayVsNoPermits }]))])),
-			otherSpend: other,
-			questCash: questCashSensitivity(),
+			sensitivity: sensitivity(),
 			shareSweep: shareSweep(),
-			levelTimesWithVsWithoutPermits: Object.fromEntries(F.LIFECYCLE.milestones.map((L) => [L, { without: noPermitRef.reached[L]?.hours ?? null, with: withPermitRef.reached[L]?.hours ?? null }])),
+			levelTimes: levelTimes(),
 		},
 		budget: budget(),
 		migration: {
@@ -1560,33 +1348,232 @@ function buildReport() {
 				const g = grandfatheredPermits(x.user);
 				return { ...x, grandfathered: g === null ? 'already migrated (no change)' : g.map((p) => p.biome) };
 			}),
-			recordShape: { biome: 'River', source: 'grandfathered | purchased', acquiredAt: 'Date', pricePaid: 0 },
+			recordShape: { biome: 'River', source: 'grandfathered or purchased', acquiredAt: 'Date', pricePaid: 0 },
 		},
 		mountainStream: mountainStream(path),
 		postFifty: postFifty(),
 		expansions: expansionSketch(),
 		mirrorParity: mirrorParity(path),
-		replication: replicationCheck(),
 		integration: integrationSection(),
+		decisions: DECISIONS.map((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== 'get' && k !== 'expected'))),
 		checks: checks(),
 	};
 }
 
 let reportCache = null;
-/** Every key number of docs/economy/5b/world.md, computed from framework.js (cached per process). */
+/** Every key number of docs/economy/5b/world.md, computed from the framework and the integrated model (cached). */
 function report() {
 	if (!reportCache) reportCache = buildReport();
 	return reportCache;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Generated doc tables (render-docs.js): { blockId: markdown }. Every number table of world.md comes from here.
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const tierLabel = (t) => (t === 0 ? 'Old Rod' : `T${t}`);
+const range = (xs, f) => `${f(Math.min(...xs))}–${f(Math.max(...xs))}`;
+
+function markdownTables() {
+	const R = report();
+	const T = {};
+	const archs = Object.keys(F.ARCHETYPES);
+	const live = F.LIVE_BIOMES;
+	const prices = R.permits.prices;
+	const ptable = R.permits.table;
+	const sens = R.permits.sensitivity;
+	const vt = R.valueModel.table;
+	const mono = R.valueModel.monotonicity;
+	const ms = R.mountainStream;
+	const pf = R.postFifty;
+	const lt = R.permits.levelTimes;
+	const share = PARAMS.permits.stageShare;
+	const lastLive = live[live.length - 1];
+	const homeTop = F.typicalTier(lastLive);
+	const strongPremium = live.map((b) => vt[0].biomes[b].strongAccessValuePerFish / vt[0].biomes[b].weakOnlyValuePerFish);
+	const refName = F.REFERENCE_ARCHETYPE;
+	const priceList = PERMIT_BIOMES.map((b) => `${b} ${fmtMoney(prices[b])}`).join(' · ');
+	const worstRodDelay = maxOf(Object.values(sens).map((s) => s.maxRodDelayH));
+	const budgetRows = Object.values(R.budget);
+
+	T['world-key-numbers'] = mdTable(['Key number', 'Value', 'Table'], [
+		[`Permit prices (stage share ${fmtPct(share, 0)})`, priceList, '§3.3'],
+		['Price, in hours of the income earned just before the level', range(ptable.map((p) => p.priceHoursOfStageIncome), (x) => `${x.toFixed(2)}`) + ' h', '§3.3'],
+		['Payback in the new biome, hours of play', range(ptable.map((p) => p.paybackHours), (x) => `${x.toFixed(2)}`) + ' h', '§3.3'],
+		[`Worst permit delay after reaching the level, in daily sessions: reference loop / harshest stress (${CONFIGS[STRESS].label.toLowerCase()})`, `${fmtNum(sens.reference.maxDelaySessions, 2)} / ${fmtNum(sens[STRESS].maxDelaySessions, 2)}`, '§3.4, §3.5'],
+		['Lowest money held on reaching a level ÷ that permit\'s price: reference loop / harshest stress', `${fmtX(sens.reference.minCoverage, 1)} / ${fmtX(sens[STRESS].minCoverage, 1)}`, '§3.4, §3.5'],
+		['Worst rod-tier delay caused by permits, any configuration', fmtH(worstRodDelay), '§3.5'],
+		['Largest level-time change caused by permits (every archetype and milestone)', fmtH(lt.maxAbsDiffH), '§3.7'],
+		[`${cap(refName)} player, reference loop: ${lt.levels.map((L) => `L${L}`).join(' / ')} (hours of play)`, lt.levels.map((L) => fmtNum(lt.archetypes[refName].with[L], 2)).join(' / '), '§3.7'],
+		['Smallest same-tier income step between biomes / between tiers', `${fmtX(mono.minBiomeStepRatio, 3)} / ${fmtX(mono.minTierStepRatio, 3)}`, '§2.3'],
+		['Strong premium on $/fish (weak + strong vs weak only, no stats)', range(strongPremium, (x) => fmtX(x)), '§2.2'],
+		[`Permits as a share of all income to Lv ${F.LIFECYCLE.maxLevel} (reference loop)`, range(budgetRows.map((v) => v.permitsShare), (x) => fmtPct(x)), '§3.6'],
+		['Mountain Stream: species (new) / top-tier $/h / same-tier step over Swamp (live band)', `${ms.speciesTotal} (${ms.newSpecies}) / ${fmtMoney(ms.byTier[ms.byTier.length - 1].cashPerHour)} / ${fmtX(ms.valueCheck.actualStep, 3)} (${ms.valueCheck.band.map((x) => fmtX(x, 3)).join('–')})`, '§5'],
+		[`Lv ${pf.from} → ${pf.to}, hours of play (${archs.join(' / ')})`, archs.map((a) => fmtNum(pf.archetypes[a].stage.hours, 2)).join(' / '), '§6.1'],
+	]);
+
+	const endTier = R.postFifty.stageBeforeMountainStream.endgameTier;
+	T['world-current-proposed'] = mdTable(['Item', 'Current', 'Proposed', 'Rationale'], [
+		['Biome access', 'Level only. `/biome` checks the level; the cast engine checks nothing.', `**Gate level ≥ biome level and a permit** (${PARAMS.permits.free.join(', ')} free). One-time, account-bound, never expires, no chain.`, 'User decision 3: a milestone purchase alongside the level.'],
+		['Permit prices', 'none', priceList, `${fmtPct(share, 0)} of the reference player's expected fish income in the previous stage (§3.2). Affordable at the level for every archetype (§3.4).`],
+		['Existing players', '—', 'Grandfathered permits for every biome they already qualify for, plus their current biome (§4)', 'Nobody loses access.'],
+		['Biome value ladder (Old Rod $/fish)', `Measured today: ${live.map((b) => `${b} ${fmtNum(R.today.oldRodValuePerFish[b], 1)}`).join(', ')}`, `Framework value model: ${live.map((b) => fmtNum(R.valueModel.oldRodValuePerFish[b], 1)).join(' / ')}`, 'Each biome pays more than the one before, at every tier (§2).'],
+		['Weak vs strong', 'The weak/strong split halves every biome until strong is unlocked (PHASE5_REPORT §7.1)', `Strong premium ${range(strongPremium, (x) => fmtX(x))} with no stats (§2.2)`, 'Crafted rods (always weak + strong) earn more, without a cliff.'],
+		['Mountain Stream', `${ms.today.species.length} Ultra salmon (weather-exclusive, strong only). No Biome document, so it can't be reached.`, `Lv ${ms.level} expansion biome: ${ms.speciesTotal} species (${ms.newSpecies} new), one Ultra salmon per weather, permit ${fmtMoney(prices[MS])}. BIOME_VALUE ${ms.biomeValue} (P-MS-VALUE). Not implemented now.`, 'User decision 11. Keeps the existing salmon.'],
+		[`After Lv ${pf.from}`, 'Nothing to unlock', `${pf.from}→${pf.to} stage: the ${tierLabel(endTier)} set and the Mountain Stream permit; expansions sketched at ${PARAMS.expansions.map((e) => e.level).join('/')}.`, `Gives the longest stage (${fmtNum(pf.archetypes[refName].stage.hours, 2)} h for the ${refName} player) its goals.`],
+	]);
+
+	const stepLabel = (row) => (row.tier === 0 ? 'Old Rod' : `T${row.tier} (Lv ${row.level}, ${fmtNum(row.meanFish, 2)} fish)`);
+	T['world-value-per-fish'] = mdTable(['Gear', ...live], vt.map((row) => [stepLabel(row), ...live.map((b) => fmtNum(row.biomes[b].valuePerFish, 1))]));
+	T['world-value-per-hour'] = mdTable(['Gear', 'XP/h', ...live], vt.map((row) => {
+		const home = F.biomeAt(row.level);
+		return [tierLabel(row.tier), fmtNum(row.biomes[live[0]].xpPerHour), ...live.map((b) => (b === home && row.tier > 0 ? `**${fmtNum(row.biomes[b].cashPerHour)}**` : fmtNum(row.biomes[b].cashPerHour)))];
+	}));
+	const topRow = vt.find((row) => row.tier === homeTop.tier);
+	T['world-strong-weak'] = mdTable(['', ...live], [
+		['Today, Old Rod $/fish (measured)', ...live.map((b) => fmtNum(R.today.oldRodValuePerFish[b], 1))],
+		['Weak-only $/fish (Old Rod)', ...live.map((b) => fmtNum(vt[0].biomes[b].weakOnlyValuePerFish, 1))],
+		['Weak + strong $/fish (no stats)', ...live.map((b) => fmtNum(vt[0].biomes[b].strongAccessValuePerFish, 1))],
+		['Strong premium', ...strongPremium.map((x) => fmtX(x))],
+		[`${tierLabel(homeTop.tier)} weak-only $/fish`, ...live.map((b) => fmtNum(topRow.biomes[b].weakOnlyValuePerFish, 1))],
+		[`${tierLabel(homeTop.tier)} weak + strong $/fish`, ...live.map((b) => fmtNum(topRow.biomes[b].strongAccessValuePerFish, 1))],
+	]);
+	T['world-value-checks'] = mdTable(['Check (`monotonicity()`)', 'Result'], [
+		['$/fish and $/cast rise strictly with biome at every tier (weak only, weak + strong, own access)', mono.ok ? `pass (${mono.failures.length} failures)` : `FAIL (${mono.failures.length})`],
+		['Smallest same-tier biome step ($/cast)', fmtX(mono.minBiomeStepRatio, 3)],
+		['Smallest tier step ($/h, same biome)', fmtX(mono.minTierStepRatio, 3)],
+		['XP per cast across live biomes (relative to Ocean, min–max)', `${fmtNum(mono.xpPerCastBiomeSpread[0], 4)}–${fmtNum(mono.xpPerCastBiomeSpread[1], 4)}`],
+	]);
+	T['world-stage-ladder'] = mdTable(['Biome', 'Level', 'Tier', '$/fish', '$/h', 'Step over previous home', 'Step over previous, same tier'], R.valueModel.stageLadder.map((s) => [
+		s.proposed ? `*${s.biome} (proposed)*` : s.biome, s.level, tierLabel(s.tier), fmtNum(s.valuePerFish, 1), fmtNum(s.cashPerHour),
+		s.stepOverPrevHome === null ? '—' : fmtX(s.stepOverPrevHome), s.stepOverPrevSameTier === null ? '—' : fmtX(s.stepOverPrevSameTier, 3),
+	]));
+
+	T['world-permit-table'] = mdTable(['Permit', 'Level', 'Stage before (biome, gear)', 'Stage hours (ref)', 'Stage $/h (ref)', 'E(k)', 'Fish income the integrated run earned in the stage', '**Price**', '= hours of stage income', 'Extra $/h in the new biome (gear at level)', 'Payback (h of play)'], ptable.map((p) => [
+		p.biome, p.level, `${p.stageBiome}, ${tierLabel(p.stageTier)}`, fmtNum(p.stageHoursReference, 2), fmtMoney(p.stageCashPerHourReference), fmtMoney(p.stageEarningsReference), fmtMoney(p.integratedStageFishIncome),
+		`**${fmtMoney(p.price)}**`, fmtNum(p.priceHoursOfStageIncome, 2), `${fmtMoney(p.gainPerHourWithGearAtLevel)} (${tierLabel(p.gearAtLevel)})`, fmtNum(p.paybackHours, 2),
+	]));
+	T['world-time-to-afford'] = mdTable(['Permit', ...archs.map((a) => `${cap(a)} (${fmtNum(F.ARCHETYPES[a].minutesPerDay, Number.isInteger(F.ARCHETYPES[a].minutesPerDay) ? 0 : 1)} min/day)`)], ptable.map((p) => [p.biome, ...archs.map((a) => {
+		const x = p.lifecycle[a];
+		if (!x) return '—';
+		return `${fmtH(x.reachedH)} / d${x.reachedDay} · **${x.delaySessions === null ? 'not bought' : fmtNum(x.delaySessions, 2)}** · ${fmtX(x.coverageAtLevel, 1)}`;
+	})]));
+	T['world-standalone'] = mdTable(['Permit', ...archs.map(cap)], ptable.map((p) => [p.biome, ...archs.map((a) => `${fmtH(p.standaloneHoursToAfford[a].hours)} (${fmtNum(p.standaloneHoursToAfford[a].sessions, 2)})`)]));
+	T['world-sensitivity'] = mdTable(['Configuration', `Worst permit delay, sessions (${archs.join(' / ')})`, 'Lowest money at the level ÷ price', 'Worst rod-tier delay vs no permits'], Object.entries(sens).map(([k, s]) => [
+		k === 'reference' ? `**${s.label}**` : s.label,
+		archs.map((a) => fmtNum(s.archetypes[a].maxDelaySessions, 2)).join(' / '),
+		fmtX(s.minCoverage, 1),
+		fmtH(s.maxRodDelayH),
+	]));
+	T['world-share-sweep'] = mdTable(['Share', PERMIT_BIOMES.join(' / '), `${CONFIGS.reference.label}: worst delay (sessions) · lowest coverage`, `${CONFIGS[STRESS].label}: worst delay (sessions) · lowest coverage`], R.permits.shareSweep.map((row) => {
+		const cell = (c) => `${fmtNum(maxOf(Object.values(row[c].maxDelaySessions)), 2)} · ${fmtX(row[c].minCoverage, 1)}`;
+		const label = row.share === share ? `**${fmtPct(row.share, 0)} (proposed)**` : fmtPct(row.share, 0);
+		return [label, PERMIT_BIOMES.map((b) => fmtNum(row.prices[b])).join(' / '), cell('reference'), cell(STRESS)];
+	}));
+	T['world-budget'] = mdTable(['Player', `All income to Lv ${F.LIFECYCLE.maxLevel}`, 'From fishing', 'Upkeep (repairs)', 'Rods (progression)', 'Permits (progression)', 'Permits ÷ fish income', 'Saved'], archs.map((a) => {
+		const v = R.budget[a];
+		return [cap(a), fmtMoney(v.income), fmtPct(v.fishingShare), fmtPct(v.upkeepShare), fmtPct(v.rodsShare), fmtPct(v.permitsShare), fmtPct(v.permitsShareOfFishIncome), `${fmtPct(v.savedShare)} (${fmtMoney(v.saved)})`];
+	}));
+	T['world-level-times'] = mdTable(['Player', ...lt.levels.map((L) => `L${L}`), 'Largest change from permits'], [
+		...archs.map((a) => [cap(a), ...lt.levels.map((L) => fmtNum(lt.archetypes[a].with[L], 2)), fmtH(lt.archetypes[a].maxAbsDiffH, 4)]),
+		[`R1 record (\`curve-integrated.json\`, ${refName}, quartic ${lt.r1Record.quartic})`, ...lt.levels.map((L) => fmtNum(lt.r1Record.regular[L], 2)), `record vs this run: ${fmtH(lt.r1Record.maxAbsDiffH, 4)}`],
+	]);
+
+	T['world-migration'] = mdTable(['Account', 'Grandfathered'], R.migration.examples.map((x) => [
+		`Lv ${x.user.level}, ${fmtNum(x.user.xp)} XP, current biome ${x.user.currentBiome}${x.user.permits ? ', `permits: []` already present' : ''}`,
+		Array.isArray(x.grandfathered) ? (x.grandfathered.length ? x.grandfathered.join(', ') : 'none (Ocean is free)') : 'no change (idempotent)',
+	]));
+
+	const td = ms.today;
+	T['world-ms-today'] = mdTable(['Today\'s biome in the real engine (`engineCatch()`)', 'Value'], [
+		['Species', td.species.join('; ')],
+		['Old Rod cast lands a fish', fmtPct(td.oldRodFishProbability, 2)],
+		['Old Rod cast lands anything (a Lucky item)', fmtPct(td.oldRodCatchProbability, 3)],
+		[`Endgame (${tierLabel(F.gearPath().length - 1)}) cast lands a fish`, fmtPct(td.topTierFishProbability)],
+		['By weather', Object.entries(td.topTierFishProbabilityByWeather).map(([w, p]) => `${w} ${fmtPct(p)}`).join(', ')],
+		['Proposed ladder, same cast', fmtPct(td.proposedFishProbability)],
+	]);
+	const ultraNames = ms.perWeatherAtTopTier.map((x) => `${x.premiumUltra.join(', ')} (${x.weather})`).join('; ');
+	T['world-ms-ladder'] = mdTable(['Rarity', 'Species', 'Weak', 'Strong', 'Weather-exclusive', 'Notes'], [
+		...RARITIES.filter((r) => ms.counts[r]).map((r) => {
+			const c = ms.counts[r];
+			return [r === 'ultra' ? '**Ultra (premium)**' : cap(r), c.total, c.weak, c.strong, c.weatherExclusive, r === 'ultra' ? `One strong salmon per weather: ${ultraNames}. Existing: ${ms.keptSpecies.join('; ')}.` : ''];
+		}),
+		['**Total**', `**${ms.speciesTotal}** (${ms.newSpecies} new)`, RARITIES.reduce((t, r) => t + (ms.counts[r]?.weak || 0), 0), RARITIES.reduce((t, r) => t + (ms.counts[r]?.strong || 0), 0), RARITIES.reduce((t, r) => t + (ms.counts[r]?.weatherExclusive || 0), 0), ''],
+	]);
+	T['world-ms-by-tier'] = mdTable(['Gear', '$/fish', 'Weak-only $/fish', '$/h', 'XP/h', 'Over Swamp, same tier'], ms.byTier.map((row) => [tierLabel(row.tier), fmtNum(row.valuePerFish, 1), fmtNum(row.weakOnlyValuePerFish, 1), fmtNum(row.cashPerHour), fmtNum(row.xpPerHour), fmtX(row.stepOverSwamp, 3)]));
+	T['world-ms-weather'] = mdTable(['Weather', 'Share of time', 'Premium Ultra', 'Today: fish per cast', 'Proposed catch', '$/fish', '$/h'], ms.perWeatherAtTopTier.map((x) => [
+		x.weather, fmtPct(x.envShare), x.premiumUltra.join(', '), fmtPct(td.topTierFishProbabilityByWeather[x.weather]), fmtPct(x.catchProbability, 0), fmtNum(x.valuePerFish, 1), fmtNum(x.cashPerHour),
+	]));
+	const vc = ms.valueCheck;
+	T['world-ms-value'] = mdTable(['BIOME_VALUE rule (`mountainStream().valueCheck`)', 'Value'], [
+		['Modelled BIOME_VALUE[\'Mountain Stream\'] (decisions.js P-MS-VALUE)', fmtNum(ms.biomeValue)],
+		['Live late-ladder same-tier steps at the endgame tier (River→Lake … Coast→Swamp)', vc.lateLiveSameTierSteps.map((x) => fmtX(x, 3)).join(', ')],
+		['Band / mean', `${vc.band.map((x) => fmtX(x, 3)).join('–')} / ${fmtX(vc.targetStep, 3)}`],
+		['Mountain Stream step over Swamp, same tier', `${fmtX(vc.actualStep, 3)} (${vc.inBand ? 'inside the band' : 'outside the band'})`],
+		['Home step over Swamp (endgame tier vs Swamp\'s typical tier)', fmtX(vc.homeStepOverSwamp, 3)],
+		['Value that puts the step at the band mean', fmtNum(vc.impliedBiomeValue, 1)],
+		...(vc.atAlternative ? [[`At the alternative value ${vc.atAlternative.biomeValue}: step / home step`, `${fmtX(vc.atAlternative.stepOverSwamp, 3)} (${vc.atAlternative.inBand ? 'inside' : 'outside'} the band) / ${fmtX(vc.atAlternative.homeStepOverSwamp, 3)}`]] : []),
+	]);
+	const sb = pf.stageBeforeMountainStream;
+	const msOwned = archs.map((a) => ptable.find((p) => p.biome === MS).lifecycle[a]);
+	T['world-ms-stage'] = mdTable([`The ${pf.from}→${pf.to} stage (\`postFifty().stageBeforeMountainStream\`, ${refName})`, 'Value'], [
+		['Stage (biome, gear)', `${sb.biome}, ${tierLabel(sb.tier)}`],
+		['Hours of play (integrated) · $/h · expected earnings E', `${fmtNum(sb.hours, 2)} h · ${fmtMoney(sb.cashPerHour)} · ${fmtMoney(sb.earnings)}`],
+		[`${tierLabel(sb.endgameTier)} assembly (expected) · share of E`, `${fmtMoney(sb.endgameTierAssembly)} · ${fmtPct(sb.endgameTierShareOfStage)}`],
+		['Mountain Stream permit · share of E', `${fmtMoney(sb.permit)} · ${fmtPct(sb.permitShareOfStage)}`],
+		[`Mountain Stream permit delay after reaching Lv ${pf.to}, sessions (${archs.join(' / ')})`, msOwned.map((x) => (x ? fmtNum(x.delaySessions, 2) : '—')).join(' / ')],
+		[`${tierLabel(sb.endgameTier)} fishing after reaching Lv ${pf.to}, hours (${archs.join(' / ')})`, archs.map((a) => fmtH(pf.archetypes[a].endTierEquipDelayH)).join(' / ')],
+	]);
+
+	const spans = pf.archetypes[refName].sketch.map((s) => `L${s.from} → L${s.to}*`);
+	T['world-post50'] = mdTable(['Player', `Reach L${pf.from}`, `Reach L${pf.to}`, `**L${pf.from} → L${pf.to}** (integrated)`, 'XP/h in that stage (fishing share)', 'Post-60 XP/h used*', ...spans], archs.map((a) => {
+		const v = pf.archetypes[a];
+		return [
+			cap(a), `${fmtH(v.reach[pf.from].hours)} (d${v.reach[pf.from].day})`, `${fmtH(v.reach[pf.to].hours)} (d${v.reach[pf.to].day})`,
+			`**${fmtH(v.stage.hours)} (${fmtNum(v.stage.days, 1)} days)**`, `${fmtNum(v.xpRate.stage)} (${fmtPct(v.xpRate.fishingShare, 0)})`, fmtNum(v.xpRate.post60),
+			...v.sketch.map((s) => `${fmtH(s.hours)} (${fmtNum(s.days, 1)} d)`),
+		];
+	}));
+	const perLevel = Object.entries(pf.perLevelHoursReference);
+	T['world-per-level'] = mdTable(['Level', ...perLevel.map(([L]) => L)], [['Hours', ...perLevel.map(([, h]) => fmtNum(h, 2))]]);
+	const stages = pf.stageHoursReference;
+	T['world-stage-lengths'] = mdTable(['Stage', ...stages.map((s) => (s.source === 'integrated' ? s.stage.replace('-', '–') : `${s.stage.replace('-', '–')}*`))], [
+		['Hours', ...stages.map((s) => fmtNum(s.hours, 2))],
+		['Ratio to previous', ...stages.map((s) => (s.ratio === null ? '—' : fmtX(s.ratio)))],
+	]);
+	const ex = R.expansions;
+	T['world-expansions'] = mdTable(['Biome', 'Level', 'Water', 'Identity', 'Indicative BIOME_VALUE (geometric step)', 'Stage before it (regular, sketch)', 'Indicative permit (same rule)'], ex.biomes.map((e) => [
+		e.biome, e.level, e.water, e.identity, `${fmtNum(e.indicativeBiomeValue)} (${fmtX(ex.valueStep, 3)})`, fmtH(e.stageHoursReference), `≈ ${fmtMoney(e.indicativePermit)}`,
+	]));
+	const par = RETIRED_LOOP_PARITY;
+	T['world-parity'] = mdTable(['Retired private loop (`RETIRED_LOOP_PARITY`)', 'Recorded value'], [
+		['Commit', `\`${par.commit}\``],
+		['Check', par.check],
+		['Largest relative difference', `${fmtPct(par.maxRelativeDifference, 4)} (${par.recorded})`],
+		['Time to afford through the core / permit prices from the core\'s stage hours', `${par.timeToAffordIdentical ? 'identical' : 'different'} / ${par.pricesFromCoreIdentical ? 'identical' : 'different'}`],
+		['Remaining difference', par.remainingDifference],
+	]);
+	const fmtVal = (v) => {
+		if (v === null || v === undefined) return '—';
+		if (typeof v === 'number') return Number.isFinite(v) ? fmtNum(v, Number.isInteger(v) ? 0 : Math.abs(v) < 0.01 ? 6 : 3) : 'not bought';
+		if (Array.isArray(v)) return v.map(fmtVal).join(', ');
+		return Object.entries(v).map(([k, x]) => `${k} ${fmtVal(x)}`).join('; ');
+	};
+	T['world-checks'] = mdTable(['Check (`checks()`)', 'Value', 'Result'], R.checks.map((c) => [c.check, fmtVal(c.value), c.ok ? 'pass' : '**FAIL**']));
+	T['world-decisions'] = mdTable(['ID', 'Proposed decision', 'Modelled', 'Alternatives', 'Why'], DECISIONS.map((d) => [
+		`\`${d.id}\` (${d.status})`, d.title, d.get ? `${d.modelled}: \`${JSON.stringify(d.get())}\`` : d.modelled, d.alternatives.join('; '), d.why,
+	]));
+	return T;
+}
+
 module.exports = {
-	PARAMS,
+	PARAMS, DECISIONS, CONFIGS, RETIRED_LOOP_PARITY,
+	system, permitPriority, permitSummary,
+	lifecycle, referenceStages, permitPrice, permitPriceMap, permitTable, timeToAfford, sensitivity, shareSweep, budget, levelTimes,
+	accessibleBiomes, canFish, grandfatheredPermits,
 	gearStep, biomeOutcome, biomeHourly, valueTable, monotonicity, stageLadder,
 	ladderSpecies, currentMountainStream, liveSpecies, ladderDraw, ladderOutcome, engineCatch, mirrorParity, mountainStream,
-	lifecycle, referenceStages, permitPrice, permitTable, timeToAfford, shareSweep, budget,
-	accessibleBiomes, canFish, grandfatheredPermits,
-	system, permitPriority, permitSavings, permitSummary, scheduledRodsBaseline, validateSystem,
-	postFifty, expansionSketch, replicationCheck, today, checks, report,
+	postFifty, expansionSketch, today, checks, report, markdownTables,
 };
 
 if (require.main === module) process.stdout.write(`${JSON.stringify(report(), null, 1)}\n`);

@@ -2,274 +2,302 @@
 
 **Status: proposal only.** Nothing here is live. No `src/` file, catalog row or player document changes until you approve.
 
-- **Framework:** 5b.2 (`CURVE.quartic` 0.0475, shared digest `26bbca823c8b2b8b`), on the provisional shared gear path (`F.GEAR_PATH_SOURCE = 'provisional'`).
-  - Every number below is computed at runtime by `scripts/economy/5b/buffs.js` from `framework.js`. Archetypes, target windows, lifecycle step, daily XP, purchase delay, biome levels, gear path, curve and value model are imported from `F`, not copied.
-  - The module also reuses finished-design exports:
-    - `streak.boxEV()`, `streak.boxForDay()` and `streak.minimumDailyArchetype()`: buff odds per box, the ladder, and the R2 adversary.
-    - `quests.questIncome().boxes`: Daily Boxes per day.
-    - `rods.crateDefinition()`, `rods.openOutcomes()`, `rods.cratePrice()`, `rods.stageIncome()`, `rods.assembly()` and `rods.cratesDistribution()`. These are crate helpers, not a gear source (R3).
-  - `check-shared.js` passes for `buffs.js`.
-- **Reproduce:**
-  - `node -e "require('./scripts/economy/5b/buffs.js').report()"` returns the report object in under 2 s.
-  - `node scripts/economy/5b/buffs.js` prints it as JSON.
-  - Each table below names the function or `report()` key that produces it.
-- **Validation** (`report().checks`: all 19 pass):
-  - With every buff source off, `lifecycle()` reproduces `docs/economy/5b/curve.json` exactly for all four archetypes (`baselineMatchesCurveJson()`).
-  - With only the streak as a source, Double Cash and Double XP values equal `streak.lifecycle()` to the dollar and XP point at 30 days, for every archetype (`reconcileWithStreak()`).
-  - The Lucky Draw assembly chain with 0 lucky opens reproduces `rods.cratesDistribution(t).expected` for T1–T5 (`luckyAssembly()`).
-- **R3:** this module reads the gear path only through `F.gearPath()`. At the 5b.3 cutover, `report()` regenerates with no edits.
+- **Framework 5b.4.** Every table in this document is **generated**. `node scripts/economy/5b/render-docs.js` fills each block from `scripts/economy/5b/buffs.js` `markdownTables()` at the current framework version, and each block ends with its provenance line (version and shared digest). Prose cites numbers only by pointing at a table. `check-shared.js` fails if a table is stale.
+- **One model.** The buff layer is a *system* on the shared lifecycle core (`lifecycle.js`). `integrate.js` composes it with rods, world, quests and streak into the reference loop, and every lifecycle figure here comes from `integrate.run()`. The module has no time-stepping loop of its own. `lifecycle(archetype)` is a traced `integrate.run()`: the trace records the exact ledgers at every day boundary and one row per played day, and changes no number (check `trace-is-observational`). Static figures (box buff odds, Lucky Draw crate chains, one buff's value at a stage, today's catalog) come from the framework's pure functions.
+- **Counting rule.** A box's non-buff contents are valued once, by the system that grants it (quests: Daily Box; streak: Streak Crate and Chest). The buffs inside reach this system as `box` events and are valued here, once (check `buff-value-counted-once`).
+- **Hand-set values:** only `PARAMS`. The shared buff rules (`F.BUFFS`: timing, duration, multipliers, Lucky Draw, stacking) and the event budget (`F.EVENTS`) are read from the framework. Every non-obvious choice is a proposed decision (§1), and `check-shared.js` checks each record against the value the model runs.
+- **Finished-design inputs:** `streak.boxEV()` and `streak.boxDefinitions()` (buff odds per box), and the rods crate helpers `crateDefinition()`, `openOutcomes()`, `cratesDistribution()`, `cratePrice()`, `stageIncome()` and `assembly()`. These are crate helpers, not a gear source (R3).
 - **Booster Packs** keep their exact contents and are valued nowhere (decision 12). A Lucky Draw charge is never spent on one.
 
+**Governing rule:** *a buff multiplies play inside its window, never a stockpile built outside it.* Hoarding is not treated as an exploit; it simply stops mattering. Stored fish values never decay, so a player can keep fish and sell whenever they like. Saving *buffs* for a long session stays a legitimate choice, bounded at one window of the player's own income per buff (§5).
+
 ---
 
-## 0. Decisions at a glance
+## 0. Summary
 
-| # | Decision | Why (numbers from the module) |
+<!-- generated:buffs-headline -->
+| Figure | Value | Table |
 | --- | --- | --- |
-| D1 | **Double Cash rewards fish *caught* during the buff.** The ×2 is stamped into the fish's stored value at catch. Every sale pays the stored value, and the sale path never reads buffs. | Hoarding fish and selling them under an uncapped sale-time buff adds **+36% to +76%** of a player's fishing income (§3). Catch-time adds 1.2–5.9%. Every other sell modifier (gear, aquarium companion, events, the private profile) is already stamped at catch. |
-| D2 | **Buffs last a real hour.** Activating one consumes one unit. Double XP and Double Cash run for 3,600 s of wall-clock time. | Today every buff expires after **3.6 s** (B1) and is never consumed (B2). A real hour covers the whole session of a casual or regular player, so their share of the buff is simply the share of buffed days (§6). |
-| D3 | **Stacking.** A second buff of a running kind **queues** behind it, with at most 3 banked. Different kinds are independent. **A buff and an event of the same category add** (×2 + ×2 = ×3). Gear, aquarium and profile keep multiplying. | Today two Double XP give ×3, the sale uses only the first cash buff, and a buff would multiply an event (×4). Under the additive rule a buff always adds exactly +100% of the unbuffed value, so there is no reason to save every buff for an event. |
-| D4 | **Lucky Draw gives +1 bonus slot on each of the next 2 box opens** (any box except the Booster Pack). It replaces +50% to every rare+ weight for an hour. | Today's Lucky Draw saves **0 crates** on the Expert, Master and Gilded Tackle Crates: their floors put every slot at rare+, so ×1.5 on every rare+ tier cancels out. It also rewards opening a stockpile of boxes within one hour. The bonus slot cuts a tier assembly by **13–20%** of its crates at every tier (§7). |
-| D5 | **Sources.** The Streak Crate/Chest pools and the Daily Box stay as designed. **Events are the tunable lever**, with a budget of at most 1 Double Cash + 1 Lucky Draw per 30 days. There is no Double XP from events and no shop sale. The Booster Pack is unchanged. | A daily player gets **4.2 buffs per 30 days**: 0.72 Double XP, 1.72 Double Cash and 1.72 Lucky Draw. Today's rate is 0.24 (Daily Box only), or 1.02 with the Top.gg votes that are being retired. Buffs add **1.4–7.2% of fishing income** and **0.5–1.9% of XP** in the first 30 days (§6). |
-| D6 | **Correctness fixes ship first, and B1 and B2 ship together.** | Fixing the 3.6 s duration (B1) without the consumption bug (B2) would make every buff permanent: a used buff stays in the inventory and can be re-activated forever (§1). |
+| Buffs a regular player receives per 30 days (integrated) | 4.21: Double XP 0.74, Double Cash 1.74, Lucky Draw 1.74; today 0.24 (1.02 with the retiring Top.gg votes) | Sources per 30 days |
+| Share of fishing income buffs add, first 30 days (Double Cash + Lucky Draw) | casual 24.0% (5.7% + 18.3%), regular 8.8% (5.8% + 3.1%), active 5.4% (2.9% + 2.5%), grinder 1.4% (1.1% + 0.2%) | Income share |
+| Share of XP from Double XP, first 30 days | 0.46%–1.88% | Income share |
+| Decision 8, regular player, 90 days | uncapped sale-time hoarder +58.8% of fishing income vs catch-time +5.7% | Decision 8 |
+| Regular player with buffs (reference loop) | L20 5.27 h, L30 12.58 h, L40 25.13 h, L50 43.65 h; every approved window met; milestones 2.35% earlier than without buffs at most | R2 windows |
+| Minimum-daily player vs casual (R2) | PASS | R2 minimum-daily |
+| No-miss grinder: largest milestone shift from buffs | 0.45% (PASS) | R2 windows |
+| Lucky Draw (proposed) on a tier assembly | saves 14%–19% of the crates, 0.22–1.16 h of stage income; today's Lucky Draw is inert on 3 of 5 tier crates | Lucky Draw |
+| Design checks | 16 of 19 pass (failing: cash-share-casual, cash-share-regular, cash-share-active) | Checks |
 
-**Governing rule:** *a buff multiplies play inside its window, never a stockpile built outside it.* Hoarding is not treated as an exploit. It simply stops mattering:
-- Stored fish values never decay, so a player can keep fish and sell whenever they like.
-- Saving *buffs* for a long session remains a legitimate choice. It is bounded at one hour of the player's own income per buff (§4).
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-headline -->
 
 ---
 
-## 1. Correctness fixes (separate from tuning; ship first)
+## 1. Decisions for approval
 
-Evidence comes from code reading and `report().current.bugs`. B1 and B2 were reproduced on the in-memory MongoDB of the test helpers, never production:
-- a Double Cash was granted, activated, swept and activated again;
-- `endTime − start = 3,601 ms`;
-- after the sweep the stack still has `count: 1` and is still in `inventory.buffs`;
-- the second activation succeeds.
+<!-- generated:buffs-decisions -->
+| ID | Proposed decision | Modelled | Alternatives | Why | Record = model |
+| --- | --- | --- | --- | --- | --- |
+| `P-BUFFS-FIX-DURATION` | Correctness fix (ships first): a buff lasts its catalog length in SECONDS and activation consumes exactly one unit (B1 + B2 together), with read-time expiry (B3) | activate(): endsAt = now + durationSeconds x 1000; stock - 1 atomically; effectsAt(): endsAt > now | fix B1 alone (every buff becomes permanent: B2 never consumes it); keep today (every buff expires after a few seconds and is never used up) | today no buff has ever had an effect, and fixing only the duration would make each one permanent (bugs table) | yes |
+| `P-BUFFS-DURATION` | Double XP and Double Cash run for 1 real (wall-clock) hour from activation | 3600 s of real time; the modelled window is counted in play minutes of the session it starts | casts-based: the next 400 casts (one reference hour), however long that takes | a real hour covers a whole casual/regular session, so their share is the share of buffed days; a casts-based buff rewards barely fishing (duration table) | yes |
+| `P-BUFFS-ACTIVATION` | A buff runs only when the player activates a unit from stock; the model assumes activation at the start of the next session (one unit per started hour of the planned session) | held Double XP / Double Cash activated at the session start, queued up to the per-kind limit; a unit received mid-session waits for the next session | auto-activate on receipt (a box opened at the end of a session wastes most of the hour); activate at receipt time in the model (the old loop's day-end valuation; parity table) | the player chooses when to play the hour; rational use is the honest model (a box granted at a session's end is used in the next one) | yes |
+| `P-BUFFS-QUEUE` | Same kind queues (a second unit extends the timer or adds charges; the multiplier stays x2), at most 3 banked per kind; different kinds run independently | sameKind 'queue', maxQueued 3, across kinds 'independent'; an activation beyond maxQueued returns QUEUE_FULL and keeps the unit | additive same-kind stacking (today's XP: two Double XP = x3); first buff only (today's sale path); refuse a second activation while one runs | one rule for every kind (B4); a buff always adds exactly +100% of the unbuffed value, so banking gains nothing but convenience | yes |
+| `P-BUFFS-EVENT-STACKING` | A buff and an event of the same category ADD their bonuses (x2 + x2 = x3); gear, aquarium and the private profile keep multiplying | stored value = raw x (1 + sellBonus) x (1 + (buff - 1) + (event - 1)) x profile.sell; XP the same shape | multiply (today: a x2 buff during a x2 event pays x4) | no reason to save every buff for an event; the event lever stays measurable | yes |
+| `P-BUFFS-LUCKY-DRAW` | Lucky Draw becomes charges: +1 bonus slot on each of the next 2 box opens (any box except the Booster Pack), replacing today's +50% rare+ weights for an hour | 1 bonus slot x 2 opens; the slot rolls the box's own table (floors, unique, pity respected); the charge is spent in the open's journal commit | keep today's rare+ weights for an hour (inert on floored tier crates; rewards opening a stockpile in one hour); K = 1 or 3 opens (Lucky Draw K table) | never inert, bounded at K opens however many boxes are saved, worth up to about a Double Cash hour on an assembly (Lucky Draw tables) | yes |
+| `P-BUFFS-SCOPE` | Double XP and Double Cash apply only to fish caught by casting: never quest XP or cash, box fish or items | the system credits (multiplier - 1) x the step's fishing rates only; the catalog descriptions say so (B5) | "all activities" as today's descriptions claim (quest rewards doubled) | a buff multiplies play; quest rewards already have their own lever (P-DAILY-FACTOR) | yes |
+| `P-BUFFS-SOURCES` | Buff sources: the streak boxes and the quest Daily Boxes (pools unchanged) plus the event budget; no shop sale; the Booster Pack keeps its buffs and is never valued | streak (Streak Crate / Chest), quests (Daily Box), events (F.EVENTS, P-EVENTS); Booster Pack unvalued; shop none | a shop sale (converts cash into levels, or a guaranteed-return investment); re-weighted streak/quest pools (a Gacha V2 featured change) | Double XP stays at the streak rate (the regular player's windows have little headroom); the event budget is the one lever the operator can schedule, measure and switch off (sources tables) | yes |
+| `P-BUFFS-PUBLIC` | A buff is a normal mechanic: its effect is part of the BASE (public) reward for everyone; the private profile multiplies after it | catchValue(): public = raw x (1 + sellBonus) x temporary; stored = public x profile.sell (buff XP is public XP) | exclude buffs from public values (public level would lag a buffed normal player) | one public presentation for every profile; the Founder drift it implies is small (Founder table) | yes |
+| `P-BUFFS-LEGACY` | Existing buffs keep their counts and map to the new kinds at read time (a held Lucky Draw becomes 2 charges); no document is rewritten | legacyKind(['gacha', '1.5']) = Lucky Draw charges; stale activations cleared once (migration 1) | rewrite every BuffData capability array | additive and idempotent; nobody loses a unit, since no buff ever had an effect (B1) | yes |
 
+Status of every entry: `proposed`. Only the user approves. `decisions.js` joins these to the Phase 5B registry, next to the framework-level entries this design relies on and does not repeat: `P-DOUBLE-CASH` (catch-time Double Cash), `P-EVENTS` (the event budget) and `P-LUCKY`. `check-shared.js` verifies each record against the model.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-decisions -->
+
+---
+
+## 2. Correctness fixes (separate from tuning; ship first)
+
+The evidence comes from code reading and `current().bugs`. B1 and B2 were reproduced on the in-memory MongoDB of the test helpers, never production: a Double Cash was granted, activated, swept and activated again.
+
+<!-- generated:buffs-bugs -->
 | # | Bug | Evidence | Fix |
 | --- | --- | --- | --- |
-| **B1** | **Every buff lasts 3.6 s.** | `User.startBooster` sets `endTime = Date.now() + buff.length`. The catalog `length` is 3600, in seconds, but it is added as milliseconds. | `endsAt = now + durationSeconds × 1000`. |
-| **B2** | **A buff is never consumed.** | `startBooster` never decrements `count`. `endBooster` filters `inventory.buffs` with `b.id !== buff.id`, but `ObjectId.id` is a Buffer and `buff.id` a string, so the filter never removes anything (verified on mongoose 7.8). `/equip` lists every stack with `count > 0`, so an expired buff is offered again. | Activation atomically takes one unit: `$inc: { count: -1 }` guarded by `count ≥ 1`, together with the activation record, in one transaction or user lock. The stack leaves the inventory only when `count` reaches 0. **B2 must ship with B1.** Fixing B1 alone makes every buff permanent. |
-| B3 | **Expiry only happens on slash commands.** | `interactionCreate.js` sweeps expired buffs only before a slash command. Buttons (`sell-one-fish`) never sweep. `cast.js`, `gacha.js` and `Fish.js` all trust `active: true`. | Read-time expiry: every consumer uses `effectsAt(state, now)` (`endsAt > now`). The sweep stays as display cleanup only. |
-| B4 | **Same-kind stacking is inconsistent.** | `modifiers.buffEffects` adds every active buff: two Double XP give **×3** (`report().current.stacking`). `Fish.sellByRarity` and `sell-one-fish` use the *first* cash buff (`.find`). `gacha.js` sums Lucky Draws. | One rule for every kind: one active per kind, and extra units queue (D3). |
-| B5 | **The descriptions over-promise.** | Double XP "from all activities" and Double Cash "income from all activities". Quest XP and cash never take a buff: the `modifiers.js` quest multiplier is profile × event. | New catalog text (§8). |
-| B6 | **Dead code.** | `User.generateBoostedXP` and `generateBoostedCash` have no callers. Each reads buffs with `.find`. | Remove both. |
+| **B1** | Every buff lasts 3.6 s | User.startBooster: endTime = Date.now() + buff.length; the catalog length 3600 is in seconds but is added as ms. Reproduced on the in-memory MongoDB of the test helpers (never production): endTime - start = 3,601 ms. | endsAt = now + durationSeconds x 1000. |
+| **B2** | A buff is never consumed | startBooster never decrements count; endBooster filters inventory with b.id !== buff.id (ObjectId.id is a Buffer, buff.id a string: always true), so nothing is removed. Reproduced: after expiry the stack still has count 1, is still in inventory, and /equip re-activates it. | Activation atomically takes one unit ($inc count -1 guarded by count >= 1) with the activation record, in one transaction under the user lock; the stack leaves the inventory only at count 0. Ships WITH B1: fixing B1 alone would make every buff permanent. |
+| **B3** | Expiry only on slash commands | interactionCreate sweeps expired buffs before slash commands only; buttons (sell-one-fish) never sweep, and cast.js / gacha.js / Fish.js trust active: true. | Read-time expiry: every consumer uses effectsAt(state, now) (endsAt > now); the sweep stays as display cleanup. |
+| **B4** | Inconsistent same-kind stacking | modifiers.buffEffects adds every active buff (two Double XP = x3); the sale paths use the first cash buff; gacha.js sums Lucky Draws. | One rule for every kind: one active per kind, extra units queue (P-BUFFS-QUEUE). |
+| **B5** | Descriptions over-promise | Double XP "from all activities" and Double Cash "income from all activities": quest XP/cash never take a buff (modifiers quest multiplier = profile x event). | New catalog text (catalog table). |
+| **B6** | Dead code | User.generateBoostedXP / generateBoostedCash have no callers (each reads buffs with .find). | Remove both. |
 
-Because of B1 the live game has effectively never applied a buff. That is why the switch to catch-time needs no compensation and no fish revaluation (§11).
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-bugs -->
+
+- **B1 and B2 ship together** (`P-BUFFS-FIX-DURATION`). Fixing the duration alone would make every buff permanent, because a used buff is never removed and can be re-activated forever.
+- Because of B1 the live game has effectively never applied a buff. That is why the switch to catch-time needs no compensation and no fish revaluation (§14).
 
 ---
 
-## 2. Current → Proposed
+## 3. Current → Proposed
 
+<!-- generated:buffs-current-proposed -->
 | Item | Current | Proposed |
 | --- | --- | --- |
-| Double Cash timing | At **sale**. The sale paths multiply the sale by the first active cash buff, so a hoard sold under it pays ×2. | At **catch**. The ×2 is stamped into `value` and `valueBase` of each fish caught by a cast during the buff. A sale always pays the stored value (D1). |
-| Double Cash scope | Every fish sale | Fish caught by casting. Not quest cash, box fish (Streak Crate / Daily Box fish), or items. |
-| Double XP scope | Catch XP (the description says "all activities") | Catch XP only, as today. Quest XP never takes a buff. The description is fixed. |
-| Duration | `length: 3600`, effectively **3.6 s** (B1) | 3,600 s of real time for Double XP and Double Cash. Lucky Draw uses **2 charges** (box opens). |
+| Double Cash timing | At **sale**: the sale paths multiply the sale by the first active cash buff, so a hoard sold under it pays the multiplier | At **catch**: the x2 is stamped into `value` and `valueBase` of each fish caught by a cast during the buff; a sale always pays the stored value (P-DOUBLE-CASH) |
+| Double Cash scope | Every fish sale | Fish caught by casting; not quest cash, box fish or items |
+| Double XP scope | Catch XP (the description says "all activities") | Catch XP only, as today; quest XP never takes a buff; the description is fixed |
+| Duration | `length: 3600`, effectively **3.6 s** (B1) | 3,600 s of real time for Double XP and Double Cash; Lucky Draw: **2 charges** (box opens) |
 | Consumption | Never consumed (B2) | One unit per activation, atomically |
 | Expiry | Swept before slash commands only (B3) | Read-time `endsAt > now` in cast, sale and gacha |
-| Same kind | XP additive (2 × Double XP = ×3); cash: first buff only; gacha additive | Queue: a second activation extends the timer or adds charges. The multiplier stays ×2. At most 3 banked per kind. |
-| Different kinds | Independent | Independent (unchanged) |
-| With events | XP: buff × event (×4). Sell: event at catch × buff at sale (×4). | **Additive** temporary bonus: 1 + (buff − 1) + (event − 1) = ×3 |
-| With gear / aquarium / profile | Multiply | Multiply (unchanged): raw × (1 + sellBonus) × temporary × profile |
-| Lucky Draw | +50% to every rare+ weight for 1 h. Inert on the Expert, Master and Gilded Tackle Crates. Rewards opening a box stockpile inside the hour. | +1 bonus slot on each of the next 2 opens (any box except the Booster Pack) |
-| Sources | Daily Box 0.26% of slots (0.088% per type), Voter's Crate 0.43% (0.145% per type), Booster Pack 100% (no source) | Streak Crate/Chest (streak design, 1.97% / 2.63% per type per open), Daily Box unchanged, **events ≤ 1 Double Cash + 1 Lucky Draw per 30 d**, Booster Pack unchanged and unvalued, no shop |
-| Buffs per 30 days (daily player) | 0.24 (Daily Box); 1.02 with Top.gg votes (being retired) | **4.16**: Double XP 0.72, Double Cash 1.72, Lucky Draw 1.72 (2.16 without events) |
-| Share of income from buffs (30 d) | ~0 in practice (B1). With B1 fixed, a sale-time hoarder could double most of their income. | Casual 6.1%, regular 7.2%, active 4.3%, grinder 1.4% of fishing income. XP 0.5–1.9%. |
-| Public presentation | The sale message shows base × cash buff | Catch card: base values, which include the buff (a normal mechanic), plus one line "💰 Double Cash ×2 · 37 min left". The sale message shows Σ `valueBase`. |
+| Same kind | XP additive (two Double XP = x3); cash: first buff only; gacha additive | Queue: a second activation extends the timer or adds charges; the multiplier stays x2; at most 3 banked per kind |
+| With events | buff x event | **Additive**: 1 + (buff - 1) + (event - 1) = x3 for a x2 buff in a x2 event |
+| With gear / aquarium / profile | Multiply | Multiply (unchanged): raw x (1 + sellBonus) x temporary x profile |
+| Lucky Draw | +50% to every rare+ weight for 1 h; inert on 3 tier crates | +1 bonus slot on each of the next 2 opens (any box except the Booster Pack) |
+| Sources | Daily Box 0.26% of slots, Voter's Crate 0.43%, Booster Pack 100% | Streak Crate / Chest (1.97% / 2.63% per type per open), Daily Box unchanged, events (P-EVENTS: 0 Double XP, 1 Double Cash, 1 Lucky Draw per 30 days), Booster Pack unvalued, no shop |
+| Buffs per 30 days (regular player) | 0.24 (Daily Box); 1.02 with Top.gg votes (being retired) | **4.21** (2.21 without events) |
+| Share of fishing income from buffs (30 d) | ~0 in practice (B1); with B1 fixed, a sale-time hoarder could double most of their income | casual 24.0%, regular 8.8%, active 5.4%, grinder 1.4%; XP 0.5%–1.9% |
+| Public presentation | The sale message shows base x cash buff | Catch card: base values, which include the buff, plus one line with the time left; the sale message shows the sum of `valueBase` |
 
-(Sources: `current()`, `report().sources`, `buffIncomeShare()`.)
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-current-proposed -->
 
 ---
 
-## 3. Decision 8: Double Cash, sale-time or catch-time
+## 4. Decision 8: Double Cash, sale-time or catch-time
 
-**Models** (`doubleCashModels(archetype, { days })`). Every model uses the same daily lifecycle rows and the same buff arrivals (the proposed sources):
+The recommendation, catch-time, is the framework-level proposal `P-DOUBLE-CASH` in `decisions.js`. Catch-time is the buffs system itself (its ledger); every alternative is evaluated analytically on the same integrated run's daily rows (`doubleCashModels()`, `saleTimeHoarder()`), with the same buff arrivals.
 
+<!-- generated:buffs-dc-models -->
 | Model | Rule |
 | --- | --- |
-| **Catch-time (proposed)** | Each Double Cash doubles min(1 h, the day's play) at the current stage. |
-| Catch-time, buff saver | The upper bound when every buff is saved for a session of at least 1 h. Casual and regular players would have to play longer that day. |
-| Catch-time, casts-based | Alternative duration: the buff lasts the next **400 casts** (one reference hour: `F.COOLDOWN` + `F.DESIGN_OVERHEAD_S`), however long that takes. |
-| Sale-time, sells every session | Sells what they catch, so the buff hour doubles that hour's sales. This equals catch-time. |
-| **Sale-time hoarder, uncapped** | Sells at ×1 only what mandatory upkeep (rods: 4% of crafted-rod income) and progression purchases (`F.PURCHASE.saveHours` of stage income per tier) need. Everything else is hoarded and sold under the next Double Cash. Exact renewal DP over the day of the last hoard sale, with P(arrival on a day) = 1 − e^(−λ). |
-| Sale-time hoarder, capped | The bonus per buff is capped at **1 hour of the player's stage income** (reference cadence). The hoarder sells exactly the capped amount under each buff and keeps the rest. |
+| **Catch-time (proposed)** | The buffs system itself: each Double Cash doubles the catch of the play its window covers (the session it starts, at each step's rates). |
+| Catch-time, buff saver | Upper bound: the same units, each played for its whole hour (casual and regular players would have to play longer that day). |
+| Catch-time, casts-based | Alternative duration: the buff lasts the next **400 casts** (one reference hour: `F.COOLDOWN` + `F.DESIGN_OVERHEAD_S`), however long that takes; mean-field on the daily rows. |
+| Sale-time, sells every session | Sells what they catch, so the buff hour doubles that hour's sales: equals catch-time. |
+| **Sale-time hoarder, uncapped** | Sells at x1 only the fish needed for the day's upkeep and progression purchases (gear, permits) beyond the non-fish cash it holds (quests, streak, salvage, Lucky Draw rebates); hoards the rest and sells it under the next Double Cash. Exact renewal DP over the day of the last hoard sale, P(arrival on a day) = 1 - e^(-lambda). |
+| Sale-time hoarder, capped | The bonus per buff is capped at **1 h of the player's stage income** at the reference cadence; the hoarder sells exactly the capped amount under each buff. |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-dc-models -->
 
 **Share of fishing income that Double Cash adds** (`report().decision8`):
 
-| Player | Period | Level at end | Fishing income | Double Cash / 30 d | **Catch-time (proposed)** | Catch-time, buff saver | Catch-time, casts-based | Sale-time, sells every session | Sale-time hoarder, uncapped | Sale-time hoarder, capped 1 h | Hoardable share |
+<!-- generated:buffs-dc-share -->
+| Player | Period | Level at end | Fishing income | Double Cash / 30 d | **Catch-time (proposed)** | Buff saver | Casts-based | Sale-time, sells every session | Sale-time hoarder, uncapped | Sale-time hoarder, capped | Hoardable share (fish not needed for spending) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Casual | 30 d | 22 | $68,696 | 1.71 | **5.8%** | 28.0% | 37.3% | 5.8% | 48.5% | 32.8% | 100% |
-| Casual | 90 d | 39 | $441,318 | 1.72 | **5.8%** | 27.7% | 36.5% | 5.8% | 59.3% | 35.4% | 81% |
-| Regular | 30 d | 38 | $727,694 | 1.72 | **5.9%** | 7.8% | 7.7% | 5.9% | 36.7% | 7.6% | 84% |
-| Regular | 90 d | 60 | $5,696,657 | 1.72 | **5.8%** | 7.7% | 7.2% | 5.8% | 62.6% | 7.5% | 86% |
-| Active | 30 d | 57 | $5,166,032 | 1.72 | **3.0%** | 3.0% | 2.5% | 3.0% | 35.7% | 2.5% | 88% |
-| Active | 90 d | 85 | $26,568,723 | 1.72 | **2.9%** | 2.9% | 2.3% | 2.9% | 71.9% | 2.5% | 94% |
-| Grinder | 30 d | 82 | $25,135,978 | 1.72 | **1.2%** | 1.2% | 0.8% | 1.2% | 43.6% | 0.9% | 93% |
-| Grinder | 90 d | 114 | $88,283,020 | 1.72 | **1.2%** | 1.2% | 0.8% | 1.2% | 75.9% | 0.8% | 95% |
+| Casual | 30 d | 22 | $80,207 | 1.72 | **5.7%** | 27.3% | 37.6% | 5.7% | 38.9% | 32.4% | 82% |
+| Casual | 90 d | 37 | $466,208 | 1.72 | **5.7%** | 27.5% | 36.4% | 5.7% | 71.1% | 35.4% | 97% |
+| Regular | 30 d | 38 | $790,712 | 1.74 | **5.8%** | 7.7% | 7.7% | 5.8% | 34.4% | 7.6% | 79% |
+| Regular | 90 d | 59 | $5,954,828 | 1.73 | **5.7%** | 7.7% | 7.2% | 5.7% | 58.8% | 7.5% | 83% |
+| Active | 30 d | 56 | $5,501,239 | 1.74 | **2.9%** | 2.9% | 2.4% | 2.9% | 28.4% | 2.5% | 71% |
+| Active | 90 d | 82 | $26,817,278 | 1.73 | **2.9%** | 2.9% | 2.3% | 2.9% | 72.1% | 2.5% | 94% |
+| Grinder | 30 d | 80 | $25,395,728 | 1.74 | **1.1%** | 1.1% | 0.8% | 1.1% | 42.6% | 0.9% | 92% |
+| Grinder | 90 d | 110 | $87,702,448 | 1.73 | **1.1%** | 1.1% | 0.8% | 1.1% | 77.8% | 0.8% | 98% |
 
-"Hoardable share" is income minus upkeep and progression purchases. Permits, bait and aquarium spending are not designed yet; they would lower it.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-dc-share -->
 
-**Buff frequency** (`report().frequency`, 90 days; each cell is catch-time / uncapped sale-time hoarder / capped sale-time hoarder):
+**Buff frequency** (`report().frequency`, over the horizon of the table above; each cell is catch-time / uncapped sale-time hoarder / capped sale-time hoarder). "Today" runs the same integrated economy with only today's buff arrival rates:
 
-| Sources | Double Cash / 30 d | Casual | Regular | Active | Grinder |
+<!-- generated:buffs-frequency -->
+| Sources | Double Cash / 30 d (regular) | Casual | Regular | Active | Grinder |
 | --- | --- | --- | --- | --- | --- |
-| today: Daily Box only | 0.08 | 0.3% / 6.7% / 1.7% | 0.3% / 6.9% / 0.4% | 0.1% / 8.6% / 0.1% | 0.1% / 9.8% / 0.0% |
-| today: Daily Box + Top.gg votes | 0.34 | 1.1% / 23.7% / 7.2% | 1.1% / 24.6% / 1.5% | 0.6% / 30.3% / 0.5% | 0.2% / 33.9% / 0.2% |
-| proposed without events | 0.72 | 2.4% / 39.3% / 15.1% | 2.4% / 41.3% / 3.2% | 1.2% / 49.8% / 1.0% | 0.5% / 54.4% / 0.4% |
-| proposed | 1.72 | 5.8% / 59.3% / 35.4% | 5.8% / 62.6% / 7.5% | 2.9% / 71.9% / 2.5% | 1.2% / 75.9% / 0.8% |
+| today: Daily Box only | 0.08 | 0.3% / 7.4% / 1.7% | 0.3% / 5.7% / 0.4% | 0.1% / 8.4% / 0.1% | 0.1% / 10.0% / 0.0% |
+| today: Daily Box + Top.gg votes | 0.34 | 1.1% / 26.9% / 7.2% | 1.1% / 20.9% / 1.5% | 0.6% / 29.7% / 0.5% | 0.2% / 34.6% / 0.2% |
+| proposed without events | 0.73 | 2.4% / 46.8% / 15.1% | 2.4% / 36.6% / 3.2% | 1.2% / 49.2% / 1.0% | 0.5% / 55.6% / 0.4% |
+| proposed | 1.73 | 5.7% / 71.1% / 35.4% | 5.7% / 58.8% / 7.5% | 2.9% / 72.1% / 2.5% | 1.1% / 77.8% / 0.8% |
 
-**Reading it.**
-- **Uncapped sale-time makes hoarding the dominant strategy.** A hoarder gets +7% of income at today's Daily Box rate and up to +76% at the proposed rate, against +0.1–5.8% for everyone else. The share rises toward the hoardable share (81–95%) as buffs become more frequent. Double Cash would stop being a fun hour and become an inventory-management chore that decides the economy. It also makes *every* buff-frequency decision an economy decision. That is why a cap would be required.
-- **Capped sale-time is bounded, but it is uneven and complex.**
-  - A casual hoarder collects a full reference hour of income per buff, about 6 days of their play, so capped sale-time gives casual players **+33–35%**. A grinder gets +0.8%.
-  - It needs a stage-income table in the engine, per-buff `bonusPaid` accounting in two sale code paths, and a sale-time public/private split.
-  - Its catch-up for casual players would be a hoarding reward, not a daily-play reward.
-- **The casts-based duration has the same casual effect (+37%) without hoarding, and it rewards barely fishing.** Its XP twin would give casual players 8.1% of all their XP instead of 1.35%, widening the R2 gap the quests design already quantified. For the minimum-daily player it nearly doubles fishing income (+98.6%) and adds 15.9% to XP, because 400 doubled casts outlast weeks of 20-cast days (table below).
-- **Catch-time with a real hour** gives casual and regular players the same share: the share of buffed days, 5.8–5.9%. Longer-session players get a smaller share, because the hour is a smaller part of their day. It needs no cap, no hoarding decision and no sale-time logic, and it matches every other sell modifier.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-frequency -->
 
-**Duration model** (`report().durationAlternatives`, 30 days; the same arrivals, the buff's share of fishing income for Double Cash and of all XP for Double XP):
+**Duration model** (`report().durationAlternatives`, first 30 days; Double Cash as a share of fishing income, Double XP as a share of all XP):
 
+<!-- generated:buffs-duration -->
 | Player | Double Cash: real hour (proposed) | Double Cash: 400 casts | Double XP: real hour (proposed) | Double XP: 400 casts |
 | --- | --- | --- | --- | --- |
-| Casual | 5.83% | 37.31% | 1.35% | 8.05% |
-| Regular | 5.86% | 7.69% | 1.91% | 2.50% |
-| Active | 2.97% | 2.46% | 1.09% | 0.92% |
-| Grinder | 1.17% | 0.79% | 0.46% | 0.32% |
-| Minimum-daily (20 casts/day) | 5.62% | **98.60%** | 0.94% | **15.90%** |
+| Casual | 5.69% | 37.57% | 1.28% | 7.94% |
+| Regular | 5.79% | 7.68% | 1.88% | 2.50% |
+| Active | 2.87% | 2.43% | 1.09% | 0.94% |
+| Grinder | 1.14% | 0.82% | 0.46% | 0.34% |
+| Minimum-daily | 5.69% | 75.68% | 0.99% | 12.88% |
 
-**Verdict:** catch-time (D1).
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-duration -->
 
-**Intended behaviour for players.** "Double Cash doubles the value of every fish you catch in the next hour. The doubled value stays on the fish, so sell whenever you like."
-- Fish caught before activation are never doubled.
-- Fish caught during the buff keep ×2 even when sold after it ends.
-- **Decision for you (D-a):** if you prefer the selling-strategy game, the capped sale-time variant is fully specified here (`PARAMS.alternatives.saleTimeCapHours`). It raises casual income by about a third via hoarding.
+**Reading it.**
+- **Uncapped sale-time makes hoarding the dominant strategy.** The hoarder's gain grows with buff frequency toward the hoardable share, far above everyone else's (frequency table). Double Cash would become an inventory-management chore that decides the economy, and every buff-frequency decision would become an economy decision. That is why sale-time would need a cap.
+- **Capped sale-time is bounded, but uneven and complex.** A casual hoarder collects a full reference hour of income per buff, several days of their own play, while a grinder gets almost nothing (Decision 8 table). It needs a stage-income table in the engine, per-buff bonus accounting in two sale code paths and a sale-time public/private split, and its casual catch-up would reward hoarding, not daily play.
+- **A casts-based duration has a similar casual effect without hoarding, and it rewards barely fishing.** Its XP twin multiplies the casual player's buff XP share, and for the minimum-daily player the doubled casts outlast weeks of short sessions (duration table).
+- **Catch-time with a real hour** gives casual and regular players the same share, the share of buffed days; longer sessions get a smaller share because the hour is a smaller part of their day. It needs no cap, no hoarding decision and no sale-time logic, and it matches every other sell modifier, which is already stamped at catch.
+
+**Intended behaviour for players.** "Double Cash doubles the value of every fish you catch in the next hour. The doubled value stays on the fish, so sell whenever you like." Fish caught before activation are never doubled; fish caught during the buff keep the bonus when sold after it ends. If you prefer the selling-strategy game, the capped sale-time variant is fully specified (`PARAMS.alternatives.saleTimeCapHours`); it raises casual income through hoarding.
 
 ---
 
-## 4. What one buff is worth
+## 5. What one buff is worth
 
-**By stage** (`valuePerBuff(level, archetype)`, typical tier of the stage):
+**By stage** (`valuePerBuff(level, archetype)`, typical tier of the stage; static stage rates, not a lifecycle):
 
+<!-- generated:buffs-value-per-buff -->
 | Player | Stage | Double Cash, used on a normal day | Double Cash, saved for a 1 h session | Double XP (XP) | Lucky Draw on the next tier assembly (hours of own play) | Lucky Draw on 2 Streak Crates |
 | --- | --- | --- | --- | --- | --- | --- |
 | Casual | Ocean (Lv 0, old) | $1,336 (12.5 min) | $6,411 | 1,166 | T1: $3,325 (0.52 h) | $207 |
-| Casual | Lake (Lv 20, t1) | $4,609 (12.5 min) | $22,125 | 1,348 | T2: $13,704 (0.62 h) | $308 |
-| Casual | Coast (Lv 40, t3) | $12,736 (12.5 min) | $61,131 | 1,860 | T4: $99,608 (1.63 h) | $456 |
-| Casual | Swamp (Lv 50, t4) | $20,780 (12.5 min) | $99,745 | 2,110 | T5: $156,774 (1.57 h) | $567 |
-| Regular | Ocean (Lv 0, old) | $6,411 (45 min) | $8,548 | 5,596 | T1: $3,325 (0.39 h) | $207 |
-| Regular | River (Lv 10, old) | $11,339 (45 min) | $15,119 | 5,596 | T1: $3,325 (0.22 h) | $257 |
-| Regular | Lake (Lv 20, t1) | $22,125 (45 min) | $29,500 | 6,473 | T2: $13,704 (0.46 h) | $308 |
-| Regular | Pond (Lv 30, t2) | $36,319 (45 min) | $48,425 | 7,572 | T3: $36,801 (0.76 h) | $380 |
-| Regular | Coast (Lv 40, t3) | $62,030 (45 min) | $82,706 | 9,058 | T4: $99,608 (1.20 h) | $456 |
-| Regular | Swamp (Lv 50, t4) | $102,012 (45 min) | $136,016 | 10,360 | T5: $156,774 (1.15 h) | $567 |
-| Grinder | Lake (Lv 20, t1) | $37,929 (60 min) | $37,929 | 11,096 | T2: $13,704 (0.36 h) | $308 |
-| Grinder | Swamp (Lv 50, t4) | $179,541 (60 min) | $179,541 | 18,233 | T5: $156,774 (0.87 h) | $567 |
+| Casual | Lake (Lv 20, t1) | $4,880 (12.5 min) | $23,424 | 1,425 | T2: $13,704 (0.59 h) | $308 |
+| Casual | Coast (Lv 40, t3) | $13,248 (12.5 min) | $63,590 | 1,860 | T4: $99,608 (1.57 h) | $456 |
+| Casual | Swamp (Lv 50, t4) | $22,034 (12.5 min) | $105,762 | 2,110 | T5: $156,774 (1.48 h) | $567 |
+| Regular | Ocean (Lv 0, old) | $6,411 (45.0 min) | $8,548 | 5,596 | T1: $3,325 (0.39 h) | $207 |
+| Regular | River (Lv 10, old) | $11,339 (45.0 min) | $15,119 | 5,596 | T1: $3,325 (0.22 h) | $257 |
+| Regular | Lake (Lv 20, t1) | $23,523 (45.0 min) | $31,364 | 6,871 | T2: $13,704 (0.44 h) | $308 |
+| Regular | Pond (Lv 30, t2) | $37,049 (45.0 min) | $49,399 | 7,572 | T3: $36,801 (0.74 h) | $380 |
+| Regular | Coast (Lv 40, t3) | $64,526 (45.0 min) | $86,034 | 9,058 | T4: $99,608 (1.16 h) | $456 |
+| Regular | Swamp (Lv 50, t4) | $108,165 (45.0 min) | $144,221 | 10,360 | T5: $156,774 (1.09 h) | $567 |
+| Grinder | Lake (Lv 20, t1) | $40,521 (60.0 min) | $40,521 | 11,836 | T2: $13,704 (0.34 h) | $308 |
+| Grinder | Swamp (Lv 50, t4) | $190,371 (60.0 min) | $190,371 | 18,233 | T5: $156,774 (0.82 h) | $567 |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-value-per-buff -->
 
 - **Double Cash and Double XP are worth one day of play for casual and regular players, and one hour for everyone else.** A buff is a treat of the same relative size for casual and regular players.
-- **Saving a buff for a longer session** raises its value to at most 1 h of the player's own income (the "saved" column). That is the bound on "hoarding buffs".
-  - The additive event rule (D3) means a buff saved for an event still adds exactly +100% of the unbuffed value. Timing a buff to an event gains nothing extra.
-- **Lucky Draw is worth the most on a tier assembly:** 0.2–1.6 h of the player's own income. Surplus Lucky Draws go on Streak Crates, where a bonus slot is worth $100–$284.
+- **Saving a buff for a longer session** raises its value to at most one hour of the player's own income (the "saved" column). That is the bound on hoarding buffs. Under the additive event rule (`P-BUFFS-EVENT-STACKING`) a buff saved for an event still adds exactly the buff's own bonus, so timing buffs to events gains nothing.
+- **Lucky Draw is worth the most on a tier assembly** (hours of own play in the table). Surplus Lucky Draws go on Streak Crates, where a bonus slot is worth much less (Lucky Draw slot table, §8).
 
 ---
 
-## 5. Sources and acquisition rates
+## 6. Sources and acquisition rates
 
 **Per open** (`report().sources.perOpen`; each buff type, exact):
 
+<!-- generated:buffs-per-open -->
 | Box | Per type per open | Any buff per open |
 | --- | --- | --- |
-| Streak Crate (streak design) | 1.97% | 5.9% |
-| Streak Chest (every 7th streak day) | 2.63% | 7.9% |
-| Daily Box (daily quest: 1, weekly quest: 2) | 0.263% | 0.79% |
-| Voter's Crate (legacy, finite stock) | 0.434% | 1.3% |
-| Booster Pack (Easter egg: ~1 in 100,000 Lucky item catches, and redeem codes) | 33.3% | 100%; never valued |
+| Streak Crate | 1.971% | 5.91% |
+| Streak Chest | 2.628% | 7.88% |
+| Daily Box | 0.263% | 0.79% |
+| Voter's Crate (legacy, finite stock) | 0.434% | 1.30% |
+| Booster Pack (Easter egg; never valued) | 33.3% | 100%; never valued |
 
-**Per 30 days of daily play** (regular player; `report().sources.perThirtyDays`):
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-per-open -->
 
-| Source | Double XP | Double Cash | Lucky Draw |
+**Per 30 days** (regular player, integrated: the boxes the streak and quests systems actually grant, plus the event budget; `report().sources.perThirtyDays`):
+
+<!-- generated:buffs-per-30d -->
+| Source (regular player, first 30 days) | Double XP | Double Cash | Lucky Draw |
 | --- | --- | --- | --- |
 | Streak (26 crates + 4 chests) | 0.62 | 0.62 | 0.62 |
-| Quests (1.29 Daily Boxes a day) | 0.10 | 0.10 | 0.10 |
-| **Events (proposed budget)** | 0 | **1.00** | **1.00** |
-| **Total** | **0.72** | **1.72** | **1.72** |
+| Quests (1.50 Daily Boxes a day) | 0.12 | 0.12 | 0.12 |
+| **Events (P-EVENTS budget)** | 0.00 | 1.00 | 1.00 |
+| **Total** | **0.74** | **1.74** | **1.74** |
 
-That is 4.16 buffs a month, about one every week. Today the rate is 0.24, or 1.02 with the votes being retired.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-per-30d -->
 
-**Why this mix.**
-- **Double XP stays at the streak's rate.** It moves the XP curve. The regular player's L20 already sits at 5.27 h against a 5.0 h floor with quests (quests.md), so there is no headroom for more XP.
-- **Double Cash and Lucky Draw get the event lever.**
-  - Cash only moves purchase timing, which is second-order.
-  - Lucky Draw is spent on assemblies the player pays for anyway.
-  - An event grant is the one source the operator can schedule, measure and switch off.
-- **Proposed event rule:** an event may grant each player at most 1 Double Cash + 1 Lucky Draw per 30 days, delivered by the player's first successful cast during the event through the cast's idempotent grant list (key `event:<eventId>:buff:<name>`). An event never grants Double XP; XP events use the existing event `multipliers.xp`, which now add to a buff instead of multiplying it.
-- **Streak and quest pools are unchanged.** A future re-weighting would be a Gacha V2 `featured` change in the streak pool. `arrivals()` values any rate change.
-- **No shop sale.**
-  - A purchasable Double XP converts cash into levels.
-  - A purchasable Double Cash is an investment with a guaranteed return.
-  - Both turn a treat into a chore.
-- **Decision for you (D-b):** the event budget. With **no events**, buffs fall to 2.16 a month and add 0.6–3.0% of income (§6).
+**Why this mix** (`P-BUFFS-SOURCES`; the budget itself is `P-EVENTS`).
+- **Double XP stays at the streak's rate.** It moves the XP curve, and the regular player's windows have little headroom (R2 windows table, §10). Events grant no Double XP; XP events use the event `multipliers.xp`, which now add to a buff instead of multiplying it.
+- **Double Cash and Lucky Draw get the event lever.** Cash only moves purchase timing; a Lucky Draw is spent on assemblies the player pays for anyway; and an event grant is the one source the operator can schedule, measure and switch off.
+- **Event rule:** an event grants each player at most the budget per 30 days, delivered by the player's first successful cast during the event through the cast's idempotent grant list (key `event:<eventId>:buff:<name>`), enforced in code as a per-player cap.
+- **Streak and quest pools are unchanged.** A future re-weighting would be a Gacha V2 `featured` change in the streak pool; `boxBuffOdds()` values any pool.
+- **No shop sale.** A purchasable Double XP converts cash into levels; a purchasable Double Cash is an investment with a guaranteed return. Both turn a treat into a chore.
 
 ---
 
-## 6. Modelled share of income and XP that buffs add (`buffIncomeShare`)
+## 7. Share of income and XP that buffs add
 
-`buffIncomeShare(archetype, { days, sources })` is the integrator entry point:
-- `.cash` is Double Cash plus the Lucky Draw cash-equivalent, as a share of fishing income.
-- `.xp` is the Double XP share of XP.
-- `.bySource` splits both by source.
+`buffIncomeShare(archetype, { days, sources })` reads the integrated run's exact ledger close after `days` days: `.cash` is Double Cash plus the Lucky Draw cash-equivalent over fishing income, `.cashOfAllIncome` the same over every cash source, `.xp` the Double XP share of all XP, `.bySource` both by source.
 
-| Player | Period | Level at end | Play-hours | Fishing income | Double Cash | Lucky Draw | **Cash share** | **XP share** |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Casual | 7 d | 10 | 1.5 | $9,485 | $595 (6.27%) | $0 (0.00%) | **6.27%** | **1.69%** |
-| Casual | 30 d | 22 | 6.3 | $68,696 | $4,005 (5.83%) | $201 (0.29%) | **6.12%** | **1.35%** |
-| Casual | 90 d | 39 | 18.8 | $441,318 | $25,439 (5.76%) | $17,752 (4.02%) | **9.79%** | **1.11%** |
-| Regular | 7 d | 19 | 5.3 | $70,865 | $4,271 (6.03%) | $0 (0.00%) | **6.03%** | **2.04%** |
-| Regular | 30 d | 38 | 22.5 | $727,694 | $42,622 (5.86%) | $9,531 (1.31%) | **7.17%** | **1.91%** |
-| Regular | 90 d | 60 | 67.5 | $5,696,657 | $330,541 (5.80%) | $300,502 (5.28%) | **11.08%** | **1.82%** |
-| Active | 7 d | 30 | 14.0 | $361,743 | $11,736 (3.24%) | $563 (0.16%) | **3.40%** | **1.12%** |
-| Active | 30 d | 57 | 60.0 | $5,166,032 | $153,330 (2.97%) | $68,102 (1.32%) | **4.29%** | **1.09%** |
-| Active | 90 d | 85 | 180.0 | $26,568,723 | $767,850 (2.89%) | $177,115 (0.67%) | **3.56%** | **1.07%** |
-| Grinder | 7 d | 47 | 35.0 | $2,243,086 | $28,596 (1.27%) | $7,191 (0.32%) | **1.60%** | **0.48%** |
-| Grinder | 30 d | 82 | 150.0 | $25,135,978 | $293,161 (1.17%) | $60,682 (0.24%) | **1.41%** | **0.46%** |
-| Grinder | 90 d | 114 | 450.0 | $88,283,020 | $1,016,851 (1.15%) | $62,633 (0.07%) | **1.22%** | **0.46%** |
-| Minimum-daily (20 casts/day) | 30 d | 15 | 1.5 | $18,002 | $1,011 (5.62%) | $181 (1.01%) | **6.62%** | **0.94%** |
+<!-- generated:buffs-income-share -->
+| Player | Period | Level at end | Play-hours | Fishing income | Double Cash | Lucky Draw | **Cash share (of fishing)** | Of all cash income | **XP share** |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Casual | 7 d | 11 | 1.5 | $10,388 | $551 (5.30%) | $1,230 (11.84%) | **17.14%** | 6.01% | **1.14%** |
+| Casual | 30 d | 22 | 6.3 | $80,207 | $4,567 (5.69%) | $14,661 (18.28%) | **23.97%** | 9.09% | **1.28%** |
+| Casual | 90 d | 37 | 18.8 | $466,208 | $26,735 (5.73%) | $52,087 (11.17%) | **16.91%** | 6.91% | **1.26%** |
+| Regular | 7 d | 20 | 5.3 | $71,741 | $3,934 (5.48%) | $305 (0.42%) | **5.91%** | 4.01% | **1.63%** |
+| Regular | 30 d | 38 | 22.5 | $790,712 | $45,748 (5.79%) | $24,212 (3.06%) | **8.85%** | 5.87% | **1.88%** |
+| Regular | 90 d | 59 | 67.5 | $5,954,828 | $341,906 (5.74%) | $279,636 (4.70%) | **10.44%** | 7.11% | **1.89%** |
+| Active | 7 d | 31 | 14.0 | $420,768 | $10,681 (2.54%) | $10,010 (2.38%) | **4.92%** | 3.90% | **0.93%** |
+| Active | 30 d | 56 | 60.0 | $5,501,239 | $157,612 (2.87%) | $136,905 (2.49%) | **5.35%** | 4.43% | **1.09%** |
+| Active | 90 d | 82 | 180.0 | $26,817,278 | $767,562 (2.86%) | $138,854 (0.52%) | **3.38%** | 2.93% | **1.09%** |
+| Grinder | 7 d | 47 | 35.0 | $2,441,996 | $25,766 (1.06%) | $15,101 (0.62%) | **1.67%** | 1.51% | **0.43%** |
+| Grinder | 30 d | 80 | 150.0 | $25,395,728 | $290,129 (1.14%) | $52,982 (0.21%) | **1.35%** | 1.27% | **0.46%** |
+| Grinder | 90 d | 110 | 450.0 | $87,702,448 | $1,003,563 (1.14%) | $54,931 (0.06%) | **1.21%** | 1.15% | **0.46%** |
+| Minimum-daily | 30 d | 17 | 2.1 | $26,865 | $1,528 (5.69%) | $2,548 (9.48%) | **15.17%** | 4.24% | **0.99%** |
 
-**With and without the event lever** (30 days; `report().buffIncomeShareWithoutEvents`):
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-income-share -->
 
-| Player | Without events: buffs / 30 d | cash share | XP share | Proposed: buffs / 30 d | cash share | XP share | Cash share by source: streak / quests / events |
+**With and without the event lever** (first 30 days; `report().buffIncomeShareWithoutEvents`):
+
+<!-- generated:buffs-events -->
+| Player | Without events: buffs / 30 d | cash share | XP share | Proposed: buffs / 30 d | cash share | XP share | Double Cash share by source: streak / quests / events |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Casual | 2.14 | 2.43% | 1.35% | 4.14 | 6.12% | 1.35% | 2.11% / 0.33% / 3.40% |
-| Regular | 2.16 | 3.00% | 1.91% | 4.16 | 7.17% | 1.91% | 2.11% / 0.35% / 3.40% |
-| Active | 2.16 | 1.80% | 1.09% | 4.16 | 4.29% | 1.09% | 1.07% / 0.18% / 1.72% |
-| Grinder | 2.16 | 0.59% | 0.46% | 4.16 | 1.41% | 0.46% | 0.42% / 0.07% / 0.68% |
+| Casual | 2.16 | 9.99% | 1.28% | 4.16 | 23.97% | 1.28% | 2.03% / 0.33% / 3.33% |
+| Regular | 2.21 | 3.74% | 1.88% | 4.21 | 8.85% | 1.88% | 2.06% / 0.40% / 3.33% |
+| Active | 2.22 | 2.29% | 1.09% | 4.22 | 5.35% | 1.09% | 1.02% / 0.20% / 1.65% |
+| Grinder | 2.22 | 0.57% | 0.46% | 4.22 | 1.35% | 0.46% | 0.41% / 0.08% / 0.66% |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-events -->
 
 **Reading it.**
-- **Double Cash is a flat ~5.8% for anyone who plays an hour a day or less.** It is less for longer sessions. The "cash" in "cash-equivalent" is real, since it flows through normal fish sales.
-- **The Lucky Draw share is lumpy by design.** It is the crates a player does not have to buy on an assembly day.
-  - The regular player's 90-day 5.3% is mostly the T4 and T5 assemblies, where a single Lucky Draw saves $99,608 and $156,774.
-  - It never pays out cash: it is progression spending avoided.
-- **XP from buffs never exceeds 2.1% for any archetype.** It is 1.1–1.7% for casual players, because the provisional daily dilutes it.
-- **Integration: count buff value once.**
-  - `streak.streakValue()` already includes its own boxes' Double Cash and Double XP (`breakdown.doubleCash`, `.xp`).
-  - With the streak as the only source, this module's values equal them exactly (`reconcileWithStreak()`). With every source on, `buffIncomeShare().bySource.streak` is the streak's part of the same total.
-  - Use one or the other, not both.
+- **Double Cash is a flat share for anyone who plays an hour a day or less**, and less for longer sessions (Double Cash column). It is real cash: it flows through normal fish sales.
+- **The Lucky Draw share is lumpy by design.** It is the crates a player does not have to buy on an assembly day, credited as a rebate at the assembly. It never pays out cash: it is progression spending avoided.
+- **XP from buffs stays small for every archetype** (XP share column). Quests dilute it most for casual players.
+- **Open issue: the 30-day cash-share targets fail for casual, regular and active players at 5b.4** (checks `cash-share-*`, §16). The Double Cash part alone stays inside every target; the excess is the Lucky Draw rebate. On the rods path the T1 and T2 assemblies come early, and the casual player funds them mostly from quest and streak cash, so a single Lucky Draw on an early assembly is a large share of their small *fishing* income (compare the "of all cash income" column). This is reported, not tuned: see §16 for the options.
 
 ---
 
-## 7. Lucky Draw
+## 8. Lucky Draw
 
-**Today it is weak, and inert where it would matter most** (`current().luckyToday`; Lake-stage fish for the box rows):
+**Today it is weak, and inert where it would matter most** (`current().luckyToday`):
 
-| Box | P(rare+) per slot | Liquid value per open |
+<!-- generated:buffs-lucky-today -->
+| Box (Lake-stage fish) | P(rare+) per slot: today -> with Lucky Draw | Liquid value per open |
 | --- | --- | --- |
-| Daily Box | 6.6% → 9.6% | $333 → $382 (+$49) |
-| Streak Crate | 21.2% → 28.7% | $462 → $476 (+$14) |
-| Streak Chest | 36.9% → 43.0% | $1,061 → $1,079 (+$19) |
+| Daily Box | 6.6% -> 9.6% | $333 -> $382 (+$49) |
+| Streak Crate | 21.2% -> 28.7% | $462 -> $476 (+$14) |
+| Streak Chest | 36.9% -> 43.0% | $1,061 -> $1,079 (+$19) |
 
-| Tier crate (rods design) | Expected crates per assembly | With **every** open lucky | Saved |
+| Tier crate (rods design) | Expected crates per assembly | With **every** open lucky (today) | Saved |
 | --- | --- | --- | --- |
 | T1 Fishing Crate | 3.873 | 3.872 | 0.002 |
 | T2 Pro Tackle Crate | 3.769 | 3.430 | 0.339 |
@@ -277,314 +305,315 @@ That is 4.16 buffs a month, about one every week. Today the rate is 0.24, or 1.0
 | T4 Master Tackle Crate | 3.656 | 3.656 | **0 (inert)** |
 | T5 Gilded Tackle Crate | 1.966 | 1.966 | **0 (inert)** |
 
-Today's Lucky Draw multiplies every rare+ weight by 1.5. On a crate whose floor is already rare or higher, that changes nothing. Where it does work, it rewards buying a stack of boxes and opening all of them inside one hour.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-lucky-today -->
 
-**Proposed: +1 bonus slot on each of the next K opens** (`luckyAssembly()`, `luckyDrawValue()`). Each cell shows crates saved · $ saved · hours of that stage's income:
+Today's Lucky Draw multiplies every rare+ weight. On a crate whose floor is already rare or higher, that changes nothing. Where it does work, it rewards buying a stack of boxes and opening all of them inside one hour.
 
+**Proposed: a bonus slot on each of the next K opens** (`luckyAssembly()`, `luckyDrawValue()`; `P-BUFFS-LUCKY-DRAW`). Each cell shows crates saved (share of the assembly) · $ saved · hours of that stage's income:
+
+<!-- generated:buffs-lucky-k -->
 | K (opens) | T1 Fishing | T2 Pro | T3 Expert | T4 Master | T5 Gilded |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 0.40 cr · $1,954 · 0.13 h | 0.38 cr · $8,033 · 0.26 h | 0.42 cr · $22,218 · 0.45 h | 0.43 cr · $60,803 · 0.71 h | 0.19 cr · $113,948 · 0.79 h |
-| **2 (proposed)** | **0.68 cr · $3,325 · 0.22 h** | **0.65 cr · $13,704 · 0.44 h** | **0.69 cr · $36,801 · 0.75 h** | **0.71 cr · $99,608 · 1.16 h** | **0.27 cr · $156,774 · 1.09 h** |
-| 3 | 0.82 cr · $4,001 · 0.26 h | 0.78 cr · $16,409 · 0.52 h | 0.82 cr · $43,423 · 0.88 h | 0.83 cr · $116,812 · 1.36 h | 0.29 cr · $171,238 · 1.19 h |
+| 1 | 0.40 cr (10%) · $1,954 · 0.13 h | 0.38 cr (10%) · $8,033 · 0.26 h | 0.42 cr (11%) · $22,218 · 0.45 h | 0.43 cr (12%) · $60,803 · 0.71 h | 0.19 cr (10%) · $113,948 · 0.79 h |
+| **2 (proposed)** | **0.68 cr (18%) · $3,325 · 0.22 h** | **0.65 cr (17%) · $13,704 · 0.44 h** | **0.69 cr (19%) · $36,801 · 0.74 h** | **0.71 cr (19%) · $99,608 · 1.16 h** | **0.27 cr (14%) · $156,774 · 1.09 h** |
+| 3 | 0.82 cr (21%) · $4,001 · 0.26 h | 0.78 cr (21%) · $16,409 · 0.52 h | 0.82 cr (22%) · $43,423 · 0.88 h | 0.83 cr (23%) · $116,812 · 1.36 h | 0.29 cr (15%) · $171,238 · 1.19 h |
 
-- **With K = 2, a Lucky Draw removes 17–20% of the crates of a T1–T4 assembly** (3.87 → 3.19, 3.77 → 3.12, 3.69 → 3.00, 3.66 → 2.94). On the T5 Gilded Tackle Crate it removes 13.5% (1.97 → 1.70; that crate already has pity).
-  - It is never inert.
-  - It is bounded by two opens, however many boxes a player has saved.
-  - Its value is comparable to a Double Cash hour: 0.2–1.2 h of stage income.
-- **Mechanics.**
-  - The bonus slot is appended after the box's own slots. It rolls the box's normal table (floor included, no guaranteed minimum), and it respects `duplicates: 'unique'` and the box pity.
-  - Charges are spent in the open's journal commit, exactly once (`appliedOps`), so a recovered open never spends two.
-  - The Booster Pack uses no charge. It keeps its exact contents (decision 12).
-- **On other boxes** (`report().luckyDraw.bonusSlot`), one bonus slot is worth:
-  - Daily Box: $111
-  - Streak Crate: $103 (Ocean) to $284 (Swamp)
-- **Decision for you (D-c):** K = 1, 2 or 3 is a single parameter (`PARAMS.catalog['Lucky Draw'].duration.opens`).
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-lucky-k -->
+
+**One bonus slot on other boxes** (`report().luckyDraw.bonusSlot`, liquid value by stage):
+
+<!-- generated:buffs-lucky-slot -->
+| Box | Ocean (Lv 0) | River (Lv 10) | Lake (Lv 20) | Pond (Lv 30) | Coast (Lv 40) | Swamp (Lv 50) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Daily Box | $111 | $111 | $111 | $111 | $111 | $111 |
+| Streak Crate | $103 | $128 | $154 | $190 | $228 | $284 |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-lucky-slot -->
+
+- The proposed Lucky Draw is never inert, it is bounded by K opens however many boxes a player has saved, and on an assembly it is worth a fraction of an hour to about an hour of stage income, the size of a Double Cash hour (K table). The Gilded crate saves a smaller share because it already has pity.
+- **Mechanics.** The bonus slot is appended after the box's own slots. It rolls the box's normal table (floor included, no guaranteed minimum) and respects `duplicates: 'unique'` and the box pity. Charges are spent in the open's journal commit, exactly once (`appliedOps`), so a recovered open never spends two. The Booster Pack uses no charge.
+- **Model use:** one Lucky Draw is kept for the next tier assembly while a tier is ahead (`PARAMS.luckyDrawReserve`); the surplus goes on Streak Crates.
+- **Your choice:** K is a single parameter (`PARAMS.catalog['Lucky Draw'].duration.opens`, via `F.BUFFS.luckyDraw`).
 
 ---
 
-## 8. Rules, stacking and presentation
+## 9. Rules, stacking and presentation
 
 **Catalog** (`PARAMS.catalog`; new text):
 
-| Buff | Effect | Duration | Description |
+<!-- generated:buffs-catalog -->
+| Buff | Effect | Duration | Description (new text) |
 | --- | --- | --- | --- |
-| Double XP | ×2 XP of fish caught by casting | 1 h (real time) | "Doubles the XP of fish you catch for one hour. Quest XP is not affected." |
-| Double Cash | ×2 value of fish caught by casting, stored on the fish | 1 h (real time) | "Fish you catch in the next hour are worth double. The bonus stays on the fish: sell whenever you like." |
+| Double XP | x2 XP of fish caught by casting | 1 h (real time) | "Doubles the XP of fish you catch for one hour. Quest XP is not affected." |
+| Double Cash | x2 value of fish caught by casting, stored on the fish | 1 h (real time) | "Fish you catch in the next hour are worth double. The bonus stays on the fish: sell whenever you like." |
 | Lucky Draw | +1 bonus slot | next 2 box opens | "Your next 2 box openings each roll one bonus slot. (Not Booster Packs.)" |
 
-**Stacking formula** (`temporaryMultiplier`, `catchValue`, `catchXp`):
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-catalog -->
+
+**Stacking formula** (`temporaryMultiplier`, `catchValue`, `catchXp`; `P-BUFFS-QUEUE`, `P-BUFFS-EVENT-STACKING`):
 - stored value = raw × (1 + gear/aquarium sellBonus) × (1 + (buff − 1) + (event − 1)) × profile.sell
-- public value = the same without profile.sell
-- XP follows the same shape with xpBonus (gear and bait), buff, event and profile.xp.
-- Quest rewards keep profile × event only.
+- public value = the same without profile.sell (`P-BUFFS-PUBLIC`)
+- XP follows the same shape with xpBonus (gear and bait), buff, event and profile.xp. Quest rewards keep profile × event only (`P-BUFFS-SCOPE`).
 
 **Worked rule traces** (`ruleExamples()`, the regression-test table):
 
+<!-- generated:buffs-rules -->
 | Case | Before | Event | After |
 | --- | --- | --- | --- |
 | activate consumes one unit | stock Double Cash 2 | activate at t0 | stock 1, ends t0 + 1 h (seconds, not ms) |
-| same kind queues | Double Cash running until t0 + 1 h | activate another at t0 + 0.5 h | EXTENDED: ends t0 + 2 h, multiplier stays ×2 |
+| same kind queues | Double Cash running until t0 + 1 h | activate another at t0 + 0.5 h | EXTENDED: ends t0 + 2 h, multiplier stays x2 |
 | no unit, no buff | stock 0 | activate | NO_STOCK |
-| read-time expiry | active flag still set | cast at t0 + 2.5 h | cash multiplier ×1 |
+| read-time expiry | active flag still set | cast at t0 + 2.5 h | cash multiplier x1 |
 | queue bound | 3 Double XP activated at t0 (ends t0 + 3 h) | activate one more | QUEUE_FULL, stock kept at 1 |
-| Lucky Draw charges | stock Lucky Draw 1 | activate, then open Master Tackle Crate, Booster Pack, Streak Crate, Daily Box | bonus slots 1, 0, 1, 0 (the Booster Pack uses no charge) |
-| buff + event | Double Cash ×2, event sell ×2 | catch a $100 fish | stored $300 (×3, not ×4) |
-| gear and profile multiply | Double Cash, handle +5%, private profile ×10 | catch a $100 fish | public $210, stored $2,100 |
-| sale pays the stored value | fish caught under Double Cash | sell with no buff active | paid the stored ×2; a fish caught before the buff is never doubled |
+| Lucky Draw charges | stock Lucky Draw 1 | activate, then open Master Tackle Crate, Booster Pack, Streak Crate, Daily Box | bonus slots per open: 1, 0, 1, 0 (the Booster Pack uses no charge) |
+| buff + event | Double Cash x2, event sell x2 | catch a $100 fish (no gear bonus) | stored $300 (x3, not x4) |
+| gear and profile multiply | Double Cash, handle +5%, private profile x10 | catch a $100 fish | public $210, stored $2,100 |
+| sale pays the stored value | fish caught under Double Cash, sold later | sell with no buff active | paid the stored value (x2 already in it); a fish caught before the buff is never doubled |
 
-**Presentation** (the standing rule: public shows base, the account receives final):
-- A buff is a normal-player mechanic, so its effect is part of the **base** (public) reward for everyone:
-  - `valueBase` and `reward.base` include the ×2;
-  - base (public) XP includes Double XP.
-- Catch card: one public line while a buff runs ("💰 Double Cash ×2 · 37 min left"). The line is identical for every profile.
-- Sale message: Σ `valueBase`. `/fishing-stats` (private): active buffs, remaining time and charges, and the Founder's final split.
-- `/boosters`: stock, active buffs with remaining time or charges, and the queue.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-rules -->
+
+**Presentation** (the standing rule: public shows base, the account receives final).
+- A buff is a normal-player mechanic, so its effect is part of the **base** (public) reward for everyone: `valueBase` and `reward.base` include the Double Cash bonus, and base (public) XP includes Double XP.
+- Catch card: one public line while a buff runs (buff name, multiplier and minutes left), identical for every profile.
+- Sale message: the sum of `valueBase`. `/fishing-stats` (private): active buffs, remaining time and charges, and the Founder's final split. `/boosters`: stock, active buffs with remaining time or charges, and the queue.
 - Leaderboards rank count, size and weight, never value, so Double Cash cannot affect competitive rankings.
 
 ---
 
-## 9. R2: XP decomposition and the adversarial scenarios (buff layer)
+## 10. R2: XP decomposition and the adversarial scenarios (buff layer)
 
-All figures come from `r2()` on the provisional lifecycle.
-- "Daily XP" is the framework's provisional daily (`F.DAILY.xpPerLevel` × level). Quests replace it at integration.
-- This module owns only the **buff XP** column: Double XP from every source.
+All figures come from `r2()`: the integrated reference loop run to the level cap with and without the buffs system (`integrate.run({ exclude: ['buffs'] })`). "Quest XP" is every quest kind (daily, weekly, repeatable, story). This module owns only the **buff XP** column: Double XP from every source.
 
-| Player | Level | Play-hours (buffs off → on) | Calendar day | Fishing XP | Daily XP (provisional) | Buff XP (by source) | Shares: fishing / daily / buff |
+<!-- generated:buffs-r2 -->
+| Player | Level | Play-hours (no buffs -> buffs) | Calendar day | Fishing XP | Quest XP | Buff XP (by source) | Shares: fishing / quests / buff |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Casual | 20 | 5.22 → 5.13 | 25 | 28,728 | 18,240 | 662 (streak 575, quests 87, events 0) | 60.3% / 38.3% / 1.39% |
-| Casual | 30 | 11.25 → 11.05 | 54 | 65,696 | 61,320 | 1,568 (streak 1,354, quests 214, events 0) | 51.1% / 47.7% / 1.22% |
-| Casual | 40 | 20.03 → 19.8 | 96 | 129,915 | 149,040 | 3,107 (streak 2,681, quests 425, events 0) | 46.1% / 52.8% / 1.10% |
-| Casual | 50 | 32.3 → 31.98 | 154 | 236,562 | 304,740 | 5,635 (streak 4,863, quests 773, events 0) | 43.3% / 55.7% / 1.03% |
-| Regular | 20 | 5.62 → 5.48 | 8 | 40,916 | 5,760 | 937 (streak 809, quests 128, events 0) | 85.9% / 12.1% / 1.97% |
-| Regular | 30 | 13.5 → 13.17 | 18 | 105,453 | 20,640 | 2,434 (streak 2,093, quests 342, events 0) | 82.0% / 16.1% / 1.89% |
-| Regular | 40 | 25.52 → 24.97 | 34 | 222,368 | 54,060 | 5,281 (streak 4,537, quests 744, events 0) | 78.9% / 19.2% / 1.87% |
-| Regular | 50 | 42.73 → 41.9 | 56 | 423,876 | 113,100 | 9,984 (streak 8,575, quests 1,409, events 0) | 77.5% / 20.7% / 1.83% |
-| Active | 20 | 5.47 → 5.43 | 3 | 45,611 | 1,740 | 388 (streak 331, quests 57, events 0) | 95.5% / 3.6% / 0.81% |
-| Active | 30 | 13.4 → 13.27 | 7 | 119,671 | 7,560 | 1,254 (streak 1,070, quests 184, events 0) | 93.1% / 5.9% / 0.98% |
-| Active | 40 | 25.98 → 25.7 | 13 | 258,867 | 19,920 | 2,859 (streak 2,449, quests 410, events 0) | 91.9% / 7.1% / 1.02% |
-| Active | 50 | 43.85 → 43.37 | 22 | 497,215 | 44,040 | 5,831 (streak 5,012, quests 819, events 0) | 90.9% / 8.0% / 1.07% |
-| Grinder | 20 | 4.97 → 4.97 | 1 | 47,649 | 0 | 0 (none) | 100.0% / 0.0% / 0.00% |
-| Grinder | 30 | 12.2 → 12.17 | 3 | 125,288 | 2,820 | 478 (streak 408, quests 70, events 0) | 97.4% / 2.2% / 0.37% |
-| Grinder | 40 | 23.82 → 23.73 | 5 | 273,685 | 6,960 | 1,082 (streak 924, quests 159, events 0) | 97.1% / 2.5% / 0.38% |
-| Grinder | 50 | 40.2 → 40.02 | 9 | 526,755 | 17,760 | 2,583 (streak 2,219, quests 363, events 0) | 96.3% / 3.2% / 0.47% |
+| Casual | 20 | 5.05 -> 4.98 | 24 | 27,889 | 19,943 | 638 (quests 89, streak 549) | 57.5% / 41.1% / 1.32% |
+| Casual | 30 | 11.95 -> 11.73 | 57 | 74,070 | 56,812 | 1,742 (quests 242, streak 1,500) | 55.8% / 42.8% / 1.31% |
+| Casual | 40 | 22.85 -> 22.50 | 108 | 155,021 | 136,668 | 3,696 (quests 521, streak 3,174) | 52.5% / 46.3% / 1.25% |
+| Casual | 50 | 38.88 -> 38.52 | 185 | 298,000 | 273,067 | 7,123 (quests 996, streak 6,126) | 51.5% / 47.2% / 1.23% |
+| Regular | 20 | 5.30 -> 5.27 | 7 | 39,299 | 8,942 | 798 (quests 133, streak 664) | 80.1% / 18.2% / 1.63% |
+| Regular | 30 | 12.87 -> 12.58 | 17 | 106,327 | 23,877 | 2,476 (quests 400, streak 2,076) | 80.1% / 18.0% / 1.87% |
+| Regular | 40 | 25.73 -> 25.13 | 34 | 233,038 | 55,832 | 5,546 (quests 874, streak 4,673) | 79.2% / 19.0% / 1.88% |
+| Regular | 50 | 44.70 -> 43.65 | 59 | 456,674 | 110,547 | 10,995 (quests 1,677, streak 9,319) | 79.0% / 19.1% / 1.90% |
+| Active | 20 | 5.10 -> 5.05 | 3 | 42,393 | 5,607 | 441 (quests 111, streak 331) | 87.5% / 11.6% / 0.91% |
+| Active | 30 | 12.80 -> 12.67 | 7 | 121,057 | 10,258 | 1,315 (quests 237, streak 1,077) | 91.3% / 7.7% / 0.99% |
+| Active | 40 | 25.58 -> 25.28 | 13 | 264,878 | 26,498 | 3,153 (quests 578, streak 2,575) | 89.9% / 9.0% / 1.07% |
+| Active | 50 | 44.52 -> 44.02 | 22 | 521,298 | 51,013 | 6,193 (quests 1,010, streak 5,183) | 90.1% / 8.8% / 1.07% |
+| Grinder | 20 | 4.80 -> 4.80 | 1 | 46,050 | 2,440 | 0 (none) | 95.0% / 5.0% / 0.00% |
+| Grinder | 30 | 11.45 -> 11.40 | 3 | 124,166 | 7,816 | 654 (quests 187, streak 467) | 93.6% / 5.9% / 0.49% |
+| Grinder | 40 | 23.18 -> 23.08 | 5 | 277,078 | 16,146 | 1,342 (quests 359, streak 982) | 94.1% / 5.5% / 0.46% |
+| Grinder | 50 | 40.42 -> 40.23 | 9 | 547,940 | 27,661 | 2,640 (quests 553, streak 2,088) | 94.8% / 4.8% / 0.46% |
 
-- **Windows (regular, all buff sources on):** L20 5.48 h, L30 13.17 h, L40 24.97 h, L50 41.90 h. All four are inside their windows, and the largest shift is 2.49%.
-  - 86% of that buff XP is the streak's, which the streak design already counted (5.50 / 13.22 / 25.05 / 42.02 h). This design adds only the Daily Box's Double XP, about 0.3% of XP.
-  - Events grant no Double XP.
-- **Bound:** buff XP is at most the share of days that bring a Double XP (0.72 per 30 days, 2.4%), because a buff doubles at most one hour of real play. Every archetype above is below it.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-r2 -->
 
-**Adversary 1: the minimum-daily player.**
-- The player makes exactly the streak gate's 20 casts a day (3.0 min at reference cadence, `streak.minimumDailyArchetype()`). They receive every buff source, and are assumed to complete the daily quest (an upper bound on Daily Boxes).
-- They are compared with the casual player at weeks 1 / 4 / 13 / 26 / 52 (`r2().minimumDaily`):
+**Milestone hours without → with the buffs system**, every archetype, and the regular player's approved windows:
 
+<!-- generated:buffs-r2-windows -->
+| Player | L10 | L20 | L30 | L40 | L50 | L60 | Largest shift |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Casual | 1.27 -> 1.25 | 5.05 -> 4.98 | 11.95 -> 11.73 | 22.85 -> 22.50 | 38.88 -> 38.52 | 60.68 -> 60.03 | 1.81% |
+| Regular | 1.18 -> 1.18 | 5.30 -> 5.27 | 12.87 -> 12.58 | 25.73 -> 25.13 | 44.70 -> 43.65 | 71.27 -> 69.77 | 2.35% |
+| Active | 1.12 -> 1.12 | 5.10 -> 5.05 | 12.80 -> 12.67 | 25.58 -> 25.28 | 44.52 -> 44.02 | 71.95 -> 71.07 | 1.23% |
+| Grinder | 0.98 -> 0.98 | 4.80 -> 4.80 | 11.45 -> 11.40 | 23.18 -> 23.08 | 40.42 -> 40.23 | 65.18 -> 64.98 | 0.45% |
+
+| Regular player window | Hours without buffs | Hours with buffs | Inside |
+| --- | --- | --- | --- |
+| L20: 5–6 h | 5.30 | 5.27 | yes |
+| L30: 12–15 h | 12.87 | 12.58 | yes |
+| L40: 24–30 h | 25.73 | 25.13 | yes |
+| L50: 40–45 h | 44.70 | 43.65 | yes |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-r2-windows -->
+
+- Without buffs the milestones come later not only because Double XP is gone: Double Cash and the Lucky Draw rebates also speed up gear purchases. Both effects are inside the shift column.
+- **Bound:** buff XP is at most the share of sessions that bring a Double XP, because a buff doubles at most one hour of real play. Every archetype above stays below the XP share target.
+
+**Adversary 1: the minimum-daily player** (`F.MINIMUM_DAILY`: plays each day only until every daily system's minimum is met, receives every buff source) against the casual player, by calendar checkpoint (`r2().minimumDaily`):
+
+<!-- generated:buffs-r2-min-daily -->
 | Day | Min-daily: level | play-h | XP / active h | XP / day | buff XP share | Casual: level | play-h | XP / active h | XP / day | buff XP share | Leads? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 7 | 6 | 0.37 | 11,708 | 614 | 1.42% | 10 | 1.47 | 7,688 | 1,611 | 1.69% | no |
-| 28 | 15 | 1.42 | 18,050 | 913 | 0.96% | 21 | 5.85 | 9,678 | 2,022 | 1.37% | no |
-| 91 | 30 | 4.57 | 30,257 | 1,518 | 0.60% | 39 | 18.97 | 14,040 | 2,926 | 1.11% | no |
-| 182 | 44 | 9.10 | 42,800 | 2,140 | 0.48% | 54 | 37.93 | 18,360 | 3,827 | 1.01% | no |
-| 364 | 62 | 18.20 | 60,271 | 3,014 | 0.43% | 72 | 75.85 | 23,934 | 4,987 | 0.94% | no |
+| 7 | 7 | 0.35 | 17,909 | 895 | 0.81% | 11 | 1.47 | 9,535 | 1,998 | 1.14% | no |
+| 28 | 17 | 1.90 | 17,622 | 1,196 | 0.97% | 21 | 5.85 | 10,202 | 2,131 | 1.30% | no |
+| 91 | 31 | 7.28 | 21,193 | 1,696 | 0.97% | 37 | 18.97 | 12,803 | 2,668 | 1.26% | no |
+| 182 | 44 | 16.38 | 24,596 | 2,214 | 0.96% | 49 | 37.93 | 15,020 | 3,131 | 1.23% | no |
+| 364 | 60 | 36.65 | 29,372 | 2,957 | 0.97% | 65 | 75.85 | 18,736 | 3,904 | 1.16% | no |
 
-- **Verdict: PASS.**
-  - Buffs never make barely fishing optimal. A Double XP doubles only the 3 minutes this player actually fishes, so the buff share of their XP (0.4–1.4%) is *lower* than the casual player's.
-  - Their high XP per active hour comes from the provisional daily (which the quests design's guardrail governs) and from their faster reference cadence (4 s overhead against the casual player's 7 s), not from buffs.
-  - Buff cash per active hour is similarly bounded: Double Cash doubles their 3 minutes.
-- **No guardrail is needed in the buff layer.** The wall-clock window is the guardrail. A casts-based duration would have broken it: 400 doubled casts against 20 a day would add 98.6% to this player's fishing income and 15.9% to their XP (`report().durationAlternatives`).
+Verdict: PASS: a buff only doubles real play inside its window, so the minimum-daily player never leads the casual player in level at any checkpoint. The minimum-daily player's buff XP share is below the casual player's at every checkpoint.
 
-**Adversary 2: the no-miss grinder.**
-- With every buff source on top of grinding, the grinder's milestones move by at most **0.45%** (L50: 40.20 → 40.02 h; L60: 63.18 → 62.92 h).
-- **Verdict: PASS.** Stacking every buff source on grinding does not break the curve targets.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-r2-min-daily -->
 
----
+- Buffs never make barely fishing optimal: a Double XP doubles only the minutes this player actually fishes, so their buff XP share is *lower* than the casual player's. Their high XP per active hour comes from the daily systems and their faster reference cadence, not from buffs.
+- **No guardrail is needed in the buff layer.** The wall-clock window is the guardrail. A casts-based duration would have broken it (duration table, §4).
 
-## 10. Founder (private)
-
-From `founderView()`:
-- **Founder gacha luck** (Rare Find +200%, Trophy +200%, Luck +400%) raises the rare-tier share of every box, and buffs are Rare items:
-  - Streak Crate: 4.12% per type vs 1.97%;
-  - Streak Chest: 5.49% vs 2.63%;
-  - Daily Box: 0.70% vs 0.26%.
-- **Per 30 days:**
-  - Double XP: 1.56 (normal 0.72, ×2.17).
-  - Double Cash and Lucky Draw: 2.56 each (normal 1.72, because events grant the same to everyone).
-- **The buff effect is identical.**
-  - The private profile multiplies after the buff. A Founder Double Cash hour is worth ×2 of the Founder's final, as today.
-  - Buff grants, activation lines and `/boosters` look the same for every profile.
-  - Box fish stay `competitiveEligible: false`.
-- **Public level drift.**
-  - Buff XP is base (public) XP for everyone. A Founder's extra Double XP days therefore put their public XP up to **2.8%** ahead of an identical normal player.
-  - That is **0.45 levels at L50**: within "plausibly lucky" and far inside the gap the Founder design manages.
-  - No special rule is proposed. If the Founder design wants zero drift, it can count buff XP in public XP only up to the normal buff rate.
+**Adversary 2: the no-miss grinder.** Stacking every buff source on grinding moves the grinder's milestones by the "largest shift" in the windows table, and the regular player stays inside every window (checks `no-miss-grinder`, `regular-in-windows-with-buffs`).
 
 ---
 
-## 11. Code touchpoints (for implementation after approval)
+## 11. Founder (private)
+
+From `founderView()` (box odds at the Lake stage; per 30 days from the boxes a regular player is granted on the integrated model, plus the event budget):
+
+<!-- generated:buffs-founder -->
+| Figure | Normal | Founder | Note |
+| --- | --- | --- | --- |
+| Streak Crate: each buff type per open | 1.97% | 4.12% | Founder gacha luck (buffs are Rare items) |
+| Streak Chest: each buff type per open | 2.63% | 5.49% | Founder gacha luck (buffs are Rare items) |
+| Daily Box: each buff type per open | 0.26% | 0.70% | Founder gacha luck (buffs are Rare items) |
+| Double XP per 30 days (regular play) | 0.74 | 1.60 | x2.18 |
+| Double Cash per 30 days (regular play) | 1.74 | 2.60 | events grant the same to everyone |
+| Lucky Draw per 30 days (regular play) | 1.74 | 2.60 | events grant the same to everyone |
+| Public XP drift (share of XP) | 0 | 2.28% | extra Double XP units a day x fishing's share of XP at L50 (79.0%) |
+| Public level drift at L50 | 0 | 0.36 | levels ahead of an identical normal player |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-founder -->
+
+- **Founder gacha luck** raises the rare-tier share of every box, and buffs are Rare items, so a Founder receives more Double XP; events grant the same to everyone.
+- **The buff effect is identical.** The private profile multiplies after the buff, so a Founder Double Cash hour doubles the Founder's final, as today. Buff grants, activation lines and `/boosters` look the same for every profile; box fish stay `competitiveEligible: false`.
+- **Public level drift.** Buff XP is base (public) XP for everyone, so a Founder's extra Double XP puts their public XP slightly ahead of an identical normal player (drift rows). That is within "plausibly lucky" and far inside the gap the Founder design manages. No special rule is proposed; if the Founder design wants zero drift, it can count buff XP in public XP only up to the normal buff rate.
+- In the integrated Founder variant the buffs system reads `state.profile` (set by the founder system): Founder box odds, and the Streak Crate bonus slot sold at the Founder's sell multiplier. The Lucky Draw assembly rebate uses the Normal crate chain, a slight overstatement for the Founder.
+
+---
+
+## 12. Integration contract
+
+`buffs.system(opts)` is this subsystem as a `lifecycle.js` system. Each call returns a fresh object, and all per-run state lives in `state.sys.buffs`. The shared core steps time and accrues base fishing (`'fishing'`); this system credits only the **bonus** a buff adds.
+
+<!-- generated:buffs-system -->
+| Hook | What it does |
+| --- | --- |
+| `on('box')` | Adds a granted box's expected buffs to the stock (`{ name, count, level, source }`, priced by `boxBuffOdds` at the payload level and the run's profile). The Booster Pack is never valued; an unknown box throws. A box from a source that `opts.sources` leaves out is counted as ignored. |
+| events | The `F.EVENTS` budget (0 Double XP, 1 Double Cash, 1 Lucky Draw per 30 days) accrues per calendar day and is delivered at the start of the next played day. |
+| `onDayStart` | Activates held Double XP / Double Cash at the session start: one unit per started hour of the planned session, queued up to 3 (the minimum-daily session: one). |
+| `onCasts` | While a window is open (counted in play minutes), credits the bonus on the step's catch: XP `'buff'` final (multiplier - 1) x `rates.xp` with public base (multiplier - 1) x `rates.xpBase`; cash `'buff'` (multiplier - 1) x `rates.cash`. The rest of the window ends with the session. |
+| `on('assembly')` | On the rods system's assembly event, one held Lucky Draw goes into the tier assembly: cash `'luckyDraw'` = `luckyDrawValue(tier).dollars`, a rebate at the assembly (the goal and its cost stay the rods system's). |
+| `onDayEnd` | Lucky Draws above the reserve (1 while a tier is still ahead) go on Streak Crates: 2 x `bonusSlotValue('Streak Crate', level)`, cash `'luckyDraw'`. |
+| `sessionDone` | Always true: buffs set no daily minimum. |
+| Ledger | Writes XP / public XP `'buff'` and cash `'buff'`, `'luckyDraw'`; no spend items, no purchases. |
+| Options | `sources` (default streak, quests, events; the frequency table also uses todayDailyBox, todayVotes), `trace` (observational closes, rows and milestone values; checks `trace-is-observational`). |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-system -->
+
+**Interplay with the other systems.**
+- **Streak:** its pools are unchanged. It emits one `box` event per streak box and books only the non-buff contents; the buff units it grants are all received here (check `buff-value-counted-once`).
+- **Quests:** Daily Box odds are unchanged; its `box` events carry the Daily Boxes. Double XP and Double Cash never apply to quest rewards.
+- **Rods:** the `assembly` event carries the tier; the Lucky Draw bonus slot cuts an assembly's crates (Lucky Draw K table). Crate definitions are unchanged.
+- **Bait:** a bait's XP bonus is a gear XP stat, and Double XP multiplies (1 + gear XP), as today.
+- **Aquarium:** the companion bonus is a `sellBonus` stat: value = raw × (1 + gear + companion) × temporary × profile.
+- **Founder:** §11. **World (permits):** no interaction.
+
+**Parity with the retired loop.** The private design-stage stepping loop (the old `buffs.lifecycle()` behind `doubleCashModels()`, `buffIncomeShare()` and `r2()`, on the provisional path) is deleted; those functions now read integrated runs. Before the loop was deleted, `validateSystem()` compared this system with it; the result is kept as a constant record (`SYSTEM_PARITY`, recorded from `validateSystem()`'s output with the code of commit a83b5f0):
+
+<!-- generated:buffs-parity -->
+| Comparison (recorded, commit a83b5f0) | Result |
+| --- | --- |
+| Replay of the old loop's day-end valuation on the core | 30/30 milestones step-exact, max relative difference 0 |
+| Design defaults vs the old loop: milestone hours | 20/30 step-exact, every milestone within 1 step (worst 0.74% at minimum-daily L20) |
+| Design defaults: ledgers at day 30 | casual 3.1%, regular 3.2%, active 4.7%, grinder 3.6%, minimumDaily 3.3% |
+| Design defaults: ledgers at the last checkpoint | casual 1.01%, regular 0.88%, active 1.11%, grinder 1.08%, minimumDaily 0.27% |
+| Value per unit actually used | Double Cash within 0.62%, Double XP within 0.19% |
+| Why they differ | a box granted at a session's end pays in the next session (a one-day lag that falls like 1/days); per unit used the two agree |
+| Streak buff value counted once | replay yes, with streak.system() yes (regular, 30 d: $17,909 + $15,816 = $33,725) |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-parity -->
+
+---
+
+## 13. Code touchpoints (for implementation after approval)
 
 | File | Change |
 | --- | --- |
-| `src/class/User.js` | `startBooster` → `activateBuff(id)`: B1 (seconds × 1000) and B2 (atomic `count ≥ 1` decrement plus the activation record, in one transaction under `engine/userLock.js`). Apply the queue rule and the `QUEUE_FULL` rejection (the unit is kept). `endBooster`: compare `String(b)`, and remove the stack only at `count` 0. Remove `generateBoostedXP` and `generateBoostedCash` (B6). |
-| `src/engine/modifiers.js` | `buffEffects(buffs, now)`: one per kind, read-time expiry (B3/B4). Cash moves into `sellWithoutProfile`, and `cashBuffAtSale` stays in the snapshot as 1 for journal-shape compatibility. xp/sell = (1 + gear) × `temporaryMultiplier(buff, event)` (additive with events). Update the header's stacking comment. |
-| `src/engine/cast.js` | Read active buffs once from the user's `activeBuffs` (the user document is already loaded), filtered by `endsAt > now`. The stamp goes into `value` and `valueBase` (line ~233 comment). Add `meta.buffs` to the fish doc and the buff line to the result. Streak and event grants use the existing grant list. |
-| `src/class/Fish.js` (`sellByRarity`), `src/components/buttons/sell-one-fish.js` | Remove the cash-buff lookup: pay Σ `value` and show Σ `valueBase`. This is two DB reads fewer per sale. |
-| `src/engine/gacha.js` | Remove the rarity-stat Lucky Draw (legacy `['gacha', x]` maps to the new effect through `legacyKind`). `slots = def.slots + bonusSlots` while charges remain and the box is not the Booster Pack. The charge decrement goes in the open's journal commit (`appliedOps`), so recovery is exactly-once. |
+| `src/class/User.js` | `startBooster` → `activateBuff(id)`: B1 (seconds × 1000) and B2 (atomic `count ≥ 1` decrement plus the activation record, in one transaction under `engine/userLock.js`). Apply the queue rule and the `QUEUE_FULL` rejection (the unit is kept). `endBooster`: compare `String(b)` and remove the stack only when `count` reaches zero. Remove `generateBoostedXP` and `generateBoostedCash` (B6). |
+| `src/engine/modifiers.js` | `buffEffects(buffs, now)`: one per kind, read-time expiry (B3/B4). Cash moves into `sellWithoutProfile`; `cashBuffAtSale` stays in the snapshot as a neutral multiplier for journal-shape compatibility. xp/sell = (1 + gear) × `temporaryMultiplier(buff, event)` (additive with events). Update the header's stacking comment. |
+| `src/engine/cast.js` | Read active buffs once from the user's `activeBuffs` (the user document is already loaded), filtered by `endsAt > now`. The stamp goes into `value` and `valueBase`. Add `meta.buffs` to the fish doc and the buff line to the result. Streak and event grants use the existing grant list. |
+| `src/class/Fish.js` (`sellByRarity`), `src/components/buttons/sell-one-fish.js` | Remove the cash-buff lookup: pay the sum of `value` and show the sum of `valueBase` (fewer DB reads per sale). |
+| `src/engine/gacha.js` | Remove the rarity-stat Lucky Draw (legacy `['gacha', x]` maps to the new effect through `legacyKind`). Slots = definition slots + bonus slots while charges remain and the box is not the Booster Pack. The charge decrement goes in the open's journal commit (`appliedOps`), so recovery is exactly-once. |
 | `src/events/Guild/interactionCreate.js` | The expiry sweep stays as display cleanup; no rule depends on it. |
 | `src/schemas/UserSchema.js` | Additive `activeBuffs: { xp, cash, gacha }`, each `{ name, multiplier or bonusSlots, endsAt or chargesLeft, activationId }`, with a read-time default of `{}`. |
-| `src/schemas/BuffSchema.js` | Additive `durationSeconds` and `charges`. `length` is kept and now documented as seconds. |
-| `src/bootstrap/data/buffs.js`, `src/bootstrap/seed.js` | New descriptions and fields (§8). An idempotent catalog-update step `$set`s them on the catalog rows by name. |
-| `src/commands/slash/User/equip.js`, `boosters.js`, `fishing-stats.js` | Activation confirmation ("runs 60 min of real time"), remaining time and charges, queue state. `fishing-stats` shows buffs privately. |
+| `src/schemas/BuffSchema.js` | Additive `durationSeconds` and `charges`. `length` is kept and documented as seconds. |
+| `src/bootstrap/data/buffs.js`, `src/bootstrap/seed.js` | New descriptions and fields (catalog table). An idempotent catalog-update step `$set`s them on the catalog rows by name. |
+| `src/commands/slash/User/equip.js`, `boosters.js`, `fishing-stats.js` | Activation confirmation (the window runs in real time), remaining time and charges, queue state. `fishing-stats` shows buffs privately. |
 | `src/engine/presentation.js` | The public catch-card buff line, identical for every profile. |
-| `src/engine/balance.js` | `EVENTS` entries gain optional `grants: [{ buff, count }]` (the event lever). Document the additive stacking. |
+| `src/engine/balance.js` | `EVENTS` entries gain optional `grants: [{ buff, count }]` (the event lever) with the per-player cap. Document the additive stacking. |
 
-Unchanged:
-- `gachaBoxes.js` (slot counts are resolved at open);
-- the Streak Crate/Chest and Daily Box pools;
-- the Booster Pack definition;
-- quest reward multipliers (never buffed).
+Unchanged: `gachaBoxes.js` (slot counts are resolved at open), the Streak Crate/Chest and Daily Box pools, the Booster Pack definition, and quest reward multipliers (never buffed).
 
 ---
 
-## 12. Migrations (additive, idempotent)
+## 14. Migrations (additive, idempotent)
 
-1. **Clear stale activations:** `BuffData.updateMany({ active: true, endTime: { $lte: now } }, { $set: { active: false } })`.
-   - Every existing activation expired 3.6 s after it started (B1).
-   - Counts are untouched: nobody loses a buff, because nobody ever received a buff's effect.
-   - Re-running the migration matches nothing.
-2. **Catalog text and fields:** `$set` description, `durationSeconds` and `charges` on the three catalog buff rows by name, only where they differ.
+1. **Clear stale activations:** `BuffData.updateMany({ active: true, endTime: { $lte: now } }, { $set: { active: false } })`. Every existing activation expired seconds after it started (B1). Counts are untouched: nobody loses a buff, because nobody ever received a buff's effect. Re-running it matches nothing.
+2. **Catalog text and fields:** `$set` description, `durationSeconds` and `charges` on the catalog buff rows by name, only where they differ.
 3. **No player-document write** for `activeBuffs`: read-time default `{}`.
-4. **No fish is rewritten or revalued.**
-   - Fish caught before the deploy keep their stored values.
-   - Sales stop applying cash buffs at the same deploy.
-   - No live buff exists to be lost, because of migration 1 and B1.
-5. Legacy `['xp','2.0']`, `['cash','2.0']` and `['gacha','1.5']` documents map to the proposed kinds at read time (`legacyKind`). No capability array is rewritten.
+4. **No fish is rewritten or revalued.** Fish caught before the deploy keep their stored values; sales stop applying cash buffs at the same deploy; no live buff exists to be lost (migration 1 and B1).
+5. **Legacy capabilities** (`['xp', …]`, `['cash', …]`, `['gacha', …]`) map to the proposed kinds at read time (`legacyKind`, `P-BUFFS-LEGACY`). No capability array is rewritten.
 
 ---
 
-## 13. Tests to add
+## 15. Tests to add
 
-1. **B1:** activation sets `endsAt = now + 3,600,000 ms`.
-2. **B2:** activation takes exactly one unit (2 → 1). An expired buff cannot be re-activated without a unit. Two concurrent activations of a stack of 1 give one success and one `NO_STOCK`, and the count is never negative. A stack at `count` 0 leaves the inventory.
-3. **B3:** a cast 1 ms after `endsAt`, with `active: true` still set, gets ×1. A button sale path never applies a buff.
-4. **Stacking:**
-   - a second Double Cash extends and does not multiply (never ×4, never ×3 from two buffs);
-   - a 4th activation returns `QUEUE_FULL` and keeps the unit;
-   - XP and Cash run independently.
-5. **Events:** buff ×2 + event ×2 gives ×3, for XP and for sell.
-6. **Catch-time Double Cash:**
-   - a fish caught during the buff stores `value` and `valueBase` at ×2;
-   - sold after expiry, it pays ×2;
-   - a fish caught before activation and sold during the buff pays ×1;
-   - both sale paths behave the same.
+1. **B1:** activation sets `endsAt = now + durationSeconds × 1000`.
+2. **B2:** activation takes exactly one unit. An expired buff cannot be re-activated without a unit. Two concurrent activations of a stack of one give one success and one `NO_STOCK`, and the count is never negative. A stack at zero leaves the inventory.
+3. **B3:** a cast just after `endsAt`, with `active: true` still set, gets no bonus. A button sale path never applies a buff.
+4. **Stacking:** a second Double Cash extends and does not multiply; the activation after `maxQueued` returns `QUEUE_FULL` and keeps the unit; XP and Cash run independently.
+5. **Events:** a buff plus an event of the same category add their bonuses, for XP and for sell (rule traces).
+6. **Catch-time Double Cash:** a fish caught during the buff stores `value` and `valueBase` with the bonus; sold after expiry it still pays it; a fish caught before activation and sold during the buff gets none; both sale paths behave the same.
 7. **Scope:** quest XP and cash, box fish and Lucky items never take a buff.
-8. **Founder:** the public base includes the buff, and the final is base × profile. The catch-card line is identical to a normal player's.
-9. **Lucky Draw:**
-   - the next 2 opens get one extra slot and the 3rd is normal;
-   - a Booster Pack open uses no charge and keeps 1 slot;
-   - a recovered open spends its charge exactly once;
-   - the bonus slot respects `unique` and floors.
-10. **Legacy mapping:** a stored `['gacha','1.5']` Lucky Draw activates as 2 charges.
-11. **Model regression:** `require('./scripts/economy/5b/buffs.js').checks().pass === true`, and `check-shared.js` passes.
+8. **Founder:** the public base includes the buff and the final is base × profile; the catch-card line is identical to a normal player's.
+9. **Lucky Draw:** the next K opens get one extra slot and the one after is normal; a Booster Pack open uses no charge and keeps its slots; a recovered open spends its charge exactly once; the bonus slot respects `unique` and floors.
+10. **Legacy mapping:** a stored legacy Lucky Draw activates as K charges.
+11. **Model regression:** `require('./scripts/economy/5b/buffs.js').report()` regenerates the tables, `render-docs.js --check` passes and `check-shared.js` passes.
 
 ---
 
-## 14. Risks and open decisions
+## 16. Risks and open issues
 
 - **Shipping B1 without B2** turns every buff into a permanent one. It is the single highest-risk change here; test 2 guards it.
-- **Wall-clock UX.** A player who activates and then gets interrupted loses the rest of the hour. Mitigations: an explicit confirmation, the remaining time on the catch card and in `/boosters`, and the queue (activate the next one when you have time).
-  - Casts-based durations avoid this, but they give casual players about +37% cash and 8.1% of their XP, and the minimum-daily player +98.6% cash (§3, §9), so they are not proposed.
-- **Event budget discipline.** The event lever is the only source that can move the buff share materially. The budget (≤ 1 Double Cash + 1 Lucky Draw per 30 days) should be enforced in code as a cap per player per 30 days, not left to scheduling.
-- **Double counting at integration** (streak vs buffs), §6.
-- **Lucky Draw semantics change for held items.** Players' existing Lucky Draws become 2 bonus-slot charges, which is better on every crate. The effect differs from the old description, so the new text must ship with it.
-- **The Lucky Draw value depends on the rods crate design** (T4/T5 ≈ 1.1 h of stage income). It regenerates at the R3 cutover. The lifecycle assumes one assembly per tier; a casual player who completes T1 from streak drops (streak.md §8) has one fewer assembly to use it on.
-- **Model limits.**
-  - Expected values with Poisson arrivals: an individual player can go weeks without a buff.
-  - The capped sale-time variant uses a mean-field approximation (exact once the hoard exceeds the cap); it is used only for the rejected alternative.
-  - Permits, bait and aquarium spending are not in the hoarder's spend, so the uncapped hoarder shares are upper bounds.
-- **Open decisions for you:**
-  - D-a: catch-time (recommended) or capped sale-time.
-  - D-b: the event budget (0 / 1 / 2 of Double Cash and Lucky Draw per 30 days).
-  - D-c: Lucky Draw K = 1, 2 (recommended) or 3.
+- **Open issue: the 30-day cash-share targets** (`PARAMS.targets.cashShareMax30d`) fail for casual, regular and active players on the integrated 5b.4 model (checks table; income share table). The Double Cash part is inside every target; the excess is the Lucky Draw assembly rebate, which on the rods path lands on the early T1/T2 assemblies and, for the casual player, is measured against a fishing income that is small next to their quest and streak cash. No parameter was changed. The options, each a decision for you:
+  - accept it: the rebate is progression spending avoided, lumpy by design, and the XP and R2 checks all pass;
+  - measure the target on all cash income or on Double Cash only (the income share table has both views);
+  - a smaller Lucky Draw (K = 1, Lucky Draw K table), or no Lucky Draw from events. The with/without-events table shows that dropping the event budget alone does not bring the casual player under the target on fishing income.
+- **Wall-clock UX.** A player who activates and then gets interrupted loses the rest of the hour. Mitigations: an explicit confirmation, the remaining time on the catch card and in `/boosters`, and the queue (activate the next one when you have time). Casts-based durations avoid this but reward barely fishing (duration table), so they are not proposed.
+- **Event budget discipline.** The event lever is the only source that can move the buff share materially. The budget should be enforced in code as a per-player cap per 30 days, not left to scheduling.
+- **Lucky Draw semantics change for held items.** Existing Lucky Draws become bonus-slot charges, which is better on every crate. The effect differs from the old description, so the new text must ship with it.
+- **The Lucky Draw value depends on the rods crate design.** `luckyAssembly()` mirrors `rods.cratesDistribution()`'s chain to evaluate lucky opens; the mirror is checked exact (`lucky-chain-reproduces-rods`), but a `rods.cratesDistribution(t, { def })` override would leave one implementation.
+- **Model limits.** Expected values with Poisson arrivals: an individual player can go weeks without a buff. The model's player activates buffs rationally (`P-BUFFS-ACTIVATION`); an impatient one gets less. The capped sale-time variant is mean-field (exact once the hoard exceeds the cap) and is used only for the rejected alternative.
 
----
+**Design checks** (`checks()`):
 
-## 15. Interplay with other subsystems
+<!-- generated:buffs-checks -->
+| Check | Pass | Detail |
+| --- | --- | --- |
+| `lucky-chain-reproduces-rods` | yes | Lucky Draw chain with 0 lucky opens = rods.cratesDistribution(t).expected, T1-T5 |
+| `cash-share-casual` | **NO** | buffs add 23.97% of fishing income in 30 days (max 8%) |
+| `xp-share-casual` | yes | Double XP adds 1.28% of XP in 30 days (max 3%) |
+| `cash-share-regular` | **NO** | buffs add 8.85% of fishing income in 30 days (max 8%) |
+| `xp-share-regular` | yes | Double XP adds 1.88% of XP in 30 days (max 3%) |
+| `cash-share-active` | **NO** | buffs add 5.35% of fishing income in 30 days (max 5%) |
+| `xp-share-active` | yes | Double XP adds 1.09% of XP in 30 days (max 3%) |
+| `cash-share-grinder` | yes | buffs add 1.35% of fishing income in 30 days (max 3%) |
+| `xp-share-grinder` | yes | Double XP adds 0.46% of XP in 30 days (max 3%) |
+| `buffs-per-30-days` | yes | 4.21 buffs per 30 days for the regular player (target 3-6) |
+| `regular-in-windows-with-buffs` | yes | L20 5.2667 h, L30 12.5833 h, L40 25.1333 h, L50 43.65 h |
+| `window-shift-small` | yes | regular milestones move 2.35% with the buffs system (max 3%) |
+| `minimum-daily-never-leads` | yes | PASS: a buff only doubles real play inside its window, so the minimum-daily player never leads the casual player in level at any checkpoint. |
+| `no-miss-grinder` | yes | grinder milestones move 0.45% with the buffs system (max 3%) |
+| `sale-time-uncapped-rewards-stockpiles` | yes | 90 days, regular: sale-time hoarder +58.8% vs catch-time +5.7% (why catch-time) |
+| `lucky-draw-never-inert` | yes | proposed Lucky Draw saves 0.22 h / 0.44 h / 0.74 h / 1.16 h / 1.09 h of stage income on the T1-T5 assemblies (min 0.15) |
+| `today-lucky-draw-inert-on-floored-crates` | yes | today's +50% rare+ Lucky Draw saves 0 crates on the Expert, Master and Gilded crates |
+| `buff-value-counted-once` | yes | regular, 90 days: ledger 'buff' / 'luckyDraw' = the system's own credits; streak buff units granted 5.5582 = received here 5.5582 |
+| `trace-is-observational` | yes | regular: integrate.run() without the trace, 30 days = the traced run's day-30 close (every XP and cash source, level) |
 
-- **Streak:** the pools are unchanged. The streak design valued its buffs as catch-time, 1-hour buffs, which matches this design exactly (`reconcileWithStreak()`). Its note §8.2, "if the buffs design keeps sale-time Double Cash, re-model", is resolved: catch-time.
-- **Quests:** Daily Box odds are unchanged. Double XP and Double Cash never apply to quest rewards, which matches quests.md.
-- **Bait:** a bait's XP bonus is a gear XP stat, and Double XP multiplies (1 + gear XP) as today. The bait design's note "Double XP multiplies bait XP" holds.
-- **Aquarium:** the companion bonus is a `sellBonus` stat, so value = raw × (1 + gear + companion) × temporary × profile. This answers aquarium.md's open question.
-- **Rods:** the Lucky Draw bonus slot on the tier crates cuts an assembly's crates by 13–20%. Crate definitions are unchanged.
-- **Founder:** see §10. The Founder design's private multipliers apply after the buff.
-- **Permits:** no interaction.
-
----
-
-## 16. Requests to the framework and other owners (not applied here)
-
-1. **Shared buff rules in `assumptions.js`**:
-
-   ```
-   BUFFS = { durationSeconds: 3600, cashTiming: 'catch', multipliers: { xp: 2, cash: 2 }, eventStacking: 'additive', luckyDraw: { bonusSlots: 1, opens: 2 } }
-   ```
-
-   - Today `streak.js` reads the buff length from the catalog and assumes catch-time, and `buffs.js` holds the same rules in `PARAMS`. They agree exactly now, but they are two copies.
-   - A future change to buff duration would silently diverge: the drift the single-source framework exists to prevent.
-   - This is a shared-value change with a version bump. Streak, quests and buffs would then read `F.BUFFS`.
-2. **An event budget as a shared assumption.** Buff grants per 30 days, plus any XP/sell event multipliers, belong at integration, because events touch every module's lifecycle.
-3. **One shared R2 minimum-daily archetype.** Streak and this module use 20 casts a day (3.0 min). Quests uses "fish until the daily is done". Both pass, but R2 should use one definition.
-4. **`rods.cratesDistribution(t, { def })` override.** `buffs.luckyAssembly()` mirrors its chain to evaluate lucky opens. The mirror is validated exact (K = 0), but one implementation is better.
-5. **Integrator:** count buff value once. Use `buffs.buffIncomeShare().bySource.streak` or `streak.streakValue().breakdown.doubleCash` / `.xp`, never both.
-
----
-
-## Integration (framework 5b.3)
-
-`buffs.system(opts)` is this subsystem as a `lifecycle.js` system. Each call returns a fresh object, and all per-run state lives in `state.sys.buffs`. The shared core steps time and accrues base fishing (`'fishing'`). This system credits only the **bonus** a buff adds. The numbers regenerate with `report().system`.
-
-**Hooks**
-
-| Hook | What it does |
-| --- | --- |
-| `on('box')` | Adds a granted box's expected buffs to the stock: `{ name, count, level, source }`, priced by `boxBuffOdds` at the payload level and the run's profile. The Booster Pack is never valued (decision 12). An unknown box throws, because a box with buffs must be priced here, once. |
-| events | The `F.EVENTS` budget accrues per calendar day. It is delivered with the first cast of the next played day, so days not played still count toward the 30-day budget. |
-| `onDayStart` | Activates the Double XP / Double Cash in stock at session start. It uses one unit per started hour of the planned session (queued, at most 3); the minimum-daily session uses one. A box granted at a session's end waits for the next session. |
-| `onCasts` | While a window is open, counted in play minutes (`state.minutesToday`), credits the bonus on that step's catch:<br>• XP `'buff'`: final (multiplier − 1) × `rates.xp`, public base (multiplier − 1) × `rates.xpBase`<br>• cash `'buff'`: (multiplier − 1) × `rates.cash` (catch-time)<br>The rest of the window expires with the session (wall clock). |
-| `on('assembly')` | On the rods system's assembly event, puts one held Lucky Draw into the tier assembly. It is credited as cash `'luckyDraw'` = `luckyDrawValue(tier).dollars`: a rebate at the assembly, not a lower goal cost, because the goal is the rods system's own. |
-| `onDayEnd` | Lucky Draws above the reserve (1 while a tier is still ahead) go on Streak Crates, valued at 2 × `bonusSlotValue('Streak Crate', level)` as cash `'luckyDraw'`. |
-| `sessionDone` | Always true: buffs set no daily minimum. |
-
-**Ledger and money**
-- Sources written: XP and public XP `'buff'`; cash `'buff'` and `'luckyDraw'`.
-- No spend items and no purchases.
-- Counting rule: each box's non-buff contents stay with the system that grants it (quests: Daily Box; streak: Streak Crate / Chest). Its buffs are valued here only.
-
-**Founder** (`state.profile === 'founder'`)
-- Box odds use the Founder's gacha luck.
-- Buff XP is public (base) XP for everyone. The final XP and the cash follow the profile's rates.
-- The Streak Crate bonus slot sells at the Founder's sell multiplier.
-- The assembly rebate uses the Normal crate chain, so it is a slight overstatement for the Founder.
-
-**Validation** (`validateSystem()`; all 22 `checks()` pass; `check-shared.js` passes at 5b.3 / `e73d1be6aec26cdd`):
-- **Exact replay.** The system is run with `lifecycle()`'s conventions (`valuation: 'dayEnd'`), together with `lifecycle()`'s own assumptions expressed as systems:
-  - its gear rule, plus an `'assembly'` event;
-  - `LC.provisionalDaily()`;
-  - its streak and Daily Box arrivals as `'box'` events.
-
-  It reproduces `lifecycle()` exactly: **30/30 milestones step-exact, maximum relative difference 0**, for every archetype and the minimum-daily player. This covers the buff XP at each milestone, and the XP, cash, Lucky Draw, arrivals and levels at days 7/30/90 (minimum-daily: up to day 364).
-- **Design defaults** (activation at the next session start):
-  - Every milestone lands within **1 step** (1 min) of `lifecycle()`. The worst is regular L10 at 81 vs 80 steps (1.2%).
-  - The 30-day shares barely move:
-
-    | Player | Cash share: before → system | XP share: before → system |
-    | --- | --- | --- |
-    | Casual | 6.12% → 5.97% | 1.35% → 1.31% |
-    | Regular | 7.06% → 6.99% | 1.91% → 1.85% |
-    | Active | 4.18% → 4.06% | 1.09% → 1.05% |
-    | Grinder | 1.43% → 1.39% | 0.46% → 0.45% |
-
-  - The gap in buff value to date is a **one-day lag**. A box granted at a session's end pays in the next session, so the last day's units are still in stock at a checkpoint. The gap therefore falls like 1/days: 16–22% of buff value at day 7, 1.5–4.3% at day 30, about 1% at day 90.
-  - Per unit actually used, the two models agree within 0.75% (Double Cash) and 0.12% (Double XP).
-  - **The design rule is right:** `lifecycle()` paid each day's arrivals at that day's end, at its last step's rates.
-- **Minimum-daily player.** The core runs the shared `F.MINIMUM_DAILY`, which stops at the streak gate's 20 casts every day. `lifecycle()`'s fixed 3-minute day drifted a step on some days through floating point. The milestones still agree within 1 step.
-- **Streak (count buff value once).** Two checks, at 30 days, for every archetype:
-  - The streak's boxes replayed as events: this system's Double Cash and Double XP XP equal `streak.lifecycle()` to the cent.
-  - `streak.system()` + `buffs.system()`: every buff unit the streak grants is received here. The streak's own `'streak'` source (non-buff contents) plus this system's `'buff'` equals `streak.lifecycle()`'s cash equivalent exactly (regular: $17,909 + $15,816 = $33,725). No other ledger source carries buff value.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `buffs.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:buffs-checks -->

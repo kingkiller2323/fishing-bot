@@ -2,35 +2,38 @@
 
 **Status: analysis only.** Nothing here is live. No `src/` file, catalog value or player document changes until you approve.
 
-- **Framework:** 5b.2 (regenerated from 5b.1 with no hand edits; every number is identical), with the authoritative curve `CURVE = { base: 100, quartic: 0.0475 }`. Shared assumptions (archetypes, target windows, daily XP, lifecycle step, biome levels) are imported from `assumptions.js` via the framework, not copied. `check-shared.js` enforces this.
-- **Where the numbers come from:** every number below is computed at runtime by `scripts/economy/5b/rods.js` from `scripts/economy/5b/framework.js`. Nothing is copied or scaled by hand. The only hand-set values are the design parameters in `PARAMS`. Prices are formulas of stage income, so a framework change regenerates every figure.
-- **Reproduce:** `node -e "require('./scripts/economy/5b/rods.js').report()"` returns the report object. `node scripts/economy/5b/rods.js` prints it as JSON. Each table below names the function or `report()` key that produces it.
-- **Booster Packs** play no part here. No rod crate contains a buff or a Booster Pack. The ~1-in-100,000 Lucky item catch can also yield a Gold Rod Piece, and that source is left out of every assembly figure (decision 12).
+- **Framework 5b.4.** Every table in this document is **generated**: `node scripts/economy/5b/render-docs.js` fills each block from `scripts/economy/5b/rods.js` `markdownTables()` at the current framework version, and each block ends with its provenance line (version and shared digest). Prose cites numbers only by pointing at a table. `check-shared.js` fails if a table is stale.
+- **One model.** Rods is a *system* on the shared lifecycle core (`lifecycle.js`). `integrate.js` composes it with world, quests, streak and buffs into the reference loop, and every lifecycle figure here comes from that integrated model. This module has no time-stepping loop of its own.
+- **Hand-set values:** only the design parameters in `PARAMS`. Prices are formulas of stage income, so a framework change regenerates every figure. Each non-obvious choice is a proposed decision (§16) whose record is checked against the model.
+- **Booster Packs** play no part here. No rod crate contains a buff or a Booster Pack. The rare Lucky item catch can also yield a Gold Rod Piece; that source is left out of every assembly figure (decision 12).
 
 ---
 
 ## 0. Summary
 
-1. **Crafted rods become tiered, bounded and differentiated.**
-   - A rod's tier comes from its highest-rarity part: Common/Uncommon = T1 (Lv 20), Rare = T2 (Lv 30), Ultra = T3 (Lv 40), Legendary = T4 (Lv 50), Lucky = T5 (Lv 60).
-   - Each slot has its own stat family:
-     - rod piece: multi-catch and durability base
-     - reel: speed and trophy
-     - hook: Rare Find and Luck
-     - handle: durability efficiency and sell bonus
-   - Reference sets average **1.20 / 1.30 / 1.50 / 1.65 / 1.80 fish per cast**, with 3+-fish jackpots on **4.6% → 18.5%** of casts.
-   - Today, 79% of all combinations sit at the 15-fish cap. Under the proposal, 14.3% sit at the 1.8 ceiling, and all of those are Lv 60 Gold Rod Piece rods.
-2. **The level bypass is gone.**
-   - A part works at full strength only from its own level. Below that level it performs at the best rarity the player has unlocked.
-   - The best rod usable at Lv 20 averages 1.20 fish (today: 10), and at Lv 30 1.32 (today: 15).
-3. **Mandatory upkeep is about 4% of home-biome income at every tier.**
-   - Repairs are unlimited and priced by formula; crafted rods are never destroyed.
-   - The **Old Rod becomes unbreakable**. That ends the free-replacement loop and the $0 soft-lock.
-4. **Tiered part crates** use Gacha V2 floors, guaranteed slots, slot-balancing `featured` weights, `unique` duplicates, and pity on T5.
-   - A tier-appropriate set costs **1.3 / 2.5 / 4.0 / 6.0 / 8.0 hours of the income of the stage before it**. That is 29–35% of that stage's income.
-   - It is always affordable by the time the level arrives (§10).
-   - Duplicate parts salvage for cash (about 22% of a crate's price back if everything is salvaged).
-5. **The regular player still lands in every approved window on this gear path:** L20 5.62 h, L30 12.82 h, L40 24.77 h, L50 41.72 h (§10). This is input for integration requirement R1.
+<!-- generated:rods-headline -->
+| Figure | Value | Detail |
+| --- | --- | --- |
+| Reference sets, mean fish per cast (T1–T5) | 1.20 / 1.30 / 1.50 / 1.65 / 1.80 | Gear path |
+| Reference sets, casts landing 3+ fish | 4.6% → 18.5% | Gear path |
+| Combinations at the fish cap | today 78.8% (15 fish); proposed 14.3% (1.8 ceiling, Lv 60 only) | All combinations |
+| Best rod usable at Lv 20 / Lv 30 | today 10 / 15 fish; proposed 1.20 / 1.32 | No bypass |
+| Mandatory upkeep in the home biome | 3.9%–4.0% | Upkeep |
+| Repairs over the whole lifecycle (integrated) | 3.9% of fishing income, every archetype | Integrated lifecycle |
+| Assembly cost of a tier set | 1.26 / 2.52 / 3.96 / 5.95 / 8.04 h of the previous stage's income | Assembly |
+| Assembly share of the income the regular player earns in the stage (integrated) | 20.7%–23.9% | Affordability |
+| Full-crate salvage return | at most 22.2% of the crate price | Salvage |
+| Regular player (integrated, framework) | L20 5.27 h, L30 12.58 h, L40 25.13 h, L50 43.65 h; every approved window met | Integrated lifecycle |
+| Rod upgrades waiting for cash (integrated: every archetype, reference loop and bait/aquarium variants) | none: every tier fishes from the step its level is reached | Affordability |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-headline -->
+
+1. **Crafted rods become tiered, bounded and differentiated.** A rod's tier comes from its highest-rarity part. Each slot has its own stat family (rod piece: multi-catch and the durability base; reel: speed and trophy; hook: Rare Find and Luck; handle: durability and sell bonus). Multi-catch lands in the approved band instead of today's fish cap.
+2. **The level bypass is gone.** A part works at full strength only from its own level; below it, it performs at the best rarity the player has unlocked.
+3. **Mandatory upkeep is modest and the same at every tier's home biome.** Repairs are unlimited and priced by formula; crafted rods are never destroyed. The **Old Rod becomes unbreakable**, which ends the free-replacement loop and the $0 soft-lock.
+4. **Tiered part crates** use Gacha V2 floors, guaranteed slots, slot-balancing `featured` weights, `unique` duplicates and pity on T5. A tier set costs a fixed number of hours of the previous stage's income. Duplicate parts salvage for cash, far below a crate's price.
+5. **On the integrated model** the regular player lands in every approved window, and no rod upgrade ever waits for cash: every tier fishes from the step its level is reached, for every archetype, with or without the bait and aquarium variants.
 6. **A correctness bug comes first:** repairing a crafted rod charges the player but repairs nothing (§1, C1).
 
 ---
@@ -39,29 +42,33 @@
 
 | # | Bug | Evidence | Fix |
 | --- | --- | --- | --- |
-| **C1 (new)** | **Repairing a crafted rod charges money and repairs nothing.** `repair-rod.js` updates with `RodData.findByIdAndUpdate`. Crafted rods are stored as the `CustomRodData` discriminator, so Mongoose adds `__t: 'RodData'` to the filter, the update matches nothing and returns `null` without throwing, and the code then runs `user.addMoney(-rod.repairCost)` and shows "Repaired!". Every crafted rod is therefore effectively single-life, and players pay $20k–70k for nothing. | Reproduced on the in-memory MongoDB: a broken `CustomRodData` rod, then `RodData.findByIdAndUpdate(...)` returns `null`, and the rod stays `broken` at durability 0. | Update through the base `ItemData` model with a state guard (`{ _id, state: { $in: ['broken', 'destroyed'] } }`). Charge only when the repair matched, in one guarded operation or transaction (the user lock exists in `engine/userLock.js`). Add a regression test. **Decision:** refund past charges where Interaction analytics can identify them (status "Rod has been repaired!" on a rod whose `__t` is `CustomRodData`). |
-| C2 (listed) | A destroyed Old Rod is replaced for free (`interactionCreate.js` ~212), which makes repairs optional. A broken Old Rod with $0 and no fish soft-locks the player. | Code reading, `PHASE5_REPORT.md` §5.6. | Make the Old Rod unbreakable (§6.3). |
-| C3 | `interactionCreate` grants a *new* Old Rod whenever no rod is equipped, including after `/equip` → "None". Duplicates pile up. | Code reading. | Equip the Old Rod the player already owns, and grant one only if they own none. |
+| **C1** | **Repairing a crafted rod charges money and repairs nothing.** `repair-rod.js` updates with `RodData.findByIdAndUpdate`. Crafted rods are stored as the `CustomRodData` discriminator, so Mongoose adds `__t: 'RodData'` to the filter, the update matches nothing and returns `null` without throwing; the code then runs `user.addMoney(-rod.repairCost)` and shows "Repaired!". Every crafted rod is effectively single-life, and players pay the legacy repair cost (Current → Proposed table) for nothing. | Reproduced on the in-memory MongoDB: a broken `CustomRodData` rod, then `RodData.findByIdAndUpdate(...)` returns `null` and the rod stays `broken` with no durability. | Update through the base `ItemData` model with a state guard (`{ _id, state: { $in: ['broken', 'destroyed'] } }`). Charge only when the repair matched, in one guarded operation or under the user lock (`engine/userLock.js`). Add a regression test. Refund: decision `P-RODS-C1-REFUND`. |
+| C2 | A destroyed Old Rod is replaced for free (`interactionCreate.js`, no-rod branch), which makes repairs optional. A broken Old Rod with $0 and no fish soft-locks the player. | Code reading, `PHASE5_REPORT.md` §5.6. | Make the Old Rod unbreakable (§6.3). |
+| C3 | `interactionCreate` grants a *new* Old Rod whenever no rod is equipped, including after `/equip` → "None". Duplicates pile up. | Code reading. | Equip the Old Rod the player already owns; grant one only if they own none. |
 | C4 | `User.decreaseRodDurability` writes `user.equippedRod` (a wrong path). | Nothing calls it (dead code). | Remove it, or align it with the cast engine. |
 
 ---
 
 ## 2. Current → Proposed
 
+<!-- generated:rods-current-proposed -->
 | Item | Current | Proposed | Rationale |
 | --- | --- | --- | --- |
-| Fish per cast (crafted) | draws × per-draw: 4–15. **1,930 of 2,450 combinations (78.8%) at the 15-fish cap**. | Rod piece sets the mean: Common 1.10, Uncommon 1.20, Rare 1.30 (±0.02 variants), Ultra 1.50, Legendary 1.65, Lucky 1.80. Uses the framework chained multi-catch (P(3+) 2.3%–18.5%). **350 combinations (14.3%) at the 1.8 ceiling**, all Lv 60. | Approved targets (decision 2). Removes the 16× cliff. |
-| Level requirement | 10 × Σ "N count" (Lv 20–70). Bare numbers (draws) cost no level, so a 10-fish rod works at Lv 20 and a 15-fish rod at Lv 30. | Requirement = the highest part level (Common/Uncommon 20, Rare 30, Ultra 40, Legendary 50, Lucky 60). Tier = that part's tier. Crafting and equipping need Lv 20. **Level cap:** a part performs at the best rarity the player has unlocked. | Part rarity finally matters, and no combination can bypass its level. Existing rods need no gate or data change (§9). |
-| Part stats | `PART_RARITY_STATS`: the same bundle for every part of a rarity, summed. +5% speed per `quick`. | Each slot has its own family, scaled by rarity and summed (table in §3.2). | Rods differ by specialty instead of by volume. |
-| Same-rarity parts | Identical except for legacy numbers | 8 named **side-grade variants**: net $/h within ±0.7%, with a different emphasis (§3.3) | Collecting variants is an aspirational goal that isn't pay-to-win. |
-| Strong access | Union of part qualities, so an all-Common rod is weak-only | Every crafted rod catches weak + strong | The first crafted rod unlocks strong fish, matching the curve fit. |
-| Durability | Sum of part durabilities: 2,300–25,000 | Rod-piece base × handle multiplier. A matched set lasts 2.5–8 h of regular play (reference sets: 1,450 / 2,150 / 3,200 / 4,300 / 6,300). | Upkeep is sized in hours of play, not arbitrary numbers. |
-| Repair cost | 10k × Σcount ($20k–70k). Max 3 repairs, then destroyed. **Repair of crafted rods is broken (C1).** | By rod-piece rarity: $2,800 / $3,700 / $7,900 / $17,000 / $34,000 / $50,000. Formula: 4% of what the matched set's durability earns at home. **Unlimited repairs.** A legacy `destroyed` crafted rod counts as broken. | Modest, predictable mandatory upkeep (decision 10). No forced re-purchase. |
-| Old Rod | 1,000 durability, $1,000 repair, free replacement once destroyed, soft-lock at $0 | **Unbreakable**. Weak only, 1.0 fish, no stats. | Removes the free-replacement exploit, the soft-lock, and a sink worth 0.8–4.7% of Old Rod income. Guarantees a fallback. |
-| Fishing Crate | $750. 68% parts / 32% bait. Legacy table (Rare 0.55%/slot/part). Coupon-collector tail on handles and hooks. | **T1 crate, $4,900** (formula). Parts only. Slot-balanced. Guaranteed Uncommon+ slot. `unique`. Unlocks at Lv 10. | A progression purchase priced from stage income. |
-| Higher crates | none | Pro (T2) $21,000, Expert (T3) $53,000, Master (T4) $140,000, Gilded (T5) $590,000 with pity. All are formulas (§7). | One progression purchase per tier, bought during the stage before it. |
-| Duplicate parts | Dead inventory | **Salvage for cash**: Common $100, Uncommon $410, Rare $1,800, Ultra $4,400, Legendary $12,000, Lucky $49,000 | Duplicates are never worthless. A crate's full salvage returns ≤ 22% of its price, so salvage can't be arbitraged. |
-| Existing crafted rods | Legacy capabilities drive draws/per-draw | Read-time converter (§9). Parts resolve, so the new rules apply to the same parts. Stored durability is grandfathered. No data rewrite. | Non-destructive (decision 13). |
+| Fish per cast (crafted) | draws × per-draw: 4–15. **1,930 of 2,450 combinations (78.8%) at the 15-fish cap** | The rod piece sets the mean: 1.10, 1.20, 1.28, 1.32, 1.50, 1.65, 1.80 (variants included), on the framework chained multi-catch. **350 combinations (14.3%) at the 1.8 ceiling**, all Lv 60 | Approved direction (A-MULTICATCH). Removes the cliff. |
+| Level requirement | 10 × Σ "N count" (Lv 20–70). Bare-number draws cost no level: the best rod usable at Lv 20 lands 10 fish, at Lv 30 15 | The highest part level (Common Lv 20, Uncommon Lv 20, Rare Lv 30, Ultra Lv 40, Legendary Lv 50, Lucky Lv 60); tier = that part's tier. Crafting and equipping need Lv 20. **Level cap:** a part performs at the best rarity the player has unlocked | Part rarity matters and nothing bypasses its level. Existing rods need no gate or data change. |
+| Part stats | `PART_RARITY_STATS`: the same bundle for every part of a rarity, summed; +5% speed per `quick` | Each slot has its own stat family, scaled by rarity and summed (slot table) | Rods differ by specialty, not volume. |
+| Same-rarity parts | Identical apart from legacy numbers | 8 named **side-grade variants**: net $/h within ±0.7% of the balanced part (specialties table) | Collecting variants is aspirational, not pay-to-win. |
+| Strong access | Union of part qualities: an all-Common rod is weak-only | Every crafted rod catches weak + strong | The first crafted rod unlocks strong fish, as the gear path assumes. |
+| Durability | Sum of part durabilities: 2,300–25,000 | Rod-piece base × handle multiplier × variant. A matched set lasts 2.5–8 h of regular play (reference sets: 1,450 / 2,150 / 3,200 / 4,300 / 6,300) | Upkeep is sized in hours of play. |
+| Repair cost | 10,000 × Σcount ($20,000–$70,000); 3 repairs, then destroyed. **Crafted-rod repair is broken (C1).** | By rod-piece rarity: $2,800 / $3,700 / $7,900 / $17,000 / $34,000 / $50,000 (Common → Lucky): 4% of what the matched set's durability earns at home. **Unlimited repairs.** A legacy `destroyed` crafted rod counts as broken | Modest, predictable upkeep (decision 10); no forced re-purchase. |
+| Old Rod | 1,000 durability, $1,000 repair, free replacement once destroyed; soft-lock at $0 | **Unbreakable.** Weak only, 1.0 fish, no stats | Removes the free-replacement exploit, the soft-lock and a sink worth 0.8%–4.7% of Old Rod income. |
+| Fishing Crate | $750; 68% parts / 32% bait per slot; legacy table (a Rare+ part in 4.2% of slots); duplicates `allow` | **T1 crate, $4,900** (formula). Parts only, slot-balanced, slot 0 ≥ uncommon, `unique`; unlocks at Lv 10 | A progression purchase priced from stage income. |
+| Higher crates | none | Pro Tackle Crate (T2) $21,000, Expert Tackle Crate (T3) $53,000, Master Tackle Crate (T4) $140,000, Gilded Tackle Crate (T5) $590,000; T5 has pity. All formulas | One progression purchase per tier, bought during the stage before it. |
+| Duplicate parts | Dead inventory | **Salvage for cash** (salvage table); a crate's full salvage returns at most 22.2% of its price | Duplicates are never worthless; no arbitrage. |
+| Existing crafted rods | Legacy capabilities drive draws and per-draw | Read-time converter: parts resolve, so the new rules apply to the same parts; stored durability grandfathered; no data rewrite | Non-destructive (decision 13). |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-current-proposed -->
 
 ---
 
@@ -69,14 +76,14 @@
 
 ### 3.1 Tier, requirement and the level cap
 - **Tier.** The tier is the tier of the rod's highest-rarity part, and the shown requirement is that part's level. Parts can be collected and crafted early.
-- **Level cap.** At cast time, each part performs at `capRarity(part rarity, player level)`: the highest rarity whose level the player has reached. Durability and repair cost belong to the physical rod and are never capped.
-- **Example** (`report().legacyConverter.samples.levelCap`): a Lv 35 player with a full Legendary set gets a Rare-set rod (1.30 fish, Rare Find +40%, Luck +20%, Trophy +10%, Speed +5%, Sell +2%). The rod still shows "Lv 50" until the player reaches 50.
-- This one rule also covers existing rods, jackpot parts and admin grants. No equip gate is needed beyond the Lv 20 crafting minimum.
+- **Level cap.** At cast time each part performs at `capRarity(part rarity, player level)`: the highest rarity whose level the player has reached. Durability and repair cost belong to the physical rod and are never capped. The converter block (§9) shows an example.
+- This one rule also covers existing rods, jackpot parts and admin grants. No equip gate is needed beyond the crafting minimum.
 
 ### 3.2 Slot stat families
-From `report().slotTable`. Magnitudes add across the four parts, following `PART_RARITY_STATS` semantics. Speed and Trophy are reel stats, Rare Find and Luck are hook stats, and the durability multiplier and Sell are handle stats. The repair cost follows the rod piece.
+Magnitudes add across the four parts (`PART_RARITY_STATS` semantics, now per slot). The repair cost follows the rod piece.
 
-| Part rarity | Full effect at | Tier | Rod piece: mean fish (chance of +1) | Speed / Trophy | Rare Find / Luck | Durability × / Sell | Rod-piece durability base | Repair cost |
+<!-- generated:rods-slots -->
+| Part rarity | Full effect at | Tier | Rod piece: mean fish (chance of +1) | Reel: Speed / Trophy | Hook: Rare Find / Luck | Handle: Durability × / Sell | Rod-piece durability base | Repair cost |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Common | Lv 20 | T1 | 1.10 (6.6%) | +0% / +0% | +10% / +5% | ×1.00 / +0% | 1,100 | $2,800 |
 | Uncommon | Lv 20 | T1 | 1.20 (13.2%) | +3% / +5% | +20% / +10% | ×1.10 / +0% | 1,331 | $3,700 |
@@ -85,451 +92,490 @@ From `report().slotTable`. Magnitudes add across the four parts, following `PART
 | Legendary | Lv 50 | T4 | 1.65 (42.9%) | +15% / +50% | +90% / +60% | ×1.70 / +6% | 2,541 | $34,000 |
 | Lucky | Lv 60 | T5 | 1.80 (52.8%) | +20% / +70% | +120% / +80% | ×2.00 / +8% | 3,696 | $50,000 |
 
-- **The "chance of +1"** is `F.chanceForMean(mean)`: the framework chain of 1 fish, +1 with that chance, each further fish with probability 0.35, up to 5.
-- **Lucky reels, hooks and handles** don't exist in the catalog yet. Their rows are defined so that a Mountain Stream-era part can drop in without new rules.
-- **Full sets match the provisional path.** For T2–T4 the full-set stats equal the provisional path `curve.js` was fitted on (T2 Rare Find .4 / Luck .2 / Trophy .1 / Speed .05, …, T4 .9 / .6 / .5 / .15), plus a small handle sell bonus. T1 adds Trophy +5% and Speed +3%, at 1.20 fish instead of 1.15. That is why the curve still fits (§10).
-- **Durability efficiency** reaches normal players through the handle's larger durability pool, not the `durabilityEfficiency` stat. The engine charges `max(1, ceil(fish × (1 − eff)))` per cast, so the stat never helps a 1-fish cast, and a 2-fish cast only from 50%. With the stat at 0, the framework's `durabilityPerCast` is exact for every normal rod.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-slots -->
+
+- **The "chance of +1"** is `F.chanceForMean(mean)`: the framework chain (one fish, a second with that chance, each further fish with the framework chain probability, up to the framework maximum).
+- **Lucky reels, hooks and handles** don't exist in the catalog yet. Their rows are defined so a Mountain Stream-era part can drop in without new rules; until then the T5 reference set is a Lucky rod piece on Legendary parts (gear path table).
+- **Durability efficiency** reaches normal players through the handle's larger durability pool, not the `durabilityEfficiency` stat, which normal rods don't carry. Without it the engine rule and the proposed stochastic rule (`P-DURABILITY`) charge the same, so the framework's `durabilityPerCast` is exact for every normal rod.
 
 ### 3.3 Specialties: side-grade variants
-From `report().specialties`: each variant against the balanced part of the same rarity, in that tier's home biome.
+Speed and Rare Find are worth several times more cash than Trophy or Luck, so the Trophy/Luck side of each pair gets the larger multiplier.
 
-Speed and Rare Find are worth several times more cash than Trophy or Luck (`report().statValue`, T3 at Coast):
+<!-- generated:rods-specialties -->
+Marginal value of each stat on the T3 reference set in Coast (`report().statValue`):
 
 | Stat change | XP/h | $/h |
 | --- | --- | --- |
 | Speed +0.02 | +1.19% | +1.19% |
 | Rare Find +0.2 | +0.47% | +1.51% |
-| Trophy +0.2 | +0.12% | +0.64% |
-| Luck +0.2 | +0.11% | +0.64% |
-| Sell +0.02 | 0% | +1.92% |
+| Trophy +0.2 | +0.12% | +0.63% |
+| Luck +0.2 | +0.11% | +0.65% |
+| Sell +0.02 | 0.00% | +1.92% |
 
-So the trophy and luck side of each pair gets the larger multiplier.
+Each variant against the balanced part of the same rarity, in that tier's home biome (`report().specialties`):
 
 | Part | Rarity | Variant | Biome | XP/h | $/h | Net $/h after repairs | Giants | Legendary+ | Rod life |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Fiberglass Rod Piece | Rare | Fast action (+0.02 fish, ×0.75 life) | Pond | +1.5% | +1.5% | +0.1% | +1.5% | +1.5% | −25.6% |
 | Graphite Rod Piece | Rare | Backbone (−0.02 fish, ×1.5 life) | Pond | −1.5% | −1.5% | −0.2% | −1.5% | −1.5% | +48.8% |
-| Centerpin Reel | Rare | Free-spool (speed ×1.2, trophy ×0.5) | Pond | +0.5% | +0.4% | +0.4% | −4.5% | +0.0% | — |
-| Jigging Reel | Rare | Heavy drag (speed ×0.8, trophy ×2.5) | Pond | −0.5% | −0.0% | −0.0% | +13.5% | −0.1% | — |
+| Centerpin Reel | Rare | Free-spool (speed ×1.2, trophy ×0.5) | Pond | +0.5% | +0.4% | +0.4% | −4.5% | 0.0% | — |
+| Jigging Reel | Rare | Heavy drag (speed ×0.8, trophy ×2.5) | Pond | −0.5% | 0.0% | 0.0% | +13.5% | −0.1% | — |
 | Fly Fishing Reel | Ultra | Light retrieve (speed ×1.2, trophy ×0.5) | Coast | +1.1% | +0.7% | +0.7% | −11.5% | +0.1% | — |
 | Trolling Reel | Ultra | Trolling drag (speed ×0.8, trophy ×2.5) | Coast | −0.9% | +0.2% | +0.3% | +34.3% | −0.2% | — |
 | Swimbait Hook | Legendary | Big bait (Rare Find ×0.85, Luck ×1.5) | Swamp | −0.1% | −0.1% | −0.1% | +0.7% | +19.6% | — |
 | Worm Hook | Legendary | Natural bait (Rare Find ×1.15, Luck ×0.6) | Swamp | +0.2% | +0.2% | +0.2% | −0.7% | −15.6% | — |
 
-- **Where the tilts come from:** today's catalog.
-  - Fiberglass has more legacy draws and less durability; Graphite has more durability.
-  - The `quick` reels become the speed variants; Trolling (with its extra legacy draw) becomes the trophy variant.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-specialties -->
+
+- **Where the tilts come from:** today's catalog. Fiberglass has more legacy draws and less durability, Graphite more durability; the `quick` reels become the speed variants; Trolling (with its extra legacy draw) becomes the trophy variant.
 - **Parts with no variant stay balanced:** Titanium Reel, Octopus Hook, and the identical twins Plastic/Spinning and Aluminum/Baitcasting.
-- **What players choose between:** XP pace, fewer repairs, Giants for collections, trophies and quests, or Legendary hunting. None of these is simply more money.
+- **What players choose between:** XP pace, fewer repairs, Giants for collections and quests, or Legendary hunting. None of these is simply more money.
 
 ---
 
-## 4. All 2,450 part combinations
+## 4. All part combinations
 
-From `evaluateAllCombos()`, summarised in `report().combos`. Each rod is evaluated at its own requirement level, in its tier's home biome, at regular cadence.
+From `evaluateAllCombos()`, summarised in `report().combos`. Each rod is evaluated at its own requirement level, in its tier's home biome, at regular cadence. The catalog has no balanced Rare rod piece: both Rare pieces are variants.
 
-**Mean fish per cast.** Every rod-piece value appears 350 times:
-
-| | Values |
+<!-- generated:rods-combos -->
+|  | Mean fish per cast (combinations) |
 | --- | --- |
-| Proposed | 1.10, 1.20, 1.28, 1.32, 1.50, 1.65, 1.80 (350 combinations each) |
-| Today | 4 (60 combinations), 6 (70), 8 (70), 9 (100), 10 (10), 12 (210), 15 (1,930) |
-
-- At the ceiling: **14.3%** of combinations (1.8, Lv 60 only), against **78.8%** today (15 fish).
-- The catalog has no balanced Rare rod piece: both Rare pieces are variants, at 1.28 and 1.32.
+| Proposed | 1.10, 1.20, 1.28, 1.32, 1.50, 1.65, 1.80 (350 each) |
+| Today | 4 (60), 6 (70), 8 (70), 9 (100), 10 (10), 12 (210), 15 (1,930) |
 
 | Tier | Combos | Level | Home biome | Fish/cast (min–median–max) | XP/h | $/h | $/h vs reference set | Life (h, regular) | Upkeep at home | Today: level / fish per cast |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | 32 | 20 | Lake | 1.10–1.20–1.20 | 8,232–8,980–9,161 | 27,912–30,450–31,362 | 89%–100% | 2.46–3.02 | 3.6%–4.3% | Lv 20 / 4–6 |
-| T2 | 184 | 30 | Pond | 1.10–1.28–1.32 | 8,232–9,659–10,308 | 39,233–46,093–50,351 | 79%–102% | 2.38–6.25 | 2.1%–7.0% | Lv 20–50 / 4–15 |
-| T3 | 504 | 40 | Coast | 1.10–1.28–1.50 | 8,232–10,154–12,211 | 55,955–69,299–86,623 | 65%–101% | 2.30–7.23 | 1.3%–6.3% | Lv 20–70 / 4–15 |
-| T4 | 1,380 | 50 | Swamp | 1.10–1.32–1.65 | 8,232–10,482–13,838 | 80,214–104,931–144,524 | 56%–100% | 2.26–8.50 | 0.8%–7.8% | Lv 20–70 / 4–15 |
-| T5 | 350 | 60 | Swamp | 1.80 | 13,470–14,086–15,096 | 123,830–138,506–157,663 | 79%–100% | 4.71–8.75 | 3.9%–7.9% | Lv 40–70 / 15 |
+| T1 | 32 | 20 | Lake | 1.10–1.20–1.20 | 8,232–9,161 | 27,913–31,364 | 89%–100% | 2.46–3.02 | 3.6%–4.3% | Lv 20 / 4–6 |
+| T2 | 184 | 30 | Pond | 1.10–1.28–1.32 | 8,232–10,308 | 39,234–50,357 | 79%–102% | 2.38–6.25 | 2.1%–7.0% | Lv 20–50 / 4–15 |
+| T3 | 504 | 40 | Coast | 1.10–1.28–1.50 | 8,232–12,211 | 55,957–86,643 | 65%–101% | 2.30–7.23 | 1.3%–6.3% | Lv 20–70 / 4–15 |
+| T4 | 1,380 | 50 | Swamp | 1.10–1.32–1.65 | 8,232–13,838 | 80,216–144,548 | 56%–100% | 2.26–8.50 | 0.8%–7.8% | Lv 20–70 / 4–15 |
+| T5 | 350 | 60 | Swamp | 1.80 | 13,470–15,096 | 123,833–157,688 | 79%–100% | 4.71–8.75 | 3.9%–7.9% | Lv 40–70 / 15 |
 
-**Stat spread (min–max over each tier's combinations):**
+Stat spread (min–max over each tier's combinations):
 
 | Tier | Rare Find | Luck | Trophy | Speed | Sell | P(3+ fish) |
 | --- | --- | --- | --- | --- | --- | --- |
-| T1 | 0.10–0.20 | 0.05–0.10 | 0–0.05 | 0–0.03 | 0 | 2.3%–4.6% |
-| T2 | 0.10–0.40 | 0.05–0.20 | 0–0.25 | 0–0.06 | 0–0.02 | 2.3%–7.4% |
-| T3 | 0.10–0.60 | 0.05–0.40 | 0–0.75 | 0–0.12 | 0–0.04 | 2.3%–11.6% |
-| T4 | 0.10–1.035 | 0.05–0.90 | 0–0.75 | 0–0.15 | 0–0.06 | 2.3%–15.0% |
-| T5 | 0.10–1.035 | 0.05–0.90 | 0–0.75 | 0–0.15 | 0–0.06 | 18.5% |
+| T1 | 0.1–0.2 | 0.05–0.1 | 0–0.05 | 0–0.03 | 0 | 2.3%–4.6% |
+| T2 | 0.1–0.4 | 0.05–0.2 | 0–0.25 | 0–0.06 | 0–0.02 | 2.3%–7.4% |
+| T3 | 0.1–0.6 | 0.05–0.4 | 0–0.75 | 0–0.12 | 0–0.04 | 2.3%–11.6% |
+| T4 | 0.1–1.035 | 0.05–0.9 | 0–0.75 | 0–0.15 | 0–0.06 | 2.3%–15.0% |
+| T5 | 0.1–1.035 | 0.05–0.9 | 0–0.75 | 0–0.15 | 0–0.06 | 18.5% |
 
-- **Mixed rods are weaker than matched ones.** The weakest T4 rod (a Legendary handle on Common rod piece, reel and hook) earns 56% of a full Legendary set, so matched sets are the goal and crates stay relevant.
-- **No bypass** (`report().combos.bestAtLevel`). The best rod usable at each level:
+- **Mixed rods are weaker than matched ones:** the weakest T4 combination earns 56% of the full Legendary set's $/h.
+- **No bypass** (`report().combos.bestAtLevel`): the best rod usable at each level.
 
-  | Level | Today | Proposed | Proposed best $/h (that level's biome) |
-  | --- | --- | --- | --- |
-  | Lv 20 | 10 fish | 1.20 | $31,362 |
-  | Lv 30 | 15 fish | 1.32 | $50,351 |
-  | Lv 40 | 15 fish | 1.50 | $86,623 |
-  | Lv 50 | 15 fish | 1.65 | $144,524 |
-  | Lv 60 | 15 fish | 1.80 | $157,663 |
+| Level | Today (fish per cast) | Proposed (mean fish) | Proposed best $/h (that level's biome) |
+| --- | --- | --- | --- |
+| Lv 20 | 10 | 1.20 | $31,364 |
+| Lv 30 | 15 | 1.32 | $50,357 |
+| Lv 40 | 15 | 1.50 | $86,643 |
+| Lv 50 | 15 | 1.65 | $144,548 |
+| Lv 60 | 15 | 1.80 | $157,688 |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-combos -->
 
 ---
 
-## 5. Gear path for the integrator: `gearPath()`
+## 5. The gear path: `gearPath()`
 
-Each step gives `{tier, level, crateUnlockLevel, homeBiome, qualities, stats, multiChance, meanFish, jackpot3plus, jackpot5, cooldownMs, maxDurability, lifeHoursRegular, repairCost, repairCostPerFish, upkeepShareHome, assembly: {crate, price, expectedCrates, p90Crates, expectedCost, hoursOfStageIncome}}`. The reference sets are balanced (no variants).
+This is the shared gear path (R3): `F.gearPath()` reads it, so every Phase 5B model prices against these tiers. Each step gives `{tier, level, crateUnlockLevel, homeBiome, qualities, stats, multiChance, meanFish, jackpot3plus, jackpot5, cooldownMs, maxDurability, lifeHoursRegular, repairCost, repairCostPerFish, upkeepShareHome, assembly}`. The reference sets are balanced (no variants).
 
-| Step | Level | Home biome | Fish/cast | P(3+) | P(5) | Cooldown | Rare Find / Luck / Trophy / Speed / Sell | Durability (h, regular) | Repair | Upkeep at home |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Old Rod | 0 | Ocean | 1.00 | 0% | 0% | 5.00 s | none | unbreakable | — | — |
-| T1 Uncommon set | 20 | Lake | 1.20 | 4.6% | 0.57% | 4.85 s | 20 / 10 / 5 / 3 / 0% | 1,450 (2.97 h) | $3,700 | 4.0% |
-| T2 Rare set | 30 | Pond | 1.30 | 6.9% | 0.85% | 4.75 s | 40 / 20 / 10 / 5 / 2% | 2,150 (4.02 h) | $7,900 | 4.0% |
-| T3 Ultra set | 40 | Coast | 1.50 | 11.6% | 1.41% | 4.50 s | 60 / 40 / 30 / 10 / 4% | 3,200 (5.04 h) | $17,000 | 3.9% |
-| T4 Legendary set | 50 | Swamp | 1.65 | 15.0% | 1.84% | 4.25 s | 90 / 60 / 50 / 15 / 6% | 4,300 (5.97 h) | $34,000 | 4.0% |
-| T5 Gold Rod Piece + Legendary | 60 | Swamp* | 1.80 | 18.5% | 2.26% | 4.25 s | 90 / 60 / 50 / 15 / 6% | 6,300 (8.02 h) | $50,000 | 4.0% |
+<!-- generated:rods-gear-path -->
+| Step | Level | Crate unlock | Home biome | Fish/cast | P(3+) | P(5) | Cooldown | Rare Find / Luck / Trophy / Speed / Sell | Durability (h, regular) | Repair | Upkeep at home |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Old Rod | 0 | — | Ocean | 1.00 | 0.0% | 0.00% | 5.00 s | none | unbreakable | — | — |
+| T1 Uncommon set | 20 | Lv 10 | Lake | 1.20 | 4.6% | 0.57% | 4.85 s | 20 / 10 / 5 / 3 / 0% | 1,450 (2.97 h) | $3,700 | 4.0% |
+| T2 Rare set | 30 | Lv 20 | Pond | 1.30 | 6.9% | 0.85% | 4.75 s | 40 / 20 / 10 / 5 / 2% | 2,150 (4.02 h) | $7,900 | 4.0% |
+| T3 Ultra set | 40 | Lv 30 | Coast | 1.50 | 11.6% | 1.41% | 4.50 s | 60 / 40 / 30 / 10 / 4% | 3,200 (5.04 h) | $17,000 | 3.9% |
+| T4 Legendary set | 50 | Lv 40 | Swamp | 1.65 | 15.0% | 1.84% | 4.25 s | 90 / 60 / 50 / 15 / 6% | 4,300 (5.97 h) | $34,000 | 4.0% |
+| T5 Lucky rod + Legendary reel/hook/handle | 60 | Lv 50 | Swamp | 1.80 | 18.5% | 2.26% | 4.25 s | 90 / 60 / 50 / 15 / 6% | 6,300 (8.02 h) | $50,000 | 4.0% |
 
-\*Mountain Stream (Lv 60) isn't modelled yet: it has three fish. T5's home biome is Swamp until it is. When Mountain Stream is modelled in the framework, T5's figures regenerate.
+Hourly rates by biome (`report().rates`, normal profile, 4 s overhead; **bold** = the tier's home biome):
 
-**Hourly rates by biome** (`report().rates`, normal profile, 4 s overhead). XP/h doesn't depend on biome.
-
-| Step | XP/h | Ocean $/h | River | Lake | Pond | Coast | Swamp |
+| Step | XP/h | Ocean $/h | River $/h | Lake $/h | Pond $/h | Coast $/h | Swamp $/h |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Old Rod | 7,462 | 8,548 | 15,119 | 20,747 | 32,241 | 37,613 | 49,574 |
-| T1 | 9,161 | 13,324 | 21,883 | **31,362** | 43,212 | 60,418 | 84,941 |
-| T2 | 10,096 | 15,256 | 25,044 | 35,858 | **49,394** | 69,009 | 96,932 |
-| T3 | 12,078 | 19,073 | 31,286 | 44,774 | 61,639 | **86,015** | 120,721 |
-| T4 | 13,813 | 22,883 | 37,511 | 53,622 | 73,787 | 102,835 | **144,177** |
-| T5 | 15,069 | 24,963 | 40,921 | 58,496 | 80,495 | 112,184 | **157,284** |
+| T1 | 9,161 | 13,325 | 21,884 | **31,364** | 43,215 | 60,421 | 84,946 |
+| T2 | 10,096 | 15,258 | 25,046 | 35,862 | **49,399** | 69,017 | 96,943 |
+| T3 | 12,078 | 19,077 | 31,293 | 44,785 | 61,653 | **86,034** | 120,747 |
+| T4 | 13,813 | 22,890 | 37,523 | 53,641 | 73,811 | 102,869 | **144,221** |
+| T5 | 15,069 | 24,971 | 40,934 | 58,517 | 80,521 | 112,220 | **157,331** |
 
-- **XP/h:** 7.5k on the Old Rod rises to 15.1k at T5, a 2.0× total gain.
-- **Cash:** at the home biome (bold), T4 earns $144k/h. Today's crafted rods earn $155k–1.4M/h.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-gear-path -->
+
+Mountain Stream isn't a live biome in the framework (`F.LIVE_BIOMES`), so T5's home biome is Swamp until it is; T5's figures regenerate when it is modelled.
 
 ---
 
 ## 6. Durability, repairs and the Old Rod (mandatory upkeep)
 
 ### 6.1 Rules
-- **Durability** (`baseDurability`, `craftRod`) = rod-piece base × handle multiplier × variant.
-  - The base is set so that a *matched* set lasts `lifeHours` of regular play: 2.5 / 3 / 4 / 5 / 6 / 8 h by rod-piece rarity.
-  - The cost stays **1 durability per fish**, so the engine rule is unchanged.
-- **Repair cost** (`repairCostFor`) = 4% × the matched set's durability × its $/fish in its home biome, rounded to 2 significant digits.
-  - It depends only on the rod-piece rarity. A better handle means fewer repairs per fish, which is where durability efficiency shows up.
-- **Unlimited repairs.** A crafted rod is never destroyed. It breaks, gets repaired, and goes on.
-  - A player who can't pay equips the Old Rod, which always works (§6.3).
-  - Today's "3 repairs, then the parts are gone" would turn a 1.3–8 h progression purchase (§7.2) into a recurring forced re-purchase. Decision 10 asks for modest upkeep.
+- **Durability** (`baseDurability`, `craftRod`) = rod-piece base × handle multiplier × variant. The base is set so that a *matched* set lasts `lifeHours` of regular play by rod-piece rarity. The cost stays **one durability per fish**, so the engine rule is unchanged.
+- **Repair cost** (`repairCostFor`) = `upkeepShare` × the matched set's durability × its $/fish in its home biome, rounded to `PARAMS.priceSigDigits` significant digits. It depends only on the rod-piece rarity; a better handle means fewer repairs per fish.
+- **Unlimited repairs.** A crafted rod breaks, gets repaired, and goes on. A player who can't pay equips the Old Rod, which always works (§6.3). Today's repair limit would turn a progression purchase (§7.2) into a recurring forced re-purchase; decision 10 asks for modest upkeep.
 
 ### 6.2 Upkeep as a share of income
-`upkeepShare(rod, biome)` = repair cost ÷ (durability × $/fish). It doesn't depend on cadence, because both durability and income are per fish.
+`upkeepShare(rod, biome)` = repair cost ÷ (durability × $/fish). It doesn't depend on cadence, because both durability and income are per fish. Over the whole integrated lifecycle, repairs as a share of income are in the lifecycle table (§10).
 
+<!-- generated:rods-upkeep -->
 | Reference set | Repair | Every (regular play) | Repair = minutes of home income | Ocean | River | Lake | Pond | Coast | Swamp |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | T1 | $3,700 | 2.97 h | 7.1 | 9.3% | 5.7% | **4.0%** | 2.9% | 2.1% | 1.5% |
 | T2 | $7,900 | 4.02 h | 9.6 | 12.9% | 7.8% | 5.5% | **4.0%** | 2.9% | 2.0% |
 | T3 | $17,000 | 5.04 h | 11.9 | 17.7% | 10.8% | 7.5% | 5.5% | **3.9%** | 2.8% |
 | T4 | $34,000 | 5.97 h | 14.1 | 24.9% | 15.2% | 10.6% | 7.7% | 5.5% | **4.0%** |
-| T5 | $50,000 | 8.02 h | 19.1 | 25.0% | 15.2% | 10.7% | 7.7% | 5.6% | **4.0%** |
+| T5 | $50,000 | 8.02 h | 19.1 | 25.0% | 15.2% | 10.7% | 7.7% | 5.5% | **4.0%** |
 
-- **One biome below home:** 5.5–5.7%.
-- **High gear in Ocean:** up to 25% of gross income. A T4 rod in Ocean still nets about $17k/h, twice the Old Rod, and the Old Rod costs nothing there.
-- **Whole lifecycle:** repairs are **3.9% of gross fish income** for every archetype (`report().lifecycle.archetypes[*].repairShare`).
+- **One biome below home:** 5.5%–5.7%. **High gear in Ocean:** up to 25.0% of gross income; a T4 rod in Ocean still nets $17,197/h, 2.0× the Old Rod (which costs nothing there).
+- **What the unbreakable Old Rod gives up:** today's repair ($1,000 per 1,000 fish) as a share of Old Rod income under the proposed value model: Ocean 4.7%, River 2.6%, Lake 1.9%, Pond 1.2%, Coast 1.1%, Swamp 0.8%.
 
-### 6.3 Old Rod: unbreakable (decision)
-- **What changes.**
-  - The engine never charges durability on the starter rod (identified by catalog name and type, plus an additive `unbreakable: true` catalog flag).
-  - Stored `state` and `durability` on existing Old Rods are ignored, so a legacy `broken` or `destroyed` Old Rod works again with no data write.
-  - `interactionCreate` stops granting replacements (C3).
-- **The soft-lock is gone:**
-  - A broken crafted rod and $0 means equip the Old Rod, fish, and repair.
-  - A broken Old Rod can no longer happen.
-  - The `ROD_BROKEN` card offers "Repair ($X)" and "Use Old Rod".
-- **What the rule gives up:** today's $1,000-per-1,000-fish Old Rod repair would be worth 4.7% (Ocean) → 0.8% (Swamp) of Old Rod income under the new value model (`report().upkeep.oldRodLegacyRepairShare`). Free replacement already makes it optional, so today its main effect is the soft-lock.
-- **Why not a cheap repair instead:** the Old Rod is also the safety net for crafted-rod owners, so it must never be the thing that blocks play.
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-upkeep -->
+
+### 6.3 Old Rod: unbreakable
+- **What changes.** The engine never charges durability on the starter rod (identified by catalog name and type, plus an additive `unbreakable: true` catalog flag). Stored `state` and `durability` on existing Old Rods are ignored, so a legacy `broken` or `destroyed` Old Rod works again with no data write. `interactionCreate` stops granting replacements (C3).
+- **The soft-lock is gone.** A broken crafted rod and $0 means: equip the Old Rod, fish, repair. A broken Old Rod can no longer happen. The `ROD_BROKEN` card offers "Repair ($X)" and "Use Old Rod".
+- **What the rule gives up** is today's Old Rod repair sink (last line of the upkeep block). Free replacement already makes it optional, so today its main effect is the soft-lock.
+- **Why not a cheap repair instead:** the Old Rod is the safety net for crafted-rod owners, so it must never be the thing that blocks play.
 
 ---
 
 ## 7. Crates (progression purchases)
 
 ### 7.1 Definitions (Gacha V2; `crateDefinitions()`)
-Every crate has 3 slots, `independent` rolls, `duplicates: 'unique'`, and a pool of `types: [part_rod, part_reel, part_hook, part_handle]` with `fish: false`.
+The crate shape (slots, rolls, duplicates, pool) is the first line of the block below. The `featured` groups make each slot type equally likely within a rarity; without them the catalog's uneven slot counts skew the drops.
 
-The slot-balancing `featured` groups come from `slotBalanceFeatured()`:
-- **Weight 2:** Wooden Rod Piece, Barbed Hook, Wooden Handle, Bamboo Rod Piece, Circle Hook, Cork Handle, Treble Hook, EVA Handle.
-- **Weight 3:** Carbon Fiber Rod Piece, Jig Hook, Carbon Fiber Handle, Composite Rod Piece, Sage Green Reel, Composite Handle.
+<!-- generated:rods-crates -->
+Every crate: 3 slots, `independent` rolls, `duplicates: 'unique'`, a pool of `types: [part_rod, part_reel, part_hook, part_handle]` with `fish: false`.
 
-These make each slot type 25% within a rarity. Without them the catalog's 10 reels / 7 rods / 7 hooks / 5 handles skew the drops.
+Slot-balancing `featured` groups (`slotBalanceFeatured()`): **weight 2:** Wooden Rod Piece, Barbed Hook, Wooden Handle, Bamboo Rod Piece, Circle Hook, Cork Handle, Treble Hook, EVA Handle; **weight 3:** Carbon Fiber Rod Piece, Jig Hook, Carbon Fiber Handle, Composite Rod Piece, Sage Green Reel, Composite Handle.
 
 | Tier | Crate | Unlock (shop) | rarityTable | rarityFloor | guaranteedSlots | Pity | Price |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | **Fishing Crate** (existing item, redefined) | Lv 10 | common 50, uncommon 47, rare 3 | — | slot 0 ≥ uncommon | — | **$4,900** |
+| T1 | Fishing Crate (existing item, redefined) | Lv 10 | common 50, uncommon 47, rare 3 | — | slot 0 ≥ uncommon | — | **$4,900** |
 | T2 | Pro Tackle Crate (new) | Lv 20 | uncommon 45, rare 52, ultra 3 | uncommon | slot 0 ≥ rare | — | **$21,000** |
 | T3 | Expert Tackle Crate (new) | Lv 30 | rare 45, ultra 52, legendary 3 | rare | slot 0 ≥ ultra | — | **$53,000** |
 | T4 | Master Tackle Crate (new) | Lv 40 | ultra 45, legendary 54, lucky 1 | ultra | slot 0 ≥ legendary | — | **$140,000** |
 | T5 | Gilded Tackle Crate (new) | Lv 50 | legendary 80, lucky 20 | legendary | — | lucky: soft 3, +0.1/open, max +0.5, hard 8 | **$590,000** |
 
-- **Price formula** (`cratePrice`): `assemblyHours[t] × stageIncome(t) ÷ E[crates to assemble]`, rounded to 2 significant digits.
-  - `assemblyHours` = 1.25 / 2.5 / 4 / 6 / 8.
-  - `stageIncome(t)` = the previous tier's reference rod in the biome unlocked 10 levels before tier t, at regular cadence.
-- **Next-tier parts.** Each crate's table carries a small next-tier weight (3 of 100; T4: 1 Lucky), so slot 0 lands one about 5–6% of the time and slots 1–2 3% each (`crateSlotOdds`). It's an exciting pull, level-capped until the player is ready.
+Chance per crate slot of a part above the tier's reference rarity (`crateSlotOdds`; T5 has none above it):
+
+| Crate | Rarity | Slot 0 | Slot 1 | Slot 2 |
+| --- | --- | --- | --- | --- |
+| Fishing Crate | rare | 6.0% | 3.0% | 3.0% |
+| Pro Tackle Crate | ultra | 5.5% | 3.0% | 3.0% |
+| Expert Tackle Crate | legendary | 5.5% | 3.0% | 3.0% |
+| Master Tackle Crate | lucky | 1.8% | 1.0% | 1.0% |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-crates -->
+
+- **Price formula** (`cratePrice`): `assemblyHours[t] × stageIncome(t) ÷ E[crates to assemble]`, rounded to `PARAMS.priceSigDigits` significant digits. `stageIncome(t)` is the previous tier's reference rod in the biome unlocked one stage before tier t, at the design cadence (fishing income only).
+- **Next-tier parts.** Each crate's table carries a small next-tier weight: an exciting pull, level-capped until the player is ready.
 - **Buying ahead.** Crates unlock one stage early, so players buy and open them while they level toward the tier.
-- **The Fishing Crate loses its bait.** Bait is a shop purchase priced by the bait subsystem. Owned Fishing Crates open under the new definition (better: guaranteed Uncommon+, parts only).
+- **The Fishing Crate loses its bait.** Bait is a shop purchase priced by the bait design. Owned Fishing Crates open under the new definition (strictly better: parts only, a guaranteed slot).
 
 ### 7.2 Cost to assemble a tier-appropriate set: `assembly(t)`
-**Method.** Exact: every outcome of one open is enumerated (`openOutcomes`: slot rarity, then `featured`-weighted pick, with `unique` applied). A Markov chain then runs over the needed slots collected and the pity counter (`cratesDistribution`). This covers floors, guaranteed slots, `unique` and pity exactly as the engine decides them.
+**Method (exact).** Every outcome of one open is enumerated (`openOutcomes`: slot rarity, then the `featured`-weighted pick, with `unique` applied). A Markov chain then runs over the needed slots collected and the pity counter (`cratesDistribution`). Floors, guaranteed slots, `unique` and pity are applied exactly as the engine decides them.
 
-| Tier | Crate | Price | Stage before (biome, $/h) | Needs | E[crates] | Median | P90 | E[cost] | Hours of stage income (P90) | Share of stage income | Leftover parts | Salvage refund | Net after salvage |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| T1 | Fishing Crate | $4,900 | River, $15,119 | 4 × Uncommon | 3.87 | 3 | 6 | $18,980 | 1.26 (1.94) | 29.4% | 7.6 | $2,570 | $16,410 |
-| T2 | Pro Tackle | $21,000 | Lake, $31,362 | 4 × Rare | 3.77 | 3 | 6 | $79,148 | 2.52 (4.02) | 35.0% | 7.3 | $9,560 | $69,588 |
-| T3 | Expert Tackle | $53,000 | Pond, $49,394 | 4 × Ultra | 3.69 | 3 | 6 | $195,767 | 3.96 (6.44) | 33.2% | 7.1 | $25,729 | $170,037 |
-| T4 | Master Tackle | $140,000 | Coast, $86,015 | 4 × Legendary | 3.66 | 3 | 6 | $511,856 | 5.95 (9.77) | 35.1% | 7.0 | $63,777 | $448,078 |
-| T5 | Gilded Tackle | $590,000 | Swamp, $144,177 | Gold Rod Piece | 1.97 | 2 | 4 (hard pity: 8) | $1,159,742 | 8.04 (16.37) | 34.2% | 4.9 | $65,402 | $1,094,341 |
+<!-- generated:rods-assembly -->
+| Tier | Crate | Price | Stage before (biome, $/h) | Needs | E[crates] | Median | P90 | E[cost] | Hours of stage income (P90) | Leftover parts | Salvage refund | Net after salvage |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| T1 | Fishing Crate | $4,900 | River, $15,119 | 4 × Uncommon | 3.87 | 3 | 6 | $18,980 | 1.26 (1.94) | 7.6 | $2,570 | $16,410 |
+| T2 | Pro Tackle Crate | $21,000 | Lake, $31,364 | 4 × Rare | 3.77 | 3 | 6 | $79,148 | 2.52 (4.02) | 7.3 | $9,560 | $69,588 |
+| T3 | Expert Tackle Crate | $53,000 | Pond, $49,399 | 4 × Ultra | 3.69 | 3 | 6 | $195,767 | 3.96 (6.44) | 7.1 | $25,729 | $170,037 |
+| T4 | Master Tackle Crate | $140,000 | Coast, $86,034 | 4 × Legendary | 3.66 | 3 | 6 | $511,856 | 5.95 (9.76) | 7.0 | $63,777 | $448,078 |
+| T5 | Gilded Tackle Crate | $590,000 | Swamp, $144,221 | Lucky rod | 1.97 | 2 | 4 (hard pity: 8) | $1,159,742 | 8.04 (16.36) | 4.9 | $65,402 | $1,094,341 |
 
-- **Share of stage income** = assembly cost ÷ (regular hours in the stage × stage $/h). The stage lasts 4.27 / 7.20 / 11.95 / 16.95 / 23.55 h (`report().lifecycle.stageHoursRegular`).
-- **Budget T1** (any Common+ part per slot, 1.10 fish): 2.79 crates (P90 4), $13,674, 0.90 h of stage income (`report().entryT1`).
+- **Budget T1** (a Common-or-better part in every slot, 1.10 fish): 2.79 crates (P90 4), $13,674, 0.90 h of stage income.
+- **Totals (T1–T5):** $1,965,493 of expected assemblies; salvaging every leftover returns $167,038.
 
-**Validation against the real engine.** `validateCratesWithEngine(8000)` replays 8,000 real `openLine` decisions per crate on an in-memory MongoDB: the proposed definitions are registered in-process only, and nothing is persisted. The engine RNG is unseeded, so each run differs within sampling error. The exact chain and the engine agree:
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-assembly -->
 
-| Crate | Exact E[crates] | Engine mean ± SE | z |
-| --- | --- | --- | --- |
-| Fishing Crate | 3.874 | 3.924 ± 0.039 | 1.29 |
-| Pro Tackle | 3.769 | 3.792 ± 0.037 | 0.62 |
-| Expert Tackle | 3.694 | 3.691 ± 0.035 | −0.09 |
-| Master Tackle | 3.656 | 3.637 ± 0.035 | −0.53 |
+### 7.3 Validation against the real engine
+`validateCratesWithEngine(8000)` replays real `openLine` decisions per crate on an in-memory MongoDB (test helpers only; the proposed definitions are registered in-process and nothing is persisted). The engine RNG is unseeded, so each run differs within sampling error; the table is the recorded run (`ENGINE_VALIDATION`) next to the live exact value, and flags the record if a definition changes.
 
-- An earlier independent 8,000-open run gave |z| ≤ 1.84.
-- A first model that treated the three slots as independent (ignoring `unique`) overstated the crate count by 14–17%. That is why the exact enumeration is used.
+<!-- generated:rods-engine-validation -->
+| Crate | Exact E[crates] (live) | Exact at the run | Engine mean ± SE | z | Completed sets |
+| --- | --- | --- | --- | --- | --- |
+| Fishing Crate | 3.8735 | 3.8735 | 3.8378 ± 0.0395 | −0.90 | 2,084 |
+| Pro Tackle Crate | 3.7689 | 3.7689 | 3.7928 ± 0.0370 | 0.64 | 2,109 |
+| Expert Tackle Crate | 3.6937 | 3.6937 | 3.7452 ± 0.0366 | 1.41 | 2,135 |
+| Master Tackle Crate | 3.6561 | 3.6561 | 3.6756 ± 0.0344 | 0.57 | 2,176 |
+
+Recorded run: 8,000 opens per crate at framework 5b.4; largest |z| 1.41. The live exact values equal the values at the run, so the recorded engine sample still applies.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-engine-validation -->
 
 ---
 
 ## 8. Salvage (`salvageValue`)
-- **Rule.** Salvaging a part pays 25% of one slot of the crate whose guaranteed rarity it is. Common parts pay a quarter of Uncommon.
-  - Common $100
-  - Uncommon $410
-  - Rare $1,800
-  - Ultra $4,400
-  - Legendary $12,000
-  - Lucky $49,000
-- **It can't be arbitraged.** Salvaging a whole crate returns 22.2% / 21.2% / 22.1% / 21.8% / 9.9% of its price (T1–T5).
-- **Free sources stay negligible.** Daily Box slots are 12% parts, mostly Common and Uncommon (`TABLES.md`), so salvaging them creates only a trickle of new money. The Streak Crate's part share is set by that subsystem.
-- **Effect on assembly.** Salvaging every leftover lowers the net assembly cost by 12–14% for T1–T4, and by 6% for T5 (table in §7.2).
-- **Implementation.** A `/salvage` flow, or a "Salvage duplicates" button on `/craft`. Removal uses the existing `removeItems`.
-- **Protection.** Parts are never salvaged automatically, and a part used in a rod can't be salvaged.
+- **Rule.** Salvaging a part pays a share of one slot of the crate whose guaranteed rarity it is; Common parts pay a share of Uncommon (`P-RODS-SALVAGE`).
+- **No arbitrage.** A whole crate salvages for a small fraction of its price, and the T5 crate for much less (table).
+- **Free sources stay negligible.** Daily Box slots are mostly Common and Uncommon parts (`TABLES.md`), so salvaging them creates only a trickle of money. The Streak Crate's part share is set by the streak design.
+- **Modelled default: on.** The integrated model salvages every leftover part when an assembly is bought (the refund is the `salvage` cash source). In the game, parts are never salvaged automatically, and a part used in a rod can't be salvaged.
+- **Implementation.** A `/salvage` flow, or a "Salvage duplicates" button on `/craft`, using the existing `removeItems`.
+
+<!-- generated:rods-salvage -->
+| Rarity | Common | Uncommon | Rare | Ultra | Legendary | Lucky |
+| --- | --- | --- | --- | --- | --- | --- |
+| Salvage value | $100 | $410 | $1,800 | $4,400 | $12,000 | $49,000 |
+
+| Tier crate | Full-crate salvage (share of price) | Salvage refund per assembly | Net assembly cost reduction |
+| --- | --- | --- | --- |
+| T1 Fishing Crate | 22.2% | $2,570 | 13.5% |
+| T2 Pro Tackle Crate | 21.2% | $9,560 | 12.1% |
+| T3 Expert Tackle Crate | 22.1% | $25,729 | 13.1% |
+| T4 Master Tackle Crate | 21.8% | $63,777 | 12.5% |
+| T5 Gilded Tackle Crate | 9.9% | $65,402 | 5.6% |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-salvage -->
 
 ---
 
 ## 9. Existing crafted rods: converter (`convertLegacyRod`; read-time, no data rewrite)
 
-1. **Path A (always, in practice).** Crafting only decrements part counts (`User.removeItems`); nothing deletes part documents. So a crafted rod's `rod` / `reel` / `hook` / `handle` ids still resolve. The proposed rules are applied to those parts, exactly as for a new craft. `cast.js` already loads the part documents for `customrod`.
-2. **Path B (a part document is missing).** Use the legacy fingerprint in `capabilities`: bare-number sum, `N count`, durability sum, `quick`, `strong`. Pick the **weakest** catalog combination with that fingerprint (by $/h in Ocean).
-   - Over all 2,450 combinations there are 832 fingerprints, 169 of them unique.
-   - The tier is recovered exactly for 86.1% of combinations (8.2% lower, 5.7% higher).
-   - **Power is never over-estimated (0%).**
+1. **Path A (always, in practice).** Crafting only decrements part counts (`User.removeItems`); nothing deletes part documents, so a crafted rod's `rod` / `reel` / `hook` / `handle` ids still resolve. The proposed rules apply to those parts exactly as for a new craft. `cast.js` already loads the part documents for `customrod`.
+2. **Path B (a part document is missing).** Use the legacy fingerprint in `capabilities` (bare-number sum, `N count`, durability sum, `quick`, `strong`) and pick the **weakest** catalog combination with that fingerprint (by $/h in Ocean). Power is never over-estimated (table).
 3. **Path C (unknown fingerprint).** Treat the rod as a matched Common set.
-4. **Durability is grandfathered.** Effective maximum = max(stored `maxDurability`, proposed). Remaining durability is as stored. Legacy pools are 1.9–10× the proposed ones (median 4.1×).
-5. **Repairs are unlimited, at the proposed cost.** The stored `repairCost`, `repairs` and `maxRepairs` are ignored by rule. A legacy `destroyed` crafted rod counts as `broken`, so rods lost to the old 3-repair rule (and to bug C1) can be repaired.
+4. **Durability is grandfathered.** Effective maximum = max(stored `maxDurability`, proposed); remaining durability as stored.
+5. **Repairs are unlimited, at the proposed cost.** Stored `repairCost`, `repairs` and `maxRepairs` are ignored by rule. A legacy `destroyed` crafted rod counts as `broken`, so rods lost to the old repair limit (and to bug C1) can be repaired.
 6. **The shown requirement** is the proposed one, and performance is level-capped.
 
-**Worked example** (`report().legacyConverter.samples`): today's "Custom (Rare parts)" rod (Graphite + Jigging + Treble + EVA).
+<!-- generated:rods-converter -->
+| Converter calibration (all combinations) | Value |
+| --- | --- |
+| Legacy fingerprints / unique | 832 / 169 |
+| Path B tier recovered exactly / lower / higher | 86.1% / 8.2% / 5.7% |
+| Path B power over-estimated | 0.0% |
+| Legacy max durability ÷ proposed (min–median–max) | 1.88×–4.13×–10× |
+| Upkeep at home with grandfathered durability (min–median–max) | 0.1%–0.7%–2.9% |
 
-| | Today (stored) | Proposed (Path A and Path B agree) |
+Worked example (`report().legacyConverter.samples`): today's rod from Graphite Rod Piece + Jigging Reel + Treble Hook + EVA Handle.
+
+|  | Today (stored) | Proposed (Path A and Path B agree) |
 | --- | --- | --- |
 | Capabilities | `["weak","quick","strong","6","5 count","10000 durability"]` | unchanged (read only) |
 | Level requirement | Lv 50 | Lv 30 (T2) |
 | Fish per cast | 15 | 1.28 |
 | Stats | none beyond the capabilities | Rare Find 40%, Luck 20%, Trophy 25%, Speed 4%, Sell 2% |
-| Durability | 4,200 / 10,000, `destroyed` | kept (10,000 max), `broken` and repairable |
+| Durability | 4200/10000, `destroyed` | kept (10,000 max), `broken` and repairable |
 | Repair | $50,000, max 3 | $7,900, unlimited |
 
-The biggest felt change for existing players is volume: today's 15-fish rods (1,930 combinations) become 1.10–1.80 fish per cast, depending on their rod piece. The value model and the XP-per-rarity rule carry the difference, as decided.
+Level cap example: a Lv 35 player with a Tier 4 Legendary set gets a Rare-set rod (1.30 fish, 40 / 20 / 10 / 5 / 2% Rare Find / Luck / Trophy / Speed / Sell); the rod still shows Lv 50.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-converter -->
+
+The biggest felt change for existing players is volume: today's cap-level rods become rods in the approved multi-catch band. The value model and the XP-per-rarity rule carry the difference, as decided.
 
 ---
 
-## 10. Lifecycle check (input for R1 and R2)
+## 10. On the integrated model (framework 5b.4)
 
-`lifecycle(archetype)` uses the same XP model as `curve.js`: placeholder daily of 60 × level XP. It runs on this gear path.
-- Crates for tier t are bought from net fish income (after repairs) from the crate's unlock level.
-- The rod is equipped when it is paid for and the level is reached.
-- Other subsystems' income and costs are **not** included. The integrator adds them.
+`lifecycle(archetype, { variant, otherSpendShare })` is the rods view of one integrated run: `integrate.run` with the reference loop (rods, world permits, quests, streak, buffs), optionally a variant (bait, aquarium). Levels, purchases, repairs and salvage all come from the shared core's ledgers. The XP curve is the framework's (R1 fitted it on this same loop), so the window check below is the regular player R1 chose the coefficient for.
 
-| Player | Lv 10 | Lv 20 (T1) | Lv 30 (T2) | Lv 40 (T3) | Lv 50 (T4) | Lv 60 (T5) | Repairs / gross | Crates / gross | Fishing share of XP at L50 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Casual | 1.47 h (d8) | 5.22 h (d26) | 11.05 h (d54) | 19.78 h (d95) | 31.88 h (d154) | 48.45 h (d233) | 3.9% | 64.8% | 44% |
-| **Regular** | 1.35 h (d2) | **5.62 h** (d8) | **12.82 h** (d18) | **24.77 h** (d34) | **41.72 h** (d56) | 65.27 h (d88) | 3.9% | 34.2% | 79% |
-| Active | 1.25 h (d1) | 5.47 h (d3) | 12.73 h (d7) | 25.07 h (d13) | 42.68 h (d22) | 67.45 h (d34) | 3.9% | 28.9% | 92% |
-| Grinder | 1.10 h (d1) | 4.97 h (d1) | 11.57 h (d3) | 22.95 h (d5) | 39.25 h (d8) | 61.87 h (d13) | 3.9% | 27.2% | 97% |
+<!-- generated:rods-lifecycle -->
+| Player | Lv 10 | Lv 20 (T1) | Lv 30 (T2) | Lv 40 (T3) | Lv 50 (T4) | Lv 60 (T5) | Tier start after its level | Repairs / fishing income | Repairs / all income | Assemblies / all income | Salvage cash | Cash held at the stop (share of all income) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| casual | 1.25 h (d6) | 4.98 h (d24) | 11.73 h (d57) | 22.50 h (d108) | 38.52 h (d185) | 60.03 h (d289) | 0 h (every tier) | 3.9% | 1.6% | 20.9% | $167,038 | $7,052,616 (75%) |
+| **regular** | 1.18 h (d2) | 5.27 h (d7) | 12.58 h (d17) | 25.13 h (d34) | 43.65 h (d59) | 69.77 h (d93) | 0 h (every tier) | 3.9% | 2.6% | 21.3% | $167,038 | $6,772,725 (73%) |
+| active | 1.12 h (d1) | 5.05 h (d3) | 12.67 h (d7) | 25.28 h (d13) | 44.02 h (d22) | 71.07 h (d36) | 0 h (every tier) | 3.9% | 3.3% | 22.5% | $167,038 | $6,233,951 (71%) |
+| grinder | 0.98 h (d1) | 4.80 h (d1) | 11.40 h (d3) | 23.08 h (d5) | 40.23 h (d9) | 64.98 h (d13) | 0 h (every tier) | 3.9% | 3.6% | 23.5% | $167,038 | $5,851,606 (70%) |
 
-- **Every approved window is met** for the regular player: 5.62 (5–6), 12.82 (12–15), 24.77 (24–30), 41.72 (40–45) h.
-  - `curve.js` on the provisional path gives 5.62 / 13.5 / 25.5 / 42.7 h.
-  - The small speed-up comes from having the rod ready at the level rather than 1.5 h later, and from T1 at 1.20 fish instead of 1.15.
-  - This is within the windows, so no coefficient change is implied by the rod design.
-- **Affordability** (`report().lifecycle.delayByOtherSpend`, rod upgrade delay after reaching the level):
-  - **Regular, active and grinder players:** never delayed, even with 60% of income spent elsewhere (checked at 0.3 / 0.4 / 0.5 / 0.6).
-  - **Casual players:** not delayed with 30% spent elsewhere.
-    - 40%: T3 +0.2 h, T4 +1.7 h, T5 +4.6 h of play.
-    - 50%: T2–T5 +0.6 / 2.4 / 5.3 / 12.2 h.
-    - 60%: T2–T5 +2.4 / 5.8 / 10.8 / 24.1 h.
-  - Casual players reach levels with far fewer fishing hours because dailies give XP, so rods take 65% of their fish income. Their affordability depends on the daily/streak subsystem paying some **cash**, not only XP (R2).
-- **For R2:** under the `curve.js` placeholder daily, the casual player's L50 XP is only 44% fishing, against 79% for the regular player. The quest and streak subsystems own that decomposition.
+| Regular player | Lv 20 | Lv 30 | Lv 40 | Lv 50 |
+| --- | --- | --- | --- | --- |
+| Approved window | 5–6 h | 12–15 h | 24–30 h | 40–45 h |
+| Integrated (framework 5b.4, quartic 0.0525) | 5.27 h (in) | 12.58 h (in) | 25.13 h (in) | 43.65 h (in) |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-lifecycle -->
+
+- **Every tier is level-gated, never cash-gated.** Each assembly is bought soon after its crate unlocks, about a stage before the tier's level, and each tier starts fishing on the step its level is reached (buy-and-fish table in §10.1).
+- **Upkeep over the lifecycle** is the same share of fishing income for every archetype, and a smaller share of all income for players whose dailies pay more of it.
+
+### 10.1 Affordability
+The first table sets each assembly against what the regular player actually earns in the stage leading to the tier (all sources, and fishing alone). Crate prices are formulas of *fishing* income (§7.1), so quests, streak and buffs make an assembly a smaller share of total income than of fishing income. The stress probe (the reference systems plus a system spending a share of each step's fishing income outside the model) shows how much room other purchases have before a rod upgrade waits for cash.
+
+<!-- generated:rods-affordability -->
+| Tier | Stage (regular) | Hours in stage | Income earned in the stage (all sources) | of which fishing | E[assembly cost] | Share of stage income | Share of stage fishing income |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| T1 | Lv 10-20 | 4.08 h | $91,729 | $61,626 | $18,980 | 20.7% | 30.8% |
+| T2 | Lv 20-30 | 7.32 h | $331,427 | $229,322 | $79,148 | 23.9% | 34.5% |
+| T3 | Lv 30-40 | 12.55 h | $918,285 | $619,735 | $195,767 | 21.3% | 31.6% |
+| T4 | Lv 40-50 | 18.52 h | $2,383,442 | $1,592,658 | $511,856 | 21.5% | 32.1% |
+| T5 | Lv 50-60 | 26.12 h | $5,496,553 | $3,765,870 | $1,159,742 | 21.1% | 30.8% |
+
+When each assembly is bought (integrated reference loop; hours of play, gate level) and when the tier starts fishing:
+
+| Player | T1 bought → fishing | T2 bought → fishing | T3 bought → fishing | T4 bought → fishing | T5 bought → fishing |
+| --- | --- | --- | --- | --- | --- |
+| casual | 1.37 h (Lv 10) → 4.98 h | 5.00 h (Lv 20) → 11.73 h | 11.75 h (Lv 30) → 22.50 h | 22.52 h (Lv 40) → 38.52 h | 38.53 h (Lv 50) → 60.03 h |
+| regular | 1.42 h (Lv 11) → 5.27 h | 5.28 h (Lv 20) → 12.58 h | 12.60 h (Lv 30) → 25.13 h | 25.15 h (Lv 40) → 43.65 h | 43.67 h (Lv 50) → 69.77 h |
+| active | 1.40 h (Lv 11) → 5.05 h | 5.33 h (Lv 20) → 12.67 h | 12.68 h (Lv 30) → 25.28 h | 25.30 h (Lv 40) → 44.02 h | 44.03 h (Lv 50) → 71.07 h |
+| grinder | 1.23 h (Lv 11) → 4.80 h | 5.10 h (Lv 20) → 11.40 h | 11.42 h (Lv 30) → 23.08 h | 23.10 h (Lv 40) → 40.23 h | 40.25 h (Lv 50) → 64.98 h |
+
+Longest wait between reaching a tier's level and fishing it, with the optional variants (integrate.run `variant`, every other system as in the reference loop):
+
+| Player | bait: cash | bait: xp | aquarium |
+| --- | --- | --- | --- |
+| casual | none | none | none |
+| regular | none | none | none |
+| active | none | none | none |
+| grinder | none | none | none |
+
+Stress probe: the reference loop plus a share of every step's fishing income spent on purchases outside the model; rod upgrades that then wait for cash:
+
+| Player | 50% of fishing income | 70% of fishing income | 80% of fishing income | 90% of fishing income |
+| --- | --- | --- | --- | --- |
+| casual | none | none | none | none |
+| regular | none | none | none | none |
+| active | none | none | none | T2 +3.2 h, T3 +4.4 h, T4 +11.0 h, T5 after Lv 60 |
+| grinder | none | none | T2 +1.8 h, T3 +3.9 h, T4 +8.9 h, T5 after Lv 60 | T1 +2.0 h, T2 +7.1 h, T3 +16.7 h, T4 after Lv 60, T5 after Lv 60 |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-affordability -->
 
 ---
 
-## 11. Code touchpoints (after approval; none are changed now)
+## 11. Integration contract: rods as a system on the shared core
+
+`system(opts)` is the `rods` entry of `integrate.js`. Each call returns a fresh object; all per-run state lives in `state.sys.rods` (`owned`, `plan`, `bought`, `equips`, `spent`). It is deterministic and draws no random numbers.
+
+| Hook | Behaviour |
+| --- | --- |
+| `goals` | The next tier's assembly (the one after the owned tier). Category `progression` (blocking), priority `LC.PRIORITY.rod`. Cost = `assembly(t)` expected cost (the gear path's `assembly.expectedCost`); available from the tier crate's unlock level on the gate level; ledger item = the crate name. `buy()` records ownership, pays the salvage refund, emits `assembly`, and equips at once if the gate level already reaches the tier. |
+| `on('levelUp')` | Equips the owned tier (`state.equippedTier`) once the gate level reaches its level; the tier fishes from the next step. |
+| `onCasts` | Repairs: `spend('upkeep', 'repairs', durability used this step × repairCost / maxDurability)` of the equipped tier. The Old Rod is unbreakable (no cost). Durability comes from the step's rates, so Founder efficiency and any bait stat carry through. |
+
+- **Ledger.** Cash source `salvage` (base fishing income is the core's `fishing`). Spend items `upkeep.repairs` and one `progression` item per tier crate.
+- **Events.** `assembly { tier, crate, crates, cost, level }` on each purchase. No `box` event: tier crates carry no buffs, so the counting rule has nothing for the buffs system to value.
+- **Profile and gate.** With `state.profile === 'founder'` an assembly costs the Founder's expected crates (`founder.founderCrates(t)`) at the same price, and its salvage refund is estimated from the Normal per-crate salvage value over those crates. Every level check uses `ctx.gateLevel()`, so `gate: 'public'` works.
+- **Options** (`SYSTEM_DEFAULTS`): `salvage` (default on; off is the conservative case) and `founderCrates` (default on).
+- **Parity with the retired loop.** Before this migration the module had its own lifecycle loop; `system()` was validated against it and the loop was then deleted. The result is kept as a constant record:
+
+<!-- generated:rods-parity -->
+| Parity record (constant; the old loop is deleted) | Value |
+| --- | --- |
+| Source | `validateSystem()` at commit a83b5f0 (framework 5b.4) |
+| Method | LC.simulate with rods.system({ salvage: false }) + LC.provisionalDaily() vs the retired rods.lifecycle() (same placeholder XP model), every archetype plus regular with 30% and casual with 50% of fish income spent elsewhere; hours compared step-exact |
+| Cases | 6 |
+| Max relative difference (tolerance) | 0.33% (0.5%); worst: grinder T1 equip hours |
+| Milestones on the same step | 24/36 |
+| Largest tier-start shift | 2 steps |
+| Replay with the old equip timing | 36/36 milestones, max difference 0%: exact |
+| Cause of every difference | equip timing only: the old loop equipped a tier in the purchase block of the step after its level was reached; the system equips on the levelUp event (the rod is owned and the level reached), so level-gated tiers start one step earlier. Replaying the old timing on the core was exact. |
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-parity -->
+
+---
+
+## 12. Code touchpoints (after approval; none are changed now)
 
 | File | Change |
 | --- | --- |
-| `src/components/buttons/repair-rod.js` | **C1**: update via `ItemData` with a state guard. Charge only when the repair applies (atomic or under the user lock). Allow repairing `destroyed` crafted rods. Repair to the effective maximum; charge the rule cost. |
-| `src/engine/balance.js` | `BALANCE_VERSION` 4.x. Add `ROD_PART_LEVEL`, `ROD_TIER_OF_RARITY`, `ROD_SLOT_STATS` (replaces `PART_RARITY_STATS` for crafted rods), `ROD_VARIANTS`, `ROD_DURABILITY_BASE`, `ROD_REPAIR_COST`, `CRAFT_MIN_LEVEL`, `OLD_ROD.unbreakable`. The values are baked from `rods.js` at implementation, and a test asserts they equal `rods.js`. |
-| `src/engine/modifiers.js` | `rodStats(rod, parts, playerLevel)`: slot families, level cap, `multiChance` from the rod piece. Legacy numbers and `N count` are ignored for crafted rods. `resolveModifiers` takes the player's level. The Old Rod gets `multiChance` 0. (The multi-catch chain itself is framework and integrator work.) |
-| `src/engine/cast.js` | No durability cost for the unbreakable Old Rod, and its stored state is ignored. Crafted rods never become `destroyed`; a legacy `destroyed` one is treated as `broken`. Effective max durability = max(stored, rule). |
+| `src/components/buttons/repair-rod.js` | **C1**: update via `ItemData` with a state guard; charge only when the repair applies (atomic or under the user lock). Allow repairing `destroyed` crafted rods. Repair to the effective maximum; charge the rule cost. |
+| `src/engine/balance.js` | Bump `BALANCE_VERSION`. Add `ROD_PART_LEVEL`, `ROD_TIER_OF_RARITY`, `ROD_SLOT_STATS` (replaces `PART_RARITY_STATS` for crafted rods), `ROD_VARIANTS`, `ROD_DURABILITY_BASE`, `ROD_REPAIR_COST`, `CRAFT_MIN_LEVEL`, `OLD_ROD.unbreakable`, baked from `rods.js` at implementation. |
+| `src/engine/modifiers.js` | `rodStats(rod, parts, playerLevel)`: slot families, level cap, `multiChance` from the rod piece. Legacy numbers and `N count` are ignored for crafted rods. `resolveModifiers` takes the player's level. The Old Rod gets `multiChance` 0 (the multi-catch chain itself is framework work). |
+| `src/engine/cast.js` | No durability cost for the unbreakable Old Rod; its stored state is ignored. Crafted rods never become `destroyed`; a legacy `destroyed` one is treated as `broken`. Effective max durability = max(stored, rule). |
 | `src/class/FishingRod.js` | `generateStats`: capabilities `['weak','strong']`, `requirements.level` = highest part level, formula `maxDurability`, rule `repairCost`. Keep `combineQualities` for the legacy fingerprint. |
-| `src/events/Guild/interactionCreate.js` (~212) | **C2/C3**: no free replacement. Equip the owned Old Rod, and grant one only if none is owned. |
-| `src/commands/slash/Fish/fish.js` | The broken-rod card gets "Repair ($X)" and "Use Old Rod" buttons. Remove the "destroyed, buy a new one" message for crafted rods. |
-| `src/commands/slash/Fish/craft.js` | Preview the tier, requirement, "performs as X until Lv Y", stats and durability before submitting. Add the salvage flow. |
-| `src/commands/slash/User/equip.js` | Crafted rods need Lv 20. Show legacy `destroyed` crafted rods (repairable). |
-| `src/commands/slash/Info/info.js`, `User/fishing-stats.js` | Show tier, effective rarity per part, durability, repair cost and "unlimited repairs". Show the Old Rod as "unbreakable". |
+| `src/events/Guild/interactionCreate.js` | **C2/C3**: no free replacement. Equip the owned Old Rod; grant one only if none is owned. |
+| `src/commands/slash/Fish/fish.js` | The broken-rod card gets "Repair ($X)" and "Use Old Rod". Remove the "destroyed, buy a new one" message for crafted rods. |
+| `src/commands/slash/Fish/craft.js` | Preview tier, requirement, "performs as X until Lv Y", stats and durability before submitting. Add the salvage flow. |
+| `src/commands/slash/User/equip.js` | Crafted rods need the crafting minimum level. Show legacy `destroyed` crafted rods (repairable). |
+| `src/commands/slash/Info/info.js`, `User/fishing-stats.js` | Show tier, effective rarity per part, durability, repair cost and "unlimited repairs"; the Old Rod as "unbreakable". |
 | `src/class/User.js` | Remove or align `decreaseRodDurability` and `repairRod` (C4). |
-| `src/engine/gachaBoxes.js` | Redefine `Fishing Crate`; add Pro / Expert / Master / Gilded Tackle Crate (definitions in §7.1). |
-| `src/bootstrap/data/gacha.js`, `rods.js` | New crate catalog items (shop, price, `requirements.level`). Fishing Crate price and requirement. Old Rod `unbreakable: true`. |
+| `src/engine/gachaBoxes.js` | Redefine `Fishing Crate`; add the Pro / Expert / Master / Gilded Tackle Crates (§7.1). |
+| `src/bootstrap/data/gacha.js`, `rods.js` | New crate catalog items (shop, price, `requirements.level`); Fishing Crate price and requirement; Old Rod `unbreakable: true`. |
 | `src/engine/gacha.js` | No change: `validateBoxes` covers the new boxes, and floors, guarantees, `featured`, `unique` and pity already exist. |
 
 ---
 
-## 12. Migrations (additive and idempotent only)
+## 13. Migrations (additive and idempotent only)
 - **Player documents: none.** Existing crafted rods, Old Rods and parts are interpreted at read time (§9, §6.3). No field is rewritten.
-- **Catalog (bootstrap upsert by name, idempotent):**
-  - New gacha items: Pro, Expert, Master and Gilded Tackle Crate.
-  - Fishing Crate `price` and `requirements.level`.
-  - Old Rod `unbreakable: true`.
-  - Newly crafted rods may carry an additive `rules: 'rods-5b'` marker (new documents only).
-- **Optional, needs your decision:** refund charges from C1 (failed crafted-rod repairs). This would be a one-off guarded `$inc` keyed by the Interaction id, so it can't be applied twice.
+- **Catalog (bootstrap upsert by name, idempotent):** the new Tackle Crate items; Fishing Crate `price` and `requirements.level`; Old Rod `unbreakable: true`. Newly crafted rods may carry an additive `rules: 'rods-5b'` marker (new documents only).
+- **Optional, needs your decision (`P-RODS-C1-REFUND`):** refund charges from C1 with a one-off guarded `$inc` keyed by the Interaction id, so it can't be applied twice.
 
 ---
 
-## 13. Tests to add
-1. **C1 regression:**
-   - Repairing a broken `CustomRodData` rod sets `repaired` and full durability, and charges exactly once.
-   - A double click charges once.
-   - Insufficient funds changes nothing.
-   - A legacy `destroyed` crafted rod can be repaired.
-2. **Old Rod:**
-   - Never loses durability.
-   - A stored `broken` or `destroyed` Old Rod casts normally.
-   - `interactionCreate` never creates a second Old Rod.
-   - A player with $0 and a broken crafted rod can equip the Old Rod and fish.
-3. **Tier, requirement and level cap:**
-   - Requirement = highest part level.
-   - Parts above the player's level perform at `capRarity`.
-   - Crafted rods need Lv 20.
-   - No catalog combination beats its tier's reference fish/cast at its level (`evaluateAllCombos`).
-4. **Stat parity:** `balance.js` rod constants equal `rods.js` `PARAMS` and formulas. The engine's `rodStats` equals `craftRod` for all 2,450 combinations.
-5. **Converter:**
-   - Path A uses the parts.
-   - Path B never over-estimates power.
-   - Path C default.
-   - Durability `max(stored, rule)`.
-   - Read-only: documents are byte-identical after casting and reading, except the normal durability write.
-6. **Crates:**
-   - `validateBoxes` passes.
-   - The Fishing Crate has no bait.
-   - Slot 0 respects its guarantee.
-   - Seeded engine opens complete sets within a 99% interval of `cratesDistribution`.
-   - T5 hard pity at 8.
-7. **Salvage:** a crate's expected salvage value is below its price. A part in a rod can't be salvaged.
-8. **Legacy parity:** `verifyLegacyParity()` (the mirror equals `FishingRod.combineQualities`; currently 0 mismatches in 2,450).
-9. **Founder:** Founder crafted-rod casts stay `competitiveEligible: false`. Founder gacha stats apply to the new crates.
+## 14. Tests to add
+1. **C1 regression:** repairing a broken `CustomRodData` rod sets `repaired` and full durability and charges exactly once; a double click charges once; insufficient funds changes nothing; a legacy `destroyed` crafted rod can be repaired.
+2. **Old Rod:** never loses durability; a stored `broken` or `destroyed` Old Rod casts normally; `interactionCreate` never creates a second Old Rod; a player with $0 and a broken crafted rod can equip the Old Rod and fish.
+3. **Tier, requirement and level cap:** requirement = highest part level; parts above the player's level perform at `capRarity`; crafted rods need the crafting minimum; no catalog combination beats its tier's reference fish per cast at its level (`evaluateAllCombos`).
+4. **Parity with the design:** `balance.js` rod constants equal `rods.js` `PARAMS` and formulas (and so the `DECISIONS` records); the engine's `rodStats` equals `craftRod` for every catalog combination.
+5. **Converter:** Path A uses the parts; Path B never over-estimates power; Path C default; durability `max(stored, rule)`; read-only (documents byte-identical after casting and reading, except the normal durability write).
+6. **Crates:** `validateBoxes` passes; the Fishing Crate has no bait; slot 0 respects its guarantee; seeded engine opens complete sets within a 99% interval of `cratesDistribution`; T5 hard pity at its configured limit.
+7. **Salvage:** a crate's expected salvage value is below its price; a part in a rod can't be salvaged.
+8. **Legacy parity:** `verifyLegacyParity()` (the mirror equals `FishingRod.combineQualities` on every combination; it currently matches everywhere).
+9. **Founder:** Founder crafted-rod casts stay `competitiveEligible: false`; Founder gacha stats apply to the new crates.
 
 ---
 
-## 14. Risks
-- **Existing players feel the volume drop** (15 fish → 1.10–1.80 per cast). Mitigations: the grandfathered durability, unlimited repairs, destroyed rods restored, and the higher value per fish. Announce it with the Phase 5B changes.
-- **Legacy durability is a perk.** Legacy rods keep 1.9–10× the new durability (median 4.1×), so their upkeep at home is 0.1–2.9% (median 0.7%) instead of about 4% (`report().legacyConverter.grandfathered`). It affects cash only, not catch rates or leaderboards. The alternative is decision 2 below.
-- **Upkeep rises outside the home biome:** up to 25% for T4 or T5 in Ocean. The Old Rod is free there, and the gear still nets 2× the Old Rod.
-- **T5 hangs on one catalog part** (Gold Rod Piece), with high variance: P90 is 4 crates (16 h of stage income), capped at 8 by pity. New Lucky parts are expected with the Mountain Stream era.
-- **Casual affordability depends on other subsystems.** Rods take about 65% of casual fish income (§10). The daily/streak designs should pay some cash.
-- **Progression spending on rods is 27–34% of gross** for regular, active and grinder players. Permits and other progression purchases share the remainder. Players can still save (decision 10), but the integrator should check the combined total.
-- **The level cap needs clear UI** ("performs as Rare until Lv 50"), or players may think a part is bugged.
-- **Redefining the Fishing Crate changes what owned crates contain** (strictly better: parts only, guaranteed Uncommon+).
+## 15. Risks
+- **Existing players feel the volume drop** (Current → Proposed). Mitigations: grandfathered durability, unlimited repairs, destroyed rods restored, and the higher value per fish. Announce it with the Phase 5B changes.
+- **Legacy durability is a perk.** Legacy rods keep several times the new durability, so their upkeep at home is well below the new rods' (converter table). It affects cash only, not catch rates or leaderboards. The alternative is in `P-RODS-LEGACY-RODS`.
+- **Upkeep rises outside the home biome**, most for high gear in Ocean (upkeep block). The Old Rod is free there, and the gear still nets more than it.
+- **T5 hangs on one catalog part** (Gold Rod Piece), with high variance, bounded by pity (assembly table). New Lucky parts are expected with the Mountain Stream era.
+- **Rod purchases leave a large cash surplus on the integrated reference loop.** Crate prices are hours of *fishing* income, while players also earn from quests, streak and buffs; assemblies take a modest share of stage income, no tier ever waits for cash even under heavy diverted spending, and most income is still held at the stop (lifecycle and affordability tables). That fits decision 10 (players can save), but the economy-wide sink total is the integrator's check; no rods parameter is changed here.
+- **The level cap needs clear UI** ("performs as Rare until Lv Y"), or players may think a part is bugged.
+- **Redefining the Fishing Crate changes what owned crates contain** (strictly better: parts only, a guaranteed slot).
 - **Salvage creates a little money** from free part drops (bounded, negligible).
 
 ---
 
-## 15. Decisions for you
-1. **Old Rod unbreakable** (recommended) vs a cheap repair.
-2. **Legacy crafted-rod durability:** keep the stored maximum (recommended, non-destructive) vs rescale to the new pool through an additive `condition` field.
-3. **Crafted rods: unlimited repairs** (recommended) vs keep "destroyed after 3 repairs".
-4. **Refund C1 charges** where analytics can identify them.
-5. **Level cap** (recommended) vs a strict equip gate at the tier level.
+## 16. Decisions for approval
+
+Every entry is **proposed**; nothing here is approved until you approve it. The framework-level rules these designs rely on (`P-LUCKY`, `P-DURABILITY`, `P-DOUBLE-CASH`, `P-MS-VALUE`, `P-EVENTS`, `P-DAY`, `P-FOUNDER-GATE`, `P-DAILY-FACTOR`) are in `decisions.js`.
+
+<!-- generated:rods-decisions -->
+| ID | Proposed decision | Modelled | Alternatives | Why | Record = model |
+| --- | --- | --- | --- | --- | --- |
+| `P-RODS-TIER` | A crafted rod's tier is the tier of its highest-rarity part; the requirement it shows is that part's level | tierOfRarity: Common T1, Uncommon T1, Rare T2, Ultra T3, Legendary T4, Lucky T5 | today: requirement 10 x the summed "N count" qualities, while bare-number draws cost no level (the level bypass); tier from the rod piece alone | part rarity finally matters and no combination can bypass its level | yes |
+| `P-RODS-LEVEL-CAP` | Part level caps: a part works at full strength from its level; below it, it performs at the best rarity the player has unlocked | partLevel: Common Lv 20, Uncommon Lv 20, Rare Lv 30, Ultra Lv 40, Legendary Lv 50, Lucky Lv 60; e.g. a Legendary part at Lv 35 performs as Rare | a strict equip gate at the tier level; no cap (today) | one rule covers new crafts, existing rods, jackpot parts and admin grants; parts can still be collected and crafted early | yes |
+| `P-RODS-CRAFT` | Crafting and equipping a crafted rod needs the first-rod level; every crafted rod catches weak and strong fish | minLevel 20; qualities weak + strong | today: no crafting level; strong access only from part qualities (an all-Common rod is weak-only) | the first crafted rod is the Lv 20 milestone and unlocks strong fish, as the gear path assumes | yes |
+| `P-RODS-MEAN-FISH` | The rod piece sets mean fish per cast by rarity (framework multi-catch chain), capped at the endgame ceiling | meanFish: Common 1.1, Uncommon 1.2, Rare 1.3, Ultra 1.5, Legendary 1.65, Lucky 1.8; ceiling 1.8 | today: draws x per-draw (4-15 fish per cast, most combinations at the 15 cap); other per-rarity means inside the approved ~1.0 to 1.5-1.8 band | progression-based, probabilistic multi-catch with rare 3-5 fish jackpots; removes the 16x cliff | yes |
+| `P-RODS-SLOT-FAMILIES` | Per-slot stat families that add across parts: reel = speed + trophy; hook = Rare Find + Luck; handle = durability multiplier + sell bonus | rod: Multi-catch (mean fish per cast) and the durability base; reel: Fishing speed (cooldown) and trophy/drag (Giant weight); hook: Rarity targeting: Rare Find (Rare/Ultra) and Luck (Legendary/Lucky); handle: Durability efficiency (casts per life, so upkeep per fish) and clean handling (sell bonus) | today: PART_RARITY_STATS, the same bundle for every part of a rarity, plus speed per quick part | rods differ by specialty instead of by volume | yes |
+| `P-RODS-VARIANTS` | Same-slot, same-rarity catalog parts become named side-grade variants (about the same net $/h, a different emphasis) | Fiberglass Rod Piece: Fast action; Graphite Rod Piece: Backbone; Centerpin Reel: Free-spool; Jigging Reel: Heavy drag; Fly Fishing Reel: Light retrieve; Trolling Reel: Trolling drag; Swimbait Hook: Big bait; Worm Hook: Natural bait | identical parts within a rarity (today, apart from legacy numbers) | collecting variants is an aspirational goal that is not pay-to-win; tilts follow each part's identity in today's catalog | yes |
+| `P-RODS-DURABILITY` | Durability sized in hours of play: a matched set lasts lifeHours by rod-piece rarity; the handle multiplies it; still 1 durability per fish | lifeHours: Common 2.5 h, Uncommon 3 h, Rare 4 h, Ultra 5 h, Legendary 6 h, Lucky 8 h; rounded to 50 | today: the sum of the parts' durability qualities | upkeep frequency is a property of play time, not an arbitrary number; a better handle means fewer repairs | yes |
+| `P-RODS-REPAIR` | Unlimited repairs for crafted rods; repair cost = a fixed share of what the matched set's durability earns in its home biome (by rod-piece rarity) | upkeepShare 0.04; maxRepairs unlimited | today: 10,000 x count, a fixed repair limit, then the rod is destroyed; another upkeep share | predictable upkeep sized to income; a forced re-purchase of a whole progression purchase is not modest | yes |
+| `P-RODS-OLD-ROD` | The Old Rod is unbreakable (weak only, one fish, no stats); no free replacements | unbreakable true; meanFish 1; qualities weak | a cheap repair; today: finite durability, a paid repair and a free replacement once destroyed | ends the free-replacement loop and the $0 soft-lock; the fallback that keeps crafted-rod owners fishing must never block play | yes |
+| `P-RODS-LEGACY-RODS` | Existing crafted rods: read-time converter (no data rewrite); stored max durability grandfathered; a destroyed crafted rod counts as broken | effective max durability = max(stored, rule); state destroyed -> broken (repairable); parts resolve -> the proposed rules on the same parts | rescale legacy durability to the new pool through an additive condition field | no player document is rewritten; rods lost to the old repair limit and to bug C1 come back | yes |
+| `P-RODS-CRATE-PRICE` | Crate prices as hours of stage income: assembling tier t's set costs assemblyHours[t] of the previous stage's income in expectation | assemblyHours: 1 1.25 h, 2 2.5 h, 3 4 h, 4 6 h, 5 8 h; price = hours x stage income / E[crates], 2 significant digits | fixed prices; other hour budgets | one progression purchase per tier, bought during the stage before it; prices regenerate with any framework change | yes |
+| `P-RODS-CRATES` | Tier part crates (Gacha V2): independent slots, unique duplicates, slot-balanced featured weights, rarity floors, a guaranteed slot 0, Lucky pity on T5; each unlocks one stage early | Fishing Crate (Lv 10, floor none, slot 0 >= uncommon); Pro Tackle Crate (Lv 20, floor uncommon, slot 0 >= rare); Expert Tackle Crate (Lv 30, floor rare, slot 0 >= ultra); Master Tackle Crate (Lv 40, floor ultra, slot 0 >= legendary); Gilded Tackle Crate (Lv 50, floor legendary, slot 0 >= none, pity) | one crate for every tier; no floors or guarantees (coupon-collector tail) | a tier-appropriate set in a few crates with a bounded tail; the next tier's parts appear rarely as exciting, level-capped pulls | yes |
+| `P-RODS-FISHING-CRATE` | Redefine the existing Fishing Crate as the T1 part crate (parts only, no bait); owned crates open under the new definition | Fishing Crate: pool part_rod, part_reel, part_hook, part_handle | keep today's Fishing Crate and add a separate T1 part crate | strictly better for owners (guaranteed slot, parts only); bait is priced by the bait design | yes |
+| `P-RODS-SALVAGE` | Duplicate parts salvage for cash; the integrated model salvages every leftover part on assembly (default on) | salvage = 0.25 of one slot of the crate that guarantees the rarity (Common: 0.25 of Uncommon); system default salvage true | no salvage (duplicates stay dead inventory); model salvage off (the conservative case) | duplicates are never worthless, while a crate's full salvage stays far below its price (no arbitrage) | yes |
+| `P-RODS-C1-REFUND` | Refund crafted-rod repair charges lost to bug C1 where Interaction analytics identify them | not modelled: a one-off guarded migration keyed by Interaction id, only after approval | no refund | players paid for repairs that never applied | n/a (not a model value) |
+
+Status of every entry: `proposed`. Only the user approves; `decisions.js` joins these to the Phase 5B registry and `check-shared.js` verifies each record against the model.
+
+<sub>Generated by `node scripts/economy/5b/render-docs.js` from `rods.js` markdownTables() at framework 5b.4 (digest d9e4938f85074918).</sub>
+<!-- /generated:rods-decisions -->
 
 ---
 
-## 16. Dependencies and framework requests
-- **Bait:** the Fishing Crate no longer contains bait.
-- **Daily/streak:** Daily Box and Streak Crate part drops feed T1 and salvage. Casual rod affordability benefits from cash rewards.
-- **Founder:** crafted rods expose `multiChance`, stats and parts. The Founder profile composes on top (durability efficiency .75, speed .6). Speed .6 alone gives a 2.0 s cooldown, and with an Ultra+ reel (+.10 or more) it reaches the 1.5 s floor. Founder gacha stats (Rare Find +200%, Trophy +200%, Luck +400%) apply to the new crates.
-- **Permits:** both are priced from stage income. Rods use 29–35% of each stage's income.
-- **Framework requests** (no edits made):
-  1. Export the player archetypes and a shared `biomeForLevel` / modelled-biome list. `rods.js` duplicates the `curve.js` archetypes.
-  2. `durabilityPerCast` = `max(1, mean × (1 − eff))`, while the engine charges `max(1, ceil(n × (1 − eff)))` per cast. They differ whenever efficiency > 0 (Founder); an exact version would use `fishDistribution`. Normal rods here use 0, so they are exact.
-  3. Mountain Stream isn't meaningful in `castOutcome` (3 weather-limited fish). Exclude it or model it once it's designed.
-  4. Export the `curve.js` lifecycle core, so subsystems don't re-implement it.
+## 17. Dependencies
+- **World (permits):** both are priced from stage income and bought through the same core purchase queue; rods sit at `progression`, priority `LC.PRIORITY.rod`.
+- **Bait:** the Fishing Crate no longer contains bait; bait stats and costs compose through the core (variant rows in §10.1).
+- **Quests, streak:** Daily Box and Streak Crate part drops feed T1 and salvage; their cash rewards are part of the stage income in §10.1.
+- **Buffs:** the `assembly` event is available if Lucky Draw charges are spent on tier crates.
+- **Founder:** crafted rods expose `multiChance`, stats and parts; the Founder profile composes on top, and its crate luck prices its assemblies (`founder.founderCrates`). Figures are in `founder.md`.
 
 ---
 
-## 17. Reproduce
+## 18. Reproduce
 ```
-node -e "require('./scripts/economy/5b/rods.js').report()"        # all numbers above (sync, ~1.5 s)
-node scripts/economy/5b/rods.js > /tmp/rods.json                    # same, as JSON
+node scripts/economy/5b/render-docs.js                  # regenerate every table in this document
+node scripts/economy/5b/check-shared.js                 # shared values, stamps, decisions, docs current
+node -e "require('./scripts/economy/5b/rods.js').report()"        # all numbers (sync)
+node scripts/economy/5b/rods.js > /tmp/rods.json                  # same, as JSON
 node -e "require('./scripts/economy/5b/rods.js').verifyLegacyParity().then(console.log)"
-node -e "require('./scripts/economy/5b/rods.js').validateCratesWithEngine(8000).then(console.log)"  # in-memory MongoDB, ~10 min
+node -e "require('./scripts/economy/5b/rods.js').validateCratesWithEngine(8000).then(console.log)"  # in-memory MongoDB, minutes
 ```
-
----
-
-## Integration (framework 5b.3)
-
-`system(opts)` expresses this subsystem as a system on the shared lifecycle core (`lifecycle.js`); it is the `rods` entry of `integrate.js`. Each call returns a fresh object, and all per-run state lives in `state.sys.rods` (`owned`, `plan`, `bought`, `equips`, `spent`). It is deterministic and draws no random numbers. `gearPath()` is unchanged (5b.3 digest `e73d1be6aec26cdd`).
-
-| Hook | Behaviour |
-| --- | --- |
-| `goals` | The next tier's assembly (the one after the owned tier). Category `progression` (blocking), priority `LC.PRIORITY.rod`. Cost = `assembly(t)` expected cost (the gear path's `assembly.expectedCost`). `available` from the tier crate's unlock level (Lv 10 / 20 / 30 / 40 / 50) on the gate level. The ledger item is the crate name. `buy()` records ownership, pays the salvage refund, emits `assembly`, and equips at once if the gate level already reaches the tier. |
-| `on('levelUp')` | Equips the owned tier (`state.equippedTier`) once the gate level reaches its level. The new tier fishes from the next step. |
-| `onCasts` | Repairs: `spend('upkeep', 'repairs', durability used this step × repairCost / maxDurability)` of the equipped tier. The Old Rod is unbreakable, so it costs 0. Durability comes from the step's rates, so Founder efficiency and any bait stat carry through. |
-
-- **Ledger.**
-  - Cash source: `salvage` only. Base fishing income is the core's `fishing`.
-  - Spend items: `upkeep.repairs`, plus `progression.Fishing Crate`, `Pro Tackle Crate`, `Expert Tackle Crate`, `Master Tackle Crate` and `Gilded Tackle Crate`.
-- **Events.**
-  - `assembly { tier, crate, crates, cost, level }` on each purchase.
-  - No `box` event: tier crates carry no buffs, so the counting rule has nothing for the buffs system to value. The buffs system can listen to `assembly` if it spends Lucky Draw charges on tier crates.
-- **Profile and gate.**
-  - With `state.profile === 'founder'`, an assembly costs the Founder's expected crates (`founder.founderCrates(t)`) at the same price.
-    - Its salvage refund is estimated from the Normal per-crate salvage value over those crates.
-  - Every level check uses `ctx.gateLevel()`, so `gate: 'public'` works.
-- **Options.**
-  - `salvage` (default `true`): every leftover part is salvaged when the assembly is bought.
-    - Over T1–T5 that returns $167,038 on $1,965,492 of assemblies.
-    - `false` is the conservative case, the one `lifecycle()` modelled. Parts are still never salvaged automatically in the game (§8); this is the player's choice, modelled.
-  - `founderCrates` (default `true`).
-  - `equipTiming` (`'levelUp'` by default). `'afterCasts'` replays `lifecycle()`'s timing, for validation only.
-
-**Validation** (`validateSystem()`, in `report().systemValidation`).
-- Setup: `LC.simulate` with `system({ salvage: false })` and `LC.provisionalDaily()`, which is `lifecycle()`'s XP model, compared against `lifecycle()`.
-- Hours are compared step-exact. The table shows hours to each level as old / core, and the step shift of each tier's first step on the core.
-
-| Case | L20 | L30 | L40 | L50 | L60 | Tier start shift T1–T5 (steps) | Max diff |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Casual | 5.22 / 5.22 | 11.05 / 11.05 | 19.78 / 19.78 | 31.88 / 31.88 | 48.45 / 48.45 | −1, −1, −1, −1, −1 | 0.32% |
-| Regular | 5.62 / 5.62 | 12.82 / 12.80 | 24.77 / 24.77 | 41.72 / 41.72 | 65.27 / 65.27 | −1, −2, −1, −1, −1 | 0.30% |
-| Active | 5.47 / 5.47 | 12.73 / 12.73 | 25.07 / 25.05 | 42.68 / 42.67 | 67.45 / 67.43 | −1, −1, −2, −2, −2 | 0.30% |
-| Grinder | 4.97 / 4.97 | 11.57 / 11.57 | 22.95 / 22.93 | 39.25 / 39.23 | 61.87 / 61.85 | −1, −1, −2, −2, −2 | 0.33% |
-| Regular, 30% spent elsewhere | 5.62 / 5.62 | 12.82 / 12.80 | 24.77 / 24.77 | 41.72 / 41.72 | 65.27 / 65.27 | −1, −2, −1, −1, −1 | 0.30% |
-| Casual, 50% spent elsewhere (cash-gated) | 5.22 / 5.22 | 11.05 / 11.05 | 19.80 / 19.80 | 32.10 / 32.10 | 48.95 / 48.95 | −1, 0, 0, 0, 0 | 0.32% |
-
-- **Maximum relative difference 0.33%.** It is the grinder's T1 starting one minute earlier at 4.97 h. Milestones differ by at most one step (0.13%). Gross income, repairs and assembly totals agree within 0.04%.
-- **One rule accounts for all of it: equip timing.**
-  - `lifecycle()` equips in the purchase block of the step after the level is reached, so that step still fishes the old rod.
-  - The core equips on `levelUp`.
-  - A level-gated tier therefore starts one step earlier on the core. The extra XP can pull a later level, and its tier, one more step forward.
-  - A cash-gated tier starts on the same step on both.
-  - The core's rule is the right one: the rod is owned and the level is reached.
-  - With `lifecycle()`'s timing on the core (`equipTiming: 'afterCasts'`), the replay is **exact**: 36/36 milestones, every tier start and every total.
-- **Purchases.**
-  - `lifecycle()` pays crates progressively from the unlock level. The core buys the whole expected assembly once cash covers it.
-  - With no competing purchases, both finish on the same step.
-  - In the integrated economy, the core's priorities decide: rods sit at `progression`, priority 20, blocking.
-- **XP decomposition.** A level reached on a day's final step is recorded by the core before that day's daily XP, and by `lifecycle()` after it. The comparison applies `lifecycle()`'s convention. It is the same state, recorded either side of the daily.
-- **Days.** Hours are compared, not days. The core counts a level reached on a day's final step in that day, while `ceil(h / dayH)` counted the next day.

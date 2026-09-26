@@ -1,74 +1,48 @@
 // Phase 5B subsystem: DAILY STREAK + STREAK CRATE, and the retirement of Top.gg voting. ANALYSIS ONLY:
 // nothing here touches the live game, src/ or production data.
 //
-// Every economic number is computed at runtime from the shared framework (./framework.js, which
-// re-exports assumptions.js) and from the finished rods/bait designs (./rods.js salvage values,
-// ./bait.js pack prices). Only the design parameters in PARAMS are hand-set. If a shared value changes
-// (curve, value model, archetypes, gear path), re-run report(): every figure regenerates.
+// Framework 5b.4. The streak is a SYSTEM on the shared lifecycle core (lifecycle.js): integrate.js composes
+// it with rods, world, quests and buffs into the reference loop. This module steps no time itself. Every
+// lifecycle figure comes from integrated runs (integratedRun(): the integrate.js reference systems plus an
+// observational recorder; recorderParity() proves the recorder changes nothing against integrate.run()).
+// Static figures (box contents, stage rates, attendance) come from the framework's pure functions and the
+// finished designs' exports: rods.salvageValue() / rods.assembly() (crate helpers, not a gear source),
+// bait.prices(), quests.templateTerms(), founder.founderProfile(). Only PARAMS is hand-set; every
+// non-obvious choice in it is a PROPOSED decision in DECISIONS (joined to decisions.js).
 //
-//   node -e "require('./scripts/economy/5b/streak.js').report()"     (returns the report object)
-//   node scripts/economy/5b/streak.js                                  (prints it as JSON)
+//   node scripts/economy/5b/streak.js          prints report() as JSON
+//   node scripts/economy/5b/render-docs.js     fills docs/economy/5b/streak.md from markdownTables()
 //
 // Exports (pure and synchronous; no database, no randomness):
-//   PARAMS                       frozen design parameters: day boundary, play gate, 7-day ladder, grace
-//                                tokens, decay, badges, box pool/tables, Top.gg retirement, design targets
-//   dayIndex(ms, startUtcHour)   the "DCC day" a timestamp belongs to (shared with the daily quest)
-//   defaultState()               streak state of a player with no `streak` fields (read-time default)
-//   boxForDay(streakDay)         'Streak Crate' | 'Streak Chest' for the n-th streak day
-//   applyGap(state, missedDays)  grace/decay/reset rules for missed days (pure)
-//   advanceStreak(state, day)    credits one streak day: new state + { box, graceUsed, decayedBy, reset,
-//                                badges } (what the engine writes in the qualifying cast's commit)
-//   onSuccessfulCast(state, day) gate counter + credit: the whole engine rule for one successful cast
+//   PARAMS, DECISIONS            design parameters; the proposed decisions (status 'proposed' only)
+//   dayIndex, defaultState, boxForDay, applyGap, advanceStreak, onSuccessfulCast
+//                                the streak rules the engine mirrors (gate, ladder, grace, decay, reset)
 //   boxDefinitions()             proposed Gacha V2 definitions: 'Streak Crate', 'Streak Chest'
-//   legacyVotersCrate()          the kept Voter's Crate definition (src) + the recommended Old Rod exclusion
-//   boxEV(box, {level, profile}) exact expected contents of one open: fish by rarity and value, parts
-//                                (salvage), bait packs (usable / not yet usable), buffs; `box` is a name
-//                                or a definition; `profile` 'normal' | 'founder' (private Founder EV)
-//   stageRates(level, {archetype, tier})
-//                                F.castOutcome/F.hourly at the player's highest biome and gear
-//   streakValue(day, level, opts)
-//                                INTEGRATOR ENTRY POINT. Expected value of the box earned on streak day
-//                                `day` at `level`: { cashEquivalent, items, xp, box, breakdown }.
-//                                xp is Double XP buff XP only (no direct XP).
-//                                opts: { archetype (name or {minutesPerDay, overheadS}), tier, profile }
-//   perClaimValue(level, opts)   average over one 7-day cycle (6 crates + 1 chest), per claimed day
-//   attendanceModel(p, days)     exact DP over (streak, grace, gap) for daily attendance probability p:
-//                                claims, crates, chests, grace used, decays, resets
-//   lifecycle(archetype, opts)   curve.js-style lifecycle (same stepping; reproduces curve.json with the
-//                                streak off on the provisional path) with the streak on: XP by source,
-//                                cash by source, items. 5b.3: superseded by system() (retired later)
-//   archetypeValue()             per day and per 30/90 days for every archetype vs fishing income
-//   r2()                         INTEGRATION_REQUIREMENTS R2: XP-source decomposition, minimum-daily and
-//                                no-miss-grinder adversarial scenarios, verdicts
-//   r2With(run, {minArch})       the same R2 evaluation on another lifecycle model (coreRun on the core)
-//   t1PartsFromStreak()          days of streak drops to complete a T1 Uncommon part set (rods interplay)
-//   topggComparison()            today's Top.gg reward (today's model and the new value model) vs streak
-//   founderView()                private Founder EV per crate/chest (Founder gacha stats, sell multiplier)
-//   ruleExamples()               worked traces of the gate, ladder, grace, decay and reset rules
-//   jackpots(level)              Legendary/Lucky odds per crate, chest, week and 30 days
-//   doubleXpDayShare()           share of streak days bringing a Double XP buff (the bound on streak XP)
-//   attendanceTable()            attendanceModel for 7..3 days a week, proposed rules and the alternative
-//   baselineMatchesCurveJson()   lifecycle with the streak off reproduces docs/economy/5b/curve.json
-//   checks()                     design-target checks (pass/fail)
-//   --- framework 5b.3: the streak SYSTEM on the shared lifecycle core (lifecycle.js) ---
-//   system(opts)                 a FRESH lifecycle.js system (per-run state in state.sys.streak only):
-//                                credits a streak day when today's casts reach the play gate (at day end
-//                                by default), grace/decay/reset through advanceStreak, grants the Streak
-//                                Crate / Chest: NON-BUFF contents as cash source 'streak' + emit('box')
-//                                for the buffs system (counting rule); no XP, no spend; sessionDone() =
-//                                today's casts >= the gate (the R2 minimum-daily player)
+//   legacyVotersCrate()          the kept Voter's Crate definition (src) + the proposed Old Rod exclusion
+//   boxEV(box, {level, profile}) exact expected contents of one open; profile: 'normal' | 'founder' (today's
+//                                balance.js profiles) or a profile object (e.g. founder.founderProfile())
 //   boxContents(box, level, profile)
-//                                the non-buff contents one grant is valued at (fish, salvage, usable bait)
-//   legacyBuffValue(opts)        VALIDATION ONLY: lifecycle()'s Double XP / Double Cash valuation from the
-//                                'box' events (never together with the buffs system)
-//   coreRun(archetype, opts)     lifecycle()'s model on the core (provisional rods/daily + system() +
-//                                legacyBuffValue()), returned in lifecycle()'s shape
-//   validateSystem()             system() on the core vs lifecycle() and r2(), every archetype and the
-//                                minimum-daily player (exact; differences explained)
+//                                what the streak system books for one grant (counting rule: non-buff
+//                                contents; buffs counted, valued by the buffs system); 'founder' = the
+//                                PROPOSED Founder profile
+//   streakValue(day, level), perClaimValue(level)
+//                                boxContents for the n-th streak day; its average over one ladder cycle
+//   stageRates(level, opts)      F.castOutcome/F.hourly at the player's highest biome and gear
+//   attendanceModel(p, days), attendanceTable()
+//                                exact DP over (streak, grace, gap) for daily attendance probability p
+//   system(opts)                 the streak SYSTEM (lifecycle.js hooks; integrate.js runs it)
+//   integratedRun(archetype, o)  one integrated lifecycle (reference loop, `exclude` for with/without)
+//   lifecycle(archetype, opts)   integratedRun() in the design-stage shape (reached / at / snapshots)
+//   minimumDailyArchetype()      the gate's casts at the reference cadence as a fixed session (gate minutes;
+//                                the R2 adversary itself is F.MINIMUM_DAILY on the core)
+//   archetypeValue(), r2(), t1PartsFromStreak(), topggComparison(), founderView(), questInterplay(),
+//   creditTiming(), recorderParity(), jackpots(), doubleXpDayShare(), ruleExamples(), checks()
+//   SYSTEM_PARITY                the recorded parity of system() with the retired private loop (a83b5f0)
 //   report()                     every number in docs/economy/5b/streak.md (cached), with ...F.stamp()
-//                                and systemValidation (validateSystem())
+//   markdownTables()             the doc's generated tables ({ blockId: markdown })
 const F = require('./framework');
 const LC = require('./lifecycle');
+const I = require('./integrate');
 const rods = require('./rods');
 const bait = require('./bait');
 const { FISH } = require('../lib/catalog-model');
@@ -81,7 +55,6 @@ const BUFF_CATALOG = require('../../../src/bootstrap/data/buffs');
 const ROD_CATALOG = require('../../../src/bootstrap/data/rods');
 const SIMULATION = require('../../../docs/economy/simulation.json');
 const GACHA_EV = require('../../../docs/economy/gacha-ev.json');
-const CURVE_JSON = require('../../../docs/economy/5b/curve.json');
 
 const deepFreeze = (o) => {
 	for (const v of Object.values(o)) if (v && typeof v === 'object' && !Object.isFrozen(v)) deepFreeze(v);
@@ -91,14 +64,16 @@ const lower = (s) => String(s).toLowerCase();
 const title = (s) => lower(s).charAt(0).toUpperCase() + lower(s).slice(1);
 const rIdx = (r) => RARITIES.indexOf(lower(r));
 const round = (x, d = 2) => (Number.isFinite(x) ? Math.round(x * 10 ** d) / 10 ** d : x);
+const sumValues = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0);
+const clone = (o) => JSON.parse(JSON.stringify(o));
 
 // ---------------------------------------------------------------------------------------------
-// Design parameters (the only hand-set numbers in this subsystem).
+// Design parameters (the only hand-set numbers in this subsystem; each is a proposed decision).
 const VOTERS = BOXES['Voter\'s Crate'];
 const PARAMS = deepFreeze({
 	id: 'streak-5b',
-	// One "DCC day" for the streak AND the daily quest: [startUtcHour, startUtcHour + 24h) in UTC. 5b.3:
-	// the shared F.DAY (decisions.js P-DAY), copied so deepFreeze never freezes the shared object.
+	// One "DCC day" for the streak AND the daily quest: the shared F.DAY (decisions.js P-DAY), copied so
+	// deepFreeze never freezes the shared object.
 	day: { ...F.DAY },
 	// A streak day is earned by real play: this many successful casts (a cast that lands >= 1 fish) in
 	// the DCC day. Casts, not fish: identical effort for every rod and every profile (no Founder tell).
@@ -111,12 +86,12 @@ const PARAMS = deepFreeze({
 	// A missed day with no token costs one week of streak (the weekly phase is kept); a gap of this many
 	// missed days in a row starts the streak over.
 	decay: { perUncoveredMiss: 7, resetAfterMissedDays: 7 },
-	// Alternative evaluated in the report (a decision for the user): more grace, so a 5-days-a-week
-	// player keeps the weekly chest.
+	// Alternative evaluated in the report (P-STREAK-GRACE): more grace, so a 5-days-a-week player keeps
+	// the weekly chest.
 	alternatives: { moreGrace: { perCycle: 2, max: 3 } },
 	// Cosmetic only (profile flair from `streak.best`): no economic value.
 	badges: [7, 30, 100, 365],
-	// No direct cash and no direct XP (decisions S3, S4 in streak.md).
+	// No direct cash and no direct XP (P-STREAK-NO-CASH-XP).
 	direct: { cash: 0, xp: 0 },
 	boxes: {
 		'Streak Crate': { id: 'streak-crate', slots: 3, guaranteedSlots: [] },
@@ -134,7 +109,7 @@ const PARAMS = deepFreeze({
 		rarityFloor: 'uncommon',
 		duplicates: 'unique',
 	},
-	// A bait slot grants one pack (bait design, bait.md §9), so a bait reward is worth using.
+	// A bait slot grants one pack (the bait design's recommendation), so a bait reward is worth using.
 	baitGrant: 'pack',
 	topgg: {
 		retire: true,
@@ -143,7 +118,7 @@ const PARAMS = deepFreeze({
 		transitionDays: 30,
 		legacyVotersCrate: { keep: true, excludeOldRod: true },
 	},
-	// Design targets checked by checks(); shares are of the archetype's own fishing income.
+	// Design targets checked by checks(); shares are of the archetype's own fishing income (integrated).
 	targets: {
 		casual30dShare: [0.15, 0.35],
 		regular30dShareMax: 0.05,
@@ -156,7 +131,7 @@ const PARAMS = deepFreeze({
 
 // ---------------------------------------------------------------------------------------------
 // Streak rules (pure; the engine mirrors these exactly).
-/** DCC day index of a timestamp (ms): the shared F.dayIndex (5b.3; the streak and the daily quest share it). */
+/** DCC day index of a timestamp (ms): the shared F.dayIndex (the streak and the daily quest share it). */
 const dayIndex = (ms, startUtcHour = PARAMS.day.startUtcHour) => F.dayIndex(ms, startUtcHour);
 
 /** Read-time default for a player without `streak` fields (no write needed). */
@@ -225,6 +200,7 @@ const ITEMS = [
 	...ROD_CATALOG.map((r) => ({ name: r.name, type: r.type, rarity: lower(r.rarity) })),
 ];
 const isPart = (i) => String(i.type).startsWith('part_');
+const BUFF_NAMES = BUFF_CATALOG.map((b) => b.name);
 
 /** Proposed Gacha V2 definitions (engine format; `fish: 'highestUnlocked'` and `fishShare` are new pool options). */
 function boxDefinitions() {
@@ -243,7 +219,7 @@ function boxDefinitions() {
 	}]));
 }
 
-/** The legacy Voter's Crate as defined in src (kept forever), plus the recommended Old Rod exclusion. */
+/** The legacy Voter's Crate as defined in src (kept forever), plus the proposed Old Rod exclusion. */
 function legacyVotersCrate({ excludeOldRod = PARAMS.topgg.legacyVotersCrate.excludeOldRod } = {}) {
 	const def = JSON.parse(JSON.stringify(VOTERS));
 	if (excludeOldRod) def.pool.exclude = [...new Set([...(def.pool.exclude || []), ...ROD_CATALOG.map((r) => r.name)])];
@@ -267,16 +243,25 @@ function fishFor(poolFish, rarity, level) {
 
 const maskBelow = (t, min) => Object.fromEntries(RARITIES.map((r) => [r, rIdx(r) >= rIdx(min) ? t[r] : 0]));
 
+/** A profile name ('normal' | 'founder': today's balance.js PROFILES) or a profile object. */
+const profileOf = (profile) => (typeof profile === 'string' ? PROFILES[profile] : profile);
+const profileLabel = (profile) => (typeof profile === 'string' ? profile : profile.name || 'custom');
+let founderProfileCache = null;
+/** The PROPOSED Founder profile (founder.founderProfile(); pure, computed once; loaded lazily). */
+const proposedFounder = () => founderProfileCache || (founderProfileCache = require('./founder').founderProfile());
+
 /**
  * Exact expected contents of one open. Mirrors gacha.openLine: base table restricted to rarities with
  * rewards, rarity floor, profile gacha stats (buildTable), per-slot guarantees; within a rarity the kind
  * is fish with probability fishShare (when both kinds exist), then uniform (no featured weights).
- * Pity is not modelled (Founder only; it can only raise Founder's figures).
+ * Pity is not modelled (Founder only; it can only raise Founder's figures). `profile` is a name (today's
+ * balance.js profile; buffs.js relies on that) or a profile object (e.g. the proposed Founder profile).
  */
 function boxEV(box, { level = 0, profile = 'normal' } = {}) {
 	const def = typeof box === 'string' ? (boxDefinitions()[box] || (box === 'Voter\'s Crate' ? legacyVotersCrate() : null)) : box;
 	if (!def) throw new Error(`Unknown box ${box}`);
-	const prof = PROFILES[profile];
+	const prof = profileOf(profile);
+	if (!prof) throw new Error(`Unknown profile ${profile}`);
 	const exclude = new Set((def.pool.exclude || []).map(lower));
 	const pools = Object.fromEntries(RARITIES.map((r) => [r, {
 		fish: fishFor(def.pool.fish, r, level),
@@ -335,7 +320,7 @@ function boxEV(box, { level = 0, profile = 'normal' } = {}) {
 		box: def.id,
 		slots: def.slots,
 		level,
-		profile,
+		profile: profileLabel(profile),
 		biome: def.pool.fish === 'highestUnlocked' ? F.biomeAt(level) : 'all live biomes',
 		slotTables: slots,
 		...acc,
@@ -343,15 +328,65 @@ function boxEV(box, { level = 0, profile = 'normal' } = {}) {
 	};
 }
 
+const contentsCache = new Map();
+/**
+ * Non-buff contents of one open of `box` at `level` by `profile` ('normal' | 'founder'), as the streak
+ * system books them: fish at sale value, parts at salvage, bait packs usable at `level` at their pack
+ * price. 'founder' is the PROPOSED Founder profile (founder.founderProfile(): its gacha stats and sell
+ * multiplier). Buffs are counted here but valued by the buffs system (counting rule).
+ */
+function boxContents(box, level, profile = 'normal') {
+	const usable = Object.values(bait.prices()).filter((q) => q.levelRequirement <= level).length;
+	const key = `${box}|${F.biomeAt(level)}|${usable}|${profile}`;
+	if (!contentsCache.has(key)) {
+		const ev = boxEV(box, { level, profile: profile === 'founder' ? proposedFounder() : 'normal' });
+		contentsCache.set(key, deepFreeze({
+			box, biome: ev.biome, profile,
+			fish: ev.fishValue, salvage: ev.salvage, baitUsable: ev.baitUsable, baitDeferred: ev.baitDeferred,
+			liquid: ev.fishValue + ev.salvage,
+			cashEquivalent: ev.fishValue + ev.salvage + ev.baitUsable,
+			items: { fish: ev.fish, parts: sumValues(ev.partsByRarity), baitPacks: sumValues(ev.baitPacks), buffs: sumValues(ev.buffs) },
+			buffs: { ...ev.buffs },
+		}));
+	}
+	return contentsCache.get(key);
+}
+
+/** The box of streak day `day` at `level`: what the streak system books (no XP: P-STREAK-NO-CASH-XP). */
+function streakValue(day, level, { profile = 'normal' } = {}) {
+	const box = boxForDay(day);
+	const v = boxContents(box, level, profile);
+	return { day, level, box, cashEquivalent: v.cashEquivalent, xp: 0, buffs: { ...v.buffs }, items: { ...v.items }, breakdown: { fish: v.fish, salvage: v.salvage, baitUsable: v.baitUsable, baitDeferred: v.baitDeferred, liquid: v.liquid } };
+}
+
+/** Average per claimed day over one ladder cycle (cycle-1 crates + 1 chest). */
+function perClaimValue(level, opts = {}) {
+	const n = PARAMS.ladder.cycle;
+	const vals = Array.from({ length: n }, (_, i) => streakValue(i + 1, level, opts));
+	const avg = (f) => vals.reduce((s, v) => s + f(v), 0) / n;
+	return {
+		cashEquivalent: avg((v) => v.cashEquivalent),
+		liquid: avg((v) => v.breakdown.liquid),
+		fish: avg((v) => v.breakdown.fish),
+		salvage: avg((v) => v.breakdown.salvage),
+		baitUsable: avg((v) => v.breakdown.baitUsable),
+		fishCount: avg((v) => v.items.fish),
+		parts: avg((v) => v.items.parts),
+		baitPacks: avg((v) => v.items.baitPacks),
+		buffs: avg((v) => v.items.buffs),
+		buffsByName: Object.fromEntries(BUFF_NAMES.map((b) => [b, avg((v) => v.buffs[b] || 0)])),
+	};
+}
+
 // ---------------------------------------------------------------------------------------------
-// Stage rates (the same castOutcome/hourly call as curve.js).
+// Stage rates (the same castOutcome/hourly call the core makes for the reference loop's base fishing).
 const rateCache = new Map();
-/** Cache key of a gear tier by content (the provisional and the rods path share tier numbers and keys). */
-const tierKey = (tier) => JSON.stringify([tier.qualities, tier.stats, tier.meanFish]);
+/** Cache key of a gear tier by content. */
+const tierKey = (tier) => JSON.stringify([tier.qualities, tier.stats, tier.meanFish, tier.multiChance ?? null]);
 function rates(biome, tier, overheadS) {
 	const key = `${biome}|${tierKey(tier)}|${overheadS}`;
 	if (!rateCache.has(key)) {
-		const o = F.castOutcome({ biome, qualities: tier.qualities, stats: tier.stats, multiChance: F.chanceForMean(tier.meanFish) });
+		const o = F.castOutcome({ biome, qualities: tier.qualities, stats: tier.stats, multiChance: tier.multiChance ?? F.chanceForMean(tier.meanFish) });
 		rateCache.set(key, { ...F.hourly(o, overheadS), valuePerFish: o.valuePerFish });
 	}
 	return rateCache.get(key);
@@ -363,62 +398,15 @@ function stageRates(level, { archetype = F.REFERENCE_ARCHETYPE, tier = F.tierAt(
 	return { biome: F.biomeAt(level), tier: tier.key, ...rates(F.biomeAt(level), tier, arch.overheadS) };
 }
 
-const buffHours = (name) => ITEMS.find((i) => i.type === 'buff' && i.name === name)?.hours || 0;
-
+/** Minutes a player needs for the gate at the Old Rod's cooldown and an overhead. */
+const gateMinutes = (overheadS) => (PARAMS.gate.successfulCasts * (F.COOLDOWN.fishMs / 1000 + overheadS)) / 60;
 /**
- * INTEGRATOR ENTRY POINT: expected value of the box earned on streak day `day` by a player at `level`.
- * cashEquivalent = fish sale value + salvage of parts + usable bait packs at their pack price + the
- * Double Cash buff's extra income over min(buff length, the archetype's daily play).
- * xp = the Double XP buff's extra XP over the same window (no direct streak XP).
+ * The gate's casts at the reference cadence as a fixed session ({ minutesPerDay, overheadS }). Kept for
+ * the gate table and buffs.js; the R2 adversary itself is F.MINIMUM_DAILY on the shared core, which plays
+ * each day until every system's daily minimum is met (here the streak gate and the daily quest).
  */
-function streakValue(day, level, { archetype = F.REFERENCE_ARCHETYPE, tier = F.tierAt(level), profile = 'normal' } = {}) {
-	const box = boxForDay(day);
-	const ev = boxEV(box, { level, profile });
-	const arch = archOf(archetype);
-	const r = rates(F.biomeAt(level), tier, arch.overheadS);
-	const playH = arch.minutesPerDay / 60;
-	const dxp = (ev.buffs['Double XP'] || 0) * Math.min(buffHours('Double XP'), playH);
-	const dcash = (ev.buffs['Double Cash'] || 0) * Math.min(buffHours('Double Cash'), playH);
-	const xp = dxp * r.xp;
-	const doubleCash = dcash * r.cash;
-	const cashEquivalent = ev.fishValue + ev.salvage + ev.baitUsable + doubleCash;
-	return {
-		day,
-		level,
-		box,
-		cashEquivalent,
-		xp,
-		items: {
-			box,
-			slots: ev.slots,
-			fish: ev.fish,
-			fishByRarity: ev.fishByRarity,
-			parts: ev.partsByRarity,
-			baitPacks: ev.baitPacks,
-			buffs: ev.buffs,
-		},
-		breakdown: { fish: ev.fishValue, salvage: ev.salvage, baitUsable: ev.baitUsable, baitDeferred: ev.baitDeferred, doubleCash, liquid: ev.liquid },
-	};
-}
-
-/** Average per claimed day over one ladder cycle (cycle-1 crates + 1 chest). */
-function perClaimValue(level, opts = {}) {
-	const n = PARAMS.ladder.cycle;
-	const vals = Array.from({ length: n }, (_, i) => streakValue(i + 1, level, opts));
-	const avg = (f) => vals.reduce((s, v) => s + f(v), 0) / n;
-	return {
-		cashEquivalent: avg((v) => v.cashEquivalent),
-		xp: avg((v) => v.xp),
-		liquid: avg((v) => v.breakdown.liquid),
-		fish: avg((v) => v.breakdown.fish),
-		salvage: avg((v) => v.breakdown.salvage),
-		baitUsable: avg((v) => v.breakdown.baitUsable),
-		doubleCash: avg((v) => v.breakdown.doubleCash),
-		fishCount: avg((v) => v.items.fish),
-		parts: avg((v) => Object.values(v.items.parts).reduce((a, b) => a + b, 0)),
-		baitPacks: avg((v) => Object.values(v.items.baitPacks).reduce((a, b) => a + b, 0)),
-		buffs: avg((v) => Object.values(v.items.buffs).reduce((a, b) => a + b, 0)),
-	};
+function minimumDailyArchetype() {
+	return { minutesPerDay: gateMinutes(F.DESIGN_OVERHEAD_S), overheadS: F.DESIGN_OVERHEAD_S };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -484,283 +472,31 @@ function attendanceTable() {
 		const r = row(p, rules);
 		return { p: round(p, 4), daysPerWeek: round(7 * p, 2), ...r, valuePerClaimVsDaily: r.valuePerClaimVsDaily / daily.valuePerClaimVsDaily };
 	});
-	return { referenceLevel: refLevel, crateLiquid: crate, chestLiquid: chest, proposed: mk(PARAMS), moreGrace: { rules: alt.grace, rows: mk(alt) } };
+	return { referenceLevel: refLevel, crateLiquid: crate, chestLiquid: chest, chestToCrate: chest / crate, proposed: mk(PARAMS), moreGrace: { rules: alt.grace, rows: mk(alt) } };
 }
 
 // ---------------------------------------------------------------------------------------------
-// Lifecycle: curve.js stepping (1-minute steps, highest biome, shared gear path bought after
-// F.PURCHASE.saveHours of stage income, F.DAILY.xpPerLevel x level per day). With `streak` on, each day
-// boundary also credits one streak day (every archetype plays daily and far exceeds the gate).
-// `gearPath` defaults to the shared path (F.gearPath()); baselineMatchesCurveJson() passes
-// F.PROVISIONAL_GEAR_PATH, the path curve.json was fitted on (curve.js 'provisional').
-// 5b.3: superseded by system() on the shared core (validateSystem() proves they agree); kept until the
-// old loops are retired.
-const svCache = new Map();
-function streakDayCached(day, L, tier, arch) {
-	const box = boxForDay(day);
-	const usable = Object.values(bait.prices()).filter((q) => q.levelRequirement <= L).length;
-	const k = `${box}|${F.biomeAt(L)}|${usable}|${tierKey(tier)}|${arch.minutesPerDay}|${arch.overheadS}`;
-	if (!svCache.has(k)) svCache.set(k, streakValue(day, L, { archetype: arch, tier }));
-	return svCache.get(k);
-}
-
-function lifecycle(archetype, { streak = true, dailyXp = true, maxDays = Infinity, maxLevel = F.LIFECYCLE.maxLevel, snapshots = [7, 30, 90], gearPath = F.gearPath() } = {}) {
-	const arch = archOf(archetype);
-	const path = gearPath;
-	const STEP_H = F.LIFECYCLE.stepH;
-	const dayH = arch.minutesPerDay / 60;
-	let xp = 0;
-	let h = 0;
-	let tierIdx = 0;
-	let saving = 0;
-	let day = 0;
-	const xpBy = { fishing: 0, daily: 0, streak: 0 };
-	const cashBy = { fishing: 0, streak: 0 };
-	const streakBy = { fish: 0, salvage: 0, baitUsable: 0, doubleCash: 0 };
-	const items = { crates: 0, chests: 0, fish: 0, parts: 0, baitPacks: 0, buffs: 0 };
-	const reached = {};
-	const at = {};
-	const snap = {};
-	const take = () => ({ level: F.levelForXp(xp), hours: round(h, 3), tier: path[tierIdx].key, xpBy: { ...xpBy }, cashBy: { ...cashBy }, streakBy: { ...streakBy }, items: { ...items } });
-	while (h < 2000) {
-		const L = F.levelForXp(xp);
-		const next = path[tierIdx + 1];
-		const cur = path[tierIdx];
-		const r = rates(F.biomeAt(L), cur, arch.overheadS);
-		if (next && L >= next.level) {
-			saving += r.cash * STEP_H;
-			if (saving >= r.cash * F.PURCHASE.saveHours) {
-				tierIdx++;
-				saving = 0;
-			}
-		}
-		xp += r.xp * STEP_H;
-		xpBy.fishing += r.xp * STEP_H;
-		cashBy.fishing += r.cash * STEP_H;
-		const before = h;
-		h += STEP_H;
-		if (Math.floor(h / dayH) !== Math.floor(before / dayH)) {
-			day++;
-			if (dailyXp) {
-				xp += F.DAILY.xpPerLevel * L;
-				xpBy.daily += F.DAILY.xpPerLevel * L;
-			}
-			if (streak) {
-				const v = streakDayCached(day, L, cur, arch);
-				xp += v.xp;
-				xpBy.streak += v.xp;
-				cashBy.streak += v.cashEquivalent;
-				for (const k of Object.keys(streakBy)) streakBy[k] += v.breakdown[k];
-				if (v.box === PARAMS.ladder.milestoneBox) items.chests++;
-				else items.crates++;
-				items.fish += v.items.fish;
-				items.parts += Object.values(v.items.parts).reduce((a, b) => a + b, 0);
-				items.baitPacks += Object.values(v.items.baitPacks).reduce((a, b) => a + b, 0);
-				items.buffs += Object.values(v.items.buffs).reduce((a, b) => a + b, 0);
-			}
-			if (snapshots.includes(day)) snap[day] = take();
-		}
-		const L2 = F.levelForXp(xp);
-		for (const T of F.LIFECYCLE.milestones) {
-			if (!reached[T] && L2 >= T) {
-				reached[T] = { hours: +h.toFixed(2), day: Math.ceil(h / dayH) };
-				at[T] = take();
-			}
-		}
-		if (L2 >= maxLevel || day >= maxDays) break;
-	}
-	return { archetype: arch, reached, at, snapshots: snap, final: take(), days: day };
-}
-
-// ---------------------------------------------------------------------------------------------
-// Value per archetype vs fishing income.
-let avCache = null;
-function archetypeValue() {
-	if (avCache) return avCache;
-	const out = {};
-	for (const name of Object.keys(F.ARCHETYPES)) {
-		const arch = F.ARCHETYPES[name];
-		const lc = lifecycle(name, { maxLevel: Infinity, maxDays: 90 });
-		const row = { minutesPerDay: arch.minutesPerDay, periods: {} };
-		for (const d of [7, 30, 90]) {
-			const s = lc.snapshots[d];
-			if (!s) continue;
-			row.periods[d] = {
-				level: s.level,
-				fishingIncome: s.cashBy.fishing,
-				streakCashEquivalent: s.cashBy.streak,
-				streakShareOfFishing: s.cashBy.streak / s.cashBy.fishing,
-				streakPerDay: s.cashBy.streak / d,
-				fishingPerDay: s.cashBy.fishing / d,
-				streakXpShare: s.xpBy.streak / (s.xpBy.fishing + s.xpBy.daily + s.xpBy.streak),
-				streakComponents: Object.fromEntries(Object.entries(s.streakBy).map(([k, v]) => [k, v / s.cashBy.streak])),
-				items: s.items,
-			};
-		}
-		// Per day at fixed levels: the start of each biome (level bands every archetype passes through).
-		row.byLevel = F.LIVE_BIOMES.map((b) => {
-			const L = F.BIOME_LEVEL[b];
-			const r = stageRates(L, { archetype: arch, tier: F.typicalTier(b) });
-			const v = perClaimValue(L, { archetype: arch, tier: F.typicalTier(b) });
-			const fishingPerDay = r.cash * (arch.minutesPerDay / 60);
-			return { biome: b, level: L, tier: F.typicalTier(b).key, streakPerDay: v.cashEquivalent, fishingPerDay, share: v.cashEquivalent / fishingPerDay, minutesOfOwnPlay: (v.cashEquivalent / r.cash) * 60 };
-		});
-		out[name] = row;
-	}
-	avCache = out;
-	return out;
-}
-
-// ---------------------------------------------------------------------------------------------
-// R2: XP-source decomposition and adversarial scenarios.
-function decomposition(lc) {
-	return Object.fromEntries(Object.keys(F.TARGET_WINDOWS).map(Number).filter((T) => lc.at[T]).map((T) => {
-		const s = lc.at[T];
-		const total = s.xpBy.fishing + s.xpBy.daily + s.xpBy.streak;
-		return [T, {
-			hours: lc.reached[T].hours,
-			day: lc.reached[T].day,
-			fishingXp: Math.round(s.xpBy.fishing),
-			questXpNonDaily: 0,
-			dailyXpProvisional: Math.round(s.xpBy.daily),
-			streakXp: Math.round(s.xpBy.streak),
-			otherXp: 0,
-			share: { fishing: s.xpBy.fishing / total, questNonDaily: 0, dailyProvisional: s.xpBy.daily / total, streak: s.xpBy.streak / total, other: 0 },
-		}];
-	}));
-}
-
-/** The minimum-daily player: exactly the gate's casts per day, at the reference cadence, Old Rod speed. */
-function minimumDailyArchetype() {
-	const overheadS = F.DESIGN_OVERHEAD_S;
-	return { minutesPerDay: (PARAMS.gate.successfulCasts * (F.COOLDOWN.fishMs / 1000 + overheadS)) / 60, overheadS };
-}
-
-/**
- * The R2 evaluation for one lifecycle model: `run(archetype, opts)` returns lifecycle()'s shape (lifecycle
- * itself, or coreRun() on the shared core); `minArch` is the minimum-daily player it runs.
- */
-function r2With(run, { minArch = minimumDailyArchetype() } = {}) {
-	const archetypes = {};
-	for (const name of Object.keys(F.ARCHETYPES)) {
-		const on = run(name, { streak: true });
-		const off = run(name, { streak: false });
-		archetypes[name] = {
-			decomposition: decomposition(on),
-			hoursWithoutStreak: Object.fromEntries(Object.entries(off.reached).map(([k, v]) => [k, v.hours])),
-			hoursWithStreak: Object.fromEntries(Object.entries(on.reached).map(([k, v]) => [k, v.hours])),
-			maxHoursDelta: Math.max(...Object.keys(off.reached).map((k) => Math.abs(on.reached[k].hours - off.reached[k].hours) / off.reached[k].hours)),
-		};
-	}
-	// Minimum-daily vs casual: levels per calendar week, XP per active hour and per calendar day.
-	// Calendar checkpoints: 1, 4, 13, 26 and 52 weeks.
-	const checkDays = [1, 4, 13, 26, 52].map((w) => w * PARAMS.ladder.cycle);
-	const horizon = checkDays[checkDays.length - 1];
-	const scenario = (dailyXp) => {
-		const snaps = (arch) => run(arch, { dailyXp, maxDays: horizon, maxLevel: Infinity, snapshots: checkDays }).snapshots;
-		const ms = snaps(minArch);
-		const cs = snaps('casual');
-		const rows = checkDays.map((d) => {
-			const m = ms[d];
-			const c = cs[d];
-			const mXp = m.xpBy.fishing + m.xpBy.daily + m.xpBy.streak;
-			const cXp = c.xpBy.fishing + c.xpBy.daily + c.xpBy.streak;
-			return {
-				day: d,
-				minimumDaily: { level: m.level, hours: m.hours, xpPerActiveHour: mXp / m.hours, xpPerDay: mXp / d, streakXpShare: m.xpBy.streak / mXp, streakCashPerDay: m.cashBy.streak / d, streakCashPerActiveHour: m.cashBy.streak / m.hours, streakShareOfIncome: m.cashBy.streak / (m.cashBy.fishing + m.cashBy.streak) },
-				casual: { level: c.level, hours: c.hours, xpPerActiveHour: cXp / c.hours, xpPerDay: cXp / d, streakXpShare: c.xpBy.streak / cXp, streakCashPerDay: c.cashBy.streak / d, streakCashPerActiveHour: c.cashBy.streak / c.hours, streakShareOfIncome: c.cashBy.streak / (c.cashBy.fishing + c.cashBy.streak) },
-				minimumDailyLeadsInLevel: m.level > c.level,
-			};
-		});
-		return { rows, leadsAnywhere: rows.some((r) => r.minimumDailyLeadsInLevel) };
-	};
-	const minimumDaily = {
-		archetype: minArch,
-		gateCasts: PARAMS.gate.successfulCasts,
-		streakOnly: scenario(false),
-		withProvisionalDaily: scenario(true),
-	};
-	minimumDaily.verdict = !minimumDaily.streakOnly.leadsAnywhere && !minimumDaily.withProvisionalDaily.leadsAnywhere
-		? 'PASS: the minimum-daily player never leads a casual player in level on any calendar checkpoint. The streak adds no direct XP, so its only XP (Double XP buffs) scales with real play.'
-		: 'FAIL: the minimum-daily player leads a casual player in level; add a guardrail.';
-	// No-miss grinder: every streak reward on top of grinding.
-	const g = archetypes.grinder;
-	const noMissGrinder = {
-		hoursWithoutStreak: g.hoursWithoutStreak,
-		hoursWithStreak: g.hoursWithStreak,
-		maxHoursDelta: g.maxHoursDelta,
-		regularStillInWindows: Object.entries(F.TARGET_WINDOWS).every(([L, [lo, hi]]) => archetypes.regular.hoursWithStreak[L] >= lo && archetypes.regular.hoursWithStreak[L] <= hi),
-	};
-	noMissGrinder.verdict = noMissGrinder.maxHoursDelta <= PARAMS.targets.grinderHoursDeltaMax && noMissGrinder.regularStillInWindows
-		? `PASS: stacking every streak reward on grinding moves the grinder's milestones by at most ${(100 * noMissGrinder.maxHoursDelta).toFixed(2)}%, and the regular player stays inside every approved window.`
-		: 'FAIL: the streak moves milestones materially; cap the buff source.';
-	return { archetypes, minimumDaily, noMissGrinder };
-}
-
-let r2Cache = null;
-/** R2 on this module's lifecycle() (validateSystem() re-runs the same evaluation on the shared core). */
-function r2() {
-	if (!r2Cache) r2Cache = r2With(lifecycle);
-	return r2Cache;
-}
-
-// ---------------------------------------------------------------------------------------------
-// Framework 5b.3: the streak SYSTEM on the shared lifecycle core (lifecycle.js). The integrator
-// (integrate.js) runs system(); validateSystem() proves it reproduces lifecycle() and r2().
+// The streak SYSTEM on the shared lifecycle core (lifecycle.js); integrate.js runs it in the reference loop.
 const SYSTEM_NAME = 'streak';
 /** The streak's only ledger entry: cash source 'streak' (box contents without buffs). No XP, no spend. */
 const CASH_SOURCE = 'streak';
-/** Validation only: the ledger source legacyBuffValue() writes (lifecycle()'s buff valuation). */
-const LEGACY_BUFF_SOURCE = 'streakBuffsLegacy';
+// The buffs system's ledger sources (buffs.js BUFF_SOURCE / LUCKY_SOURCE), read for attribution only.
+const BUFF_XP_SOURCE = 'buff';
+const LUCKY_SOURCE = 'luckyDraw';
 const CREDIT_MODES = ['gate', 'dayEnd'];
 const BAIT_VALUES = ['cash', 'items'];
-// Float tolerance on the gate (3 steps of 60/9 casts are 20 casts, up to rounding).
+// Float tolerance on the gate (whole steps of casts reach the gate up to rounding).
 const GATE_EPS = 1e-9;
-const clone = (o) => JSON.parse(JSON.stringify(o));
-const sumValues = (o) => Object.values(o).reduce((a, b) => a + b, 0);
-
-let founderSellCache = null;
-/** Sell multiplier of the proposed Founder profile (founder.founderProfile(); pure, computed once). */
-function founderSell() {
-	if (founderSellCache === null) founderSellCache = require('./founder').founderProfile().multipliers.sell;
-	return founderSellCache;
-}
-
-const contentsCache = new Map();
-/**
- * Non-buff contents of one open of `box` at `level` by `profile` ('normal' | 'founder'), as the streak
- * system values them: fish at sale value, parts at salvage, bait packs usable at `level` at their pack
- * price (streakValue()'s breakdown without its Double Cash term). Founder box fish sell at the proposed
- * Founder sell multiplier (founder.founderProfile(); boxEV applies today's profile's). Buffs are counted
- * here but valued by the buffs system (counting rule).
- */
-function boxContents(box, level, profile = 'normal') {
-	const usable = Object.values(bait.prices()).filter((q) => q.levelRequirement <= level).length;
-	const key = `${box}|${F.biomeAt(level)}|${usable}|${profile}`;
-	if (!contentsCache.has(key)) {
-		const ev = boxEV(box, { level, profile });
-		const fish = profile === 'founder' ? ev.fishValue * (founderSell() / PROFILES.founder.multipliers.sell) : ev.fishValue;
-		contentsCache.set(key, deepFreeze({
-			box, biome: ev.biome, profile,
-			fish, salvage: ev.salvage, baitUsable: ev.baitUsable, baitDeferred: ev.baitDeferred,
-			liquid: fish + ev.salvage,
-			cashEquivalent: fish + ev.salvage + ev.baitUsable,
-			items: { fish: ev.fish, parts: sumValues(ev.partsByRarity), baitPacks: sumValues(ev.baitPacks), buffs: sumValues(ev.buffs) },
-			buffs: { ...ev.buffs },
-		}));
-	}
-	return contentsCache.get(key);
-}
 
 /**
  * The streak SYSTEM (lifecycle.js hooks). Per-run state lives in state.sys.streak only.
  *   onDayEnd     credit 'dayEnd' (default): when today's casts (state.castsToday) reached the play gate
  *                (PARAMS.gate.successfulCasts), the streak day is credited (advanceStreak) and its box
- *                granted at day end, valued at the level the day's last step started at (the level the
- *                daily XP uses; lifecycle()'s convention). The engine credits on the qualifying cast; the
- *                model's player opens the box after the session. An attended day below the gate is a miss.
+ *                granted at day end, valued at the level the day's last step started at. The engine credits
+ *                on the qualifying cast; the model's player opens the box after the session. An attended
+ *                day below the gate is a miss.
  *   onCasts      credit 'gate' (option; the engine's timing): the step whose casts reach the gate credits
- *                the day and grants the box at once, valued at that step's level.
+ *                the day and grants the box at once, valued at that step's level (creditTiming()).
  *   onMissedDay  a calendar day not attended (daysPerWeek < 7) is a miss.
  *                Misses are settled by the engine rule when the next streak day is credited (advanceStreak
  *                -> applyGap): grace tokens first, then PARAMS.decay.perUncoveredMiss streak days per
@@ -768,23 +504,19 @@ function boxContents(box, level, profile = 'normal') {
  *   grant        a Streak Crate, or the Streak Chest on every PARAMS.ladder.cycle-th streak day (+ a grace
  *                token): its NON-BUFF contents (boxContents) as cash source 'streak', and
  *                emit('box', { name, count: 1, level, source: 'streak', streakDay, profile }) so the buffs
- *                system values its buffs (counting rule). level = the gate level when the crediting step
- *                started. No direct XP (decision S4), no purchases, no spend.
- *   sessionDone  today's casts >= the play gate (the R2 minimum-daily player stops there).
- * Profile: state.profile 'founder' (set by the founder system) values the box with the Founder gacha
- * stats and the proposed Founder sell multiplier; the gate is the same for every profile (casts, not fish).
+ *                system values its buffs (counting rule). No direct XP, no purchases, no spend.
+ *   sessionDone  today's casts >= the play gate (the R2 minimum-daily player stops there at the earliest).
+ * Profile: state.profile 'founder' (set by the founder system) values the box with the PROPOSED Founder
+ * profile (gacha stats, sell multiplier); the gate is the same for every profile (casts, not fish).
  * Successful casts: every modelled cast lands at least one draw; a cast whose every draw is an item
  * (P ~ itemPerDraw, under 0.1%) is counted as successful (the gate is met at most one step later).
  * @param {object} opts { credit: 'dayEnd' (default) | 'gate', baitValue: 'cash' (default: usable packs
- *   at pack price, streakValue()'s cash equivalent) | 'items' (packs tallied only; cash = fish + salvage),
- *   requireGate: true (default) | false (validation replay only: lifecycle()'s rule, which credited every
- *   played day at its end without checking the gate; credit 'dayEnd' only) }
+ *   at pack price) | 'items' (packs tallied only; cash = fish + salvage) }
  */
 function system(opts = {}) {
-	const { credit = 'dayEnd', baitValue = 'cash', requireGate = true } = opts;
+	const { credit = 'dayEnd', baitValue = 'cash' } = opts;
 	if (!CREDIT_MODES.includes(credit)) throw new Error(`Unknown streak credit mode ${credit}`);
 	if (!BAIT_VALUES.includes(baitValue)) throw new Error(`Unknown streak baitValue ${baitValue}`);
-	if (!requireGate && credit !== 'dayEnd') throw new Error('requireGate: false replays lifecycle()\'s day-end credit only');
 	const gateMet = (state) => state.castsToday >= PARAMS.gate.successfulCasts - GATE_EPS;
 	const own = (state) => state.sys[SYSTEM_NAME];
 	function grant(state, ctx) {
@@ -817,7 +549,7 @@ function system(opts = {}) {
 		name: SYSTEM_NAME,
 		init(state) {
 			state.sys[SYSTEM_NAME] = {
-				credit, baitValue, requireGate, streak: defaultState(),
+				credit, baitValue, streak: defaultState(),
 				credits: 0, crates: 0, chests: 0, graceUsed: 0, decays: 0, daysDecayed: 0, resets: 0, badges: [],
 				missedDays: 0, belowGateDays: 0, last: null,
 				value: { fish: 0, salvage: 0, baitUsable: 0, baitDeferred: 0, cash: 0 },
@@ -829,7 +561,7 @@ function system(opts = {}) {
 			if (credit === 'gate' && gateMet(state)) grant(state, ctx);
 		},
 		onDayEnd(state, ctx) {
-			if (credit === 'dayEnd' && (!requireGate || gateMet(state))) grant(state, ctx);
+			if (credit === 'dayEnd' && gateMet(state)) grant(state, ctx);
 			if (own(state).streak.lastDay !== state.day) own(state).belowGateDays++;
 		},
 		onMissedDay(state) {
@@ -841,297 +573,280 @@ function system(opts = {}) {
 	};
 }
 
-/**
- * Validation only: values each streak box's Double XP / Double Cash exactly as lifecycle() did
- * (streakValue(): buff odds x min(buff length, the archetype's daily play) x the stage rates of the tier
- * the step fished), from the 'box' events, into ledger source LEGACY_BUFF_SOURCE. The integrated economy
- * values buffs in the buffs system instead (counting rule): never run both. `archetype` overrides the
- * play time the buffs are valued over (the minimum-daily session has no minutesPerDay).
- */
-function legacyBuffValue({ archetype = null } = {}) {
-	const NAME = 'streakLegacyBuffs';
+// ---------------------------------------------------------------------------------------------
+// Integrated runs. The reference loop of integrate.js (rods, world, quests, streak, buffs) with an
+// observational recorder appended last: it snapshots the ledgers and the streak/buffs figures at each
+// milestone (on 'levelUp', the moment the core records the milestone) and at calendar checkpoints (day
+// end). It writes nothing, so the run is integrate.run()'s run (recorderParity() checks it every report).
+const RECORDER = 'streakRecorder';
+function recorder({ checkpoints = [] } = {}) {
+	const snap = (state) => ({
+		hours: state.h,
+		day: state.day + 1,
+		ledger: clone(state.ledger),
+		streak: state.sys[SYSTEM_NAME] ? clone(state.sys[SYSTEM_NAME]) : null,
+		buffs: state.sys.buffs ? clone({ received: state.sys.buffs.received, receivedBySource: state.sys.buffs.receivedBySource, valueBySource: state.sys.buffs.valueBySource }) : null,
+	});
 	return {
-		name: NAME,
+		name: RECORDER,
 		init(state) {
-			state.sys[NAME] = { tier: state.equippedTier };
-		},
-		beforeStep(state, ctx, stepRates) {
-			if (stepRates.tier !== undefined) state.sys[NAME].tier = stepRates.tier;
-		},
-		on(event, payload, state, ctx) {
-			if (event !== 'box' || payload.source !== SYSTEM_NAME) return;
-			const v = streakDayCached(payload.streakDay, payload.level, ctx.path[state.sys[NAME].tier], archetype || ctx.arch);
-			ctx.addXp(LEGACY_BUFF_SOURCE, v.xp);
-			ctx.addCash(LEGACY_BUFF_SOURCE, v.breakdown.doubleCash);
-		},
-	};
-}
-
-/**
- * Validation only (runs last): ledger + streak-state snapshots in lifecycle()'s conventions. A milestone
- * reached on a day's final step is snapshotted after that day's day-end credits (lifecycle() credits the
- * day inside that step, before its milestone check; the core records the milestone first); calendar
- * `checkpoints` are snapshotted at their day end.
- */
-function validationProbe({ checkpoints = [] } = {}) {
-	const NAME = 'streakProbe';
-	const snap = (state) => ({ hours: +state.h.toFixed(4), ledger: clone(state.ledger), streak: state.sys[SYSTEM_NAME] ? clone(state.sys[SYSTEM_NAME]) : null });
-	return {
-		name: NAME,
-		init(state) {
-			state.sys[NAME] = { milestones: {}, days: {} };
+			state.sys[RECORDER] = { milestones: {}, days: {} };
 		},
 		on(event, payload, state) {
 			if (event !== 'levelUp' || payload.kind !== 'real') return;
-			const p = state.sys[NAME];
-			for (const T of Object.keys(state.milestones)) if (!(T in p.milestones)) p.milestones[T] = snap(state);
+			const r = state.sys[RECORDER];
+			for (const T of Object.keys(state.milestones)) if (!(T in r.milestones)) r.milestones[T] = snap(state);
 		},
-		onDayEnd(state, ctx) {
-			const p = state.sys[NAME];
-			// A fixed session cut short by the stop level has no day end in lifecycle().
-			const ranToClock = ctx.arch.session !== 'fixed' || Math.floor(state.h / (ctx.arch.minutesPerDay / 60)) !== state.playDay;
-			if (ranToClock) for (const [T, m] of Object.entries(p.milestones)) if (m.hours === +state.h.toFixed(4)) p.milestones[T] = snap(state);
-			if (checkpoints.includes(state.day + 1)) p.days[state.day + 1] = { level: F.levelForXp(state.xp, ctx.curve), ...snap(state) };
+		onDayEnd(state) {
+			if (checkpoints.includes(state.day + 1)) state.sys[RECORDER].days[state.day + 1] = snap(state);
 		},
 	};
 }
 
-/** A probe snapshot in lifecycle()'s take() shape. */
-function lifecycleView(x, level) {
-	const L = x.ledger;
-	const st = x.streak || { value: { fish: 0, salvage: 0, baitUsable: 0 }, crates: 0, chests: 0, items: { fish: 0, parts: 0, baitPacks: 0, buffs: 0 } };
-	const doubleCash = L.cash[LEGACY_BUFF_SOURCE] || 0;
-	return {
-		level, hours: round(x.hours, 3),
-		xpBy: { fishing: L.xp.fishing || 0, daily: L.xp.daily || 0, streak: L.xp[LEGACY_BUFF_SOURCE] || 0 },
-		cashBy: { fishing: L.cash.fishing || 0, streak: (L.cash[CASH_SOURCE] || 0) + doubleCash },
-		streakBy: { fish: st.value.fish, salvage: st.value.salvage, baitUsable: st.value.baitUsable, doubleCash },
-		items: { crates: st.crates, chests: st.chests, ...st.items },
-	};
+const ARCHETYPE_NAMES = Object.keys(F.ARCHETYPES);
+const MINIMUM_DAILY = F.MINIMUM_DAILY.name;
+/** Value periods (calendar days) and the R2 calendar checkpoints (weeks 1, 4, 13, 26, 52). */
+const PERIODS = [7, 30, 90];
+const R2_DAYS = [1, 4, 13, 26, 52].map((w) => 7 * w);
+const R2_LEVELS = Object.keys(F.TARGET_WINDOWS).map(Number);
+const CHECKPOINTS = [...new Set([...PERIODS, ...R2_DAYS])].sort((a, b) => a - b);
+// Calendar horizon of a default run: a year for the casual and minimum-daily players (the R2 calendar
+// comparison); for the others the value periods, which already contain their last milestone
+// (checks(): 'milestones-covered').
+const VALUE_HORIZON_DAYS = 120;
+const horizon = (a) => (a === 'casual' || a === MINIMUM_DAILY ? R2_DAYS[R2_DAYS.length - 1] : VALUE_HORIZON_DAYS);
+
+const runCache = new Map();
+/**
+ * One integrated lifecycle: integrate.js's reference systems (I.REFERENCE minus `exclude`, each built by
+ * I.systemOf with `systemOpts[name]`) plus the recorder, on LC.simulate with the gate on the real level
+ * (the reference loop; the Founder variant goes through integrate.run directly). Cached.
+ */
+function integratedRun(archetype, { exclude = [], systemOpts = {}, days = horizon(archetype), stopAtLevel = null, checkpoints = CHECKPOINTS } = {}) {
+	const key = JSON.stringify([archetype, exclude, systemOpts, days, stopAtLevel, checkpoints]);
+	if (!runCache.has(key)) {
+		const names = I.REFERENCE.filter((n) => !exclude.includes(n));
+		const systems = [...names.map((n) => I.systemOf(n, systemOpts[n] || {})), recorder({ checkpoints })];
+		const result = LC.simulate({ archetype, systems, days, stopAtLevel, checkpoints, gate: 'real' });
+		runCache.set(key, { ...result, systems: names, exclude, ...F.stamp() });
+	}
+	return runCache.get(key);
 }
 
-/**
- * lifecycle()'s model on the shared core, returned in lifecycle()'s shape (reached / at / snapshots):
- * LC.provisionalRods() + LC.provisionalDaily() (lifecycle()'s gear purchases and daily XP), this system
- * and legacyBuffValue() (lifecycle()'s buff valuation). Same options as lifecycle(), plus `systemOpts`
- * (this system's options).
- */
-function coreRun(archetype, { streak = true, dailyXp = true, maxDays = Infinity, maxLevel = F.LIFECYCLE.maxLevel, snapshots = [7, 30, 90], systemOpts = {}, gearPath } = {}) {
-	const minimumDaily = archetype === F.MINIMUM_DAILY.name || archetype?.session === 'minimumDaily';
-	const result = LC.simulate({
-		archetype,
-		gearPath,
-		days: Number.isFinite(maxDays) ? maxDays : 3650,
-		stopAtLevel: Number.isFinite(maxLevel) ? maxLevel : null,
-		systems: [
-			LC.provisionalRods(),
-			dailyXp ? LC.provisionalDaily() : null,
-			streak ? legacyBuffValue({ archetype: minimumDaily ? minimumDailyArchetype() : null }) : null,
-			streak ? system(systemOpts) : null,
-			validationProbe({ checkpoints: snapshots }),
-		],
-	});
-	const p = result.sys.streakProbe;
-	const milestones = Object.keys(result.milestones).filter((T) => p.milestones[T]);
-	return {
-		archetype: result.archetype,
-		reached: Object.fromEntries(milestones.map((T) => [T, { hours: +result.milestones[T].hours.toFixed(2), day: result.milestones[T].day, coreHours: result.milestones[T].hours }])),
-		at: Object.fromEntries(milestones.map((T) => [T, lifecycleView(p.milestones[T], Number(T))])),
-		snapshots: Object.fromEntries(Object.entries(p.days).map(([d, x]) => [d, lifecycleView(x, x.level)])),
-		days: result.days,
-		result,
-	};
-}
+// R2 groups of XP ledger sources (as r2.js); the buffs system's XP is split into the streak's share
+// (Double XP from streak boxes: its valueBySource.streak) and the rest.
+const XP_GROUPS = { fishing: ['fishing'], quests: ['story', 'repeatable'], daily: ['daily', 'weekly'], buffs: [BUFF_XP_SOURCE] };
+const pick = (o, keys) => keys.reduce((a, k) => a + (o[k] || 0), 0);
 
 /**
- * Relative difference |a - b| / max(|a|, |b|) (bounded: a figure that is 0 on one side reads 1, not
- * infinity); float noise (different summation order) counts as equal.
+ * The streak's figures in a recorder snapshot (or a run's final state): XP by group, cash by source,
+ * the streak's own contents, and the buffs system's value of the streak's buffs. Lucky Draw value is
+ * attributed pro rata to the Lucky Draw units received (the buffs system does not split it by source).
  */
-const relDiff = (a, b) => {
-	const d = Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1e-12);
-	return d < 1e-9 ? 0 : d;
+function figures(snap) {
+	const { xp, cash } = snap.ledger;
+	const st = snap.streak;
+	const b = snap.buffs;
+	const own = b?.valueBySource?.[SYSTEM_NAME] || { doubleXpXp: 0, doubleCash: 0 };
+	const ldAll = b?.received?.['Lucky Draw'] || 0;
+	const ldOwn = b?.receivedBySource?.[SYSTEM_NAME]?.['Lucky Draw'] || 0;
+	const xpTotal = sumValues(xp);
+	const nonBuff = cash[CASH_SOURCE] || 0;
+	const fishing = cash.fishing || 0;
+	return {
+		xpTotal,
+		xpBy: {
+			fishing: pick(xp, XP_GROUPS.fishing), quests: pick(xp, XP_GROUPS.quests), daily: pick(xp, XP_GROUPS.daily),
+			streak: own.doubleXpXp, buffsOther: pick(xp, XP_GROUPS.buffs) - own.doubleXpXp,
+			other: xpTotal - pick(xp, Object.values(XP_GROUPS).flat()),
+		},
+		cashBy: { fishing, streak: nonBuff + own.doubleCash, other: sumValues(cash) - fishing - nonBuff - own.doubleCash },
+		streakBy: {
+			fish: st?.value.fish || 0, salvage: st?.value.salvage || 0, baitUsable: st?.value.baitUsable || 0, baitDeferred: st?.value.baitDeferred || 0,
+			nonBuff, doubleCash: own.doubleCash, luckyDrawAttributed: ldAll > 0 ? ((cash[LUCKY_SOURCE] || 0) * ldOwn) / ldAll : 0,
+		},
+		items: { crates: st?.crates || 0, chests: st?.chests || 0, ...(st?.items || { fish: 0, parts: 0, baitPacks: 0, buffs: 0 }) },
+		credits: st?.credits || 0,
+	};
+}
+const finalSnap = (run) => ({ hours: run.hours, day: run.days, ledger: run.ledger, streak: run.sys[SYSTEM_NAME] || null, buffs: run.sys.buffs || null });
+const dayRow = (run, d) => {
+	const t = run.timeline.find((x) => x.day === d);
+	const s = run.sys[RECORDER].days[d];
+	return t && s ? { level: t.level, hours: s.hours, ...figures(s) } : null;
 };
-const stepOf = (hours) => Math.round(hours / F.LIFECYCLE.stepH);
+const milestoneHours = (run) => Object.fromEntries(Object.entries(run.milestones).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, v.hours]));
 
 /**
- * One archetype: coreRun() vs lifecycle(). Milestone hours step-exact (lifecycle() reports hours rounded
- * to 0.01 h, a third of a step at most). With `ledgers`, every ledger/breakdown/item total at each
- * milestone (lifecycle()'s snapshot convention, see validationProbe()); always, the day-end totals at
- * the calendar checkpoints both runs reach.
+ * integratedRun() in the design-stage lifecycle() shape (buffs.js reads it): reached / at / snapshots /
+ * final with xpBy, cashBy, streakBy and items (figures()). opts: streak (false: exclude the streak),
+ * dailyXp (false: exclude the quests system), maxDays, maxLevel, snapshots (calendar days).
  */
-function compareArchetype(archetype, systemOpts) {
-	const old = lifecycle(archetype, { streak: true });
-	const core = coreRun(archetype, { systemOpts });
-	const out = { maxRel: 0, worst: null, milestonesExact: 0, milestonesCompared: 0 };
-	const note = (key, a, b) => {
-		const d = relDiff(a, b);
-		if (d > out.maxRel) {
-			out.maxRel = d;
-			out.worst = key;
-		}
-		return d;
+function lifecycle(archetype, { streak = true, dailyXp = true, maxDays = Infinity, maxLevel = F.LIFECYCLE.maxLevel, snapshots = PERIODS } = {}) {
+	const exclude = [...(streak ? [] : [SYSTEM_NAME]), ...(dailyXp ? [] : ['quests'])];
+	const stopAtLevel = Number.isFinite(maxLevel) ? maxLevel : null;
+	const days = Number.isFinite(maxDays) ? maxDays : stopAtLevel === null ? horizon(archetype) : 3650;
+	const run = integratedRun(archetype, { exclude, days, stopAtLevel, checkpoints: snapshots });
+	const rec = run.sys[RECORDER];
+	const levels = Object.keys(run.milestones).filter((T) => /^\d+$/.test(T) && rec.milestones[T]);
+	const view = (s, level) => ({ level, hours: round(s.hours, 3), ...figures(s) });
+	return {
+		archetype: run.archetype,
+		model: I.REFERENCE_NOTE,
+		systems: run.systems,
+		reached: Object.fromEntries(levels.map((T) => [T, { hours: run.milestones[T].hours, day: run.milestones[T].day }])),
+		at: Object.fromEntries(levels.map((T) => [T, view(rec.milestones[T], Number(T))])),
+		snapshots: Object.fromEntries(Object.keys(rec.days).map((d) => [d, view(rec.days[d], run.timeline.find((t) => t.day === Number(d))?.level)])),
+		final: view(finalSnap(run), run.final.level),
+		days: run.days,
+		frameworkVersion: run.frameworkVersion,
+		sharedDigest: run.sharedDigest,
 	};
-	const totals = (label, o, c) => {
-		let max = 0;
-		const rows = [
-			['xp.fishing', c.xpBy.fishing, o.xpBy.fishing], ['xp.daily', c.xpBy.daily, o.xpBy.daily], ['xp.streakDoubleXp', c.xpBy.streak, o.xpBy.streak],
-			['cash.fishing', c.cashBy.fishing, o.cashBy.fishing], ['cash.streak', c.cashBy.streak, o.cashBy.streak],
-			...['fish', 'salvage', 'baitUsable', 'doubleCash'].map((k) => [`streak.${k}`, c.streakBy[k], o.streakBy[k]]),
-			...Object.keys(o.items).map((k) => [`items.${k}`, c.items[k], o.items[k]]),
-		];
-		for (const [k, a, b] of rows) max = Math.max(max, note(`${label} ${k}`, a, b));
-		return round(max, 6);
-	};
-	const milestones = {};
-	for (const T of F.LIFECYCLE.milestones) {
-		const o = old.reached[T];
-		const c = core.reached[T];
-		if (!o || !c) {
-			milestones[T] = { old: o ? o.hours : null, core: c ? c.coreHours : null };
-			continue;
-		}
-		const [kOld, kCore] = [stepOf(o.hours), stepOf(c.coreHours)];
-		out.milestonesCompared++;
-		if (kOld === kCore) out.milestonesExact++;
-		milestones[T] = { old: o.hours, core: c.coreHours, steps: kCore - kOld, rel: round(note(`L${T} hours`, kCore, kOld), 6) };
-		// Milestone ledgers are compared for day-end credit (a gate credit lands inside the day, before or
-		// after the level, so its milestone snapshot differs by a whole box by construction).
-		if ((systemOpts.credit || 'dayEnd') === 'dayEnd') milestones[T].ledgerMaxRel = totals(`L${T}`, old.at[T], core.at[T]);
-	}
-	const days = {};
-	for (const d of Object.keys(old.snapshots)) {
-		if (core.snapshots[d]) days[d] = { level: { old: old.snapshots[d].level, core: core.snapshots[d].level }, ledgerMaxRel: totals(`day ${d}`, old.snapshots[d], core.snapshots[d]) };
-	}
-	return { ...out, row: { milestones, days } };
 }
 
-/** Deep comparison of two R2 results: numeric leaves (relative), booleans and strings (equality). */
-function compareR2(a, b, { skip = ['day', 'archetype'] } = {}) {
-	const out = { maxRel: 0, worst: null, mismatches: [] };
-	const walk = (x, y, path) => {
-		if (typeof x === 'number' && typeof y === 'number') {
-			const d = relDiff(x, y);
-			if (d > out.maxRel) {
-				out.maxRel = d;
-				out.worst = path;
-			}
-			return;
-		}
-		if (x && y && typeof x === 'object' && typeof y === 'object') {
-			for (const k of Object.keys(y)) if (!skip.includes(k)) walk(x[k], y[k], `${path}.${k}`);
-			return;
-		}
-		if (x !== y) out.mismatches.push(path);
-	};
-	walk(a, b, 'r2');
-	return { maxRelativeDifference: round(out.maxRel, 6), worst: out.worst, mismatches: out.mismatches };
-}
-
-let validationCache = null;
 /**
- * Framework 5b.3 validation: system() on the shared core vs this module's lifecycle() and r2(), every
- * archetype and the minimum-daily player. Baseline systems in every run: LC.provisionalRods() +
- * LC.provisionalDaily() (lifecycle()'s gear purchases and daily XP) and legacyBuffValue() (lifecycle()'s
- * buff valuation; the integrated economy uses the buffs system instead).
- *   system   the default system(): every milestone hour, every ledger/breakdown/item total at every
- *            milestone and at days 7/30/90, and the whole of r2() re-evaluated on the core.
- *   replay   system({ requireGate: false }): lifecycle()'s one different rule (every played day credited),
- *            which isolates that rule: exact everywhere, r2() included.
- *   sharedMinimumDaily  the R2 adversary as the shared F.MINIMUM_DAILY session (plays until every
- *            sessionDone(); here the streak gate) with the default system.
- *   gateCredit  sensitivity: system({ credit: 'gate' }) (the engine's timing).
+ * recorderParity(): every default integratedRun() equals integrate.run() with the same archetype, horizon and
+ * checkpoints (milestone hours, timeline and every ledger entry identical): the recorder only observes.
  */
-function validateSystem({ tolerance = 0.005 } = {}) {
-	if (validationCache && validationCache.tolerance === tolerance) return validationCache;
-	const archetypes = Object.keys(F.ARCHETYPES);
-	const compareAll = (systemOpts) => {
-		const agg = { maxRel: 0, worst: null, exact: 0, compared: 0, cases: {} };
-		for (const a of archetypes) {
-			const c = compareArchetype(a, systemOpts);
-			if (c.maxRel > agg.maxRel) {
-				agg.maxRel = c.maxRel;
-				agg.worst = `${a} ${c.worst}`;
-			}
-			agg.exact += c.milestonesExact;
-			agg.compared += c.milestonesCompared;
-			agg.cases[a] = c.row;
-		}
-		return { systemOpts, maxRelativeDifference: round(agg.maxRel, 6), worst: agg.worst, exactMilestoneHours: `${agg.exact}/${agg.compared}`, exact: agg.maxRel === 0 && agg.exact === agg.compared, cases: agg.cases };
-	};
-	const r2On = (systemOpts, extra) => r2With((a, o) => coreRun(a, { ...o, systemOpts }), extra);
-	const verdicts = (x) => ({ minimumDaily: x.minimumDaily.verdict.split(':')[0], noMissGrinder: x.noMissGrinder.verdict.split(':')[0] });
-	const oldR2 = r2();
-	const r2Summary = (x) => {
-		const d = compareR2(x, oldR2);
-		return { ...d, verdicts: verdicts(x), sameVerdicts: JSON.stringify(verdicts(x)) === JSON.stringify(verdicts(oldR2)), grinderMaxHoursDelta: round(x.noMissGrinder.maxHoursDelta, 6), regularStillInWindows: x.noMissGrinder.regularStillInWindows };
-	};
+let parityCache = null;
+function recorderParity() {
+	if (parityCache) return parityCache;
+	const rows = {};
+	for (const a of [...ARCHETYPE_NAMES, MINIMUM_DAILY]) {
+		const mine = integratedRun(a);
+		const ref = I.run({ archetype: a, stopAtLevel: null, days: horizon(a), checkpoints: CHECKPOINTS });
+		rows[a] = {
+			milestones: Object.keys(milestoneHours(ref)).length,
+			milestoneHours: JSON.stringify(milestoneHours(mine)) === JSON.stringify(milestoneHours(ref)),
+			timeline: JSON.stringify(mine.timeline) === JSON.stringify(ref.timeline),
+			ledger: JSON.stringify(mine.ledger) === JSON.stringify(ref.ledger),
+		};
+	}
+	parityCache = { rows, exact: Object.values(rows).every((r) => r.milestoneHours && r.timeline && r.ledger) };
+	return parityCache;
+}
 
-	const main = compareAll({});
-	const mainR2 = r2On({});
-	const replay = compareAll({ requireGate: false });
-	const replayR2 = r2Summary(r2On({ requireGate: false }));
-	const gate = compareAll({ credit: 'gate' });
-	const gateR2 = r2Summary(r2On({ credit: 'gate' }));
-	const sharedR2 = r2On({}, { minArch: F.MINIMUM_DAILY.name });
-	const sharedVsFixed = compareR2(sharedR2.minimumDaily, mainR2.minimumDaily);
-	// Days credited over the R2 horizon: the shared session vs lifecycle()'s fixed 3-minute session.
-	const horizon = 52 * PARAMS.ladder.cycle;
-	const credited = (arch) => {
-		const st = coreRun(arch, { maxDays: horizon, maxLevel: Infinity, snapshots: [] }).result.sys[SYSTEM_NAME];
-		return { credited: st.credits, belowGateDays: st.belowGateDays, chests: st.chests, graceUsed: st.graceUsed };
+// ---------------------------------------------------------------------------------------------
+// Value per archetype vs fishing income: integrated periods, plus the static per-stage view.
+let avCache = null;
+function archetypeValue() {
+	if (avCache) return avCache;
+	const out = {};
+	for (const name of ARCHETYPE_NAMES) {
+		const arch = F.ARCHETYPES[name];
+		const run = integratedRun(name);
+		const row = { minutesPerDay: arch.minutesPerDay, periods: {} };
+		for (const d of PERIODS) {
+			const s = dayRow(run, d);
+			if (!s) continue;
+			row.periods[d] = {
+				level: s.level,
+				hours: s.hours,
+				fishingIncome: s.cashBy.fishing,
+				boxContents: s.streakBy.nonBuff,
+				doubleCash: s.streakBy.doubleCash,
+				streakValue: s.cashBy.streak,
+				streakShareOfFishing: s.cashBy.streak / s.cashBy.fishing,
+				streakPerDay: s.cashBy.streak / d,
+				doubleCashShareOfStreak: s.streakBy.doubleCash / s.cashBy.streak,
+				luckyDrawAttributed: s.streakBy.luckyDrawAttributed,
+				withLuckyDrawShareOfFishing: (s.cashBy.streak + s.streakBy.luckyDrawAttributed) / s.cashBy.fishing,
+				streakXpShare: s.xpBy.streak / s.xpTotal,
+				items: s.items,
+				credits: s.credits,
+			};
+		}
+		// Per claimed day at fixed levels: the start of each biome (box contents only; static stage rates).
+		row.byLevel = F.LIVE_BIOMES.map((b) => {
+			const L = F.BIOME_LEVEL[b];
+			const r = stageRates(L, { archetype: arch, tier: F.typicalTier(b) });
+			const v = perClaimValue(L);
+			const fishingPerDay = r.cash * (arch.minutesPerDay / 60);
+			return { biome: b, level: L, tier: F.typicalTier(b).key, streakPerDay: v.cashEquivalent, fishingPerDay, share: v.cashEquivalent / fishingPerDay, minutesOfOwnPlay: (v.cashEquivalent / r.cash) * 60 };
+		});
+		out[name] = row;
+	}
+	avCache = out;
+	return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// R2 on the integrated model: XP-source decomposition with the streak's share, the minimum-daily player
+// (F.MINIMUM_DAILY) against the casual player, and the no-miss grinder with and without the streak.
+function decomposition(run) {
+	const rec = run.sys[RECORDER];
+	return Object.fromEntries(R2_LEVELS.filter((T) => run.milestones[T] && rec.milestones[T]).map((T) => {
+		const f = figures(rec.milestones[T]);
+		return [T, {
+			hours: run.milestones[T].hours,
+			day: run.milestones[T].day,
+			xpTotal: f.xpTotal,
+			xp: f.xpBy,
+			share: Object.fromEntries(Object.entries(f.xpBy).map(([k, v]) => [k, v / f.xpTotal])),
+		}];
+	}));
+}
+
+let r2Cache = null;
+function r2() {
+	if (r2Cache) return r2Cache;
+	const archetypes = {};
+	for (const name of ARCHETYPE_NAMES) {
+		const on = integratedRun(name);
+		const off = integratedRun(name, { exclude: [SYSTEM_NAME] });
+		const hOn = milestoneHours(on);
+		const hOff = milestoneHours(off);
+		const common = Object.keys(hOff).filter((k) => k in hOn);
+		archetypes[name] = {
+			decomposition: decomposition(on),
+			hoursWithoutStreak: hOff,
+			hoursWithStreak: hOn,
+			maxHoursDelta: Math.max(...common.map((k) => Math.abs(hOn[k] - hOff[k]) / hOff[k])),
+		};
+	}
+	// Minimum-daily vs casual by calendar week. 'streakOnly': the quests system excluded, so the minimum-
+	// daily session ends at the streak gate (isolates this subsystem). 'reference': the whole reference loop
+	// (the session ends when the streak gate AND the daily quest are met).
+	const scenario = (exclude) => {
+		const md = integratedRun(MINIMUM_DAILY, { exclude });
+		const cas = integratedRun('casual', { exclude });
+		const side = (run, d) => {
+			const s = dayRow(run, d);
+			return { level: s.level, hours: s.hours, xpPerActiveHour: s.xpTotal / s.hours, xpPerDay: s.xpTotal / d, streakXpShare: s.xpBy.streak / s.xpTotal, streakCashPerDay: s.cashBy.streak / d, streakCashPerActiveHour: s.cashBy.streak / s.hours, streakShareOfIncome: s.cashBy.streak / (s.cashBy.fishing + s.cashBy.streak), credits: s.credits };
+		};
+		const rows = R2_DAYS.map((d) => {
+			const m = side(md, d);
+			const c = side(cas, d);
+			return { day: d, minimumDaily: m, casual: c, minimumDailyLeadsInLevel: m.level > c.level };
+		});
+		const st = md.sys[SYSTEM_NAME];
+		return { exclude, rows, leadsAnywhere: rows.some((r) => r.minimumDailyLeadsInLevel), minutesPerDay: (md.hours * 60) / md.days, credited: st.credits, belowGateDays: st.belowGateDays, days: md.days };
 	};
-	const mainR2Summary = r2Summary(mainR2);
-	const hoursOnly = (c) => {
-		let max = 0;
-		for (const row of Object.values(c.cases)) for (const m of Object.values(row.milestones)) max = Math.max(max, m.rel || 0);
-		return max;
+	const minimumDaily = { archetype: F.MINIMUM_DAILY, gateCasts: PARAMS.gate.successfulCasts, streakOnly: scenario(['quests']), reference: scenario([]) };
+	minimumDaily.verdict = !minimumDaily.streakOnly.leadsAnywhere && !minimumDaily.reference.leadsAnywhere
+		? 'PASS: the minimum-daily player never leads the casual player in level at any calendar checkpoint, with the streak alone or with the whole reference loop. The streak adds no direct XP, so its only XP (Double XP buffs) scales with real play.'
+		: 'FAIL: the minimum-daily player leads the casual player in level; add a guardrail.';
+	// No-miss grinder: every streak reward on top of grinding.
+	const g = archetypes.grinder;
+	const reg = archetypes.regular.hoursWithStreak;
+	const noMissGrinder = {
+		hoursWithoutStreak: g.hoursWithoutStreak,
+		hoursWithStreak: g.hoursWithStreak,
+		maxHoursDelta: g.maxHoursDelta,
+		regularHours: Object.fromEntries(Object.keys(F.TARGET_WINDOWS).map((L) => [L, reg[L]])),
+		regularStillInWindows: Object.entries(F.TARGET_WINDOWS).every(([L, [lo, hi]]) => reg[L] >= lo && reg[L] <= hi),
 	};
-	// Where the default system departs from r2(): only the fixed 3-minute minimum-daily session (below).
-	const mainArchetypesR2 = compareR2({ archetypes: mainR2.archetypes, noMissGrinder: mainR2.noMissGrinder }, { archetypes: oldR2.archetypes, noMissGrinder: oldR2.noMissGrinder });
-	validationCache = {
-		method: 'LC.simulate with streak.system() + LC.provisionalRods() + LC.provisionalDaily() (lifecycle()\'s gear purchases and daily XP) + legacyBuffValue() (validation only: lifecycle()\'s Double XP / Double Cash valuation from the \'box\' events; the integrated economy values buffs in the buffs system) vs streak.lifecycle() and streak.r2(), every archetype; hours compared step-exact',
-		tolerance,
-		matches: main.exact && mainArchetypesR2.maxRelativeDifference === 0 && mainR2Summary.sameVerdicts && replay.exact && replayR2.maxRelativeDifference === 0 && !replayR2.mismatches.length,
-		maxRelativeDifference: main.maxRelativeDifference,
-		worst: main.worst,
-		system: main,
-		r2: {
-			system: { ...mainR2Summary, archetypesAndGrinder: mainArchetypesR2 },
-			replay: replayR2,
-		},
-		replay: { ...replay, cases: undefined },
-		sharedMinimumDaily: {
-			archetype: F.MINIMUM_DAILY,
-			days: horizon,
-			streak: { shared: credited(F.MINIMUM_DAILY.name), fixedSession: credited(minimumDailyArchetype()), lifecycleCredited: horizon },
-			vsFixedSession: sharedVsFixed,
-			leadsCasualAnywhere: sharedR2.minimumDaily.streakOnly.leadsAnywhere || sharedR2.minimumDaily.withProvisionalDaily.leadsAnywhere,
-			verdict: verdicts(sharedR2).minimumDaily,
-			rows: sharedR2.minimumDaily.withProvisionalDaily.rows.map((r) => ({ day: r.day, minimumDaily: { level: r.minimumDaily.level, hours: r.minimumDaily.hours, streakCashPerDay: round(r.minimumDaily.streakCashPerDay, 2) }, casualLevel: r.casual.level })),
-		},
-		gateCredit: {
-			systemOpts: { credit: 'gate' },
-			milestoneHoursMaxRel: round(hoursOnly(gate), 6),
-			maxRelativeDifference: gate.maxRelativeDifference,
-			worst: gate.worst,
-			exactMilestoneHours: gate.exactMilestoneHours,
-			r2: { maxRelativeDifference: gateR2.maxRelativeDifference, worst: gateR2.worst, verdicts: gateR2.verdicts, grinderMaxHoursDelta: gateR2.grinderMaxHoursDelta },
-		},
-		differences: [
-			'None for the four archetypes: the default system reproduces lifecycle() exactly (every milestone step, every ledger, breakdown and item total at every milestone and at days 7/30/90) and r2()\'s archetype decompositions, hours and no-miss-grinder verdict.',
-			'One rule differs, and the core is right: lifecycle() credited EVERY played day at its end without checking the play gate (it assumed every player exceeds it); system() credits a day only when today\'s casts reach the gate. The four archetypes always do, so they are unaffected. lifecycle()\'s minimum-daily player is a fixed 3-minute session (exactly 20 casts); with floating-point day boundaries a few of its days are 4 steps and the next only 2 (13.3 casts, below the gate: sharedMinimumDaily.streak.fixedSession.belowGateDays), and lifecycle() still credited those. The replay (requireGate: false) restores that rule and reproduces r2() exactly; with the gate enforced, only r2()\'s minimum-daily rows move (r2.system.maxRelativeDifference, on streak cash: a missed box, and the grace token it costs shifts the weekly chest), and the verdict is unchanged.',
-			'The shared R2 adversary F.MINIMUM_DAILY (session \'minimumDaily\': plays until every sessionDone(), here today\'s casts >= the gate) plays exactly 3 steps (20 casts) every day, so every day is credited: the right model of the minimum-daily player; its verdict is the same.',
-			'Ledger split (counting rule): lifecycle() folded the Double Cash buff into cashBy.streak and the Double XP buff into xpBy.streak; system() writes only the non-buff contents (cash \'streak\') and emits a \'box\' event for the buffs system. The comparison adds legacyBuffValue()\'s validation-only source back to reproduce lifecycle()\'s totals.',
-			'Snapshots: a level reached on a day\'s final step is snapshotted by the core before that day\'s day-end credits and by lifecycle() after them; the milestone ledger comparison applies lifecycle()\'s convention (validationProbe). Day-end checkpoints need no adjustment.',
-			'Days: the core counts a level reached on a day\'s final step in that day (ceil(h/dayH) counted the next day), so hours are compared, not days.',
-			'Sensitivity, credit \'gate\' (the engine\'s timing: the box on the qualifying cast): milestone hours move by 1-2 steps (gateCredit.milestoneHoursMaxRel, largest at Lv 10 where one step is ~1%), but each box is valued at the level the session STARTED at, which for fast levellers early on is a lower biome (gateCredit.maxRelativeDifference on day-7 streak totals), and lifecycle()\'s buff valuation books the whole Double XP value at the gate (minute 3), which moves the grinder\'s Lv 10 past the 1% no-miss-grinder target (gateCredit.r2.grinderMaxHoursDelta); with the buffs system the buff is applied over its window instead. Day-end credit (the player opens the box after the session) is the default: it matches lifecycle() and the daily quest\'s day-end grants.',
-		],
-	};
-	return validationCache;
+	noMissGrinder.verdict = noMissGrinder.maxHoursDelta <= PARAMS.targets.grinderHoursDeltaMax && noMissGrinder.regularStillInWindows
+		? `PASS: stacking every streak reward on grinding moves the grinder's milestones by at most ${(100 * noMissGrinder.maxHoursDelta).toFixed(2)}%, and the regular player stays inside every approved window.`
+		: 'FAIL: the streak moves milestones materially; cap the buff source.';
+	r2Cache = { model: I.REFERENCE_NOTE, archetypes, minimumDaily, noMissGrinder };
+	return r2Cache;
 }
 
 // ---------------------------------------------------------------------------------------------
 // Rods interplay: days of streak drops to complete the T1 reference set (one Uncommon part per slot).
+// The integrated model books streak parts at salvage (counting rule); a completed set saving the T1
+// assembly is an upside the lifecycle does not count.
 function t1PartsFromStreak() {
 	const crate = boxEV('Streak Crate', { level: 0 });
 	const perSlot = crate.partsByRarity.Uncommon / crate.slots;
@@ -1150,7 +865,8 @@ function t1PartsFromStreak() {
 	}
 	// Tier 1 level from the shared gear path; its assembly cost from the rods crate helper (not a gear source).
 	const t1 = { level: F.gearPath().find((x) => x.tier === 1).level, assembly: rods.assembly(1) };
-	const daysToTier1 = Object.fromEntries(Object.keys(F.ARCHETYPES).map((k) => [k, lifecycle(k, { streak: false }).reached[t1.level].day]));
+	// Calendar day each archetype reaches the Tier 1 level (integrated reference loop).
+	const daysToTier1 = Object.fromEntries(ARCHETYPE_NAMES.map((k) => [k, integratedRun(k).milestones[t1.level].day]));
 	const doneBy = {};
 	let dist = new Map([[0, 1]]);
 	let expected = 0;
@@ -1183,11 +899,11 @@ function t1PartsFromStreak() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Top.gg today vs the proposed streak.
+// Top.gg today vs the proposed streak (30 days).
 function topggComparison() {
 	const players = SIMULATION.players;
 	const today = {};
-	for (const name of Object.keys(F.ARCHETYPES)) {
+	for (const name of ARCHETYPE_NAMES) {
 		const wv = players[name]?.withVotes;
 		if (!wv) continue;
 		const votesPerDay = wv.arch.votes;
@@ -1199,16 +915,14 @@ function topggComparison() {
 			votesShareOfFishing: (wv.sources.votes + wv.sources.voterCrateLiquid) / wv.sources.fishSales,
 		};
 	}
-	// The same Top.gg rule under the new value model and the proposed lifecycle (30 days).
+	// The same Top.gg rule under the new value model, against the integrated 30-day lifecycle.
 	const proposed = {};
 	for (const name of Object.keys(today)) {
-		const lc = lifecycle(name, { maxLevel: Infinity, maxDays: 30 });
-		const s = lc.snapshots[30];
-		const L = s.level;
-		const voters = boxEV(legacyVotersCrate(), { level: L });
+		const s = dayRow(integratedRun(name), 30);
+		const voters = boxEV(legacyVotersCrate(), { level: s.level });
 		const topgg30 = 30 * today[name].votesPerDay * (today[name].cashPerVote + voters.liquid + voters.baitUsable);
 		proposed[name] = {
-			level30: L,
+			level30: s.level,
 			fishing30d: s.cashBy.fishing,
 			topggRule30d: topgg30,
 			topggShareOfFishing: topgg30 / s.cashBy.fishing,
@@ -1253,7 +967,7 @@ function ruleExamples() {
 			st = r.state;
 			return { day: d, credited: r.credited, streak: st.count, grace: st.grace, box: r.box, graceUsed: r.graceUsed || 0, decayedBy: r.decayedBy || 0, reset: Boolean(r.reset), badges: r.badges || [] };
 		});
-		return { label, start, steps };
+		return { label, start: { ...defaultState(), ...start }, steps };
 	};
 	const G = PARAMS.gate.successfulCasts;
 	let gs = defaultState();
@@ -1278,42 +992,203 @@ function ruleExamples() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Founder (private): the PROPOSED Founder profile (founder.founderProfile()) on the same boxes.
 function founderView() {
-	return F.LIVE_BIOMES.map((b) => {
-		const L = F.BIOME_LEVEL[b];
-		const n = boxEV('Streak Crate', { level: L });
-		const f = boxEV('Streak Crate', { level: L, profile: 'founder' });
-		const nc = boxEV('Streak Chest', { level: L });
-		const fc = boxEV('Streak Chest', { level: L, profile: 'founder' });
-		return {
-			biome: b,
-			crate: { normal: n.liquid, founder: f.liquid, ratio: f.liquid / n.liquid, founderLegendaryPlus: (f.rarity.legendary || 0) + (f.rarity.lucky || 0), normalLegendaryPlus: (n.rarity.legendary || 0) + (n.rarity.lucky || 0) },
-			chest: { normal: nc.liquid, founder: fc.liquid, ratio: fc.liquid / nc.liquid },
-		};
+	const prof = proposedFounder();
+	const hi = (ev) => (ev.rarity.legendary || 0) + (ev.rarity.lucky || 0);
+	return {
+		profile: { source: 'founder.founderProfile()', sell: prof.multipliers.sell, gachaStats: { ...(prof.gacha?.stats || {}) }, todaySell: PROFILES.founder.multipliers.sell },
+		stages: F.LIVE_BIOMES.map((b) => {
+			const L = F.BIOME_LEVEL[b];
+			const n = boxEV(PARAMS.ladder.dailyBox, { level: L });
+			const f = boxEV(PARAMS.ladder.dailyBox, { level: L, profile: prof });
+			const nc = boxEV(PARAMS.ladder.milestoneBox, { level: L });
+			const fc = boxEV(PARAMS.ladder.milestoneBox, { level: L, profile: prof });
+			return {
+				biome: b,
+				level: L,
+				crate: { normal: n.liquid, founder: f.liquid, ratio: f.liquid / n.liquid, normalLegendaryPlus: hi(n), founderLegendaryPlus: hi(f) },
+				chest: { normal: nc.liquid, founder: fc.liquid, ratio: fc.liquid / nc.liquid },
+			};
+		}),
+	};
+}
+
+// ---------------------------------------------------------------------------------------------
+// Quests interplay: does completing the daily quest also meet the streak gate? (quests.templateTerms at
+// each band: fish required, and casts at the band's gear.)
+function questInterplay() {
+	const quests = require('./quests');
+	const [catchT, rareT] = quests.PARAMS.daily.templates;
+	return quests.bands().map((band) => {
+		const c = quests.templateTerms('daily', catchT, band);
+		const r = quests.templateTerms('daily', rareT, band);
+		const fpc = F.castOutcome({ biome: band.biome, qualities: band.gear.qualities, stats: band.gear.stats, multiChance: band.gear.multiChance ?? F.chanceForMean(band.gear.meanFish) }).fishPerCast;
+		const catchCasts = c.progressMax / fpc;
+		const rareCastsP50 = r.fish.p50 / fpc;
+		return { band: band.id, biome: band.biome, fishPerCast: fpc, catchFish: c.progressMax, catchCasts, rareTarget: r.progressMax, rareFishP50: r.fish.p50, rareCastsP50, catchMeetsGate: catchCasts >= PARAMS.gate.successfulCasts - GATE_EPS, rareP50MeetsGate: rareCastsP50 >= PARAMS.gate.successfulCasts - GATE_EPS };
 	});
 }
 
-let baselineCache = null;
-/**
- * lifecycle() with the streak off reproduces docs/economy/5b/curve.json. curve.json is curve.js's
- * 'provisional' model, fitted on F.PROVISIONAL_GEAR_PATH, so the stepping is checked on that path (on the
- * 5b.3 shared rods path the hours legitimately differ; the curve itself is unchanged).
- */
-function baselineMatchesCurveJson() {
-	if (baselineCache) return baselineCache;
+// ---------------------------------------------------------------------------------------------
+// Credit timing sensitivity on the integrated model: credit 'gate' (the engine: the box on the qualifying
+// cast) vs the default 'dayEnd' (the player opens the box after the session).
+function creditTiming() {
 	const rows = {};
-	let ok = CURVE_JSON.chosen === F.CURVE.quartic && CURVE_JSON.model === 'provisional';
-	for (const name of Object.keys(F.ARCHETYPES)) {
-		const lc = lifecycle(name, { streak: false, gearPath: F.PROVISIONAL_GEAR_PATH });
-		const cj = CURVE_JSON.archetypes[name];
-		rows[name] = Object.fromEntries(Object.keys(cj).map((k) => [k, { mine: lc.reached[k], curveJson: cj[k] }]));
-		// Hours only: curve.json is generated on the shared core, which counts a level reached on a day's
-		// final step in that day (ceil(h/dayH) here counts the next day), so the day column may differ by 1.
-		for (const k of Object.keys(cj)) ok = ok && lc.reached[k] && lc.reached[k].hours === cj[k].hours;
+	for (const name of ARCHETYPE_NAMES) {
+		const a = integratedRun(name);
+		const b = integratedRun(name, { systemOpts: { [SYSTEM_NAME]: { credit: 'gate' } } });
+		const ha = milestoneHours(a);
+		const hb = milestoneHours(b);
+		const common = Object.keys(ha).filter((k) => k in hb);
+		const d30 = [dayRow(a, 30), dayRow(b, 30)];
+		rows[name] = {
+			maxMilestoneShift: Math.max(...common.map((k) => Math.abs(hb[k] - ha[k]) / ha[k])),
+			streakValue30dChange: d30[1].cashBy.streak / d30[0].cashBy.streak - 1,
+		};
 	}
-	baselineCache = { match: Boolean(ok), rows };
-	return baselineCache;
+	return { rows, maxMilestoneShift: Math.max(...Object.values(rows).map((r) => r.maxMilestoneShift)), maxStreakValueChange: Math.max(...Object.values(rows).map((r) => Math.abs(r.streakValue30dChange))) };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Parity of system() with the retired private loop. RECORDED, not live: streak.validateSystem() at
+// framework 5b.4 on the code of commit a83b5f0 (the loop, its replication checks and the validation
+// were deleted in the final migration stage; this constant is the record the doc cites).
+const SYSTEM_PARITY = deepFreeze({
+	source: 'streak.validateSystem() at framework 5b.4, code of commit a83b5f0',
+	method: 'LC.simulate with streak.system() + LC.provisionalRods() + LC.provisionalDaily() + a validation-only replay of the old buff valuation, vs the retired streak.lifecycle() and streak.r2(), every archetype; hours compared step-exact',
+	archetypes: { exactMilestoneHours: '24/24', maxRelativeDifference: 0, scope: 'every XP, cash, breakdown and item total at every milestone and at days 7, 30 and 90' },
+	r2: { archetypesAndGrinderMaxRelativeDifference: 0, minimumDailyMaxRelativeDifference: 0.073294, worst: 'minimum-daily streak cash per active hour at week 4 (streak only)', verdicts: { minimumDaily: 'PASS', noMissGrinder: 'PASS' }, sameVerdicts: true },
+	replay: { rule: 'requireGate: false', exactMilestoneHours: '24/24', maxRelativeDifference: 0, r2MaxRelativeDifference: 0 },
+	minimumDaily: { days: 364, sharedSession: { credited: 364, belowGateDays: 0, chests: 52 }, oldFixedSession: { sessionMinutes: 3, credited: 362, belowGateDays: 2, chests: 51, graceUsed: 2 }, oldLoopCredited: 364 },
+	cause: 'the old loop credited every played day without checking the gate',
+});
+
+// ---------------------------------------------------------------------------------------------
+// Proposed decisions (status 'proposed' only: only the user approves). get() reads what the model runs;
+// decisions.verify() checks it against `expected`.
+const DECISIONS = [
+	{
+		id: 'P-STREAK-GATE', status: 'proposed',
+		title: 'A streak day is earned by real play: successful casts in the DCC day, credited automatically on the qualifying cast (no claim command)',
+		modelled: `${PARAMS.gate.successfulCasts} successful casts (a cast landing at least one fish) per DCC day; casts, not fish`,
+		alternatives: ['a /daily claim command (can be forgotten; needs no play)', 'a fish count (multi-catch gear and the Founder profile reach it sooner)', 'minutes played', 'another cast count'],
+		source: 'streak design', why: 'a few minutes of real play for every archetype (gate table); identical effort for every rod and profile; nothing to forget',
+		get: () => PARAMS.gate, expected: { successfulCasts: 20 },
+	},
+	{
+		id: 'P-STREAK-LADDER', status: 'proposed',
+		title: `${PARAMS.ladder.cycle}-day ladder: a Streak Crate every streak day, the Streak Chest (bonus slots, a guaranteed high-rarity slot, a grace token) at the end of each cycle`,
+		modelled: `${PARAMS.ladder.dailyBox} (${PARAMS.boxes[PARAMS.ladder.dailyBox].slots} slots) daily; every ${PARAMS.ladder.cycle}th streak day the ${PARAMS.ladder.milestoneBox} (${PARAMS.boxes[PARAMS.ladder.milestoneBox].slots} slots, slot ${PARAMS.boxes[PARAMS.ladder.milestoneBox].guaranteedSlots[0].slot} >= ${PARAMS.boxes[PARAMS.ladder.milestoneBox].guaranteedSlots[0].minRarity})`,
+		alternatives: ['a flat daily box with no weekly goal', 'an escalating 1-to-7 ladder that restarts weekly', 'a longer milestone (e.g. 30 days)'],
+		source: 'streak design', why: 'a weekly goal with a jackpot slot; the chest is the only consistency bonus, so value stays close to proportional to days played (attendance table)',
+		get: () => ({ ladder: PARAMS.ladder, boxes: PARAMS.boxes }),
+		expected: { ladder: { cycle: 7, dailyBox: 'Streak Crate', milestoneBox: 'Streak Chest' }, boxes: { 'Streak Crate': { id: 'streak-crate', slots: 3, guaranteedSlots: [] }, 'Streak Chest': { id: 'streak-chest', slots: 5, guaranteedSlots: [{ slot: 0, minRarity: 'ultra' }] } } },
+	},
+	{
+		id: 'P-STREAK-GRACE', status: 'proposed',
+		title: 'Grace tokens cover missed days automatically: a starting token, more from each Streak Chest, a small cap',
+		modelled: `start ${PARAMS.grace.start}, +${PARAMS.grace.perCycle} per chest, max ${PARAMS.grace.max}`,
+		alternatives: [`${PARAMS.alternatives.moreGrace.perCycle} per chest, max ${PARAMS.alternatives.moreGrace.max} (a 5-days-a-week player keeps more chests; attendance table)`, 'no grace tokens'],
+		source: 'streak design', why: 'a player who plays six days a week keeps almost all of the daily player\'s value per claim, while the streak still means something (attendance table)',
+		get: () => PARAMS.grace, expected: { start: 1, perCycle: 1, max: 2 },
+	},
+	{
+		id: 'P-STREAK-DECAY', status: 'proposed',
+		title: 'A miss with no token costs a ladder cycle of streak days (the chest phase is kept); a long gap resets the streak (tokens kept)',
+		modelled: `-${PARAMS.decay.perUncoveredMiss} streak days per uncovered miss; reset after ${PARAMS.decay.resetAfterMissedDays} missed days in a row`,
+		alternatives: ['reset on any uncovered miss (the classic streak)', 'lose one streak day per miss'],
+		source: 'streak design', why: 'one bad day never erases a long streak and the next chest still comes on schedule; consistency still matters (rule traces)',
+		get: () => PARAMS.decay, expected: { perUncoveredMiss: 7, resetAfterMissedDays: 7 },
+	},
+	{
+		id: 'P-STREAK-NO-CASH-XP', status: 'proposed',
+		title: 'No direct cash and no direct XP: the streak pays only box contents; its only XP is the Double XP buffs in its boxes, valued by the buffs system',
+		modelled: `direct cash ${PARAMS.direct.cash}, direct XP ${PARAMS.direct.xp}`,
+		alternatives: ['cash per streak day (today\'s vote paid a fixed sum per vote)', 'level-scaled XP per streak day'],
+		source: 'streak design', why: 'value scales with progression through the normal sale path, and a minimum-daily player cannot turn a few casts into levels (R2 tables)',
+		get: () => PARAMS.direct, expected: { cash: 0, xp: 0 },
+	},
+	{
+		id: 'P-STREAK-FISH-POOL', status: 'proposed',
+		title: 'Streak box fish come from the opener\'s highest accessible biome, with a fixed fish share per rarity (two new generic Gacha V2 pool options)',
+		modelled: `pool.fish '${PARAMS.pool.fish}' (per-rarity fallback to the next biome down), pool.fishShare ${PARAMS.pool.fishShare}`,
+		alternatives: ['fish from every catchable biome (today\'s Voter\'s Crate: a Swamp Giant at Lv 1)', 'no fish (items only)'],
+		source: 'streak design', why: 'value tracks the stage and every fish is one the player can already catch; the fixed share keeps a single-biome fish pool from being swamped by items',
+		get: () => ({ fish: PARAMS.pool.fish, fishShare: PARAMS.pool.fishShare }), expected: { fish: 'highestUnlocked', fishShare: 0.75 },
+	},
+	{
+		id: 'P-STREAK-ITEM-POOL', status: 'proposed',
+		title: 'Streak box items: the Voter\'s Crate pool without the Old Rod, rod parts up to Uncommon, bait and buffs, never a Booster Pack; the Voter\'s table without Common; unique duplicates',
+		modelled: `types ${PARAMS.pool.types.join(', ')}; parts <= ${PARAMS.pool.maxPartRarity}; table ${Object.entries(PARAMS.pool.rarityTable).map(([r, w]) => `${r} ${w}`).join(', ')}; floor ${PARAMS.pool.rarityFloor}; duplicates ${PARAMS.pool.duplicates}`,
+		alternatives: ['today\'s Voter\'s pool (Old Rod, parts of every rarity, a Common tier)'],
+		source: 'streak design', why: 'free rare+ parts would undercut the tiered crates; Booster Packs stay an Easter egg (decision 12); every reward is Uncommon or better',
+		get: () => ({ types: PARAMS.pool.types, maxPartRarity: PARAMS.pool.maxPartRarity, rarityTable: PARAMS.pool.rarityTable, rarityFloor: PARAMS.pool.rarityFloor, duplicates: PARAMS.pool.duplicates }),
+		expected: { types: ['bait', 'buff', 'part_rod', 'part_reel', 'part_hook', 'part_handle'], maxPartRarity: 'uncommon', rarityTable: { common: 0, uncommon: 2500, rare: 500, ultra: 100, giant: 50, legendary: 20, lucky: 1 }, rarityFloor: 'uncommon', duplicates: 'unique' },
+	},
+	{
+		id: 'P-STREAK-BAIT-PACK', status: 'proposed',
+		title: 'A bait reward in a streak box is one pack; packs for bait the player cannot use yet keep until usable',
+		modelled: `baitGrant '${PARAMS.baitGrant}'`,
+		alternatives: ['one unit (worth almost nothing at the new bait prices)'],
+		source: 'streak design (bait design recommendation)', why: 'a bait reward should be worth using',
+		get: () => PARAMS.baitGrant, expected: 'pack',
+	},
+	{
+		id: 'P-STREAK-VOTE', status: 'proposed',
+		title: '/vote retired: an ephemeral notice pointing to the streak for a transition period, then unregistered; TOPGG_TOKEN, the topgg_token config and User.vote() removed',
+		modelled: `${PARAMS.topgg.vote}, transition ${PARAMS.topgg.transitionDays} days; no Top.gg network call remains`,
+		alternatives: ['unregister /vote at release', 'repurpose /vote for a later cosmetic-only Top.gg reward'],
+		source: 'streak design (A-TOPGG)', why: 'retire, do not repurpose: "vote" names an external action that no longer exists; no external dependency or token remains',
+		get: () => ({ retire: PARAMS.topgg.retire, vote: PARAMS.topgg.vote, transitionDays: PARAMS.topgg.transitionDays }), expected: { retire: true, vote: 'notice-then-unregister', transitionDays: 30 },
+	},
+	{
+		id: 'P-STREAK-VOTERS-CRATE', status: 'proposed',
+		title: 'Owned Voter\'s Crates open forever under their current definition, minus the now-worthless Old Rod reward',
+		modelled: 'keep the Voter\'s Crate definition and catalog item (REQUIRED_ITEMS); add exclude: [\'Old Rod\']',
+		alternatives: ['keep the definition byte-identical'],
+		source: 'streak design (A-TOPGG)', why: 'an extra Old Rod has no value once the Old Rod is unbreakable (P-RODS-OLD-ROD); the definition changes, no data does',
+		get: () => PARAMS.topgg.legacyVotersCrate, expected: { keep: true, excludeOldRod: true },
+	},
+	{
+		id: 'P-STREAK-BADGES', status: 'proposed',
+		title: 'Streak badges are cosmetic only, derived from the best streak',
+		modelled: `badges at ${PARAMS.badges.join(' / ')} streak days (streak.best)`,
+		alternatives: ['economic rewards at long-streak milestones'],
+		source: 'streak design', why: 'long streaks earn prestige, not economy, so players who miss days are not left behind',
+		get: () => PARAMS.badges, expected: [7, 30, 100, 365],
+	},
+	{
+		id: 'P-STREAK-INDEPENDENT', status: 'proposed',
+		title: 'The streak and the daily quest share the DCC day (P-DAY) but are independent: the streak never requires the daily quest, and the daily quest never extends the streak',
+		modelled: 'one day boundary (PARAMS.day = F.DAY); separate rewards (Streak Crate / Daily Box)',
+		alternatives: ['the daily quest as the streak\'s gate (casual players cannot always finish one)'],
+		source: 'streak + quests designs', why: 'one streak system, and a gate every archetype meets in minutes',
+		get: () => PARAMS.day.startUtcHour === F.DAY.startUtcHour, expected: true,
+	},
+	{
+		id: 'P-STREAK-FOUNDER', status: 'proposed',
+		title: 'Founder: the same gate, boxes and public catch-card line; the Founder gacha stats and sell multiplier apply privately to the box contents',
+		modelled: 'boxContents(..., \'founder\') = the proposed founder.founderProfile() (gacha stats, sell multiplier); gate counts casts',
+		alternatives: ['Founder-specific streak boxes'],
+		source: 'streak design', why: 'nothing public differs (A-FOUNDER-VISIBLE); the private value follows the Founder profile (Founder table)',
+	},
+	{
+		id: 'P-STREAK-TARGETS', status: 'proposed',
+		title: 'Value targets the streak is checked against: casual 30-day value in a band of its own fishing income, caps for regular and grinder, a streak-XP cap, a no-miss-grinder shift cap, and the T1 part set not free for regular players',
+		modelled: `casual ${PARAMS.targets.casual30dShare.map((x) => `${100 * x}%`).join('-')}; regular <= ${100 * PARAMS.targets.regular30dShareMax}%; grinder <= ${100 * PARAMS.targets.grinder30dShareMax}%; streak XP <= ${100 * PARAMS.targets.streakXpShareMax}%; grinder shift <= ${100 * PARAMS.targets.grinderHoursDeltaMax}%; T1 set median >= ${PARAMS.targets.minT1Days} days`,
+		alternatives: ['other bands (the streak as a larger share of casual income, or a flat share for everyone)'],
+		source: 'streak design', why: 'a catch-up for casual players and a small bonus for engaged ones (checks table)',
+		get: () => PARAMS.targets, expected: { casual30dShare: [0.15, 0.35], regular30dShareMax: 0.05, grinder30dShareMax: 0.01, streakXpShareMax: 0.02, grinderHoursDeltaMax: 0.01, minT1Days: 14 },
+	},
+	{
+		id: 'P-STREAK-SUPPORTER-FLAIR', status: 'proposed',
+		title: 'Optional: a cosmetic "Early Supporter" flair for past voters, derived at read time from stats.lastVoted',
+		modelled: 'offered, not modelled (cosmetic; no write, no economy); stats.totalVotes cannot be used (it was never incremented)',
+		alternatives: ['no flair'],
+		source: 'streak design', why: 'acknowledges voters who lose the vote reward at no economic cost',
+	},
+];
 
 // ---------------------------------------------------------------------------------------------
 function checks() {
@@ -1324,12 +1199,21 @@ function checks() {
 	const defs = boxDefinitions();
 	const pools = Object.values(defs).flatMap((d) => d.pool.types);
 	const shares = Object.fromEntries(Object.entries(av).map(([k, v]) => [k, v.periods[30].streakShareOfFishing]));
-	const order = ['casual', 'regular', 'active', 'grinder'];
+	const order = ARCHETYPE_NAMES;
 	const maxStreakXpShare = Math.max(...Object.values(r.archetypes).flatMap((a) => Object.values(a.decomposition).map((d) => d.share.streak)));
-	const minDailyXpShare = Math.max(...r.minimumDaily.streakOnly.rows.map((x) => x.minimumDaily.streakXpShare));
+	const minDailyXpShare = Math.max(...['streakOnly', 'reference'].flatMap((v) => r.minimumDaily[v].rows.map((x) => x.minimumDaily.streakXpShare)));
 	const bound = doubleXpDayShare();
+	const refRuns = [...ARCHETYPE_NAMES, MINIMUM_DAILY].map((a) => integratedRun(a));
+	const countedOnce = refRuns.every((run) => {
+		const st = run.sys[SYSTEM_NAME];
+		const received = sumValues(run.sys.buffs.receivedBySource[SYSTEM_NAME]);
+		return Math.abs(sumValues(st.buffs) - received) <= 1e-9 * Math.max(1, received) && run.ledger.cash[CASH_SOURCE] === st.value.cash;
+	});
 	const list = [
-		{ id: 'no-direct-cash-or-xp', pass: PARAMS.direct.cash === 0 && PARAMS.direct.xp === 0 },
+		{ id: 'no-direct-cash-or-xp', pass: PARAMS.direct.cash === 0 && PARAMS.direct.xp === 0 && refRuns.every((run) => !(SYSTEM_NAME in run.ledger.xp)) },
+		{ id: 'buffs-counted-once', pass: countedOnce },
+		{ id: 'recorder-observational', pass: recorderParity().exact },
+		{ id: 'milestones-covered', value: F.LIFECYCLE.maxLevel, pass: ARCHETYPE_NAMES.every((a) => integratedRun(a).milestones[F.LIFECYCLE.maxLevel]) },
 		{ id: 'no-booster-pack-no-old-rod', pass: !pools.includes('gacha') && !pools.includes('rod') },
 		{ id: 'casual-30d-share-in-band', value: shares.casual, band: T.casual30dShare, pass: shares.casual >= T.casual30dShare[0] && shares.casual <= T.casual30dShare[1] },
 		{ id: 'regular-30d-share-max', value: shares.regular, max: T.regular30dShareMax, pass: shares.regular <= T.regular30dShareMax },
@@ -1337,12 +1221,10 @@ function checks() {
 		{ id: 'casual-gains-relatively-most', value: order.map((k) => round(shares[k], 4)), pass: order.every((k, i) => i === 0 || shares[order[i - 1]] > shares[k]) },
 		{ id: 'streak-xp-share-max', value: maxStreakXpShare, max: T.streakXpShareMax, pass: maxStreakXpShare <= T.streakXpShareMax },
 		{ id: 'streak-xp-within-double-xp-bound', value: { archetypes: maxStreakXpShare, minimumDaily: minDailyXpShare }, max: bound, pass: maxStreakXpShare <= bound && minDailyXpShare <= bound },
-		{ id: 'r2-minimum-daily', pass: !r.minimumDaily.streakOnly.leadsAnywhere && !r.minimumDaily.withProvisionalDaily.leadsAnywhere },
+		{ id: 'r2-minimum-daily', pass: !r.minimumDaily.streakOnly.leadsAnywhere && !r.minimumDaily.reference.leadsAnywhere },
 		{ id: 'r2-no-miss-grinder', value: r.noMissGrinder.maxHoursDelta, max: T.grinderHoursDeltaMax, pass: r.noMissGrinder.maxHoursDelta <= T.grinderHoursDeltaMax },
-		{ id: 'regular-in-windows-with-streak', pass: r.noMissGrinder.regularStillInWindows },
-		{ id: 't1-set-not-free-for-regular', value: t1.medianDays, min: T.minT1Days, pass: t1.medianDays >= T.minT1Days && t1.medianDays > t1.daysToTier1Level.regular },
-		{ id: 'baseline-reproduces-curve-json', pass: baselineMatchesCurveJson().match },
-		{ id: 'system-reproduces-lifecycle', value: validateSystem().maxRelativeDifference, max: validateSystem().tolerance, pass: validateSystem().matches },
+		{ id: 'regular-in-windows-with-streak', value: r.noMissGrinder.regularHours, pass: r.noMissGrinder.regularStillInWindows },
+		{ id: 't1-set-not-free-for-regular', value: { medianDays: t1.medianDays, regularTier1Day: t1.daysToTier1Level.regular }, min: T.minT1Days, pass: t1.medianDays >= T.minT1Days && t1.medianDays > t1.daysToTier1Level.regular },
 	];
 	return { pass: list.every((c) => c.pass), list };
 }
@@ -1352,12 +1234,12 @@ let reportCache = null;
 function report() {
 	if (reportCache) return reportCache;
 	const defs = boxDefinitions();
-	const crate = Object.fromEntries(F.LIVE_BIOMES.map((b) => {
+	const values = Object.fromEntries(F.LIVE_BIOMES.map((b) => {
 		const L = F.BIOME_LEVEL[b];
-		const c = boxEV('Streak Crate', { level: L });
-		const h = boxEV('Streak Chest', { level: L });
+		const c = boxEV(PARAMS.ladder.dailyBox, { level: L });
+		const h = boxEV(PARAMS.ladder.milestoneBox, { level: L });
 		const r = stageRates(L, { tier: F.typicalTier(b) });
-		const v = perClaimValue(L, { tier: F.typicalTier(b) });
+		const v = perClaimValue(L);
 		return [b, {
 			level: L,
 			tier: F.typicalTier(b).key,
@@ -1367,23 +1249,29 @@ function report() {
 			chest: { liquid: h.liquid, fish: h.fish, fishValue: h.fishValue, salvage: h.salvage, baitUsable: h.baitUsable, baitDeferred: h.baitDeferred, buffs: h.buffs, fishByRarity: h.fishByRarity, slot0: h.slotTables[0] },
 			perClaim: v,
 			perClaimMinutesOfStageIncome: (v.cashEquivalent / r.cash) * 60,
-			perClaimStageFish: v.fish / r.valuePerFish,
 		}];
 	}));
 	const legacy = F.LIVE_BIOMES.map((b) => ({ biome: b, level: F.BIOME_LEVEL[b], ...(({ liquid, fishValue, salvage, baitUsable, buffs }) => ({ liquid, fishValue, salvage, baitUsable, buffs }))(boxEV(legacyVotersCrate(), { level: F.BIOME_LEVEL[b] })) }));
 	const ladderAt = F.gearPath()[1].level;
-	const ladder = Array.from({ length: PARAMS.ladder.cycle + 1 }, (_, i) => {
-		const v = streakValue(i + 1, ladderAt);
-		return { streakDay: i + 1, box: v.box, cashEquivalent: v.cashEquivalent, xp: v.xp, fish: v.items.fish, breakdown: v.breakdown };
-	});
+	const ladder = Array.from({ length: PARAMS.ladder.cycle }, (_, i) => streakValue(i + 1, ladderAt));
+	const crateAt = boxEV(PARAMS.ladder.dailyBox, { level: ladderAt });
+	const chestAt = boxEV(PARAMS.ladder.milestoneBox, { level: ladderAt });
+	const r2r = r2();
 	reportCache = {
 		...F.stamp(),
 		gearPathSource: F.GEAR_PATH_SOURCE,
+		model: I.REFERENCE_NOTE,
 		params: PARAMS,
-		gate: { successfulCasts: PARAMS.gate.successfulCasts, minutesByArchetype: Object.fromEntries(Object.entries(F.ARCHETYPES).map(([k, a]) => [k, (PARAMS.gate.successfulCasts * (F.COOLDOWN.fishMs / 1000 + a.overheadS)) / 60])), shareOfDailyCasts: Object.fromEntries(Object.entries(F.ARCHETYPES).map(([k, a]) => [k, PARAMS.gate.successfulCasts / (a.minutesPerDay * 60 / (F.COOLDOWN.fishMs / 1000 + a.overheadS))])) },
+		gate: {
+			successfulCasts: PARAMS.gate.successfulCasts,
+			minutesByArchetype: Object.fromEntries(Object.entries(F.ARCHETYPES).map(([k, a]) => [k, gateMinutes(a.overheadS)])),
+			shareOfDailyCasts: Object.fromEntries(Object.entries(F.ARCHETYPES).map(([k, a]) => [k, PARAMS.gate.successfulCasts / (a.minutesPerDay * 60 / (F.COOLDOWN.fishMs / 1000 + a.overheadS))])),
+			minimumDailyMinutesPerDay: { streakOnly: r2r.minimumDaily.streakOnly.minutesPerDay, reference: r2r.minimumDaily.reference.minutesPerDay },
+		},
 		boxDefinitions: defs,
 		legacyVotersCrate: legacyVotersCrate(),
-		values: crate,
+		contents: { level: ladderAt, crate: crateAt, chest: chestAt },
+		values,
 		legacyVotersCrateValue: legacy,
 		ladder: { level: ladderAt, days: ladder },
 		rules: ruleExamples(),
@@ -1391,34 +1279,298 @@ function report() {
 		doubleXpDayShare: doubleXpDayShare(),
 		attendance: attendanceTable(),
 		archetypeValue: archetypeValue(),
-		r2: r2(),
+		r2: r2r,
 		t1PartsFromStreak: t1PartsFromStreak(),
 		topgg: topggComparison(),
 		founder: founderView(),
-		baselineMatchesCurveJson: baselineMatchesCurveJson().match,
+		quests: questInterplay(),
 		integration: {
 			system: SYSTEM_NAME,
 			hooks: ['init', 'onCasts (credit \'gate\' only)', 'onDayEnd', 'onMissedDay', 'sessionDone'],
 			ledger: { cash: [CASH_SOURCE], xp: [], spend: [] },
 			events: { emits: 'box { name: \'Streak Crate\' | \'Streak Chest\', count: 1, level, source: \'streak\', streakDay, profile }' },
-			defaults: { credit: 'dayEnd', baitValue: 'cash', requireGate: true },
+			defaults: { credit: 'dayEnd', baitValue: 'cash' },
 		},
-		systemValidation: validateSystem(),
+		recorderParity: recorderParity(),
+		creditTiming: creditTiming(),
+		systemParity: SYSTEM_PARITY,
+		decisions: DECISIONS.map((d) => ({ ...Object.fromEntries(Object.entries(d).filter(([k]) => k !== 'get' && k !== 'expected')), recordMatchesModel: d.get ? JSON.stringify(d.get()) === JSON.stringify(d.expected) : null })),
 		checks: checks(),
 	};
 	return reportCache;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Generated doc tables (render-docs.js). Every number in docs/economy/5b/streak.md comes from here.
+const mdTable = (headers, rows) => [`| ${headers.join(' | ')} |`, `| ${headers.map(() => '---').join(' | ')} |`, ...rows.map((r) => `| ${r.map((c) => String(c).replace(/\|/g, '\\|')).join(' | ')} |`)].join('\n');
+const usd = (x) => `$${Math.round(x).toLocaleString('en-US')}`;
+const pct = (x, d = 1) => `${(100 * x).toFixed(d)}%`;
+/** Whole percent from 10% up, one decimal below (small shares stay readable). */
+const pctAuto = (x) => pct(x, Math.abs(x) >= 0.1 ? 0 : 1);
+const fx = (x, d = 2) => Number(x).toFixed(d);
+const n0 = (x) => Math.round(x).toLocaleString('en-US');
+const hrs = (x) => `${fx(x, 2)} h`;
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const range = (xs, f) => {
+	const lo = Math.min(...xs);
+	const hi = Math.max(...xs);
+	return lo === hi ? f(lo) : `${f(lo)}–${f(hi)}`;
+};
+const yes = (b) => (b ? 'yes' : '**no**');
+
+function markdownTables() {
+	const R = report();
+	const P = PARAMS;
+	const out = {};
+	const av = R.archetypeValue;
+	const r2r = R.r2;
+	const tg = R.topgg;
+	const G = P.gate.successfulCasts;
+	const chestDef = P.boxes[P.ladder.milestoneBox];
+	const crateDef = P.boxes[P.ladder.dailyBox];
+	const s30 = Object.fromEntries(ARCHETYPE_NAMES.map((a) => [a, av[a].periods[30]]));
+	const t1 = R.t1PartsFromStreak;
+	const fv = R.founder;
+	const att = R.attendance;
+	const jp = R.jackpots;
+
+	// Summary.
+	const allDecomp = Object.values(r2r.archetypes).flatMap((a) => Object.values(a.decomposition));
+	const maxStreakXp = Math.max(...allDecomp.map((d) => d.share.streak));
+	out['streak-headline'] = mdTable(['Figure', 'Value', 'Table'], [
+		['Play gate', `${G} successful casts per DCC day: ${range(Object.values(R.gate.minutesByArchetype), (x) => fx(x, 1))} min of play`, 'Gate'],
+		['Streak value in the first 30 days, share of own fishing income (integrated)', ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].streakShareOfFishing)}`).join(', '), 'Lifecycle'],
+		['Streak XP share at L20–L50 (Double XP from streak boxes, integrated)', `at most ${pct(maxStreakXp, 2)}; structural bound ${pct(R.doubleXpDayShare, 2)}`, 'R2 decomposition'],
+		['Minimum-daily player vs casual (R2)', r2r.minimumDaily.verdict.split(':')[0], 'R2 minimum-daily'],
+		['No-miss grinder: largest milestone shift from the streak', `${pct(r2r.noMissGrinder.maxHoursDelta, 2)} (${r2r.noMissGrinder.verdict.split(':')[0]})`, 'R2 grinder'],
+		['Regular player with the streak (reference loop)', `${Object.entries(r2r.noMissGrinder.regularHours).map(([L, h]) => `L${L} ${hrs(h)}`).join(', ')}; ${r2r.noMissGrinder.regularStillInWindows ? 'every approved window met' : 'a window is MISSED'}`, 'R2 grinder'],
+		['Today\'s vote rule on the new value model (casual, 30 days)', `${usd(tg.newValueModel.casual.topggRule30d)} = ${pct(tg.newValueModel.casual.topggShareOfFishing, 0)} of fishing income, against the streak's ${pct(tg.newValueModel.casual.streakShareOfFishing)}`, 'Top.gg'],
+		['Legendary/Lucky in streak boxes', `${pct(jp.crate.pAtLeastOne)} of crates, ${pct(jp.chest.pAtLeastOne)} of chests, ${pct(jp.pAtLeastOnePerWeek, 0)} of weeks`, 'Box contents'],
+		['Founder box value (proposed profile, private)', `a crate is worth ${range(fv.stages.map((s) => s.crate.ratio), (x) => `${fx(x, 1)}×`)} a normal one`, 'Founder'],
+		['Design checks', `${R.checks.list.filter((c) => c.pass).length} of ${R.checks.list.length} pass`, 'Checks'],
+	]);
+
+	// Decisions for approval.
+	out['streak-decisions'] = `${mdTable(['ID', 'Proposed decision', 'Modelled', 'Alternatives', 'Why', 'Record = model'], DECISIONS.map((d) => [
+		`\`${d.id}\``, d.title, d.modelled, d.alternatives.join('; '), d.why,
+		d.get ? yes(JSON.stringify(d.get()) === JSON.stringify(d.expected)) : 'n/a (not a PARAMS value)',
+	]))}\n\nStatus of every entry: \`${[...new Set(DECISIONS.map((d) => d.status))].join(', ')}\`. Only the user approves; \`decisions.js\` joins these to the Phase 5B registry (alongside the framework's \`P-DAY\`, \`P-EVENTS\`, \`P-DOUBLE-CASH\` and \`A-TOPGG\`, which this design relies on) and \`check-shared.js\` verifies each record against the model.`;
+
+	// Current -> Proposed.
+	const todayC = tg.todayModel;
+	const vt = VOTERS.rarityTable;
+	out['streak-current-proposed'] = mdTable(['Item', 'Current', 'Proposed'], [
+		['External daily reward', `\`/vote\`: a Top.gg API check (\`User.vote()\`, \`TOPGG_TOKEN\`, a network call) on every vote, paying ${usd(todayC.casual.cashPerVote)} + a Voter's Crate per vote`, '**Retired** (`P-STREAK-VOTE`). No network call and no token'],
+		['DCC-native daily reward', 'None. The daily quest runs on a rolling clock from the time the last one was accepted', `A **streak day** once per DCC day, earned by ${G} successful casts and credited in the qualifying cast (\`P-STREAK-GATE\`)`],
+		['Reward', `Cash + a Voter's Crate: ${VOTERS.slots} slots, fish from **every** biome, the Old Rod, parts of every rarity, bait, buffs`, `${P.ladder.dailyBox} (${crateDef.slots} slots) or, every ${P.ladder.cycle}th streak day, the ${P.ladder.milestoneBox} (${chestDef.slots} slots, slot 0 ${chestDef.guaranteedSlots[0].minRarity}+). Fish from the player's highest biome; parts up to ${P.pool.maxPartRarity}; no cash`],
+		['Rarity table', `Voter's: ${RARITIES.map((r) => `${r} ${vt[r]}`).join(', ')}`, `The same table with common ${P.pool.rarityTable.common}, rarity floor ${P.pool.rarityFloor}`],
+		['Streak, grace, decay', 'None', `Count, best, total; grace tokens (${P.grace.start} → max ${P.grace.max}); −${P.decay.perUncoveredMiss} days per uncovered miss; reset after ${P.decay.resetAfterMissedDays} missed days`],
+		['Value in the first 30 days, share of own fishing income', `${ARCHETYPE_NAMES.map((a) => `${a} ${pctAuto(todayC[a].votesShareOfFishing)}`).join(', ')} (Phase 5 model, \`simulation.json\`)`, `${ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].streakShareOfFishing)}`).join(', ')} (integrated, framework ${R.frameworkVersion})`],
+		['XP', 'None from votes', `None direct. Double XP buffs in streak boxes only: at most ${pct(maxStreakXp, 2)} of XP at L20–L50`],
+		['Voter\'s Crate', 'Granted per vote', 'No longer granted. Owned crates open forever, minus the Old Rod reward (`P-STREAK-VOTERS-CRATE`)'],
+		['Vote counters', '`stats.lastVoted` is written. `stats.totalVotes` is never incremented (`User.vote()` increments `stats.votes`, which the schema does not define)', 'Both kept read-only. New additive `streak.*` fields'],
+	]);
+
+	// Gate.
+	out['streak-gate'] = mdTable(['Archetype', 'Overhead per cast', 'Minutes to reach the gate', 'Share of the day\'s casts'], ARCHETYPE_NAMES.map((a) => [
+		cap(a), `${F.ARCHETYPES[a].overheadS} s`, fx(R.gate.minutesByArchetype[a], 1), pct(R.gate.shareOfDailyCasts[a]),
+	]).concat([[
+		'Minimum-daily player (integrated, `F.MINIMUM_DAILY`)', `${F.MINIMUM_DAILY.overheadS} s`,
+		`${fx(R.gate.minimumDailyMinutesPerDay.streakOnly, 1)} a day with the streak alone; ${fx(R.gate.minimumDailyMinutesPerDay.reference, 1)} with the daily quest too`, '—',
+	]])) + `\n\nOld Rod cooldown ${F.COOLDOWN.fishMs / 1000} s + overhead; ${G} casts.`;
+
+	// Rule traces.
+	const rx = R.rules;
+	const gateHit = rx.gate.find((g) => g.credited);
+	const after = rx.gate.find((g) => g.cast === G + 1);
+	const nextDay = rx.gate[rx.gate.length - 1];
+	const fw = rx.firstWeek.steps;
+	const chestStep = fw[fw.length - 1];
+	const missed = (tr) => tr.steps[0].day - tr.start.lastDay - 1;
+	const gapRow = (tr, event) => {
+		const s = tr.steps[0];
+		const parts = [];
+		if (s.graceUsed) parts.push(`${s.graceUsed} token${s.graceUsed > 1 ? 's' : ''} used`);
+		if (s.reset) parts.push(`**reset** (tokens kept: ${s.grace})`);
+		else if (s.decayedBy) parts.push(`${tr.start.count} − ${P.decay.perUncoveredMiss * (missed(tr) - s.graceUsed)} → ${tr.start.count - s.decayedBy}`);
+		return [tr.label, `streak ${tr.start.count}, grace ${tr.start.grace}`, event, `${parts.join('; ')}${parts.length ? '; then ' : ''}streak **${s.streak}**, grace ${s.grace}`];
+	};
+	out['streak-rules'] = mdTable(['Case', 'Before', 'Event', 'After'], [
+		['Gate', `${G - 1} casts today`, `cast ${gateHit.cast}`, `credited: ${gateHit.box}. Cast ${after.cast} credits nothing (${after.credited ? 'CREDITED' : 'no-op'}); the next day starts again at ${nextDay.castsToday}`],
+		[rx.firstWeek.label, `new player (grace ${rx.firstWeek.start.grace})`, `${fw.length} consecutive days`, `days 1–${fw.length - 1}: ${fw[0].box}; day ${chestStep.day}: **${chestStep.box}**, grace ${fw[fw.length - 2].grace} → ${chestStep.grace}${chestStep.badges.length ? `, badge ${chestStep.badges.join(', ')}` : ''}`],
+		[rx.sameDayTwice.label, 'credited today', 'another credit attempt', rx.sameDayTwice.steps[1].credited ? 'CREDITED TWICE' : 'no-op'],
+		gapRow(rx.missCovered, `skip ${missed(rx.missCovered)} day, play`),
+		gapRow(rx.missUncovered, `skip ${missed(rx.missUncovered)} days, play`),
+		gapRow(rx.newStreakMiss, `skip ${missed(rx.newStreakMiss)} day, play`),
+		gapRow(rx.longGap, `skip ${missed(rx.longGap)} days, play`),
+	]);
+
+	// Ladder.
+	const ld = R.ladder.days;
+	const ldRow = (v, label) => [label, v.box, usd(v.cashEquivalent), fx(v.items.fish), fx(v.items.parts), fx(v.items.baitPacks, 3), BUFF_NAMES.map((b) => fx(v.buffs[b] || 0, 3)).join(' / ')];
+	out['streak-ladder'] = mdTable(['Streak day', 'Box', 'Box contents (cash-equivalent)', 'Fish', 'Uncommon parts', 'Bait packs', `Buffs (${BUFF_NAMES.join(' / ')})`], [
+		ldRow(ld[0], `1–${P.ladder.cycle - 1}, ${P.ladder.cycle + 1}–${2 * P.ladder.cycle - 1}, …`),
+		ldRow(ld[P.ladder.cycle - 1], `${P.ladder.cycle}, ${2 * P.ladder.cycle}, ${3 * P.ladder.cycle}, …`),
+	]) + `\n\nAt Lv ${R.ladder.level} (${F.biomeAt(R.ladder.level)}). Cash-equivalent = fish at sale value + parts at salvage + usable bait packs at pack price (what the streak system books). Buffs are counted here and valued by the buffs system.`;
+
+	// Attendance.
+	const alt = att.moreGrace.rows;
+	out['streak-attendance'] = mdTable(['Days played per week', 'Claims / 30 d', 'Chests / 30 d', 'Tokens used / 30 d', 'Chests / year', 'Chest share of claims', 'Uncovered misses / year', 'Resets / year', 'Value per claim vs daily player', `Alternative (${att.moreGrace.rules.perCycle} per chest, max ${att.moreGrace.rules.max}): chests / year`, 'Alternative: value per claim'], att.proposed.map((x, i) => [
+		fx(x.daysPerWeek, 0), fx(x.d30.claims, 1), fx(x.d30.chests), fx(x.d30.graceUsed), fx(x.d365.chests, 1), pct(x.d365.chestShare), fx(x.d365.decayEvents, 1), fx(x.d365.resets), pct(x.valuePerClaimVsDaily),
+		fx(alt[i].d365.chests, 1), pct(alt[i].valuePerClaimVsDaily),
+	])) + `\n\nExact DP over streak × tokens × missed days, each day played independently with probability days/7; values at Lv ${att.referenceLevel}, where a chest is worth ${fx(att.chestToCrate, 1)}× a crate.`;
+
+	// Box definitions.
+	const cd = R.boxDefinitions[P.ladder.dailyBox];
+	const hd = R.boxDefinitions[P.ladder.milestoneBox];
+	const tbl = (t) => RARITIES.filter((r) => t[r] > 0).map((r) => `${r} ${t[r]}`).join(', ');
+	out['streak-boxes'] = mdTable(['', P.ladder.dailyBox, P.ladder.milestoneBox], [
+		['id', `\`${cd.id}\``, `\`${hd.id}\``],
+		['slots', cd.slots, `${hd.slots} (${hd.slots - cd.slots} bonus)`],
+		['strategy', cd.strategy, hd.strategy],
+		['pool.types', cd.pool.types.join(', '), 'same'],
+		['pool.fish', `**\`'${cd.pool.fish}'\`** (new option)`, 'same'],
+		['pool.fishShare', `**${cd.pool.fishShare}** (new option)`, 'same'],
+		['pool.exclude', `every rod part above ${P.pool.maxPartRarity} (${cd.pool.exclude.length} names, from the catalog)`, 'same'],
+		['rarityTable', `${tbl(cd.rarityTable)} (the Voter's table without common)`, 'same'],
+		['rarityFloor', cd.rarityFloor, hd.rarityFloor],
+		['guaranteedSlots', cd.guaranteedSlots.length ? JSON.stringify(cd.guaranteedSlots) : 'none', hd.guaranteedSlots.map((g) => `slot ${g.slot} ≥ **${g.minRarity}**`).join(', ')],
+		['duplicates', cd.duplicates, hd.duplicates],
+		['pity', 'none', 'none'],
+	]);
+
+	// Contents of one open.
+	const cc = R.contents.crate;
+	const hc = R.contents.chest;
+	const rar = RARITIES.filter((r) => (cc.slotTables[0][r] || 0) + (hc.slotTables[0][r] || 0) > 0);
+	out['streak-contents'] = mdTable(['Rarity', `${P.ladder.dailyBox} slot`, `${P.ladder.milestoneBox} slot 0`], rar.map((r) => [cap(r), pct(cc.slotTables[0][r] || 0, 2), pct(hc.slotTables[0][r] || 0, 2)])) + '\n\n' +
+		mdTable(['Per open', 'Fish', 'Uncommon parts', 'Bait packs', ...BUFF_NAMES, 'Holds a Legendary/Lucky fish'], [
+			[P.ladder.dailyBox, fx(cc.fish), fx(cc.parts), fx(sumValues(cc.baitPacks), 3), ...BUFF_NAMES.map((b) => fx(cc.buffs[b] || 0, 3)), pct(jp.crate.pAtLeastOne)],
+			[P.ladder.milestoneBox, fx(hc.fish), fx(hc.parts), fx(sumValues(hc.baitPacks), 3), ...BUFF_NAMES.map((b) => fx(hc.buffs[b] || 0, 3)), pct(jp.chest.pAtLeastOne)],
+		]) + `\n\nAt Lv ${R.contents.level}. At least one Legendary or Lucky fish arrives in ${pct(jp.pAtLeastOnePerWeek, 0)} of weeks; about ${fx(jp.expectedPer30Days)} arrive per 30 days. Bait packs: ${Object.keys(cc.baitPacks).join(', ')}.`;
+
+	// Value per box by stage.
+	out['streak-box-value'] = mdTable(['Stage', 'Crate: fish', 'fish $', 'salvage $', 'usable bait $', 'bait not yet usable $', 'Chest: fish', 'fish $', 'salvage $', 'usable bait $'], F.LIVE_BIOMES.map((b) => {
+		const v = R.values[b];
+		return [`${b} (Lv ${v.level})`, fx(v.crate.fish), usd(v.crate.fishValue), usd(v.crate.salvage), usd(v.crate.baitUsable), usd(v.crate.baitDeferred), fx(v.chest.fish), usd(v.chest.fishValue), usd(v.chest.salvage), usd(v.chest.baitUsable)];
+	})) + '\n\nFish at the framework\'s `proposedValue`, parts at `rods.salvageValue`, bait at `bait.prices()` pack price once the player can use it.';
+
+	// Legacy Voter's Crate.
+	out['streak-voters'] = mdTable(['Stage', 'One open (liquid)', 'Fish (all biomes)', 'Part salvage', 'Usable bait'], R.legacyVotersCrateValue.map((x) => [`${x.biome} (Lv ${x.level})`, usd(x.liquid), usd(x.fishValue), usd(x.salvage), usd(x.baitUsable)])) +
+		`\n\nToday (\`gacha-ev.json\`, today's value model): ${usd(tg.votersCrateTodayLiquid)} per open. With the proposed Old Rod exclusion.`;
+
+	// Per claimed day by stage (static rates).
+	out['streak-stage-value'] = mdTable(['Stage', 'Regular $/h at the stage', 'Crate', 'Chest', 'Per claimed day', 'Minutes of stage income (regular)', 'Buffs per claimed day', ...ARCHETYPE_NAMES.map((a) => `Share of ${a}'s daily fishing`)], F.LIVE_BIOMES.map((b, i) => {
+		const v = R.values[b];
+		return [`${b} · ${v.tier} (Lv ${v.level})`, usd(v.stageCashPerHour), usd(v.crate.liquid), usd(v.chest.liquid), usd(v.perClaim.cashEquivalent), fx(v.perClaimMinutesOfStageIncome, 1), fx(v.perClaim.buffs, 3), ...ARCHETYPE_NAMES.map((a) => pct(av[a].byLevel[i].share))];
+	})) + '\n\nBox columns: liquid value (fish + salvage); per claimed day adds usable bait (7-day cycle average). Stage $/h: `F.castOutcome` at the typical tier, the core\'s base fishing rate for the reference loop. Buffs are not in these columns (the buffs system values them; lifecycle table).';
+
+	// Integrated lifecycle totals.
+	out['streak-lifecycle'] = mdTable(['Player', 'Day', 'Level', 'Fishing income', 'Box contents', 'Double Cash (buffs system)', 'Streak / fishing', 'Streak per day', 'Double Cash share', 'Streak XP share', 'Lucky Draw (attributed)', 'With Lucky Draw / fishing'], ARCHETYPE_NAMES.flatMap((a) => PERIODS.map((d) => {
+		const s = av[a].periods[d];
+		return [d === PERIODS[0] ? `${cap(a)} (${F.ARCHETYPES[a].minutesPerDay} min/day)` : '', d, s.level, usd(s.fishingIncome), usd(s.boxContents), usd(s.doubleCash), `**${pct(s.streakShareOfFishing)}**`, usd(s.streakPerDay), pct(s.doubleCashShareOfStreak, 0), pct(s.streakXpShare, 2), usd(s.luckyDrawAttributed), pct(s.withLuckyDrawShareOfFishing)];
+	}))) + `\n\nIntegrated reference loop (${I.REFERENCE_NOTE}); every archetype plays every day. Streak = box contents (the streak's ledger) + the Double Cash of streak boxes (the buffs system's value by source). Lucky Draw: the buffs system's Lucky Draw value (assembly rebates and Streak Crate bonus slots) attributed to streak boxes pro rata to the Lucky Draw units received; outside the streak share the design targets use (last column: with it).` + '\n\n' +
+		mdTable(['Per 30 days (integrated)', ...ARCHETYPE_NAMES.map(cap)], [
+			['Streak days credited', ...ARCHETYPE_NAMES.map((a) => n0(s30[a].credits))],
+			['Crates / chests', ...ARCHETYPE_NAMES.map((a) => `${n0(s30[a].items.crates)} / ${n0(s30[a].items.chests)}`)],
+			['Fish', ...ARCHETYPE_NAMES.map((a) => fx(s30[a].items.fish, 1))],
+			['Uncommon parts', ...ARCHETYPE_NAMES.map((a) => fx(s30[a].items.parts, 1))],
+			['Bait packs', ...ARCHETYPE_NAMES.map((a) => fx(s30[a].items.baitPacks, 1))],
+			['Buffs', ...ARCHETYPE_NAMES.map((a) => fx(s30[a].items.buffs, 2))],
+		]);
+
+	// R2 decomposition.
+	out['streak-r2-decomposition'] = mdTable(['Player', 'Level', 'Play-hours (without streak → with)', 'Calendar day', 'Fishing XP', 'Quest XP (story + repeatable)', 'Daily systems XP (daily + weekly)', 'Streak XP (Double XP of streak boxes)', 'Other buff XP', 'Other', 'Streak share'], ARCHETYPE_NAMES.flatMap((a) => {
+		const x = r2r.archetypes[a];
+		return R2_LEVELS.filter((L) => x.decomposition[L]).map((L, i) => {
+			const d = x.decomposition[L];
+			return [i === 0 ? cap(a) : '', L, `${fx(x.hoursWithoutStreak[L])} → ${fx(x.hoursWithStreak[L])}`, d.day, n0(d.xp.fishing), n0(d.xp.quests), n0(d.xp.daily), n0(d.xp.streak), n0(d.xp.buffsOther), n0(d.xp.other), pct(d.share.streak, 2)];
+		});
+	})) + `\n\nIntegrated reference loop; "without streak" excludes the streak system (\`exclude: ['streak']\`). Structural bound on the streak share: ${pct(R.doubleXpDayShare, 2)} of streak days bring a Double XP buff.`;
+
+	// R2 minimum-daily.
+	const mdRows = (key, label) => r2r.minimumDaily[key].rows.map((r, i) => [
+		i === 0 ? label : '', r.day,
+		r.minimumDaily.level, fx(r.minimumDaily.hours, 1), n0(r.minimumDaily.xpPerActiveHour), usd(r.minimumDaily.streakCashPerActiveHour),
+		r.casual.level, fx(r.casual.hours, 1), n0(r.casual.xpPerActiveHour), usd(r.casual.streakCashPerActiveHour),
+		r.minimumDailyLeadsInLevel ? '**yes**' : 'no',
+	]);
+	out['streak-r2-minimum-daily'] = mdTable(['Variant', 'Day', 'Min-daily: level', 'play-h', 'XP / active h', 'streak $ / active h', 'Casual: level', 'play-h', 'XP / active h', 'streak $ / active h', 'Leads?'], [
+		...mdRows('streakOnly', `Streak alone (quests excluded; ${fx(r2r.minimumDaily.streakOnly.minutesPerDay, 1)} min/day)`),
+		...mdRows('reference', `Reference loop (streak + daily quest; ${fx(r2r.minimumDaily.reference.minutesPerDay, 1)} min/day)`),
+	]) + `\n\n\`F.MINIMUM_DAILY\` (${F.MINIMUM_DAILY.overheadS} s overhead) plays each day only until every system's \`sessionDone()\` holds. Verdict: **${r2r.minimumDaily.verdict}** Streak days credited: ${r2r.minimumDaily.streakOnly.credited} of ${r2r.minimumDaily.streakOnly.days} (streak alone), ${r2r.minimumDaily.reference.credited} of ${r2r.minimumDaily.reference.days} (reference loop).`;
+
+	// R2 grinder.
+	const g = r2r.noMissGrinder;
+	const gl = Object.keys(g.hoursWithoutStreak).filter((L) => L in g.hoursWithStreak);
+	out['streak-r2-grinder'] = mdTable(['Level', 'Grinder without streak', 'with streak', 'Shift'], gl.map((L) => [L, hrs(g.hoursWithoutStreak[L]), hrs(g.hoursWithStreak[L]), pct((g.hoursWithoutStreak[L] - g.hoursWithStreak[L]) / g.hoursWithoutStreak[L], 2)])) +
+		`\n\nVerdict: **${g.verdict}** Regular player with the streak: ${Object.entries(g.regularHours).map(([L, h]) => `L${L} ${hrs(h)} (window ${F.TARGET_WINDOWS[L].join('–')} h)`).join(', ')}.`;
+
+	// T1 parts.
+	out['streak-t1-parts'] = mdTable(['Figure', 'Value'], [
+		['Uncommon parts per Streak Crate', fx(t1.uncommonPartsPerCrate)],
+		['Chance per crate slot', Object.entries(t1.slotChancePerCrateSlot).map(([k, v]) => `${k.replace('part_', '')} ${pct(v)}`).join(', ')],
+		['Days of crates to collect all four slot types', `median ${t1.medianDays}, mean ${fx(t1.expectedDays, 1)}, P90 ${t1.p90Days}`],
+		['T1 assembly the set would save', `${usd(t1.t1AssemblyCost)} (\`rods.assembly(1)\`, Lv ${t1.t1Level})`],
+		...ARCHETYPE_NAMES.map((a) => [`${cap(a)}: reaches Lv ${t1.t1Level} on day (integrated) / set complete by then`, `day ${t1.daysToTier1Level[a]} / ${pct(t1.pSetCompleteByTier1Level[a] || 0, 0)}`]),
+	]) + `\n\n${t1.note}. The integrated lifecycle books these parts at salvage (counting rule), so a set that saves the T1 assembly is an upside the lifecycle tables do not count.`;
+
+	// Quests interplay.
+	out['streak-quests'] = mdTable(['Daily band', 'Fish per cast at the band\'s gear', 'Daily Catch: fish', 'casts', 'Daily Rare Hunt: target', 'median fish', 'median casts', 'Completing the daily meets the gate?'], R.quests.map((q) => [
+		`${q.band} (${q.biome})`, fx(q.fishPerCast), q.catchFish, fx(q.catchCasts, 1), q.rareTarget, q.rareFishP50, fx(q.rareCastsP50, 1),
+		`Catch ${q.catchMeetsGate ? 'yes' : '**no**'}; Rare Hunt (median) ${q.rareP50MeetsGate ? 'yes' : '**no**'}`,
+	])) + `\n\nFrom \`quests.templateTerms()\`; the gate is ${G} successful casts.`;
+
+	// Founder.
+	out['streak-founder'] = mdTable(['Stage', 'Crate: normal', 'Founder', 'ratio', 'Legendary+ per crate: normal', 'Founder', 'Chest: normal', 'Founder', 'ratio'], fv.stages.map((s) => [
+		`${s.biome} (Lv ${s.level})`, usd(s.crate.normal), usd(s.crate.founder), `${fx(s.crate.ratio, 1)}×`, fx(s.crate.normalLegendaryPlus, 3), fx(s.crate.founderLegendaryPlus, 3), usd(s.chest.normal), usd(s.chest.founder), `${fx(s.chest.ratio, 1)}×`,
+	])) + `\n\nLiquid value (fish + salvage). Founder: the proposed profile (\`${fv.profile.source}\`): gacha stats ${Object.entries(fv.profile.gachaStats).map(([k, v]) => `${k} +${pct(v, 0)}`).join(', ')}, sell ×${fv.profile.sell} (today's profile: ×${fv.profile.todaySell}). Founder pity is not modelled (it can only raise these).`;
+
+	// Top.gg.
+	out['streak-topgg'] = mdTable(['Player', 'Votes/day', 'Today (Phase 5 simulation, 30 d): votes vs fishing', 'Today\'s vote rule on the new value model (integrated, 30 d)', 'Proposed streak (integrated, 30 d)'], Object.keys(todayC).map((a) => {
+		const t = todayC[a];
+		const p = tg.newValueModel[a];
+		return [cap(a), t.votesPerDay, `${usd(t.votes30d)} vs ${usd(t.fishing30d)} (**${pctAuto(t.votesShareOfFishing)}**)`, `${usd(p.topggRule30d)} vs ${usd(p.fishing30d)} (**${pctAuto(p.topggShareOfFishing)}**)`, `${usd(p.streak30d)} (**${pct(p.streakShareOfFishing)}**)`];
+	}));
+
+	// Validation.
+	const rp = R.recorderParity;
+	const ct = R.creditTiming;
+	const sp = R.systemParity;
+	out['streak-validation'] = mdTable(['Check', 'Result', 'Detail'], [
+		['Recorder is observational (live)', rp.exact ? 'exact' : '**differs**', `integratedRun() vs integrate.run() for ${Object.keys(rp.rows).join(', ')}: milestone hours, timeline and every ledger entry identical (${Object.values(rp.rows).map((r) => r.milestones).reduce((a, b) => a + b, 0)} milestones)`],
+		['Buffs counted once (live)', R.checks.list.find((c) => c.id === 'buffs-counted-once').pass ? 'yes' : '**no**', 'every buff unit the streak grants is received by the buffs system; the streak\'s ledger holds only its non-buff contents'],
+		['Credit timing: \'gate\' vs \'dayEnd\' (live)', ct.maxMilestoneShift === 0 ? 'no milestone moves' : `milestones move ≤ ${pct(ct.maxMilestoneShift, 2)}`, `the box on the qualifying cast instead of after the session; 30-day streak value changes by at most ${pct(ct.maxStreakValueChange, 1)} (${ARCHETYPE_NAMES.map((a) => `${a} ${pct(ct.rows[a].streakValue30dChange, 1)}`).join(', ')})`],
+		['Parity with the retired private loop (record)', `${sp.archetypes.exactMilestoneHours} milestones step-exact; max relative difference ${sp.archetypes.maxRelativeDifference}`, `${sp.source}. Scope: ${sp.archetypes.scope}; R2 verdicts ${Object.values(sp.r2.verdicts).join('/')} (unchanged); archetype and grinder R2 rows max relative difference ${sp.r2.archetypesAndGrinderMaxRelativeDifference}`],
+		['One rule differed (record)', `minimum-daily streak cash ≤ ${pct(sp.r2.minimumDailyMaxRelativeDifference, 1)}`, `${cap(sp.cause)}. Its fixed ${sp.minimumDaily.oldFixedSession.sessionMinutes}-minute minimum-daily session fell below the gate on ${sp.minimumDaily.oldFixedSession.belowGateDays} of ${sp.minimumDaily.days} days (floating-point day boundaries): the core credited ${sp.minimumDaily.oldFixedSession.credited}, the old loop ${sp.minimumDaily.oldLoopCredited}; the core is right. \`F.MINIMUM_DAILY\` meets the gate every day (${sp.minimumDaily.sharedSession.credited} of ${sp.minimumDaily.days}). A replay with the old rule (\`${sp.replay.rule}\`) was exact: ${sp.replay.exactMilestoneHours} milestones, max relative difference ${sp.replay.maxRelativeDifference}`],
+	]);
+
+	// Checks.
+	const fmtVal = (c) => {
+		if (c.value === undefined) return '—';
+		if (c.id === 'milestones-covered') return `Lv ${c.value} reached by every archetype`;
+		if (c.id === 'regular-in-windows-with-streak') return Object.entries(c.value).map(([L, h]) => `L${L} ${hrs(h)}`).join(', ');
+		if (c.id === 't1-set-not-free-for-regular') return `median ${c.value.medianDays} days; regular at Lv ${t1.t1Level} on day ${c.value.regularTier1Day}`;
+		if (typeof c.value === 'number') return pct(c.value, 2);
+		if (Array.isArray(c.value)) return c.value.map((x) => pct(x)).join(' > ');
+		return Object.entries(c.value).map(([k, v]) => `${k} ${pct(v, 2)}`).join(', ');
+	};
+	const fmtTarget = (c) => (c.band ? `${pct(c.band[0], 0)}–${pct(c.band[1], 0)}` : c.max !== undefined ? `≤ ${pct(c.max, 2)}` : c.min !== undefined ? `median ≥ ${c.min} days, and after the regular player's T1 day` : '—');
+	out['streak-checks'] = mdTable(['Check', 'Value', 'Target', 'Pass'], R.checks.list.map((c) => [`\`${c.id}\``, fmtVal(c), fmtTarget(c), c.pass ? 'pass' : '**FAIL**'])) +
+		`\n\n\`checks().pass\`: **${R.checks.pass}**.`;
+	return out;
+}
+
 module.exports = {
-	PARAMS,
+	PARAMS, DECISIONS, SYSTEM_PARITY,
 	dayIndex, defaultState, boxForDay, applyGap, advanceStreak, onSuccessfulCast,
-	boxDefinitions, legacyVotersCrate, boxEV,
-	stageRates, streakValue, perClaimValue,
-	attendanceModel, attendanceTable, lifecycle, minimumDailyArchetype,
-	archetypeValue, r2, r2With, t1PartsFromStreak, topggComparison, founderView, baselineMatchesCurveJson, ruleExamples,
+	boxDefinitions, legacyVotersCrate, boxEV, boxContents,
+	stageRates, streakValue, perClaimValue, minimumDailyArchetype,
+	attendanceModel, attendanceTable,
+	SYSTEM_NAME, CASH_SOURCE, system, integratedRun, lifecycle, recorderParity,
+	archetypeValue, r2, t1PartsFromStreak, topggComparison, founderView, questInterplay, creditTiming, ruleExamples,
 	jackpots, doubleXpDayShare, checks,
-	SYSTEM_NAME, CASH_SOURCE, boxContents, system, legacyBuffValue, coreRun, validateSystem,
-	report,
+	report, markdownTables,
 };
 
 if (require.main === module) process.stdout.write(`${JSON.stringify(module.exports.report(), null, 1)}\n`);
