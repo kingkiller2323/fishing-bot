@@ -11,7 +11,8 @@
 //      CURVE.quartic, was generated at the current digest, and keeps the regular player in every window;
 //   4. the decision registry (decisions.js + every module's DECISIONS) only uses allowed statuses
 //      (nothing claims user approval of a candidate rule) and every modelled value is what runs;
-//   5. every module doc's generated tables are current (render-docs.js).
+//   5. every module doc's generated tables, and the final report's (docs/economy/PHASE5B_REPORT.md,
+//      from summary.js), are current (render-docs.js).
 //
 //   node scripts/economy/5b/check-shared.js
 const fs = require('node:fs');
@@ -24,7 +25,7 @@ const DIR = __dirname;
 const SOURCE_FILES = new Set(['framework.js', 'assumptions.js', 'decisions.js', 'check-shared.js']);
 // Infrastructure and runners: scanned for local copies, but not subsystem modules (no report() stamp;
 // runners print on load, so they are never required here).
-const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js', 'render-docs.js']);
+const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js', 'render-docs.js', 'summary.js']);
 const num = (n) => String(n).replace('.', '\\.').replace(/^0\\\./, '0?\\.');
 
 const RULES = [
@@ -122,11 +123,18 @@ async function main() {
 	const provenanceFile = path.join(DIR, '../../../docs/economy/5b/curve.json');
 	if (fs.existsSync(provenanceFile) && JSON.parse(fs.readFileSync(provenanceFile, 'utf8')).model !== 'provisional') problems.push('curve.json must be the provisional-model provenance record');
 	// Generated docs: every module doc's number tables are current (render-docs.js --check).
-	const { renderModule, MODULES } = require('./render-docs');
+	const { renderModule, MODULES, docName } = require('./render-docs');
 	for (const name of MODULES) {
-		const r = renderModule(name);
+		let r;
+		try {
+			r = renderModule(name);
+		}
+		catch (e) {
+			problems.push(`docs: rendering ${docName(name)} threw: ${e.message}`);
+			continue;
+		}
 		for (const p of r.problems) problems.push(`docs: ${p}`);
-		if (r.changed) problems.push(`docs: ${name}.md is stale; run node scripts/economy/5b/render-docs.js`);
+		if (r.changed) problems.push(`docs: ${docName(name)} is stale; run node scripts/economy/5b/render-docs.js`);
 	}
 	// Decision registry: candidate rules stay 'proposed' and match what the model runs.
 	const decisions = require('./decisions').verify();
