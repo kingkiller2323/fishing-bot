@@ -70,22 +70,30 @@ function progressText(xp, level) {
  * freeze anchor), whatever curve is active. Each field is set only where it is missing (guarded
  * update), so it is idempotent and never lowers a floor a cast has already raised with $max.
  */
+/**
+ * Additive, idempotent: writes levelFloor = max(stored level, today's curve(xp)) and publicLevelFloor
+ * (the same for a member, whose publicXp equals xp; today's curve(publicXp) for an account with private
+ * bonuses) where missing. Floors never decrease afterwards.
+ */
 async function migrateLevelFloors({ UserModel }) {
 	const { publicXpOf } = require('./publicLevel');
 	const todays = CURVES.current.levelForXp;
 	const users = await UserModel.collection.find(
 		{ $or: [{ levelFloor: { $exists: false } }, { publicLevelFloor: { $exists: false } }] },
-		{ projection: { xp: 1, publicXp: 1, levelFloor: 1, publicLevelFloor: 1 } },
+		{ projection: { xp: 1, level: 1, publicXp: 1, levelFloor: 1, publicLevelFloor: 1 } },
 	).toArray();
 	let levelFloors = 0;
 	let publicLevelFloors = 0;
 	for (const u of users) {
+		// P-CURVE-EXISTING: the floor keeps the level the player has today, max(stored level, today's curve(xp)).
+		const stored = Number.isFinite(u.level) ? u.level : 0;
+		const realFloor = Math.max(stored, todays(u.xp || 0));
 		if (u.levelFloor === undefined) {
-			const res = await UserModel.collection.updateOne({ _id: u._id, levelFloor: { $exists: false } }, { $set: { levelFloor: todays(u.xp || 0) } });
+			const res = await UserModel.collection.updateOne({ _id: u._id, levelFloor: { $exists: false } }, { $set: { levelFloor: realFloor } });
 			levelFloors += res.modifiedCount;
 		}
 		if (u.publicLevelFloor === undefined) {
-			const res = await UserModel.collection.updateOne({ _id: u._id, publicLevelFloor: { $exists: false } }, { $set: { publicLevelFloor: todays(publicXpOf(u)) } });
+			const res = await UserModel.collection.updateOne({ _id: u._id, publicLevelFloor: { $exists: false } }, { $set: { publicLevelFloor: publicXpOf(u) >= (u.xp || 0) ? realFloor : todays(publicXpOf(u)) } });
 			publicLevelFloors += res.modifiedCount;
 		}
 	}

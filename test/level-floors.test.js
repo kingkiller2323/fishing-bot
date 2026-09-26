@@ -85,6 +85,9 @@ test('migration writes both floors from today\'s curve, only where missing, idem
 		{ userId: 'fl-m3', xp: 700 },
 		// Already has a floor (e.g. raised by a cast): never lowered or rewritten.
 		{ userId: 'fl-m4', xp: 100, publicXp: 100, levelFloor: 30, publicLevelFloor: 20 },
+		// Stored level above today's curve (P-CURVE-EXISTING: the floor keeps the stored level).
+		{ userId: 'fl-m5', xp: 2500, publicXp: 2500, level: 12 },
+		{ userId: 'fl-m6', xp: 90000, publicXp: 1600, level: 35 },
 	]);
 	const first = await migrateLevelFloors({ UserModel });
 	assert.ok(first.levelFloors >= 3);
@@ -93,6 +96,8 @@ test('migration writes both floors from today\'s curve, only where missing, idem
 	assert.deepEqual([(await d('fl-m2')).levelFloor, (await d('fl-m2')).publicLevelFloor], [30, 4]);
 	assert.deepEqual([(await d('fl-m3')).levelFloor, (await d('fl-m3')).publicLevelFloor], [2, 2], 'missing publicXp reads as xp');
 	assert.deepEqual([(await d('fl-m4')).levelFloor, (await d('fl-m4')).publicLevelFloor], [30, 20]);
+	assert.deepEqual([(await d('fl-m5')).levelFloor, (await d('fl-m5')).publicLevelFloor], [12, 12], 'member: max(stored level, curve) for both');
+	assert.deepEqual([(await d('fl-m6')).levelFloor, (await d('fl-m6')).publicLevelFloor], [35, 4], 'private bonuses: public floor from publicXp only');
 	const again = await migrateLevelFloors({ UserModel });
 	assert.deepEqual(again, { scanned: 0, levelFloors: 0, publicLevelFloors: 0 });
 });
