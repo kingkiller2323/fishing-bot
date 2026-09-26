@@ -190,3 +190,23 @@ test('boot recovery: corrupt journals do not stop the boot or the valid journals
 	assert.equal(await Cast.countDocuments({ userId: id, status: 'pending' }), 3);
 	assert.equal(await GachaOpen.countDocuments({ userId: id, status: 'pending' }), 1);
 });
+
+test('replaying a 3.2.0 journal never lowers a stored level above the curve (the level is written with $max)', async () => {
+	const result = fixture('cast-journal-3.2.0.json');
+	result.userId = 'journal-highlevel';
+	result.castId = new mongoose.Types.ObjectId().toString();
+	result.rod.id = new mongoose.Types.ObjectId().toString();
+	result.writes.fishDocs = result.writes.fishDocs.map((d) => ({ ...d, _id: new mongoose.Types.ObjectId().toString(), user: result.userId, castId: result.castId }));
+	await fixturePlayer(result, { xp: 350 });
+	// Stored level 9 at 350 XP (curve level 1): e.g. XP removed by the old /dev command.
+	await UserModel.collection.updateOne({ userId: result.userId }, { $set: { level: 9, levelFloor: 9, publicLevelFloor: 9 } });
+	assert.ok(result.level.after < 9, 'the journal carries a lower level');
+	await Cast.collection.insertOne({ _id: result.castId, userId: result.userId, result, status: 'pending', attempts: 0, createdAt: new Date() });
+
+	assert.equal(await recoverPendingCasts({ userId: result.userId }), 1);
+	const after = await userDoc(result.userId);
+	assert.equal(after.level, 9, 'stored level kept');
+	assert.equal(after.levelFloor, 9);
+	assert.equal(after.publicLevelFloor, 9);
+	assert.equal(after.xp, 350 + result.xp.total);
+});

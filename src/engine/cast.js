@@ -449,15 +449,15 @@ async function writeCast(result, { session, fault }) {
 		inc[key] = (inc[key] || 0) + c.count;
 	}
 	const set = {
-		level: result.level.after,
 		'stats.latestFish': fishIds,
 		'stats.soldLatestFish': false,
 		'pity.castsSinceLegendary': result.pity.after.castsSinceLegendary,
 		'pity.castsSinceLucky': result.pity.after.castsSinceLucky,
 		updatedAt: now,
 	};
-	// Level floors only ever rise ($max). Journals from before the public level have no level.public.
-	const max = { levelFloor: result.level.after };
+	// The stored level and the floors only ever rise ($max): a journal written before the floors (3.2.0)
+	// may carry a level below the stored one. Journals from before the public level have no level.public.
+	const max = { level: result.level.after, levelFloor: result.level.after };
 	if (Number.isFinite(result.level.public?.after)) max.publicLevelFloor = result.level.public.after;
 	const update = { $inc: inc, $set: set, $max: max, $push: { 'inventory.fish': { $each: fishIds }, ...guardPush(castId) } };
 	if (result.bait?.depleted) {
