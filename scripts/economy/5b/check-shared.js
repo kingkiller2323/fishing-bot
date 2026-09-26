@@ -2,14 +2,16 @@
 // framework:
 //   1. static scan: no module redefines a shared assumption (archetypes, target windows, daily XP,
 //      purchase delay, lifecycle step, biome levels, curve, value/XP tables, provisional tier stats)
-//      or reads an alternate gear source (rods.gearPath() outside assumptions.js; R3);
+//      or reads an alternate gear source (rods.gearPath() outside assumptions.js; R3); subsystem
+//      modules may not step time themselves (every lifecycle runs on the shared core);
 //      a line may opt out only with an explicit `// shared-ok: <reason>` comment;
 //   2. runtime: framework.verifyShared() passes (shared values match the digest pinned for
 //      FRAMEWORK_VERSION), and every module's report() carries that exact version and digest;
 //   3. R1: the integrated sweep's best fit (docs/economy/5b/curve-integrated.json) equals framework
 //      CURVE.quartic, was generated at the current digest, and keeps the regular player in every window;
-//   4. the decision registry (decisions.js) only uses allowed statuses (nothing claims user approval
-//      of a candidate rule) and every entry's modelled value is what the framework actually runs.
+//   4. the decision registry (decisions.js + every module's DECISIONS) only uses allowed statuses
+//      (nothing claims user approval of a candidate rule) and every modelled value is what runs;
+//   5. every module doc's generated tables are current (render-docs.js).
 //
 //   node scripts/economy/5b/check-shared.js
 const fs = require('node:fs');
@@ -22,7 +24,7 @@ const DIR = __dirname;
 const SOURCE_FILES = new Set(['framework.js', 'assumptions.js', 'decisions.js', 'check-shared.js']);
 // Infrastructure and runners: scanned for local copies, but not subsystem modules (no report() stamp;
 // runners print on load, so they are never required here).
-const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js']);
+const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js', 'render-docs.js']);
 const num = (n) => String(n).replace('.', '\\.').replace(/^0\\\./, '0?\\.');
 
 const RULES = [
@@ -46,6 +48,12 @@ const RULES = [
 	})),
 ];
 
+// Subsystem modules only: no private time-stepping. Every lifecycle runs on the shared core
+// (lifecycle.js via integrate.js); a module that steps time itself is a parallel simulator.
+const MODULE_RULES = [
+	{ name: 'private lifecycle stepping (use integrate.run / lifecycle.simulate)', re: /\bLIFECYCLE\.stepH\b|\+=\s*stepH\b|\bstepH\s*[:=]/ },
+];
+
 const problems = [];
 const scanned = fs.readdirSync(DIR).filter((f) => f.endsWith('.js') && !SOURCE_FILES.has(f)).sort();
 const modules = scanned.filter((f) => !NOT_MODULES.has(f));
@@ -53,7 +61,7 @@ for (const file of scanned) {
 	const lines = fs.readFileSync(path.join(DIR, file), 'utf8').split('\n');
 	lines.forEach((line, i) => {
 		if (/\/\/\s*shared-ok:/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) return;
-		for (const rule of RULES) {
+		for (const rule of [...RULES, ...(NOT_MODULES.has(file) ? [] : MODULE_RULES)]) {
 			if (rule.re.test(line)) problems.push(`${file}:${i + 1} ${rule.name}: ${line.trim().slice(0, 120)}`);
 		}
 	});
@@ -113,6 +121,13 @@ async function main() {
 	}
 	const provenanceFile = path.join(DIR, '../../../docs/economy/5b/curve.json');
 	if (fs.existsSync(provenanceFile) && JSON.parse(fs.readFileSync(provenanceFile, 'utf8')).model !== 'provisional') problems.push('curve.json must be the provisional-model provenance record');
+	// Generated docs: every module doc's number tables are current (render-docs.js --check).
+	const { renderModule, MODULES } = require('./render-docs');
+	for (const name of MODULES) {
+		const r = renderModule(name);
+		for (const p of r.problems) problems.push(`docs: ${p}`);
+		if (r.changed) problems.push(`docs: ${name}.md is stale; run node scripts/economy/5b/render-docs.js`);
+	}
 	// Decision registry: candidate rules stay 'proposed' and match what the model runs.
 	const decisions = require('./decisions').verify();
 	for (const p of decisions.problems) problems.push(`decisions.js: ${p}`);

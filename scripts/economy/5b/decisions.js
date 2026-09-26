@@ -34,11 +34,24 @@ const DECISIONS = [
 	{ id: 'P-FOUNDER-GATE', status: 'proposed', title: 'Founder: gameplay gates read the PUBLIC level', modelled: 'public', alternatives: ['real'], source: 'founder design D1', why: 'otherwise the Founder fishes Swamp at public Lv ~10 within the first hour', get: () => require('./integrate').DEFAULT_FOUNDER_GATE, expected: 'public' },
 ];
 
+// Subsystem modules export their own proposed decisions (same shape) as DECISIONS; they join the
+// registry here so there is ONE list for the Phase 5B report.
+const MODULES = ['rods', 'bait', 'quests', 'streak', 'aquarium', 'founder', 'buffs', 'world'];
+function all() {
+	const out = DECISIONS.map((d) => ({ module: 'framework', ...d }));
+	for (const m of MODULES) {
+		const list = require(`./${m}`).DECISIONS;
+		if (Array.isArray(list)) out.push(...list.map((d) => ({ module: m, ...d })));
+	}
+	return out;
+}
+
 /** Verifies the registry: allowed statuses only, unique ids, and every modelled value is what runs. */
 function verify() {
 	const problems = [];
 	const seen = new Set();
-	for (const d of DECISIONS) {
+	for (const m of MODULES) if (!Array.isArray(require(`./${m}`).DECISIONS)) problems.push(`${m}.js exports no DECISIONS array`);
+	for (const d of all()) {
 		if (seen.has(d.id)) problems.push(`duplicate decision id ${d.id}`);
 		seen.add(d.id);
 		if (!STATUSES.includes(d.status)) problems.push(`${d.id}: status '${d.status}' is not allowed (${STATUSES.join(', ')}); only the user approves final rules`);
@@ -51,11 +64,11 @@ function verify() {
 	const covered = new Set(DECISIONS.filter((d) => d.get).map((d) => String(d.get)));
 	const rulesCovered = Object.keys(F().RULES).every((k) => DECISIONS.some((d) => String(d.get).includes(`RULES.${k}`)));
 	if (!rulesCovered) problems.push(`an entry of RULES (${Object.keys(F().RULES).join(', ')}) has no decision entry`);
-	return { ok: problems.length === 0, problems, count: DECISIONS.length, covered: covered.size };
+	return { ok: problems.length === 0, problems, count: all().length, covered: covered.size };
 }
 
 /** Plain rows for the report (proposed first). */
 // The `get`/`expected` verification fields are left out of the report rows.
-const table = () => DECISIONS.map((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== 'get' && k !== 'expected'))).sort((a, b) => (a.status === b.status ? 0 : a.status === 'proposed' ? -1 : 1));
+const table = () => all().map((d) => Object.fromEntries(Object.entries(d).filter(([k]) => k !== 'get' && k !== 'expected'))).sort((a, b) => (a.status === b.status ? 0 : a.status === 'proposed' ? -1 : 1));
 
-module.exports = { STATUSES, DECISIONS, verify, table };
+module.exports = { STATUSES, DECISIONS, MODULES, all, verify, table };
