@@ -1,8 +1,9 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } = require('discord.js');
 const { User } = require('../../../class/User');
 const { ItemData } = require('../../../schemas/ItemSchema');
 const config = require('../../../config');
 const { Interaction } = require('../../../class/Interaction');
+const { checkLevelGate } = require('../../../engine/levelGate');
 
 const selectionOptions = async (inventoryPath, userData, allowNone = true) => {
 	const uniqueValues = new Set();
@@ -64,14 +65,40 @@ const selectionOptions = async (inventoryPath, userData, allowNone = true) => {
 	return options;
 };
 
+/**
+ * Level gate for equipping bait (rods: held, see L6B): the player's current real level (getLevel) must reach the item's
+ * requirements.level. Returns the refusal to send, or null when the item may be equipped.
+ */
 const checkItemRequirements = async (item, userData) => {
-	const requirements = item.requirements;
-	if (requirements.level && userData.level < requirements.level) {
-		return false;
-	}
+	const gate = await checkLevelGate(userData, item);
+	return gate.ok ? null : gate;
+};
 
-	return true;
-}
+/** Refuses an equip: closes the menu, then explains privately (the shop's ephemeral "Uh-oh!" style). */
+const refuseEquip = async (selection, item, gate, analyticsObject) => {
+	if (process.env.ANALYTICS || config.client.analytics) {
+		await analyticsObject.setStatus('failed');
+		await analyticsObject.setStatusMessage('User does not meet level requirements');
+	}
+	await selection.update({
+		embeds: [
+			new EmbedBuilder()
+				.setTitle('Equipment')
+				.setDescription('You do not meet the requirements to equip this item.'),
+		],
+		components: [],
+	});
+	return await selection.followUp({
+		embeds: [
+			new EmbedBuilder()
+				.setTitle('Equipment')
+				.setColor('Red')
+				.addFields({ name: 'Uh-oh!', value: `You need to be level ${gate.required} to equip ${item.name}!`, inline: false }),
+		],
+		flags: MessageFlags.Ephemeral,
+		components: [],
+	});
+};
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -173,21 +200,8 @@ module.exports = {
 
 				const selection = await response.awaitMessageComponent({ filter: collectorFilter, time: 90_000 });
 				const rodChoice = selection.values[0];
-				const item = await ItemData.findById(rodChoice);
-				if (!await checkItemRequirements(item, userData)) {
-					if (process.env.ANALYTICS || config.client.analytics) {
-						await analyticsObject.setStatus('failed');
-						await analyticsObject.setStatusMessage('Requirements not met.');
-					}
-					return await selection.update({
-						embeds: [
-							new EmbedBuilder()
-								.setTitle('Equipment')
-								.setDescription('You do not meet the requirements to equip this item.'),
-						],
-						components: [],
-					});
-				}
+				// Rod level enforcement is held (hotfix L6B) until the rod progression redesign ships:
+				// only bait is level-gated here for now.
 
 				const newRod = await userData.setEquippedRod(rodChoice);
 
@@ -265,20 +279,8 @@ module.exports = {
 				}
 
 				const item = await ItemData.findById(chosenBait);
-				if (!await checkItemRequirements(item, userData)) {
-					if (process.env.ANALYTICS || config.client.analytics) {
-						await analyticsObject.setStatus('failed');
-						await analyticsObject.setStatusMessage('Requirements not met.');
-					}
-					return await selection.update({
-						embeds: [
-							new EmbedBuilder()
-								.setTitle('Equipment')
-								.setDescription('You do not meet the requirements to equip this item.'),
-						],
-						components: [],
-					});
-				}
+				const refusal = await checkItemRequirements(item, userData);
+				if (refusal) return await refuseEquip(selection, item, refusal, analyticsObject);
 
 				let newBait = {};
 				let description = '';

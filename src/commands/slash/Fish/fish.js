@@ -92,6 +92,9 @@ const followUpMessage = async (interaction, user, result) => {
 		if (result.bait?.depleted) {
 			warnings.push('You ran out of bait!');
 		}
+		else if (result.bait?.levelLocked) {
+			warnings.push(`Your ${result.bait.name} requires level ${result.bait.requiredLevel}: it had no effect and was not used.`);
+		}
 
 		if (warnings.length > 0) {
 			fields.push({ name: '⚠️ Heads up', value: warnings.join('\n') });

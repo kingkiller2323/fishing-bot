@@ -5,6 +5,7 @@ const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
 const { purchase, replaceCollector } = require('../../engine/purchase');
+const { checkLevelGate } = require('../../engine/levelGate');
 
 module.exports = {
 	customId: 'buy-bait',
@@ -92,7 +93,9 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 	const baitChoice = selection.values[0];
 	const originalItem = await getItemById(baitChoice);
 
-	if (!meetsItemRequirements(userData, originalItem)) {
+	// Awaited: the un-awaited Promise was always truthy, so the level gate never refused anything.
+	const gate = await checkLevelGate(userData, originalItem);
+	if (!gate.ok) {
 		if (process.env.ANALYTICS || config.client.analytics) {
 			await analyticsObject.setStatus('failed');
 			await analyticsObject.setStatusMessage('User does not meet level requirements');
@@ -103,7 +106,7 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 			.setTitle('Shop')
 			.setColor('Red')
 			.addFields(
-				{ name: 'Uh-oh!', value: `You need to be level ${originalItem.toJSON().requirements.level} to buy this item!`, inline: false },
+				{ name: 'Uh-oh!', value: `You need to be level ${gate.required} to buy this item!`, inline: false },
 			),
 		);
 		
@@ -188,11 +191,6 @@ const processBaitSelection = async (selection, userData, user, analyticsObject) 
 
 const getItemById = async (itemId) => {
 	return await Item.findById(itemId);
-};
-
-const meetsItemRequirements = async (userData, item) => {
-	const userLevel = await userData.getLevel();
-	return userLevel >= item.toJSON().requirements.level;
 };
 
 const createAmountActionRow = () => {
