@@ -60,6 +60,12 @@ const APPROVED = {
 	'P-BUFFS-DURATION': '1 hour real time', 'P-BUFFS-FIX-DURATION': 'one unit per activation; B1+B2 ship with catch-time Double Cash',
 	'P-BUFFS-QUEUE': 'same-kind queue, max 3', 'P-BUFFS-SCOPE': 'catch-only Double XP / Double Cash', 'P-BUFFS-EVENT-STACKING': 'additive same-category stacking',
 	'P-BUFFS-HOTFIX': 'B3 shipped alone (hotfix L1)',
+	// Approved with a change; each module now models the chosen option.
+	'P-RODS-FISHING-CRATE': 'option B: delisted now; owned units snapshotted into an additive legacyCount and opened under the old definition first; never converted',
+	'P-BAIT-SPINNER-TIERS': 'clamp the final normal-player mean at 1.80; no tier limit, no per-tier clamp',
+	'P-BAIT-XP-SIZING': 'keep the proposed values; guard = net economic sink and at most ~10% sooner milestones than the same no-bait run',
+	'P-STREAK-ITEM-POOL': 'no Lucky Draw in Streak Crates/Chests; no replacement cash',
+	'P-STREAK-TARGETS': 'regular streak value including attributed buffs <= 5% of fishing income',
 };
 const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id); // "aquarium redesign: approve the overall design"
 const withApproval = (d) => (APPROVED[d.id] || isApprovedModule(d.id) ? { ...d, status: 'approved', approval: APPROVED[d.id] || 'aquarium redesign approved' } : d);

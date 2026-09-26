@@ -80,6 +80,10 @@ const PARAMS = deepFreeze({
 		// A second water type costs the same and adds tanks (collection, breeding, display), not companion slots.
 		secondWaterAddsSlots: false,
 		roundSig: 2,
+		// User-approved prices (the aquarium redesign was approved at 5b.4), locked like the permits: the
+		// formula above derived them; after the 5b.5 rod ladder the formula would drift slightly, so the
+		// approved values are what runs. formulaLicensePrice() keeps the formula for sensitivities.
+		approved: { basic: 30000, advanced: 120000, expert: 260000 },
 	},
 	companion: {
 		// Thriving pets add to the cast's sellBonus stat (the modifier pipeline's reserved pets/aquarium source).
@@ -135,6 +139,8 @@ const PARAMS = deepFreeze({
 		perWaterType: 3,
 		tankSize: 5,
 		firstPriceHours: 3,
+		// User-approved display-tank prices (5b.4), locked; the formula is kept for sensitivities.
+		approvedPrices: [430000, 870000, 1700000],
 		growth: 2,
 	},
 	upkeep: {
@@ -225,6 +231,10 @@ const companionCash = (cashPerHour, gearSell, bonus) => (cashPerHour * bonus) / 
 // ---------------------------------------------------------------------------------------------
 // Licenses.
 function licensePrice(tierKey) {
+	if (PARAMS.licenses.approved?.[tierKey] !== undefined) return PARAMS.licenses.approved[tierKey];
+	return formulaLicensePrice(tierKey);
+}
+function formulaLicensePrice(tierKey) {
 	const t = PARAMS.licenses.tiers[tierKey];
 	return sig(t.priceHours * stageAt(t.level).cashPerHour, PARAMS.licenses.roundSig);
 }
@@ -407,6 +417,7 @@ function availability(level, { overheadS = F.DESIGN_OVERHEAD_S } = {}) {
 const topLevel = () => F.BIOME_LEVEL[F.LIVE_BIOMES[F.LIVE_BIOMES.length - 1]];
 function displayTankPrice(n) {
 	const d = PARAMS.display;
+	if (d.approvedPrices?.[n - 1] !== undefined) return d.approvedPrices[n - 1];
 	return sig(d.firstPriceHours * d.growth ** (n - 1) * stageAt(topLevel()).cashPerHour, PARAMS.licenses.roundSig);
 }
 function displayTanks() {
@@ -1159,7 +1170,7 @@ const DECISIONS = [
 		alternatives: ['no aspirational aquarium sink', 'display tanks with companion slots (power creep)'],
 		source: 'aquarium design (user decision 10: aspirational sinks)', why: 'absorbs late-game cash with no power (Display tanks)',
 		get: () => ({ ...PARAMS.display, prices: displayTanks().tanks.map((t) => t.price) }),
-		expected: { requires: 'expert', perWaterType: 3, tankSize: 5, firstPriceHours: 3, growth: 2, prices: [430000, 870000, 1700000] },
+		expected: { requires: 'expert', perWaterType: 3, tankSize: 5, firstPriceHours: 3, approvedPrices: [430000, 870000, 1700000], growth: 2, prices: [430000, 870000, 1700000] },
 	},
 	{
 		id: 'P-AQUARIUM-OPTIONAL-SINK', status: 'proposed',
