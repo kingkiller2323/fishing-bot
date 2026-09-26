@@ -45,9 +45,9 @@ Already live on `main` (`71fde4d`):
   - Q3 (prerequisites checked with `every`, not `some`);
   - Q4 (daily eligibility from `questLog`, no recursion);
   - Q5 (an unfinished daily no longer blocks `/daily`).
-- **Aquarium:** A2–A5 and A7–A9 (breeding comparison, capacity await, duplicate licences, atomic pet sale, temperature clamp). A2 ships only after A1 is closed in step C, so it goes out with the release, not before.
+- **Aquarium:** A3–A5 and A7–A9 (breeding cooldown record, capacity await, success XP, duplicate licences, atomic pet sale, temperature clamp). **A2 (the breeding chance fix) is not a step-B item.** It is held until A1 (the play → sell loop) closes in the balance release (step C.10).
 - **Stealth closure (D4 privacy part):** `/sell` and `/boosters` ephemeral for everyone. Plus the `/dev founder` override hardening (`P-FOUNDER-DEV-OVERRIDE`).
-- **L6B rod gates** use the approved highest-part-rarity rule. They ship **with** step C's standard shop rods, never before, so no one is stranded on the Old Rod. The Lv 10 Common custom sidegrade check (D1 condition) must be green first.
+- **L6B rod gates** use the final D1 rule: a custom rod's required level is that of its highest-rarity part, enforced at `/craft` and `/equip`, and the Rod Workshop previews that level before crafting. The Common rod piece is 1.05 fish per cast. L6B ships **with** step C's standard shop rods, never before, so no one is stranded on the Old Rod.
 
 ### Step C: the balance release (built dark behind `BALANCE_5B`, one PR per system, merged in this order)
 1. **Curve, value model, XP per rarity** (`balance.js`, `cast.js`, `rewards.js`, `publicLevel.js`): the new curve behind the flag, with the floors from step A.
@@ -111,7 +111,20 @@ Already live on `main` (`71fde4d`):
 Each PR brings its module's "tests to add" list (in the module docs) and an engine-vs-model parity test for its numbers (as the crate validation does today).
 
 ### Step D: staging rehearsal, then the flip
-- Run a copy of the production data (2 accounts plus synthetic fixtures) on DCC Staging. Run every migration twice to prove idempotence. Flip `BALANCE_5B` on and replay a scripted session per archetype.
+
+**Required before the production flip:**
+- every migration has run twice on DCC Fishing Staging;
+- old pending cast and gacha journals replay correctly;
+- the engine matches the model for every affected system;
+- the full suite is repeatedly green;
+- scripted Casual / Regular / Active / Grinder runs pass;
+- the Founder's public distributions are identical to Normal's;
+- standard and custom rod progression and the L6B gates are verified;
+- the startup catalog assertions are green;
+- a staging flag-on → flag-off rollback rehearsal completes with no destructive data change.
+
+- **Environment:** a dedicated Railway project, **DCC Fishing Staging**, with its own MongoDB, its own fishing-bot service and its own env vars, `BALANCE_5B=off` at first. It has no connection to production Mongo and no production write path. It never runs a second consumer on the production Discord guild: it uses a separate staging bot and test guild, or migration/model validation runs with no Discord login.
+- **Data:** a clone of the 2 production fishing accounts plus synthetic fixtures, restored into the staging Mongo. Run every migration twice to prove idempotence. Flip `BALANCE_5B` on and replay a scripted session per archetype.
 - Compare the engine against the model: fish/cast, $/h, XP/h per rod, prices, and time to the first rods.
 - **Production flip:** set `BALANCE_5B=on` in Railway and restart, then check the migration logs and bootstrap validation.
 - **Rollback:** flag off. Migrations are additive, so turning the flag off restores today's rules without touching data.
@@ -127,5 +140,7 @@ Track:
 
 ## What I need from you
 - Approve step A to start (foundations only; no player-visible change).
-- Confirm that DCC Staging (Railway) may be used for rehearsals, including the dev env vars it needs.
-- Confirm the one-flag release: everything in step C goes live in one flip, not system by system.
+Decided:
+- Step A approved.
+- Rehearsals run on a dedicated **DCC Fishing Staging** project, never the Dynasty Command Center "DCC Staging".
+- One-flag release: code rolls out incrementally and dark; gameplay switches in one atomic flip.
