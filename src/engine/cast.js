@@ -31,6 +31,7 @@ const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, levelForXp, activeEvent } 
 const { resolveModifiers, rollDraws } = require('./modifiers');
 const { applyPity, roll, toPercent } = require('./rarity');
 const { oid, notApplied, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
+const { publicXpOf, publicXpOfResult } = require('./publicLevel');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
 const MAX_DRAW_ATTEMPTS = 25;
@@ -319,6 +320,12 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 	const cashTotal = questCash;
 	const levelBefore = user.level || 1;
 	const levelAfter = levelForXp((user.xp || 0) + xpTotal);
+	// Public level: from the base XP the card shows (publicXp). The real level above includes private
+	// profile bonuses and must never be what other players see level up.
+	const publicXpBefore = publicXpOf(user);
+	const publicXpGain = catchXpWithoutProfile + quests.reduce((s, q) => s + q.reward.xp.base, 0);
+	const publicBefore = levelForXp(publicXpBefore);
+	const publicAfter = levelForXp(publicXpBefore + publicXpGain);
 
 	// Counters reset only when the qualifying tier was actually caught (Legendary+ = Legendary or Lucky).
 	const hit = (rarity) => catches.some((c) => c.rarity === rarity);
@@ -354,7 +361,10 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 		rewards: rewardBreakdown({ catches, catchXp, catchXpWithoutProfile, quests }),
 		cash: { quest: questCash, total: cashTotal },
 		quests,
-		level: { before: levelBefore, after: levelAfter, levelUp: levelAfter > levelBefore },
+		level: {
+			before: levelBefore, after: levelAfter, levelUp: levelAfter > levelBefore,
+			public: { xpBefore: publicXpBefore, xpAfter: publicXpBefore + publicXpGain, before: publicBefore, after: publicAfter, levelUp: publicAfter > publicBefore },
+		},
 		pity: { before: pityBefore, after: pityAfter, applied: pity.applied },
 		pond: pondResult,
 		writes: { fishDocs, grants },
@@ -407,7 +417,8 @@ async function writeCast(result, { session, fault }) {
 	// Commit point: catches, XP, cash, stats, level and pity in one atomic update.
 	await fault('commit');
 	const fishIds = result.writes.fishDocs.map((d) => oid(d._id));
-	const inc = { xp: result.xp.total, 'inventory.money': result.cash.total, 'stats.fishCaught': result.units };
+	// publicXp moves with xp in the same atomic update (base rewards only; see publicLevel.js).
+	const inc = { xp: result.xp.total, publicXp: publicXpOfResult(result), 'inventory.money': result.cash.total, 'stats.fishCaught': result.units };
 	for (const c of result.catches) {
 		const key = `stats.fishStats.${c.name.toLowerCase()}`;
 		inc[key] = (inc[key] || 0) + c.count;
@@ -496,6 +507,8 @@ async function fishingStats(userId) {
 		odds: result.rarity.table,
 		pity: { counters: result.pity.before, applied: result.pity.applied, config: resolveProfile(userId, await UserModel.findOne({ userId: String(userId) }).lean()).pity },
 		cooldownMs: result.cooldownMs,
+		// Private: the real level (all XP) and the public level other players see (base XP).
+		level: { real: result.level.before, public: result.level.public.before, publicXp: result.level.public.xpBefore },
 	};
 }
 

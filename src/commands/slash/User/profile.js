@@ -31,9 +31,10 @@ module.exports = {
 			// Founder status is private: only shown when players view their own profile.
 			const isFounder = target.id === interaction.user.id && resolveProfile(target.id, user.user).name === 'founder';
 
+			// Public level (base XP): a profile never shows private profile bonuses (engine/publicLevel.js).
 			let fields = [{
-				name: `Level ${await user.getLevel() || 0}`,
-				value: `${await user.getXPToNextLevel()}`,
+				name: `Level ${await user.getPublicLevel() || 0}`,
+				value: `${await user.getPublicXPToNextLevel()}`,
 				inline: false,
 			}];
 

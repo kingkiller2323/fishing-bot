@@ -25,6 +25,12 @@ function privateStatsFields({ stats, lastCast, lastSale = null, gachaPity = null
 		: stats.profile === 'test' ? '🧪 **Test** · non-competitive' : 'Standard · competitive';
 	fields.push({ name: 'Profile', value: `${profileLine}\n-# Balance ${stats.balanceVersion}` });
 
+	// Real level vs the public level other players see (they differ only with private profile bonuses).
+	if (stats.level) {
+		const lv = stats.level;
+		fields.push({ name: 'Level', value: lv.real === lv.public ? `Level ${lv.real}` : `Real level ${lv.real} · Public level ${lv.public} (others see ${lv.public})` });
+	}
+
 	fields.push({
 		name: 'Odds per fish',
 		value: RARITIES.map((r) => `${r.charAt(0).toUpperCase()}${r.slice(1)} ${pct(stats.odds[r])}%`).join(' · '),

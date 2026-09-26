@@ -8,6 +8,7 @@ const fetch = require('node-fetch');
 const { QuestData } = require('../schemas/QuestSchema');
 const { assertRemovable, partitionProtected, isProtected } = require('../engine/protection');
 const { levelForXp } = require('../engine/balance');
+const { publicLevelOf, publicProgressOf } = require('../engine/publicLevel');
 
 class User {
 	constructor(data) {
@@ -240,6 +241,16 @@ class User {
 
 	async getLevel() {
 		return levelForXp(await this.getXP());
+	}
+
+	/** Level other players see (base/competitive XP; equal to getLevel() for normal players). */
+	async getPublicLevel() {
+		return publicLevelOf(this.user);
+	}
+
+	/** Progress to the next public level, "progress / needed". */
+	async getPublicXPToNextLevel() {
+		return publicProgressOf(this.user);
 	}
 
 	async getXPToNextLevel() {
@@ -624,6 +635,7 @@ class User {
 			userId: userId,
 			commands: 0,
 			xp: 0,
+			publicXp: 0,
 			inventory: {
 				equippedRod: null,
 				equippedBait: null,

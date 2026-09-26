@@ -74,8 +74,10 @@ const followUpMessage = async (interaction, user, result) => {
 			fields.push({ name: '📜 Quest complete', value: questLines.join('\n') });
 		}
 
-		if (result.level.levelUp) {
-			fields.push({ name: '⭐ Level up!', value: `You reached level **${result.level.after}**.` });
+		// Public level-ups only: the card shows base XP, so the level it announces must come from base XP
+		// too (a Founder's real level rises faster and would contradict the XP on the card).
+		if (result.level.public.levelUp) {
+			fields.push({ name: '⭐ Level up!', value: `You reached level **${result.level.public.after}**.` });
 		}
 
 		if (rodState === 'broken') {

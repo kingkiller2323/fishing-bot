@@ -113,9 +113,11 @@ test('/dev money and xp: add and set, each audited with before/after', async () 
 	assert.deepEqual(await dev.money('dev', 'target', 'add', 500), { before: 0, after: 500 });
 	assert.deepEqual(await dev.money('dev', 'target', 'set', 42), { before: 500, after: 42 });
 	const xp = await dev.xp('dev', 'target', 'set', 40_000);
-	assert.deepEqual(xp.after, { xp: 40_000, level: 20 });
+	// The public (base) XP moves with a developer grant and is audited alongside xp.
+	assert.deepEqual(xp.after, { xp: 40_000, level: 20, publicXp: 40_000 });
 	await dev.xp('dev', 'target', 'add', 50_000);
 	assert.equal((await userDoc('target')).level, 30);
+	assert.equal((await userDoc('target')).publicXp, 90_000);
 
 	const audits = await DevAudit.find({ target: 'target' }).sort({ timestamp: 1 }).lean();
 	assert.deepEqual(audits.map((a) => a.operation), ['money.add', 'money.set', 'xp.set', 'xp.add']);

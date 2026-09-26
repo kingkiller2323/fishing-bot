@@ -13,6 +13,12 @@ const UserSchema = new Schema ({
 		type: Number,
 		default: 0,
 	},
+	// Public (base / competitive) XP: the base rewards the player was shown. Other players see the level
+	// derived from it (engine/publicLevel.js); `xp` stays the true total. No default: the startup migration
+	// initialises existing accounts and new accounts start at 0.
+	publicXp: {
+		type: Number,
+	},
 	commands: {
 		type: Number,
 		default: 0,
