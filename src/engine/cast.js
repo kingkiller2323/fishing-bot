@@ -28,11 +28,13 @@ const { Cast } = require('../schemas/CastSchema');
 const { WeatherPattern } = require('../class/WeatherPattern');
 const { Season } = require('../class/Season');
 const { rng } = require('./rng');
-const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, levelForXp, activeEvent } = require('./balance');
+const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, activeEvent } = require('./balance');
 const { resolveModifiers, rollDraws } = require('./modifiers');
 const { applyPity, roll, toPercent } = require('./rarity');
 const { oid, notApplied, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
-const { publicXpOf, publicXpOfResult } = require('./publicLevel');
+const { publicXpOf, publicXpOfResult, publicLevelOf } = require('./publicLevel');
+const { levelOf, levelWithFloor } = require('./levels');
+const { Utils } = require('../class/Utils');
 const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
@@ -324,14 +326,16 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 
 	const xpTotal = catchXp + questXp;
 	const cashTotal = questCash;
-	const levelBefore = user.level || 1;
-	const levelAfter = levelForXp((user.xp || 0) + xpTotal);
+	// Levels go through max(stored floor, curve) (levels.js): never below the floor, and a level-up only
+	// when the curve rises above the level the player already had.
+	const levelBefore = levelOf(user);
+	const levelAfter = levelWithFloor(user.levelFloor, (user.xp || 0) + xpTotal);
 	// Public level: from the base XP the card shows (publicXp). The real level above includes private
 	// profile bonuses and must never be what other players see level up.
 	const publicXpBefore = publicXpOf(user);
 	const publicXpGain = catchXpWithoutProfile + quests.reduce((s, q) => s + q.reward.xp.base, 0);
-	const publicBefore = levelForXp(publicXpBefore);
-	const publicAfter = levelForXp(publicXpBefore + publicXpGain);
+	const publicBefore = publicLevelOf(user);
+	const publicAfter = levelWithFloor(user.publicLevelFloor, publicXpBefore + publicXpGain);
 
 	// Counters reset only when the qualifying tier was actually caught (Legendary+ = Legendary or Lucky).
 	const hit = (rarity) => catches.some((c) => c.rarity === rarity);
@@ -425,6 +429,16 @@ async function writeCast(result, { session, fault }) {
 		await Pond.collection.updateOne({ id: result.pond.id, ...notApplied(castId) }, { $set: set, $push: guardPush(castId) }, opts);
 	}
 
+	// publicXp self-healing (F4): a document without publicXp (not reached by the migration) starts from
+	// its own xp, never from 0. A separate guarded pipeline update in the same session/transaction, just
+	// before the commit: a filter clause on the commit itself would drop the whole commit. Idempotent
+	// (only a missing field is set, and never once this cast has committed).
+	await UserModel.collection.updateOne(
+		{ userId, publicXp: { $exists: false }, ...notApplied(castId) },
+		[{ $set: { publicXp: { $ifNull: ['$publicXp', { $ifNull: ['$xp', 0] }] } } }],
+		opts,
+	);
+
 	// Commit point: catches, XP, cash, stats, level and pity in one atomic update.
 	await fault('commit');
 	const fishIds = result.writes.fishDocs.map((d) => oid(d._id));
@@ -442,7 +456,10 @@ async function writeCast(result, { session, fault }) {
 		'pity.castsSinceLucky': result.pity.after.castsSinceLucky,
 		updatedAt: now,
 	};
-	const update = { $inc: inc, $set: set, $push: { 'inventory.fish': { $each: fishIds }, ...guardPush(castId) } };
+	// Level floors only ever rise ($max). Journals from before the public level have no level.public.
+	const max = { levelFloor: result.level.after };
+	if (Number.isFinite(result.level.public?.after)) max.publicLevelFloor = result.level.public.after;
+	const update = { $inc: inc, $set: set, $max: max, $push: { 'inventory.fish': { $each: fishIds }, ...guardPush(castId) } };
 	if (result.bait?.depleted) {
 		set['inventory.equippedBait'] = null;
 		update.$pull = { 'inventory.baits': oid(result.bait.id) };
@@ -491,13 +508,44 @@ async function applyCastResult(result, { fault = async () => undefined } = {}) {
 	return { applied: true };
 }
 
-/** Completes interrupted casts (optionally for one player). Returns how many were rolled forward. */
-async function recoverPendingCasts({ userId } = {}) {
+const logRecoveryFailure = (kind, id, error) => Utils.log(`[RECOVERY] ${kind} ${id} could not be applied and stays pending: ${error?.stack || error?.message || error}`, 'err');
+
+/**
+ * Completes interrupted casts (optionally for one player), each in isolation: a journal that fails
+ * (corrupt, or from a shape the code cannot apply) is logged with its id and left pending; it never
+ * stops the others, the boot or the player's next cast. Returns { recovered, failed: [{ id, error }] }.
+ */
+async function recoverPendingCastsDetailed({ userId, onFailure = (id, error) => logRecoveryFailure('cast', id, error) } = {}) {
 	const query = { status: 'pending' };
 	if (userId) query.userId = String(userId);
 	const pending = await Cast.find(query).sort({ createdAt: 1 }).lean();
-	for (const cast of pending) await applyCastResult(cast.result);
-	return pending.length;
+	let recovered = 0;
+	const failed = [];
+	for (const cast of pending) {
+		try {
+			if (!cast.result || typeof cast.result !== 'object') throw new Error('journal has no result');
+			// A journal whose castId disagrees with its own id would write under another key: refuse it.
+			if (String(cast.result.castId) !== String(cast._id)) throw new Error(`journal result.castId ${cast.result.castId} != ${cast._id}`);
+			await applyCastResult(cast.result);
+			recovered++;
+		}
+		catch (error) {
+			failed.push({ id: String(cast._id), error: String(error?.message || error) });
+			await Cast.updateOne({ _id: cast._id }, { $set: { lastError: String(error?.message || error) } }).catch(() => undefined);
+			try {
+				onFailure(String(cast._id), error);
+			}
+			catch {
+				// Logging never breaks recovery.
+			}
+		}
+	}
+	return { recovered, failed };
+}
+
+/** Completes interrupted casts (optionally for one player). Returns how many were rolled forward. */
+async function recoverPendingCasts(options = {}) {
+	return (await recoverPendingCastsDetailed(options)).recovered;
 }
 
 /**
@@ -523,4 +571,4 @@ async function fishingStats(userId) {
 	};
 }
 
-module.exports = { castLine, applyCastResult, recoverPendingCasts, fishingStats, grantItem, NoCatchError, MAX_DRAW_ATTEMPTS };
+module.exports = { castLine, applyCastResult, recoverPendingCasts, recoverPendingCastsDetailed, fishingStats, grantItem, NoCatchError, MAX_DRAW_ATTEMPTS };

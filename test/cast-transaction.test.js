@@ -44,3 +44,18 @@ test('a failure inside the transaction leaves no partial writes; recovery applie
 	assert.equal((await ItemData.findById(r.rod.id).lean()).durability, 48);
 	assert.equal((await ItemData.findById(baitId).lean()).count, 3);
 });
+
+test('F4 in a transaction: the publicXp init on a legacy document rolls back with a failed commit, then heals once', async () => {
+	const { User: UserModel } = require('../src/schemas/UserSchema');
+	await makeUser('tx-f4');
+	await useTestRod('tx-f4', { capabilities: ['weak', '1'] });
+	await UserModel.collection.updateOne({ userId: 'tx-f4' }, { $set: { xp: 900 }, $unset: { publicXp: 1 } });
+	const r = await castLine({ userId: 'tx-f4' });
+	await assert.rejects(applyCastResult(r, { fault: async (s) => { if (s === 'commit') throw new Error('boom'); } }));
+	assert.equal((await userDoc('tx-f4')).publicXp, undefined, 'rolled back with the transaction');
+	await recoverPendingCasts({ userId: 'tx-f4' });
+	const after = await userDoc('tx-f4');
+	assert.equal(after.xp, 900 + r.xp.total);
+	assert.equal(after.publicXp, after.xp);
+	assert.equal(after.levelFloor, r.level.after);
+});

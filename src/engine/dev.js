@@ -8,8 +8,9 @@ const { User: UserModel } = require('../schemas/UserSchema');
 const { Fish: FishTemplate, FishData } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
 const { DevAudit } = require('../schemas/DevAuditSchema');
-const { levelForXp, BALANCE_VERSION } = require('./balance');
-const { publicXpOf } = require('./publicLevel');
+const { BALANCE_VERSION } = require('./balance');
+const { publicXpOf, publicLevelOf } = require('./publicLevel');
+const { levelOf, curveLevel, floorOf, levelWithFloor } = require('./levels');
 const { grantItem } = require('./cast');
 const { Utils } = require('../class/Utils');
 
@@ -53,14 +54,25 @@ async function xp(actor, target, mode, amount) {
 	if (!Number.isFinite(amount)) throw new Error('Amount must be a number.');
 	const doc = await targetDoc(target);
 	const publicBefore = publicXpOf(doc);
-	const before = { xp: doc.xp || 0, level: doc.level || 1, publicXp: publicBefore };
+	const before = { xp: doc.xp || 0, level: levelOf(doc), publicXp: publicBefore };
+	const floorsBefore = { levelFloor: doc.levelFloor ?? null, publicLevelFloor: doc.publicLevelFloor ?? null, publicLevel: publicLevelOf(doc) };
 	const newXp = Math.max(0, mode === 'set' ? amount : before.xp + amount);
 	// A developer XP change applies to the public XP too (set -> the same value, add -> the same delta),
-	// never leaving publicXp above xp.
+	// never leaving publicXp above xp. publicXpOf already falls back to xp for a document without the
+	// field, so the write heals it (F4).
 	const newPublic = Math.min(newXp, Math.max(0, mode === 'set' ? amount : publicBefore + amount));
-	await UserModel.updateOne({ userId: String(target) }, { $set: { xp: newXp, level: levelForXp(newXp), publicXp: newPublic } });
-	const after = { xp: newXp, level: levelForXp(newXp), publicXp: newPublic };
-	await audit(actor, target, `xp.${mode}`, before, after, { amount });
+	// Levels: `add` keeps max(stored floor, curve) and never lowers a floor; `set` is the one explicit,
+	// audited demotion: both floors are reset to the curve of the new values.
+	const level = mode === 'set' ? curveLevel(newXp) : levelWithFloor(doc.levelFloor, newXp);
+	const publicLevel = mode === 'set' ? curveLevel(newPublic) : levelWithFloor(doc.publicLevelFloor, newPublic);
+	const update = mode === 'set'
+		? { $set: { xp: newXp, level, publicXp: newPublic, levelFloor: level, publicLevelFloor: publicLevel } }
+		: { $set: { xp: newXp, level, publicXp: newPublic }, $max: { levelFloor: level, publicLevelFloor: publicLevel } };
+	await UserModel.updateOne({ userId: String(target) }, update);
+	const stored = await UserModel.findOne({ userId: String(target) }).lean();
+	const after = { xp: newXp, level, publicXp: newPublic };
+	const floorsAfter = { levelFloor: floorOf(stored?.levelFloor), publicLevelFloor: floorOf(stored?.publicLevelFloor), publicLevel };
+	await audit(actor, target, `xp.${mode}`, before, after, { amount, floors: { before: floorsBefore, after: floorsAfter } });
 	return { before, after };
 }
 

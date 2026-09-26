@@ -1,0 +1,626 @@
+{
+	"castId": "6ab8061eddbc63abecdb8ae3",
+	"userId": "journal-fixture",
+	"guildId": null,
+	"channelId": null,
+	"createdAt": {
+		"$date": {
+			"$numberLong": "1790445086038"
+		}
+	},
+	"profile": "normal",
+	"balanceVersion": "3.2.0",
+	"competitiveEligible": true,
+	"status": "ok",
+	"environment": {
+		"biome": "Testpool",
+		"weather": "Cloudy",
+		"season": "Fall"
+	},
+	"rod": {
+		"id": "6ab8061eddbc63abecdb8ad0",
+		"name": "Old Rod",
+		"type": "rod",
+		"capabilities": [
+			"weak",
+			"1"
+		],
+		"before": {
+			"durability": {
+				"$numberInt": "1000"
+			},
+			"state": "mint",
+			"fishCaught": {
+				"$numberInt": "0"
+			}
+		},
+		"after": {
+			"durability": {
+				"$numberInt": "999"
+			},
+			"state": "mint",
+			"fishCaught": {
+				"$numberInt": "1"
+			}
+		},
+		"durabilityCost": {
+			"$numberInt": "1"
+		}
+	},
+	"bait": {
+		"id": "6ab8061eddbc63abecdb8add",
+		"name": "Worm",
+		"applied": true,
+		"before": {
+			"count": {
+				"$numberInt": "10"
+			}
+		},
+		"after": {
+			"count": {
+				"$numberInt": "9"
+			}
+		},
+		"depleted": false
+	},
+	"buffs": [],
+	"modifiers": {
+		"balanceVersion": "3.2.0",
+		"profile": "normal",
+		"competitiveEligible": true,
+		"sources": [
+			{
+				"source": "base",
+				"stats": {},
+				"note": "balance 3.2.0"
+			},
+			{
+				"source": "profile",
+				"name": "normal",
+				"override": null,
+				"stats": {},
+				"multipliers": {
+					"xp": {
+						"$numberInt": "1"
+					},
+					"sell": {
+						"$numberInt": "1"
+					},
+					"questXp": {
+						"$numberInt": "1"
+					},
+					"questCash": {
+						"$numberInt": "1"
+					}
+				}
+			},
+			{
+				"source": "rod",
+				"id": "6ab8061eddbc63abecdb8ad0",
+				"name": "Old Rod",
+				"stats": {},
+				"parts": []
+			},
+			{
+				"source": "bait",
+				"id": "6ab8061eddbc63abecdb8add",
+				"name": "Worm",
+				"applied": true,
+				"method": "catalog",
+				"stats": {}
+			}
+		],
+		"stats": {
+			"luck": {
+				"$numberInt": "0"
+			},
+			"rareFind": {
+				"$numberInt": "0"
+			},
+			"trophyChance": {
+				"$numberInt": "0"
+			},
+			"multiCatch": {
+				"$numberInt": "0"
+			},
+			"perDraw": {
+				"$numberInt": "0"
+			},
+			"xpBonus": {
+				"$numberInt": "0"
+			},
+			"sellBonus": {
+				"$numberInt": "0"
+			},
+			"durabilityEfficiency": {
+				"$numberInt": "0"
+			},
+			"fishingSpeed": {
+				"$numberInt": "0"
+			}
+		},
+		"qualities": [
+			"weak"
+		],
+		"draws": {
+			"$numberInt": "1"
+		},
+		"bonusDraws": null,
+		"maxDraws": {
+			"$numberInt": "5"
+		},
+		"expectedDraws": {
+			"$numberInt": "1"
+		},
+		"perDraw": {
+			"$numberInt": "1"
+		},
+		"xp": {
+			"perFish": {
+				"min": {
+					"$numberInt": "10"
+				},
+				"max": {
+					"$numberInt": "25"
+				}
+			},
+			"gear": {
+				"$numberInt": "0"
+			},
+			"buff": {
+				"$numberInt": "0"
+			},
+			"profile": {
+				"$numberInt": "1"
+			},
+			"event": {
+				"$numberInt": "1"
+			},
+			"withoutProfile": {
+				"$numberInt": "1"
+			},
+			"multiplier": {
+				"$numberInt": "1"
+			}
+		},
+		"sell": {
+			"gear": {
+				"$numberInt": "0"
+			},
+			"profile": {
+				"$numberInt": "1"
+			},
+			"event": {
+				"$numberInt": "1"
+			},
+			"withoutProfile": {
+				"$numberInt": "1"
+			},
+			"multiplier": {
+				"$numberInt": "1"
+			},
+			"cashBuffAtSale": {
+				"$numberInt": "0"
+			}
+		},
+		"quest": {
+			"xp": {
+				"$numberInt": "1"
+			},
+			"cash": {
+				"$numberInt": "1"
+			},
+			"xpWithoutProfile": {
+				"$numberInt": "1"
+			},
+			"cashWithoutProfile": {
+				"$numberInt": "1"
+			}
+		},
+		"gacha": {
+			"stats": {},
+			"buffBonus": {
+				"$numberInt": "0"
+			}
+		},
+		"durabilityCostPerFish": {
+			"$numberInt": "1"
+		},
+		"cooldownMs": {
+			"$numberInt": "5000"
+		},
+		"rarity": {
+			"base": {
+				"common": {
+					"$numberDouble": "68.8231"
+				},
+				"uncommon": {
+					"$numberDouble": "24.5797"
+				},
+				"rare": {
+					"$numberDouble": "4.9159"
+				},
+				"ultra": {
+					"$numberDouble": "0.9832"
+				},
+				"giant": {
+					"$numberDouble": "0.4916"
+				},
+				"legendary": {
+					"$numberDouble": "0.1966"
+				},
+				"lucky": {
+					"$numberDouble": "0.0098"
+				}
+			},
+			"table": {
+				"common": {
+					"$numberDouble": "68.8231"
+				},
+				"uncommon": {
+					"$numberDouble": "24.5797"
+				},
+				"rare": {
+					"$numberDouble": "4.9159"
+				},
+				"ultra": {
+					"$numberDouble": "0.9832"
+				},
+				"giant": {
+					"$numberDouble": "0.4916"
+				},
+				"legendary": {
+					"$numberDouble": "0.1966"
+				},
+				"lucky": {
+					"$numberDouble": "0.0098"
+				}
+			}
+		}
+	},
+	"rarity": {
+		"table": {
+			"common": {
+				"$numberDouble": "68.8231"
+			},
+			"uncommon": {
+				"$numberDouble": "24.5797"
+			},
+			"rare": {
+				"$numberDouble": "4.9159"
+			},
+			"ultra": {
+				"$numberDouble": "0.9832"
+			},
+			"giant": {
+				"$numberDouble": "0.4916"
+			},
+			"legendary": {
+				"$numberDouble": "0.1966"
+			},
+			"lucky": {
+				"$numberDouble": "0.0098"
+			}
+		},
+		"guarantee": null
+	},
+	"draws": {
+		"draws": {
+			"$numberInt": "1"
+		},
+		"bonusDraws": {
+			"$numberInt": "0"
+		},
+		"perDraw": {
+			"$numberInt": "1"
+		},
+		"qualities": [
+			"weak"
+		]
+	},
+	"cooldownMs": {
+		"$numberInt": "5000"
+	},
+	"catches": [
+		{
+			"kind": "fish",
+			"id": "6ab8061eddbc63abecdb8aec",
+			"templateId": "6ab8061dddbc63abecdb8ac7",
+			"name": "Pool Minnow",
+			"rarity": "Common",
+			"type": "fish",
+			"count": {
+				"$numberInt": "1"
+			},
+			"size": {
+				"$numberDouble": "14.108"
+			},
+			"weight": {
+				"$numberDouble": "1.571"
+			},
+			"rawValue": {
+				"$numberInt": "30"
+			},
+			"value": {
+				"$numberInt": "30"
+			},
+			"reward": {
+				"base": {
+					"$numberInt": "30"
+				},
+				"profileBonus": {
+					"$numberInt": "0"
+				},
+				"final": {
+					"$numberInt": "30"
+				}
+			},
+			"qualities": [
+				"weak"
+			],
+			"biome": "Testpool",
+			"icon": {
+				"animated": false,
+				"data": "rawfish"
+			},
+			"locked": false,
+			"autoLocked": false
+		}
+	],
+	"units": {
+		"$numberInt": "1"
+	},
+	"xp": {
+		"perFish": [
+			{
+				"$numberInt": "11"
+			}
+		],
+		"base": {
+			"$numberInt": "11"
+		},
+		"multiplier": {
+			"$numberInt": "1"
+		},
+		"catch": {
+			"$numberInt": "11"
+		},
+		"bonus": {
+			"$numberInt": "0"
+		},
+		"quest": {
+			"$numberInt": "30"
+		},
+		"total": {
+			"$numberInt": "41"
+		}
+	},
+	"rewards": {
+		"catchXp": {
+			"base": {
+				"$numberInt": "11"
+			},
+			"profileBonus": {
+				"$numberInt": "0"
+			},
+			"final": {
+				"$numberInt": "11"
+			}
+		},
+		"questXp": {
+			"base": {
+				"$numberInt": "30"
+			},
+			"profileBonus": {
+				"$numberInt": "0"
+			},
+			"final": {
+				"$numberInt": "30"
+			}
+		},
+		"xp": {
+			"base": {
+				"$numberInt": "41"
+			},
+			"profileBonus": {
+				"$numberInt": "0"
+			},
+			"final": {
+				"$numberInt": "41"
+			}
+		},
+		"questCash": {
+			"base": {
+				"$numberInt": "12"
+			},
+			"profileBonus": {
+				"$numberInt": "0"
+			},
+			"final": {
+				"$numberInt": "12"
+			}
+		},
+		"catchValue": {
+			"base": {
+				"$numberInt": "30"
+			},
+			"profileBonus": {
+				"$numberInt": "0"
+			},
+			"final": {
+				"$numberInt": "30"
+			}
+		}
+	},
+	"cash": {
+		"quest": {
+			"$numberInt": "12"
+		},
+		"total": {
+			"$numberInt": "12"
+		}
+	},
+	"quests": [
+		{
+			"questId": "6ab8061eddbc63abecdb8ae0",
+			"title": "Test quest",
+			"before": {
+				"$numberInt": "0"
+			},
+			"after": {
+				"$numberInt": "1"
+			},
+			"max": {
+				"$numberInt": "1"
+			},
+			"completed": true,
+			"xp": {
+				"$numberInt": "30"
+			},
+			"cash": {
+				"$numberInt": "12"
+			},
+			"rewards": [],
+			"reward": {
+				"xp": {
+					"base": {
+						"$numberInt": "30"
+					},
+					"profileBonus": {
+						"$numberInt": "0"
+					},
+					"final": {
+						"$numberInt": "30"
+					}
+				},
+				"cash": {
+					"base": {
+						"$numberInt": "12"
+					},
+					"profileBonus": {
+						"$numberInt": "0"
+					},
+					"final": {
+						"$numberInt": "12"
+					}
+				}
+			}
+		}
+	],
+	"level": {
+		"before": {
+			"$numberInt": "1"
+		},
+		"after": {
+			"$numberInt": "1"
+		},
+		"levelUp": false,
+		"public": {
+			"xpBefore": {
+				"$numberInt": "0"
+			},
+			"xpAfter": {
+				"$numberInt": "41"
+			},
+			"before": {
+				"$numberInt": "1"
+			},
+			"after": {
+				"$numberInt": "1"
+			},
+			"levelUp": false
+		}
+	},
+	"pity": {
+		"before": {
+			"castsSinceLegendary": {
+				"$numberInt": "0"
+			},
+			"castsSinceLucky": {
+				"$numberInt": "0"
+			},
+			"gachaSinceHighTier": {
+				"$numberInt": "0"
+			}
+		},
+		"after": {
+			"castsSinceLegendary": {
+				"$numberInt": "1"
+			},
+			"castsSinceLucky": {
+				"$numberInt": "1"
+			},
+			"gachaSinceHighTier": {
+				"$numberInt": "0"
+			}
+		},
+		"applied": {}
+	},
+	"pond": null,
+	"writes": {
+		"fishDocs": [
+			{
+				"icon": {
+					"animated": false,
+					"data": "rawfish"
+				},
+				"name": "Pool Minnow",
+				"description": "A fish",
+				"rarity": "Common",
+				"value": {
+					"$numberInt": "30"
+				},
+				"baseValue": {
+					"$numberInt": "40"
+				},
+				"locked": false,
+				"qualities": [
+					"weak"
+				],
+				"count": {
+					"$numberInt": "1"
+				},
+				"type": "fish",
+				"biome": "Testpool",
+				"guild": "0",
+				"size": {
+					"$numberDouble": "14.108"
+				},
+				"weight": {
+					"$numberDouble": "1.571"
+				},
+				"minSize": {
+					"$numberInt": "10"
+				},
+				"minWeight": {
+					"$numberInt": "1"
+				},
+				"maxSize": {
+					"$numberInt": "20"
+				},
+				"maxWeight": {
+					"$numberInt": "2"
+				},
+				"catchId": {
+					"$numberInt": "0"
+				},
+				"weather": "all",
+				"season": "all",
+				"_id": "6ab8061eddbc63abecdb8aec",
+				"__t": "FishData",
+				"user": "journal-fixture",
+				"obtained": {
+					"$numberLong": "1790445086038"
+				},
+				"valueBase": {
+					"$numberInt": "30"
+				},
+				"castId": "6ab8061eddbc63abecdb8ae3",
+				"profile": "normal",
+				"balanceVersion": "3.2.0",
+				"competitiveEligible": true
+			}
+		],
+		"grants": []
+	}
+}
