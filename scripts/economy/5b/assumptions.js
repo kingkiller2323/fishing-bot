@@ -101,12 +101,20 @@ const PROVISIONAL_GEAR_PATH = [
 ];
 // 5b.3: R3 cutover (was 'provisional' through 5b.2).
 const GEAR_PATH_SOURCE = 'rods';
+// 5b.5: which rods ladder is the reference path (rods.gearPath(ladder)). 'standard': Old Rod + six shop rods
+// (Lv 10-60) bought with cash (P-RODS-STANDARD-LADDER); crafting is the optional depth path ('custom' variant,
+// integrate.run variant.rods). Through 5b.4 the reference was the crafted T1-T5 path (now 'crafted5b4').
+const GEAR_PATH_LADDER = 'standard';
+// 5b.5: the permanent cash upgrades the reference loop buys (upgrades.js POLICIES; P-UPGRADES-REFERENCE-POLICY):
+// 'reference' = a level is bought when it costs at most the policy's hours of current income AND the next
+// rod and the next permit stay covered; 'none' and 'greedy' are the variants.
+const UPGRADE_POLICY = 'reference';
 const TIER_KEYS = PROVISIONAL_GEAR_PATH.map((t) => t.key);
 
 /** The shared gear path (see GEAR_PATH_SOURCE). rods.js is loaded lazily to avoid a require cycle. */
 function gearPath() {
 	if (GEAR_PATH_SOURCE === 'rods') {
-		return require('./rods').gearPath().map((s) => ({ ...s, key: s.tier === 0 ? 'old' : `t${s.tier}` }));
+		return require('./rods').gearPath(GEAR_PATH_LADDER).map((s) => ({ ...s, key: s.tier === 0 ? 'old' : `t${s.tier}` }));
 	}
 	return PROVISIONAL_GEAR_PATH;
 }
@@ -121,5 +129,5 @@ module.exports = {
 	TARGET_WINDOWS,
 	DAILY, PURCHASE, LIFECYCLE,
 	DAY, dayIndex, RULES, BUFFS, EVENTS,
-	PROVISIONAL_GEAR_PATH, GEAR_PATH_SOURCE, TIER_KEYS, gearPath, tierAt, typicalTier,
+	PROVISIONAL_GEAR_PATH, GEAR_PATH_SOURCE, GEAR_PATH_LADDER, UPGRADE_POLICY, TIER_KEYS, gearPath, tierAt, typicalTier,
 };

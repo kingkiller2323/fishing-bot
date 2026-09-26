@@ -100,19 +100,21 @@ const PARAMS = deepFreeze({
 	targets: {
 		// Headroom above the binding target, for every solved value ("err on the side of absurd").
 		margin: 1.1,
-		// Today's measured rod that stands for each new tier when ratios are compared at equal gear.
-		// Where two rods bracket a tier, the higher ratio is the target.
-		todayRodOfTier: {
-			0: ['Old Rod'],
-			1: ['Custom (Uncommon parts)'],
-			2: ['Custom (Rare parts)'],
-			3: ['Custom (Rare parts)', 'Custom (Legendary parts)'],
-			4: ['Custom (Legendary parts)'],
-			5: ['Custom (Legendary parts)'],
-		},
-		// Time to afford: the two gear purchases that exist today (simulation.json stages) and the new
-		// tier set bought at the same milestone.
-		todayPurchaseOfTier: { 1: 'c20', 2: 'c30' },
+		// Today's measured rod that stands for each gear-path step when ratios are compared at equal gear,
+		// by the step's LEVEL (so any gear path maps: a step takes the last band at or below its level).
+		// Where two rods bracket a band, the higher ratio is the target. On the 5b.4 rods path (steps at Lv 0,
+		// 20, 30, 40, 50, 60) this is exactly the earlier per-tier map (todayRodOfTier()).
+		todayRodByLevel: [
+			{ level: 0, rods: ['Old Rod'] },
+			{ level: 20, rods: ['Custom (Uncommon parts)'] },
+			{ level: 30, rods: ['Custom (Rare parts)'] },
+			{ level: 40, rods: ['Custom (Rare parts)', 'Custom (Legendary parts)'] },
+			{ level: 50, rods: ['Custom (Legendary parts)'] },
+		],
+		// Time to afford: the two gear purchases that exist today (simulation.json stages). The new gear bought
+		// at the same milestone is the highest gear-path step unlocked at the stage's level (purchaseTierOf()):
+		// T1 and T2 on the 5b.4 rods path.
+		todayPurchases: ['c20', 'c30'],
 		todayStageBefore: { c20: 'old', c30: 'c20' },
 		// Both level-gate options are solved; the multipliers satisfy the targets under either.
 		gatingModes: ['public', 'real'],
@@ -194,6 +196,22 @@ const bisect = (ok, lo, hi, iters = 60) => {
 	}
 	return hi;
 };
+
+// Gear-path mapping to today's rods and purchases, by level (works on any F.gearPath()).
+/** Today's measured rods a gear-path step (index or step) is compared with (PARAMS.targets.todayRodByLevel). */
+function todayRodsOf(t) {
+	const level = gear(t).level || 0;
+	const bands = PARAMS.targets.todayRodByLevel.filter((b) => b.level <= level);
+	return bands[bands.length - 1].rods;
+}
+/** { [tier index]: today's rods } for the current gear path (the earlier per-tier map on the 5b.4 rods path). */
+const todayRodOfTier = () => Object.fromEntries(F.gearPath().map((t) => [t.tier, todayRodsOf(t)]));
+/** The gear-path step bought at today's purchase stage (the highest step unlocked at its level). */
+function purchaseTierOf(stage) {
+	const level = SIMULATED.stages[stage].level;
+	const steps = F.gearPath().filter((t) => t.level <= level);
+	return steps[steps.length - 1].tier;
+}
 
 // ---------------------------------------------------------------------------------------------
 // The profile
@@ -381,6 +399,7 @@ const founderCache = new Map();
  */
 function founderOutcome(stage, { profile = null, overheadS = stage?.overheadS ?? F.DESIGN_OVERHEAD_S } = {}) {
 	const p = profile || founderProfile();
+	if (p.variant === 'hybrid') return hybridOutcome(stage, { profile: p, overheadS });
 	const tier = gear(stage?.tier ?? stage);
 	const biome = stage?.biome || F.biomeAt(tier.level);
 	const key = `${JSON.stringify([p.rarityTable, p.stats, p.multipliers, p.bonusDraws, p.limits, p.pity])}|${tierKey(tier)}|${biome}|${overheadS}`;
@@ -394,6 +413,9 @@ function founderOutcome(stage, { profile = null, overheadS = stage?.overheadS ??
 		xp: c.xpBase * p.multipliers.xp,
 		valueBase: c.valueBase,
 		value: c.valueBase * p.multipliers.sell,
+		// Before the private multipliers (every reward here is on the public card, so pre = base).
+		xpPre: c.xpBase,
+		valuePre: c.valueBase,
 		durability: durabilityPerCast,
 		legendaryPlus: pity.perCast,
 		baitUnits: 1,
@@ -414,6 +436,8 @@ function founderOutcome(stage, { profile = null, overheadS = stage?.overheadS ??
 			xp: hourly.xp / n.hourly.xp,
 			cashBase: hourly.valueBase / n.hourly.cash,
 			cash: hourly.value / n.hourly.cash,
+			xpPre: hourly.xpPre / n.hourly.xp,
+			cashPre: hourly.valuePre / n.hourly.cash,
 			legendaryPlus: hourly.legendaryPlus / n.legendaryPlusPerHour,
 			casts: casts / n.hourly.casts,
 			fish: visible.mean / n.outcome.fishPerCast,
@@ -945,7 +969,7 @@ function solve() {
 	const margin = PARAMS.targets.margin;
 	const T = today();
 	const tiers = path.map((t) => t.tier);
-	const targetOf = (t, pick) => maxOf(PARAMS.targets.todayRodOfTier[t].map((rod) => pick(T.byRod[rod])));
+	const targetOf = (t, pick) => maxOf(todayRodsOf(t).map((rod) => pick(T.byRod[rod])));
 
 	// 0. Durability efficiency: rod life in hours of play, Founder / Normal, >= today's on every crafted
 	//    tier (the Old Rod is unbreakable under the rods design). Never below today's value.
@@ -1007,12 +1031,12 @@ function solve() {
  * @param opts { crateCost: (tier) => expected cost of the tier set, provisional: (sell) => the profile other
  *   systems read while M2 runs (solve() only; a sensitivity runs after solve(), so they read the proposed one) }
  */
-function solveMultipliers(make, { crateCost, provisional = null }) {
+function solveMultipliers(make, { crateCost, provisional = null, gates = PARAMS.targets.gatingModes }) {
 	const path = F.gearPath();
 	const margin = PARAMS.targets.margin;
 	const T = today();
 	const tiers = path.map((t) => t.tier);
-	const targetOf = (t, pick) => maxOf(PARAMS.targets.todayRodOfTier[t].map((rod) => pick(T.byRod[rod])));
+	const targetOf = (t, pick) => maxOf(todayRodsOf(t).map((rod) => pick(T.byRod[rod])));
 	if (!provisional && !solveMemo) throw new Error(`${SYSTEM_NAME}: a sensitivity solve needs the proposed profile solved first (quests, streak and buffs read it)`);
 
 	// Sell: (a) $/h ratio to Normal at equal gear, every tier x biome >= today's ratio (same biome);
@@ -1025,13 +1049,14 @@ function solveMultipliers(make, { crateCost, provisional = null }) {
 			const fo = founderOutcome({ tier: t, biome }, { profile: base });
 			const cashTarget = targetOf(t, (r) => r.biomes[biome].cashRatio);
 			const xpTarget = targetOf(t, (r) => r.biomes[biome].xpRatio);
-			cashNeed.push({ tier: t, biome, target: cashTarget, baseRatio: fo.ratio.cashBase, need: (cashTarget * margin) / fo.ratio.cashBase });
-			xpRatioNeed.push({ tier: t, biome, target: xpTarget, baseRatio: fo.ratio.xpBase, need: (xpTarget * margin) / fo.ratio.xpBase });
+			cashNeed.push({ tier: t, biome, target: cashTarget, baseRatio: fo.ratio.cashPre, need: (cashTarget * margin) / fo.ratio.cashPre });
+			xpRatioNeed.push({ tier: t, biome, target: xpTarget, baseRatio: fo.ratio.xpPre, need: (xpTarget * margin) / fo.ratio.xpPre });
 		}
 	}
 	const afford = [];
-	for (const [t, stage] of Object.entries(PARAMS.targets.todayPurchaseOfTier)) {
-		const tier = path[Number(t)];
+	for (const stage of PARAMS.targets.todayPurchases) {
+		const t = purchaseTierOf(stage);
+		const tier = path[t];
 		const st = SIMULATED.stages[stage];
 		const prev = SIMULATED.stages[PARAMS.targets.todayStageBefore[stage]];
 		const crate = BOX_CATALOG.find((b) => b.name === 'Fishing Crate');
@@ -1040,7 +1065,7 @@ function solveMultipliers(make, { crateCost, provisional = null }) {
 		const todayIncome = todayRates(prev.founderMeasured || prev.measured, biome, 'founder').cashPerHour;
 		const todayHours = todayCost / todayIncome;
 		const newCost = crateCost(Number(t));
-		const newBaseIncome = founderOutcome({ tier: path[Number(t) - 1], biome: F.biomeAt(tier.level) }, { profile: base }).hourly.valueBase;
+		const newBaseIncome = founderOutcome({ tier: path[t - 1], biome: F.biomeAt(tier.level) }, { profile: base }).hourly.valuePre;
 		afford.push({ tier: Number(t), todayStage: stage, todayCost, todayIncomePerHour: todayIncome, todayMinutes: todayHours * 60, newCost, newBaseIncomePerHour: newBaseIncome, need: (newCost / (newBaseIncome * todayHours)) * margin });
 	}
 	const bindingCash = [...cashNeed].sort((a, b) => b.need - a.need)[0];
@@ -1055,7 +1080,7 @@ function solveMultipliers(make, { crateCost, provisional = null }) {
 		for (const a of Object.keys(F.ARCHETYPES)) {
 			const target = T.lifecycles[a]?.founderHours;
 			if (!target) continue;
-			for (const gating of PARAMS.targets.gatingModes) {
+			for (const gating of gates) {
 				const ok = (x) => {
 					const hours = LC.milestoneHours(runIntegrated(a, { profile: make({ sell, xp: x }), gate: gating, horizon: 'real', cache: false }));
 					return F.LIFECYCLE.milestones.every((L) => target[L] == null || (hours[L] != null && hours[L] <= target[L]));
@@ -1409,7 +1434,7 @@ function todayCardShape(rod) {
 }
 
 // Today's rod -> the gear-path tier whose comparison it heads (its home biome is used for today's rows).
-const TODAY_ROD_TIER = Object.fromEntries(TODAY_RODS.map((rod) => [rod, Math.min(...Object.entries(PARAMS.targets.todayRodOfTier).filter(([, list]) => list[0] === rod).map(([t]) => Number(t)))]));
+const todayRodTier = (rod) => Math.min(...Object.entries(todayRodOfTier()).filter(([, list]) => list[0] === rod).map(([t]) => Number(t)));
 
 /** The fastest cooldown any normal reel the rods design allows can reach (its strongest reel stat x best variant). */
 function normalCooldownFloorMs() {
@@ -1440,7 +1465,7 @@ function detection() {
 	const stealth = path.map((t) => tierEvidence(t.tier, stealthProfileWith({ xp: s.xp, sell: s.sell })));
 	const measuredNormalFloorMs = minOf(MEASURED.results.filter((r) => r.profile === 'normal').map((r) => r.cooldownMs));
 	const todayRows = TODAY_RODS.map((rod) => {
-		const t = TODAY_ROD_TIER[rod];
+		const t = todayRodTier(rod);
 		const biome = F.biomeAt(path[t].level);
 		const { qualities, stats } = todayRodInputs(rod);
 		const pN = F.castOutcome({ biome, qualities, stats, multiChance: 0 }).rarity;
@@ -1686,15 +1711,15 @@ const DECISIONS = [
 		id: 'P-FOUNDER-TARGETS', status: 'proposed',
 		title: 'What "preserved" means: six targets (M1-M6) met at today\'s value x a margin on today\'s rods mapped to the new tiers, under both gate options; solved values rounded up',
 		get modelled() {
-			return `margin ×${PARAMS.targets.margin}; tier map ${Object.entries(PARAMS.targets.todayRodOfTier).map(([t, r]) => `${t === '0' ? 'Old Rod' : `T${t}`} = ${r.join(' / ')}`).join('; ')}; gates ${PARAMS.targets.gatingModes.join(' and ')}; rounding ×${PARAMS.rounding.smallStep} below ×${PARAMS.rounding.largeFrom}, ×${PARAMS.rounding.largeStep} above, luck and efficiency ${PARAMS.rounding.luckStep}`;
+			return `margin ×${PARAMS.targets.margin}; rod map by level ${PARAMS.targets.todayRodByLevel.map((x) => `Lv ${x.level}+ = ${x.rods.join(' / ')}`).join('; ')} (on the current gear path: ${Object.entries(todayRodOfTier()).map(([t, r]) => `${t === '0' ? 'Old Rod' : `T${t}`} = ${r.join(' / ')}`).join('; ')}); purchases ${PARAMS.targets.todayPurchases.map((st) => `${st} = T${purchaseTierOf(st)}`).join(', ')}; gates ${PARAMS.targets.gatingModes.join(' and ')}; rounding ×${PARAMS.rounding.smallStep} below ×${PARAMS.rounding.largeFrom}, ×${PARAMS.rounding.largeStep} above, luck and efficiency ${PARAMS.rounding.luckStep}`;
 		},
 		alternatives: ['no margin (exactly today\'s values)', 'ratio targets only (drops M2 time-to-level and M4 time-to-afford: much smaller multipliers, a slower Founder than today)'],
 		source: 'founder design', why: 'the approved direction (A-FOUNDER-VISIBLE: private multipliers preserve effective power) keeps the Founder\'s effective power "absurd"; M1-M6 are this design\'s proposed reading of it. The steeper curve and the repriced gear are compensated like the lost visible volume (Targets)',
-		get: () => ({ margin: PARAMS.targets.margin, todayRodOfTier: PARAMS.targets.todayRodOfTier, todayPurchaseOfTier: PARAMS.targets.todayPurchaseOfTier, gatingModes: PARAMS.targets.gatingModes, rounding: PARAMS.rounding }),
+		get: () => ({ margin: PARAMS.targets.margin, todayRodByLevel: PARAMS.targets.todayRodByLevel, todayPurchases: PARAMS.targets.todayPurchases, gatingModes: PARAMS.targets.gatingModes, rounding: PARAMS.rounding }),
 		expected: {
 			margin: 1.1,
-			todayRodOfTier: { 0: ['Old Rod'], 1: ['Custom (Uncommon parts)'], 2: ['Custom (Rare parts)'], 3: ['Custom (Rare parts)', 'Custom (Legendary parts)'], 4: ['Custom (Legendary parts)'], 5: ['Custom (Legendary parts)'] },
-			todayPurchaseOfTier: { 1: 'c20', 2: 'c30' },
+			todayRodByLevel: [{ level: 0, rods: ['Old Rod'] }, { level: 20, rods: ['Custom (Uncommon parts)'] }, { level: 30, rods: ['Custom (Rare parts)'] }, { level: 40, rods: ['Custom (Rare parts)', 'Custom (Legendary parts)'] }, { level: 50, rods: ['Custom (Legendary parts)'] }],
+			todayPurchases: ['c20', 'c30'],
 			gatingModes: ['public', 'real'],
 			rounding: { smallStep: 0.5, largeStep: 5, largeFrom: 10, luckStep: 0.05, efficiencyStep: 0.05 },
 		},
@@ -1891,7 +1916,7 @@ function report() {
 			tier: t.tier, key: t.key, level: t.level, biome: fo.biome,
 			normal: { dist: nd.dist.slice(1).map((p) => round(p, 4)), mean: round(nd.mean, 3), p3plus: round(nd.p3plus, 4), p5: round(nd.p5, 4), legendaryCardShare: round(fo.normal.legendaryCardShare, 4) },
 			founder: { dist: fo.visible.dist.slice(1).map((p) => round(p, 4)), mean: round(fo.visible.mean, 3), pOne: round(fo.visible.pOne, 4), p3plus: round(fo.visible.p3plus, 4), p5: round(fo.visible.p5, 4), legendaryCardShare: round(fo.legendaryCardShare, 4) },
-			todayFounderFishPerCast: round(T.byRod[PARAMS.targets.todayRodOfTier[t.tier][0]].fishPerCast.founder, 2),
+			todayFounderFishPerCast: round(T.byRod[todayRodsOf(t)[0]].fishPerCast.founder, 2),
 		};
 	});
 
@@ -1899,8 +1924,8 @@ function report() {
 	const power = path.map((t) => {
 		const fo = founderOutcome({ tier: t.tier }, { profile: prof });
 		const all = F.LIVE_BIOMES.map((b) => founderOutcome({ tier: t.tier, biome: b }, { profile: prof }));
-		const tgtXp = F.LIVE_BIOMES.map((b) => maxOf(PARAMS.targets.todayRodOfTier[t.tier].map((rod) => T.byRod[rod].biomes[b].xpRatio)));
-		const tgtCash = F.LIVE_BIOMES.map((b) => maxOf(PARAMS.targets.todayRodOfTier[t.tier].map((rod) => T.byRod[rod].biomes[b].cashRatio)));
+		const tgtXp = F.LIVE_BIOMES.map((b) => maxOf(todayRodsOf(t).map((rod) => T.byRod[rod].biomes[b].xpRatio)));
+		const tgtCash = F.LIVE_BIOMES.map((b) => maxOf(todayRodsOf(t).map((rod) => T.byRod[rod].biomes[b].cashRatio)));
 		const nl = founderOutcome({ tier: t.tier }, { profile: profileWith({ xp: s.xp, sell: s.sell, durabilityEfficiency: s.durabilityEfficiency }) });
 		return {
 			tier: t.tier, key: t.key, level: t.level, homeBiome: fo.biome,
@@ -1937,7 +1962,7 @@ function report() {
 		const lc = Object.fromEntries(gates.map((g) => [g, lifecycle(ref, { profile: p0, gating: g, horizon: 'real' })]));
 		const rows = path.map((t) => {
 			const fo = founderOutcome({ tier: t.tier }, { profile: p0 });
-			const todayL = maxOf(PARAMS.targets.todayRodOfTier[t.tier].map((rod) => T.byRod[rod].legendaryPlusPerHour.founder));
+			const todayL = maxOf(todayRodsOf(t).map((rod) => T.byRod[rod].legendaryPlusPerHour.founder));
 			return { tier: t.tier, fishPerCast: round(fo.visible.mean, 2), xpRatio: round(fo.ratio.xp, 1), cashRatio: round(fo.ratio.cash, 1), legendaryPlusPerHour: round(fo.hourly.legendaryPlus, 1), todayFounderLegendaryPlusPerHour: round(todayL, 1), legendaryPlusDrop: round(todayL / fo.hourly.legendaryPlus, 1) };
 		});
 		// XP for Lv 50: the new curve against today's (100·L², balance.js levelForXp).
@@ -2303,7 +2328,7 @@ function markdownTables() {
 		+ `\n\nToday's Founder profile (XP ×${U.profile.xp}, sell ×${U.profile.sell}, no luck, efficiency ${U.profile.durabilityEfficiency}) under the new rules. Lv 50 needs ${times(U.l50XpVsToday, 2)} today's XP. On the integrated model the regular Founder would reach real Lv 50 after **${hrs(U.regularRealL50Hours.realGate)}** of play (real gate) or ${hrs(U.regularRealL50Hours.publicGate)} (public gate), against ${hrs(U.regularRealL50Hours.todayFounder)} today. (Its casts use today's profile; quests, boxes and buffs read the proposed one, which changes box and quest money, not the cast XP.)`;
 
 	// ----- Targets -----
-	T['founder-tier-map'] = mdTable(['New tier', 'Today\'s rod it is compared with'], Object.entries(PARAMS.targets.todayRodOfTier).map(([t, list]) => [tierName(t), list.map((r) => rodRow[r] || r).join(' and ') + (list.length > 1 ? ' (the higher ratio)' : '')]));
+	T['founder-tier-map'] = mdTable(['New tier', 'Today\'s rod it is compared with'], Object.entries(todayRodOfTier()).map(([t, list]) => [tierName(t), list.map((r) => rodRow[r] || r).join(' and ') + (list.length > 1 ? ' (the higher ratio)' : '')]));
 	const tn = (x) => `${cap(x.archetype)}, ${x.gating} gate`;
 	T['founder-targets'] = mdTable(['#', 'Metric', 'Definition', 'Binding case', 'Needed (× margin)', 'Chosen'], [
 		['M1', 'XP ratio at equal gear', `Founder final XP/h ÷ Normal XP/h, same tier and biome, ${F.DESIGN_OVERHEAD_S} s overhead; ≥ today's ratio on the mapped rod in all ${F.LIVE_BIOMES.length} biomes × ${R.power.length} tiers`, `${tierName(B.xpRatio.tier)} ${B.xpRatio.biome} (today ${times(B.xpRatio.today)}; Founder base ${times(B.xpRatio.baseRatio, 2)})`, times(B.xpRatio.need, 2), '—'],

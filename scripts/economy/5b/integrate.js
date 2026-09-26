@@ -1,11 +1,15 @@
-// Phase 5B INTEGRATION (framework 5b.3): composes every subsystem's `system()` on the shared lifecycle
+// Phase 5B INTEGRATION (framework 5b.3; 5b.5: standard rods + upgrades): composes every subsystem's `system()` on the shared lifecycle
 // core (lifecycle.js) into one economy. Every Phase 5B progression/economy table comes from run().
 //
 //   const I = require('./integrate');
 //   I.run({ archetype: 'regular', variant: { bait: 'none', aquarium: false, founder: false } })
 //
 // System contract (each subsystem module exports `system(opts)` returning a lifecycle.js system):
-//   rods      gear purchases (tier assemblies, equip at tier level), repair upkeep, salvage refunds
+//   rods      gear purchases (5b.5: standard shop rods on the reference ladder; tier assemblies on the custom
+//             path, variant.rods 'custom'), equip at the step's level, repair upkeep, salvage refunds
+//   upgrades  (5b.5) permanent cash upgrades ('optional' sink) under a purchase policy (variant.upgrades:
+//             F.UPGRADE_POLICY in the reference loop, 'none', 'greedy'); stat bonuses on every cast; always
+//             composed LAST so its Bait Conservation sees the bait system's per-cast cost
 //   world     biome access (canFish: permit held) and permit purchases
 //   quests    daily/weekly/repeatable/story income (XP and cash by kind), Daily Box grants; the daily
 //             requirement is its sessionDone() for the minimum-daily player
@@ -32,10 +36,17 @@ const REGISTRY = {
 	bait: () => require('./bait'),
 	aquarium: () => require('./aquarium'),
 	founder: () => require('./founder'),
+	upgrades: () => require('./upgrades'),
 };
-/** The approved core loop every player runs: gear, permits, quests, streak and buffs. */
-const REFERENCE = ['rods', 'world', 'quests', 'streak', 'buffs'];
-const REFERENCE_NOTE = 'integrated core loop: rods (gear purchases, repairs) + world (permits) + quests + streak + buffs, no bait, no aquarium';
+/**
+ * The reference core loop every player runs: gear (standard rods), permits, quests, streak, buffs and the
+ * permanent upgrades under the reference purchase policy (5b.5; P-UPGRADES-REFERENCE-POLICY). 'upgrades' is
+ * listed last on purpose (see the contract above).
+ */
+const REFERENCE = ['rods', 'world', 'quests', 'streak', 'buffs', 'upgrades'];
+const REFERENCE_NOTE = `integrated core loop: rods (standard shop ladder, repairs) + world (permits) + quests + streak + buffs + upgrades (policy '${F.UPGRADE_POLICY}'), no bait, no aquarium`;
+/** Gear path of each rods variant (variant.rods). */
+const RODS_LADDERS = { standard: () => F.gearPath(), custom: () => require('./rods').customPath() };
 /** Which level gates content for the Founder variant: PROPOSED 'public' (decisions.js P-FOUNDER-GATE). */
 const DEFAULT_FOUNDER_GATE = 'public';
 
@@ -47,26 +58,33 @@ function systemOf(name, opts = {}) {
 
 /** The reference systems (fresh instances: systems keep per-run state in state.sys only). */
 function referenceSystems(opts = {}) {
-	return REFERENCE.map((n) => systemOf(n, opts[n] || {}));
+	return REFERENCE.map((n) => systemOf(n, { ...(n === 'upgrades' ? { policy: F.UPGRADE_POLICY } : {}), ...(opts[n] || {}) }));
 }
 
 /**
  * One integrated lifecycle.
  * @param {object} o { archetype, variant: { bait: 'none'|'cash'|'xp', aquarium: bool, founder: bool,
- *   gate: 'public'|'real' }, exclude: [system names], systemOpts: { [name]: opts }, ...simulate opts }
+ *   gate: 'public'|'real', rods: 'standard'|'custom' (5b.5), upgrades: an upgrades.js policy name (5b.5;
+ *   default F.UPGRADE_POLICY; 'none' leaves the system out) }, exclude: [system names],
+ *   systemOpts: { [name]: opts }, ...simulate opts }
  */
 function run(o = {}) {
-	const variant = { bait: 'none', aquarium: false, founder: false, ...(o.variant || {}) };
+	const variant = { bait: 'none', aquarium: false, founder: false, rods: 'standard', upgrades: F.UPGRADE_POLICY, ...(o.variant || {}) };
 	variant.gate = variant.gate || (variant.founder ? DEFAULT_FOUNDER_GATE : 'real');
-	const names = REFERENCE.filter((n) => !(o.exclude || []).includes(n));
+	if (!RODS_LADDERS[variant.rods]) throw new Error(`Unknown rods variant ${variant.rods}`);
+	const names = REFERENCE.filter((n) => n !== 'upgrades' && !(o.exclude || []).includes(n));
 	if (variant.bait !== 'none') names.push('bait');
 	if (variant.aquarium) names.push('aquarium');
 	if (variant.founder) names.push('founder');
+	if (variant.upgrades !== 'none' && !(o.exclude || []).includes('upgrades')) names.push('upgrades');
 	const opts = o.systemOpts || {};
-	const systems = names.map((n) => systemOf(n, { ...(opts[n] || {}), ...(n === 'bait' ? { policy: variant.bait } : {}), ...(n === 'founder' ? { gate: variant.gate } : {}) }));
+	const systems = names.map((n) => systemOf(n, {
+		...(opts[n] || {}), ...(n === 'bait' ? { policy: variant.bait } : {}), ...(n === 'founder' ? { gate: variant.gate } : {}), ...(n === 'upgrades' ? { policy: variant.upgrades } : {}),
+	}));
 	// Founder runs continue until the PUBLIC level reaches the stop level (the real level races ahead).
 	const stopOn = o.stopOn || (variant.founder ? 'public' : 'gate');
-	const result = LC.simulate({ ...o, stopOn, systems, gate: variant.founder ? variant.gate : 'real' });
+	const gearPath = o.gearPath || (variant.rods === 'standard' ? undefined : RODS_LADDERS[variant.rods]());
+	const result = LC.simulate({ ...o, stopOn, systems, gate: variant.founder ? variant.gate : 'real', ...(gearPath ? { gearPath } : {}) });
 	return { ...result, variant, systems: names, ...F.stamp() };
 }
 
@@ -96,4 +114,4 @@ function sinkSummary(result) {
 	return { income: Math.round(income), sources: Object.fromEntries(Object.entries(result.ledger.cash).map(([k, v]) => [k, Math.round(v)])), byCategory, saved: Math.round(result.final.money), savedShare: +(result.final.money / income).toFixed(4) };
 }
 
-module.exports = { REGISTRY, REFERENCE, REFERENCE_NOTE, DEFAULT_FOUNDER_GATE, systemOf, referenceSystems, run, xpDecomposition, sinkSummary };
+module.exports = { REGISTRY, REFERENCE, REFERENCE_NOTE, RODS_LADDERS, DEFAULT_FOUNDER_GATE, systemOf, referenceSystems, run, xpDecomposition, sinkSummary };

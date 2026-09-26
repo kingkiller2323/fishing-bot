@@ -101,15 +101,17 @@ const canon = (r) => RARITY_ORDER.find((x) => x.toLowerCase() === String(r).toLo
 const PARAMS = deepFreeze({
 	id: 'rods-5b',
 	craft: {
-		// Crafting and equipping a crafted rod needs Lv 20 (the first-rod milestone). Above that, a part
-		// works at full strength once the player reaches its level (see capRarity); below it, it works
-		// at the best rarity the player has unlocked. Every crafted rod catches strong fish.
-		minLevel: 20,
+		// 5b.5 (P-RODS-CUSTOM-LEVEL-RULE): the Rod Workshop opens at Lv 10, with the Fishing Crate (its parts'
+		// source) and the first standard rod. A part works at full strength once the player reaches its level
+		// (see capRarity); below it, it works at the best rarity the player has unlocked. The rod's requirement
+		// is its highest part's level (four Commons: Lv 10, not today's inherited 10 x the summed counts = Lv 40).
+		// Every crafted rod catches strong fish.
+		minLevel: 10,
 		qualities: ['weak', 'strong'],
 	},
 	// Level at which a part of each rarity works at full strength. The rod's requirement (shown on the
 	// rod) is the highest of its four parts; its tier follows from that level.
-	partLevel: { Common: 20, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 },
+	partLevel: { Common: 10, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 },
 	tierOfRarity: { Common: 1, Uncommon: 1, Rare: 2, Ultra: 3, Legendary: 4, Lucky: 5 },
 	// The tier-appropriate set every tier figure is quoted for (matchedSet of this rarity).
 	referenceRarity: { 1: 'Uncommon', 2: 'Rare', 3: 'Ultra', 4: 'Legendary', 5: 'Lucky' },
@@ -196,6 +198,31 @@ const PARAMS = deepFreeze({
 		commonOfUncommon: 0.25,
 	},
 	priceSigDigits: 2,
+	// 5b.5 STANDARD RODS (P-RODS-STANDARD-LADDER): shop rods bought with cash, one per biome level, the
+	// reference gear path (GEAR_PATH_LADDER 'standard'). Generalists: modest multi-catch (always below the
+	// custom set of the same level and the 1.80 normal ceiling), a little of every stat, strong access from
+	// the first one. price = priceHours x the income of the stage before the rod (the previous standard rod in
+	// the biome unlocked 10 levels earlier, reference cadence), 2 significant digits. Durability: one life lasts
+	// lifeHours of regular play; repair = repair.upkeepShare of what that life earns at home (as crafted rods).
+	standard: {
+		rods: [
+			{ tier: 1, name: 'Trusty Rod', role: 'basic', level: 10, meanFish: 1.05, qualities: ['weak', 'strong'], stats: { rareFind: 0.1, luck: 0.05, trophyChance: 0, fishingSpeed: 0.02, sellBonus: 0 }, lifeHours: 3, priceHours: 0.6 },
+			{ tier: 2, name: 'Angler\'s Rod', role: 'better', level: 20, meanFish: 1.15, qualities: ['weak', 'strong'], stats: { rareFind: 0.15, luck: 0.08, trophyChance: 0.05, fishingSpeed: 0.03, sellBonus: 0 }, lifeHours: 3.5, priceHours: 0.75 },
+			{ tier: 3, name: 'Pro Angler Rod', role: 'midgame', level: 30, meanFish: 1.25, qualities: ['weak', 'strong'], stats: { rareFind: 0.3, luck: 0.15, trophyChance: 0.08, fishingSpeed: 0.04, sellBonus: 0.01 }, lifeHours: 4, priceHours: 1.75 },
+			{ tier: 4, name: 'Expedition Rod', role: 'advanced', level: 40, meanFish: 1.4, qualities: ['weak', 'strong'], stats: { rareFind: 0.45, luck: 0.3, trophyChance: 0.2, fishingSpeed: 0.07, sellBonus: 0.02 }, lifeHours: 5, priceHours: 2.75 },
+			{ tier: 5, name: 'Master\'s Rod', role: 'elite', level: 50, meanFish: 1.55, qualities: ['weak', 'strong'], stats: { rareFind: 0.7, luck: 0.45, trophyChance: 0.35, fishingSpeed: 0.11, sellBonus: 0.04 }, lifeHours: 6, priceHours: 4 },
+			{ tier: 6, name: 'Summit Rod', role: 'endgame', level: 60, meanFish: 1.7, qualities: ['weak', 'strong'], stats: { rareFind: 0.85, luck: 0.55, trophyChance: 0.45, fishingSpeed: 0.14, sellBonus: 0.05 }, lifeHours: 7, priceHours: 5.5 },
+		],
+		// A standard rod is listed (greyed, "unlocks at Lv X") one stage early so the player can save toward it.
+		previewLevels: 10,
+		// Custom tier c (crate tier c) competes with the standard rod of the same level (standard tier c + 1).
+		customOffset: 1,
+	},
+	// Owned Fishing Crates at the 5B migration (P-RODS-FISHING-CRATE, user decision: option B). The crate is
+	// already delisted (hotfix L5). The migration snapshots each owned stack into an additive legacyCount;
+	// /open consumes legacy units first under the OLD Fishing Crate definition; they are never converted and
+	// never open as the new T1 part crate. Units acquired after release open under the new definition.
+	legacyCrateStock: { option: 'b', marker: 'legacyCount', opensAs: 'legacy-definition-first', converted: false },
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -348,6 +375,38 @@ function upkeepShare(rod, biome) {
 
 // Shared player archetypes (framework assumptions).
 const ARCHETYPES = F.ARCHETYPES;
+
+// ---------------------------------------------------------------------------------------------
+// STANDARD RODS (5b.5): shop rods bought with cash; the reference gear path (P-RODS-STANDARD-LADDER).
+const STANDARD_TIERS = PARAMS.standard.rods.map((r) => r.tier);
+const standardCache = new Map();
+/** The standard (shop) rod of tier t (1..6), priced from the income of the stage before it. */
+function standardRod(t) {
+	if (standardCache.has(t)) return standardCache.get(t);
+	const d = PARAMS.standard.rods.find((r) => r.tier === t);
+	if (!d) throw new Error(`No standard rod tier ${t}`);
+	const stats = { rareFind: 0, luck: 0, trophyChance: 0, sellBonus: 0, xpBonus: 0, fishingSpeed: 0, durabilityEfficiency: 0, ...d.stats };
+	const meanFish = Math.min(PARAMS.multi.ceilingMean, d.meanFish);
+	const multiChance = meanFish > 1 ? F.chanceForMean(meanFish) : 0;
+	const dist = F.fishDistribution(multiChance);
+	const perf = { meanFish, cooldownMs: Math.max(F.COOLDOWN.minMs, Math.round(F.COOLDOWN.fishMs * (1 - stats.fishingSpeed))) };
+	const maxDurability = roundTo(d.lifeHours * fishPerHour(perf), PARAMS.durability.roundTo);
+	const home = biomeForLevel(d.level);
+	const rod = { tier: t, name: d.name, role: d.role, level: d.level, qualities: [...d.qualities], stats, meanFish, multiChance, jackpot3plus: dist.p3plus, jackpot5: dist.p5, cooldownMs: perf.cooldownMs, maxDurability, maxRepairs: null };
+	rod.lifeHoursRegular = maxDurability / fishPerHour(perf, ARCHETYPES.regular.overheadS);
+	rod.repairCost = nicePrice(PARAMS.repair.upkeepShare * maxDurability * rodOutcome(rod, home).valuePerFish);
+	const prev = t === 1 ? oldRod() : standardRod(t - 1);
+	const stage = biomeForLevel(d.level - 10);
+	rod.homeBiome = home;
+	rod.stageBiome = stage;
+	rod.stageIncomePerHour = rodHourly(prev, stage, F.DESIGN_OVERHEAD_S).cash;
+	rod.priceHours = d.priceHours;
+	rod.price = nicePrice(d.priceHours * rod.stageIncomePerHour);
+	rod.previewLevel = Math.max(0, d.level - PARAMS.standard.previewLevels);
+	standardCache.set(t, rod);
+	return rod;
+}
+const standardRods = () => STANDARD_TIERS.map(standardRod);
 
 // ---------------------------------------------------------------------------------------------
 // Today's rules (for Current -> Proposed and the legacy converter).
@@ -920,36 +979,59 @@ async function validateCratesWithEngine(opens = 3000, tiers = [1, 2, 3, 4]) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The designed gear path: the shared path every Phase 5B model uses (framework F.gearPath(); R3).
-function gearPath() {
-	const steps = [{ ...oldRod(), label: 'Old Rod', crateUnlockLevel: 0, homeBiome: 'Ocean', assembly: null, upkeepShareHome: 0, lifeHoursRegular: null }];
-	for (const t of TIERS) {
-		const rod = craftRod(referenceSet(t));
-		const a = assembly(t);
-		steps.push({
-			tier: t,
-			label: `Tier ${t} (${PARAMS.referenceRarity[t]} set)`,
-			level: rod.level,
-			crateUnlockLevel: PARAMS.crates.tiers[t].unlockLevel,
-			homeBiome: homeBiome(t),
-			qualities: rod.qualities,
-			stats: rod.stats,
-			multiChance: rod.multiChance,
-			meanFish: rod.meanFish,
-			jackpot3plus: rod.jackpot3plus,
-			jackpot5: rod.jackpot5,
-			cooldownMs: rod.cooldownMs,
-			maxDurability: rod.maxDurability,
-			lifeHoursRegular: rod.lifeHoursRegular,
-			repairCost: rod.repairCost,
-			repairCostPerFish: rod.repairCost / rod.maxDurability,
-			maxRepairs: rod.maxRepairs,
-			upkeepShareHome: upkeepShare(rod, homeBiome(t)),
-			assembly: { crate: a.crate, price: a.price, expectedCrates: a.expectedCrates, p90Crates: a.p90Crates, expectedCost: a.expectedCost, hoursOfStageIncome: a.hoursOfStageIncome },
-		});
-	}
-	return steps;
+// The designed gear paths. gearPath('standard') is the shared path every Phase 5B model uses (framework
+// F.gearPath() with GEAR_PATH_LADDER 'standard'; R3). Each step carries its `purchase` (what the rods system
+// buys to hold it), so system() is path-agnostic:
+//   'standard'  Old Rod + the six standard rods (Lv 10-60), bought in the shop with cash (5b.5 reference)
+//   'custom'    Old Rod + the Lv 10 standard rod + the five crafted reference sets (Lv 20-60), assembled from tier
+//               crates (the custom variant: the same 7 steps, crafted from Lv 20)
+//   'crafted5b4' the 5b.4 reference path (Old Rod + crafted T1-T5); kept for the 5b.4 -> 5b.5 delta table only
+const oldRodStep = () => ({ ...oldRod(), label: 'Old Rod', name: 'Old Rod', kind: 'starter', unlockLevel: 0, crateUnlockLevel: 0, homeBiome: 'Ocean', assembly: null, upkeepShareHome: 0, lifeHoursRegular: null, price: 0, purchase: null });
+function standardStep(t, tier = t) {
+	const rod = standardRod(t);
+	return {
+		tier,
+		label: `${rod.name} (standard, ${rod.role})`,
+		name: rod.name, kind: 'standard', role: rod.role,
+		level: rod.level, unlockLevel: rod.level, crateUnlockLevel: null, homeBiome: rod.homeBiome,
+		qualities: rod.qualities, stats: rod.stats, multiChance: rod.multiChance, meanFish: rod.meanFish, jackpot3plus: rod.jackpot3plus, jackpot5: rod.jackpot5,
+		cooldownMs: rod.cooldownMs, maxDurability: rod.maxDurability, lifeHoursRegular: rod.lifeHoursRegular, repairCost: rod.repairCost,
+		repairCostPerFish: rod.repairCost / rod.maxDurability, maxRepairs: rod.maxRepairs, upkeepShareHome: upkeepShare(rod, rod.homeBiome),
+		price: rod.price, assembly: null,
+		purchase: { kind: 'shop', item: rod.name, cost: rod.price, unlockLevel: rod.level },
+	};
 }
+function craftedStep(c, tier = c) {
+	const rod = craftRod(referenceSet(c));
+	const a = assembly(c);
+	return {
+		tier,
+		label: `Custom T${c} (${PARAMS.referenceRarity[c]} set)`,
+		name: `Custom T${c}`, kind: 'custom', customTier: c,
+		level: rod.level, unlockLevel: rod.level, crateUnlockLevel: PARAMS.crates.tiers[c].unlockLevel, homeBiome: homeBiome(c),
+		qualities: rod.qualities, stats: rod.stats, multiChance: rod.multiChance, meanFish: rod.meanFish, jackpot3plus: rod.jackpot3plus, jackpot5: rod.jackpot5,
+		cooldownMs: rod.cooldownMs, maxDurability: rod.maxDurability, lifeHoursRegular: rod.lifeHoursRegular, repairCost: rod.repairCost,
+		repairCostPerFish: rod.repairCost / rod.maxDurability, maxRepairs: rod.maxRepairs, upkeepShareHome: upkeepShare(rod, homeBiome(c)),
+		price: null,
+		assembly: { crate: a.crate, price: a.price, expectedCrates: a.expectedCrates, p90Crates: a.p90Crates, expectedCost: a.expectedCost, hoursOfStageIncome: a.hoursOfStageIncome },
+		purchase: { kind: 'assembly', crateTier: c, item: a.crate, cost: a.expectedCost, crates: a.expectedCrates, unlockLevel: PARAMS.crates.tiers[c].unlockLevel, salvage: a.salvageRefund },
+	};
+}
+const LADDERS = ['standard', 'custom', 'crafted5b4'];
+const pathCache = new Map();
+function gearPath(ladder = 'standard') {
+	if (!LADDERS.includes(ladder)) throw new Error(`Unknown ladder ${ladder} (${LADDERS.join(', ')})`);
+	if (!pathCache.has(ladder)) {
+		let steps;
+		if (ladder === 'standard') steps = [oldRodStep(), ...STANDARD_TIERS.map((t) => standardStep(t))];
+		else if (ladder === 'custom') steps = [oldRodStep(), standardStep(1), ...TIERS.map((c) => craftedStep(c, c + PARAMS.standard.customOffset))];
+		else steps = [oldRodStep(), ...TIERS.map((c) => craftedStep(c))];
+		pathCache.set(ladder, steps);
+	}
+	return pathCache.get(ladder).map((s) => ({ ...s }));
+}
+/** The custom variant's path (same 7 steps as the standard ladder; crafted from Lv 20). */
+const customPath = () => gearPath('custom');
 
 // Approved target windows (shared framework assumption).
 const TARGETS = F.TARGET_WINDOWS;
@@ -990,46 +1072,50 @@ const SYSTEM_DEFAULTS = deepFreeze({ salvage: true, founderCrates: true });
 const repairPerPoint = (step) => (step && step.maxDurability && step.repairCost ? step.repairCost / step.maxDurability : 0);
 
 /**
- * Per-tier purchase plan on a gear path: the tier crate, expected crates and cost of assembling the
- * tier's reference set (assembly(t); the Founder profile uses founder.founderCrates(t), i.e. the same
- * price with the Founder's crate luck), the crate unlock level, the tier level and, with `salvage`, the
- * refund for salvaging every leftover part (assembly(t).salvageRefund; for the Founder, the Normal
- * per-crate salvage value over its own expected crates).
+ * Purchase plan on a gear path: per step, what the rods system buys to hold it (step.purchase). A standard
+ * rod is one shop purchase (its price, available at its level). A custom step is the assembly of its tier's
+ * reference set from tier crates (assembly(c): expected crates and cost; the Founder profile uses
+ * founder.founderCrates(c), the same price with the Founder's crate luck), available from the crate's unlock
+ * level, with, when `salvage` is on, the refund for salvaging every leftover part.
  */
 function assemblyPlan(path, { profile = 'normal', salvage = SYSTEM_DEFAULTS.salvage } = {}) {
 	const plan = [null];
-	for (let t = 1; t < path.length; t++) {
-		const step = path[t];
-		if (!TIERS.includes(t)) break;
-		const a = assembly(t);
-		let crates = step.assembly?.expectedCrates ?? a.expectedCrates;
-		let cost = step.assembly?.expectedCost ?? a.expectedCost;
-		let refund = a.salvageRefund;
+	for (let i = 1; i < path.length; i++) {
+		const step = path[i];
+		const p = step.purchase;
+		if (!p) throw new Error(`gear path step ${i} (${step.label || step.key}) has no purchase: rods.system() needs a rods gear path`);
+		if (p.kind === 'shop') {
+			plan.push({ tier: i, kind: 'shop', item: p.item, crate: null, price: p.cost, crates: 0, cost: p.cost, unlockLevel: p.unlockLevel, level: step.level, salvage: 0 });
+			continue;
+		}
+		const c = p.crateTier;
+		const a = assembly(c);
+		let crates = p.crates;
+		let cost = p.cost;
+		let refund = p.salvage ?? a.salvageRefund;
 		if (profile === 'founder') {
-			const fc = require('./founder').founderCrates(t).founder;
+			const fc = require('./founder').founderCrates(c).founder;
 			refund = Math.max(0, a.salvageRefund + a.salvageReturnPerCrate * a.price * (fc.expected - a.expectedCrates));
 			crates = fc.expected;
 			cost = fc.expectedCost;
 		}
-		plan.push({
-			tier: t, crate: step.assembly?.crate ?? a.crate, price: step.assembly?.price ?? a.price, crates, cost,
-			unlockLevel: step.crateUnlockLevel ?? PARAMS.crates.tiers[t].unlockLevel, level: step.level,
-			salvage: salvage ? refund : 0,
-		});
+		plan.push({ tier: i, kind: 'assembly', customTier: c, item: p.item, crate: p.item, price: a.price, crates, cost, unlockLevel: p.unlockLevel, level: step.level, salvage: salvage ? refund : 0 });
 	}
 	return plan;
 }
 
 /**
- * The rods SYSTEM (lifecycle.js hooks). Per-run state lives in state.sys.rods only.
- *   goals     the next tier's assembly: category 'progression', priority LC.PRIORITY.rod, cost = the
- *             expected assembly cost, available from the tier crate's unlock level (gate level); ledger
- *             item = the crate name. buy() records ownership, pays any salvage refund (cash source
- *             'salvage') and equips at once if the gate level already reaches the tier.
- *   on        'levelUp': equips the owned tier once the gate level reaches its level (it fishes from the
- *             next step). Emits 'assembly' { tier, crate, crates, cost, level } on each purchase (tier
- *             crates carry no buffs, so no 'box' event: the counting rule has nothing for buffs to value).
- *   onCasts   repairs: spend('upkeep', 'repairs', durability used this step x the equipped tier's repair
+ * The rods SYSTEM (lifecycle.js hooks). Per-run state lives in state.sys.rods only. Path-agnostic: it buys
+ * each step's `purchase` of ctx.path (the standard ladder in the reference loop; the custom path in the
+ * custom variant, integrate.run variant.rods 'custom').
+ *   goals     the next step's purchase: category 'progression', priority LC.PRIORITY.rod, cost = the shop
+ *             price or the expected assembly cost, available from its unlock level (gate level); ledger item =
+ *             the rod's name or the crate's name. buy() records ownership, pays any salvage refund (cash
+ *             source 'salvage') and equips at once if the gate level already reaches the step.
+ *   on        'levelUp': equips the owned step once the gate level reaches its level (it fishes from the
+ *             next step). Emits 'assembly' { tier, kind, item, crates, cost, level } on each purchase (rods and
+ *             tier crates carry no buffs, so no 'box' event).
+ *   onCasts   repairs: spend('upkeep', 'repairs', durability used this step x the equipped step's repair
  *             cost per durability point); the Old Rod is unbreakable (0).
  * @param {object} opts { salvage: salvage every leftover part on assembly (default SYSTEM_DEFAULTS),
  *   founderCrates: price the Founder's assemblies with its crate luck (default SYSTEM_DEFAULTS) }
@@ -1062,19 +1148,23 @@ function system(opts = {}) {
 		init(state) {
 			state.sys[SYSTEM_NAME] = { owned: state.equippedTier, plan: null, planProfile: null, bought: {}, equips: {}, spent: 0 };
 		},
+		/** The next purchase (for other systems' reserves, e.g. upgrades.js): { tier, item, cost, unlockLevel } or null. */
+		nextPurchase(state, ctx) {
+			return plan(state, ctx)[own(state).owned + 1] || null;
+		},
 		goals(state, ctx) {
 			const s = own(state);
 			const next = plan(state, ctx)[s.owned + 1];
 			if (!next) return [];
 			return [{
-				id: `rods:T${next.tier}`, item: next.crate, category: 'progression', priority: LC.PRIORITY.rod, cost: next.cost,
+				id: `rods:T${next.tier}`, item: next.item, category: 'progression', priority: LC.PRIORITY.rod, cost: next.cost,
 				available: ctx.gateLevel() >= next.unlockLevel,
 				buy(st, c) {
 					s.owned = next.tier;
 					s.spent += next.cost;
-					s.bought[next.tier] = { hours: +st.h.toFixed(4), day: st.day + 1, level: c.gateLevel(), crates: next.crates, cost: next.cost, salvage: next.salvage };
+					s.bought[next.tier] = { hours: +st.h.toFixed(4), day: st.day + 1, level: c.gateLevel(), kind: next.kind, item: next.item, crates: next.crates, cost: next.cost, salvage: next.salvage };
 					if (next.salvage > 0) c.addCash('salvage', next.salvage);
-					c.emit('assembly', { tier: next.tier, crate: next.crate, crates: next.crates, cost: next.cost, level: c.gateLevel() });
+					c.emit('assembly', { tier: next.tier, kind: next.kind, item: next.item, crate: next.crate, crates: next.crates, cost: next.cost, level: c.gateLevel() });
 					equip(st, c);
 				},
 			}];

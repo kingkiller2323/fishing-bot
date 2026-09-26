@@ -229,6 +229,8 @@ function sharedValues() {
 		tier: t.tier, level: t.level, meanFish: t.meanFish, multiChance: t.multiChance ?? null, qualities: t.qualities, stats: t.stats,
 		cooldownMs: t.cooldownMs ?? null, maxDurability: t.maxDurability ?? null, repairCost: t.repairCost ?? null,
 		crateUnlockLevel: t.crateUnlockLevel ?? null, assemblyCost: t.assembly?.expectedCost ?? null,
+		// 5b.5: the standard ladder's shop purchase.
+		kind: t.kind ?? null, name: t.name ?? null, price: t.price ?? null, unlockLevel: t.unlockLevel ?? null,
 	}));
 	return { assumptions: data, framework: { CURVE, BIOME_VALUE, RARITY_VALUE, QUALITY_VALUE, SPECIES_CLAMP, XP_PER_FISH_MEAN, XP_RARITY, MULTI, COOLDOWN, NORMAL_RARITY_TABLE, FOUNDER_RARITY_TABLE, STAT_CAPS, LUCKY_ITEM_SHARE } };
 }
