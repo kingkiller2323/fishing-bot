@@ -17,16 +17,14 @@
 //                               (src/bootstrap/data/rodParts.js), player cadences, approved level windows
 //   tierLevel(t), homeBiome(t), stageBiome(t)
 //                               level of a tier, biome a tier is built for, biome of the stage before it
-//   capRarity(rarity, level)    highest part rarity whose full effect a player of `level` has unlocked
-//   partProfile(part, {playerLevel})
-//                               one part's contribution under the proposed slot families
+//   rodGate(parts, playerLevel) the L6B level gate: required level (highest part's level), the parts that
+//                               set it, and whether a player of that level may craft / equip the rod
+//   partProfile(part)           one part's contribution under the proposed slot families (full strength)
 //   matchedSet(rarity)          catalog-free balanced part set of one rarity (per slot: the highest
 //                               rarity <= `rarity` that exists in the catalog for that slot)
 //   referenceSet(tier)          the tier-appropriate set every tier figure is quoted for
-//   performance(parts, {playerLevel})
-//                               stats, meanFish, multiChance, jackpot odds, cooldown (no durability)
-//   craftRod(parts, {playerLevel})
-//                               the proposed crafted rod: performance + tier, level requirement,
+//   performance(parts)          stats, meanFish, multiChance, jackpot odds, cooldown (no durability)
+//   craftRod(parts)             the proposed crafted rod: performance + tier, level requirement,
 //                               maxDurability, repairCost (unlimited repairs)
 //   baseDurability(rarity), repairCostFor(rarity)
 //                               durability base and repair cost by rod-piece rarity (formulas)
@@ -101,16 +99,16 @@ const canon = (r) => RARITY_ORDER.find((x) => x.toLowerCase() === String(r).toLo
 const PARAMS = deepFreeze({
 	id: 'rods-5b',
 	craft: {
-		// 5b.5 (P-RODS-CUSTOM-LEVEL-RULE): the Rod Workshop opens at Lv 10, with the Fishing Crate (its parts'
-		// source) and the first standard rod. A part works at full strength once the player reaches its level
-		// (see capRarity); below it, it works at the best rarity the player has unlocked. The rod's requirement
-		// is its highest part's level (four Commons: Lv 10, not today's inherited 10 x the summed counts = Lv 40).
-		// Every crafted rod catches strong fish.
+		// 5b.5 (P-RODS-CUSTOM-LEVEL-RULE, final D1 rule): the Rod Workshop opens at Lv 10, with the Fishing
+		// Crate (its parts' source) and the first standard rod. The rod's requirement is its highest-rarity
+		// part's level (four Commons: Lv 10, not today's inherited 10 x the summed counts = Lv 40); every part
+		// always works at full strength. A rod above the player's level can be neither crafted nor equipped
+		// (levelGate). Every crafted rod catches strong fish.
 		minLevel: 10,
 		qualities: ['weak', 'strong'],
 	},
-	// Level at which a part of each rarity works at full strength. The rod's requirement (shown on the
-	// rod) is the highest of its four parts; its tier follows from that level.
+	// Level of a part of each rarity. The rod's requirement (shown on the rod and in the Workshop preview)
+	// is the highest of its four parts; its tier follows from that level.
 	partLevel: { Common: 10, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 },
 	tierOfRarity: { Common: 1, Uncommon: 1, Rare: 2, Ultra: 3, Legendary: 4, Lucky: 5 },
 	// The tier-appropriate set every tier figure is quoted for (matchedSet of this rarity).
@@ -121,7 +119,9 @@ const PARAMS = deepFreeze({
 	slots: {
 		rod: {
 			family: 'Multi-catch (mean fish per cast) and the durability base',
-			meanFish: { Common: 1.10, Uncommon: 1.20, Rare: 1.30, Ultra: 1.50, Legendary: 1.65, Lucky: 1.80 },
+			// Common 1.05 (final D1 rod rule; was 1.10): the Lv 10 all-Common set stays a sidegrade of the
+			// Trusty Rod (ladderGuard.sidegradeMargin). The other rarities are unchanged.
+			meanFish: { Common: 1.05, Uncommon: 1.20, Rare: 1.30, Ultra: 1.50, Legendary: 1.65, Lucky: 1.80 },
 		},
 		reel: {
 			family: 'Fishing speed (cooldown) and trophy/drag (Giant weight)',
@@ -218,15 +218,20 @@ const PARAMS = deepFreeze({
 		// Custom tier c (crate tier c) competes with the standard rod of the same level (standard tier c + 1).
 		customOffset: 1,
 	},
+	// Rod level gate (final D1 rule; ships as hotfix L6B): a custom rod's required level is its highest-rarity
+	// part's level. A rod whose requirement is above the player's level can be neither crafted (/craft, the Rod
+	// Workshop) nor equipped (/equip); owning its parts is fine. The Workshop previews the resulting required
+	// level (and the part that sets it) before crafting. Parts are never weakened to fit a lower level.
+	levelGate: { requirement: 'highest-part-level', enforcedAt: ['craft', 'equip'], partsOwnable: true, workshopPreview: true, ships: 'L6B' },
 	// Lv 10 ladder guard (user direction at the hybrid-ladder approval, before rod level gates ship: the Lv 10
 	// Common custom rod is an explicit SIDEGRADE / specialisation of the Trusty Rod, and a regression check
-	// proves no legal custom set leapfrogs the ladder; see ladderGuard() and report().progressionChecks).
+	// proves no custom set a player can use leapfrogs the ladder; see ladderGuard()).
 	// sidegradeMargin: the most net $/h (at River, the Lv 10 home) a custom set legal at Lv 10 may earn over
 	// the Trusty Rod. It is the thinnest edge a Lv 20-60 balanced custom UPGRADE earns over its standard rod
 	// (Lv 30, +2.5%, rods-custom-relation), rounded down: a sidegrade earns less over its standard rod than
-	// any upgrade does. proposedCommonRodMeanFish: the minimal fix to the Common custom rule when the approved
-	// Common rod piece (slots.rod.meanFish.Common) fails the margin; modelled as an override, not applied.
-	ladderGuard: { level: 10, sidegradeMargin: 0.025, proposedCommonRodMeanFish: 1.05 },
+	// any upgrade does. supersededCommonRodMeanFish: the Common rod piece as first approved (1.10), which
+	// failed the margin; kept only as the comparison column (an override; the model runs slots.rod.meanFish).
+	ladderGuard: { level: 10, sidegradeMargin: 0.025, supersededCommonRodMeanFish: 1.10 },
 	// Owned Fishing Crates at the 5B migration (P-RODS-FISHING-CRATE, user decision: option B). The crate is
 	// already delisted (hotfix L5). The migration snapshots each owned stack into an additive legacyCount;
 	// /open consumes legacy units first under the OLD Fishing Crate definition; they are never converted and
@@ -251,26 +256,33 @@ function nicePrice(x, digits = PARAMS.priceSigDigits) {
 	return Math.round(x / p) * p;
 }
 
-/** Highest part rarity (<= rarity) whose full effect a player of `level` has unlocked; null below Lv 20. */
-function capRarity(rarity, level = Infinity) {
-	for (let i = rank(rarity); i >= 0; i--) if (PARAMS.partLevel[RARITY_ORDER[i]] <= level) return RARITY_ORDER[i];
-	return null;
+/**
+ * The rod level gate (PARAMS.levelGate, hotfix L6B; P-RODS-LEVEL-CAP / P-RODS-CUSTOM-LEVEL-RULE): a rod's
+ * required level is the level of its highest-rarity part, read part by part. A player below it may own the
+ * parts but can neither craft (/craft, Rod Workshop) nor equip (/equip) the rod. Returns what the Workshop
+ * preview shows: the required level, the part(s) that set it, and whether `playerLevel` may use it.
+ */
+function rodGate(parts, playerLevel = Infinity) {
+	const list = Object.values(bySlot(parts));
+	const levels = list.map((p) => PARAMS.partLevel[canon(p.rarity)]);
+	const requiredLevel = Math.max(...levels);
+	const setBy = list.filter((p, i) => levels[i] === requiredLevel).map((p) => ({ name: p.name, slot: SLOT_OF_TYPE[p.type], rarity: canon(p.rarity) }));
+	const allowed = requiredLevel <= playerLevel;
+	return { requiredLevel, setBy, playerLevel, allowed, craft: allowed, equip: allowed, blockedParts: list.filter((p, i) => levels[i] > playerLevel).map((p) => p.name) };
 }
 
-/** One part's contribution under the proposed slot families. `part` = { name, type, rarity }. */
-function partProfile(part, { playerLevel = Infinity, rodMeans = null } = {}) {
+/** One part's contribution under the proposed slot families (always full strength). `part` = { name, type, rarity }. */
+function partProfile(part, { rodMeans = null } = {}) {
 	const slot = SLOT_OF_TYPE[part.type];
 	const rarity = canon(part.rarity);
 	if (!slot || !rarity) throw new Error(`Not a rod part: ${part.name} (${part.type}, ${part.rarity})`);
-	const eff = capRarity(rarity, playerLevel) || 'Common';
 	const v = PARAMS.variants[part.name] || {};
 	const S = PARAMS.slots[slot];
-	const out = { slot, name: part.name, rarity, effectiveRarity: eff, level: PARAMS.partLevel[rarity], tier: PARAMS.tierOfRarity[rarity], variant: v.label || 'Balanced', stats: {} };
-	if (slot === 'rod') out.meanFish = (rodMeans || S.meanFish)[eff] + (v.meanDelta || 0);
-	if (slot === 'reel') out.stats = { fishingSpeed: S.fishingSpeed[eff] * (v.fishingSpeed ?? 1), trophyChance: S.trophyChance[eff] * (v.trophyChance ?? 1) };
-	if (slot === 'hook') out.stats = { rareFind: S.rareFind[eff] * (v.rareFind ?? 1), luck: S.luck[eff] * (v.luck ?? 1) };
-	if (slot === 'handle') out.stats = { sellBonus: S.sellBonus[eff] };
-	// Durability is a property of the physical rod (nominal rarity), never level-capped.
+	const out = { slot, name: part.name, rarity, level: PARAMS.partLevel[rarity], tier: PARAMS.tierOfRarity[rarity], variant: v.label || 'Balanced', stats: {} };
+	if (slot === 'rod') out.meanFish = (rodMeans || S.meanFish)[rarity] + (v.meanDelta || 0);
+	if (slot === 'reel') out.stats = { fishingSpeed: S.fishingSpeed[rarity] * (v.fishingSpeed ?? 1), trophyChance: S.trophyChance[rarity] * (v.trophyChance ?? 1) };
+	if (slot === 'hook') out.stats = { rareFind: S.rareFind[rarity] * (v.rareFind ?? 1), luck: S.luck[rarity] * (v.luck ?? 1) };
+	if (slot === 'handle') out.stats = { sellBonus: S.sellBonus[rarity] };
 	if (slot === 'rod') out.durabilityVariant = v.durability ?? 1;
 	if (slot === 'handle') out.durabilityMult = S.durabilityMult[rarity];
 	for (const k of Object.keys(out.stats)) out.stats[k] = round4(out.stats[k]);
@@ -299,9 +311,9 @@ function matchedSet(rarity) {
 const referenceSet = (t) => matchedSet(PARAMS.referenceRarity[t]);
 
 /** Performance of a set (no durability): stats, mean fish, multi-catch chance, cooldown. */
-function performance(parts, { playerLevel = Infinity, rodMeans = null } = {}) {
+function performance(parts, { rodMeans = null } = {}) {
 	const s = bySlot(parts);
-	const prof = Object.fromEntries(Object.entries(s).map(([k, p]) => [k, partProfile(p, { playerLevel, rodMeans })]));
+	const prof = Object.fromEntries(Object.entries(s).map(([k, p]) => [k, partProfile(p, { rodMeans })]));
 	const stats = { rareFind: 0, luck: 0, trophyChance: 0, sellBonus: 0, xpBonus: 0, fishingSpeed: 0, durabilityEfficiency: 0 };
 	for (const p of Object.values(prof)) for (const [k, v] of Object.entries(p.stats)) stats[k] = round4(stats[k] + v);
 	const meanFish = Math.min(PARAMS.multi.ceilingMean, Math.max(1, prof.rod.meanFish));
@@ -354,8 +366,8 @@ function repairCostFor(rarity, rodMeans = null) {
 }
 
 /** The proposed crafted rod for a part set (catalog parts or matchedSet virtual parts). */
-function craftRod(parts, { playerLevel = Infinity, rodMeans = null } = {}) {
-	const perf = performance(parts, { playerLevel, rodMeans });
+function craftRod(parts, { rodMeans = null } = {}) {
+	const perf = performance(parts, { rodMeans });
 	const s = bySlot(parts);
 	const rp = perf.parts.rod;
 	const maxDurability = roundTo(baseDurability(rp.rarity, rodMeans) * perf.parts.handle.durabilityMult * rp.durabilityVariant, PARAMS.durability.roundTo);
@@ -532,27 +544,31 @@ function legacyIndexMap() {
  * C: unknown fingerprint (admin/custom data) -> a matched Common set.
  * Durability is grandfathered: effective max = max(stored maxDurability, proposed). Repairs are
  * unlimited and priced by the proposed rules; a legacy 'destroyed' crafted rod counts as 'broken'.
+ * The rod always performs at full strength; `gate` is the L6B level gate for `stored.playerLevel` (the rod
+ * stays owned and repairable, but it cannot be equipped below its required level).
  */
 function convertLegacyRod(stored, partDocs = null) {
 	let method = 'parts';
-	let rod;
-	if (partDocs && Object.values(partDocs).filter(Boolean).length === 4) {rod = craftRod(partDocs, { playerLevel: stored.playerLevel ?? Infinity });}
+	let parts;
+	if (partDocs && Object.values(partDocs).filter(Boolean).length === 4) {parts = partDocs;}
 	else {
 		const hit = legacyIndexMap().get(legacySignature(stored.capabilities || []));
 		if (hit) {
 			method = 'signature';
 			const find = (n) => CATALOG.find((p) => p.name === n);
-			rod = craftRod(hit.names.map(find), { playerLevel: stored.playerLevel ?? Infinity });
+			parts = hit.names.map(find);
 		}
 		else {
 			method = 'default';
-			rod = craftRod(matchedSet('Common'), { playerLevel: stored.playerLevel ?? Infinity });
+			parts = matchedSet('Common');
 		}
 	}
+	const rod = craftRod(parts);
 	const max = Math.max(Number(stored.maxDurability) || 0, rod.maxDurability);
 	return {
 		method,
 		rod,
+		gate: rodGate(parts, stored.playerLevel ?? Infinity),
 		durability: { max, remaining: Math.min(max, Number(stored.durability) || 0) },
 		state: stored.state === 'destroyed' ? 'broken' : stored.state || 'mint',
 		repairCost: rod.repairCost,
@@ -1342,15 +1358,16 @@ const spread = (arr) => ({ min: Math.min(...arr), median: quant(arr, 0.5), max: 
 const maxRarity = (rarities) => RARITY_ORDER[Math.max(...Object.values(rarities).map(rank))];
 
 // ---------------------------------------------------------------------------------------------
-// LADDER GUARD (PARAMS.ladderGuard; P-RODS-CUSTOM-LEVEL-RULE / P-RODS-CUSTOM-RELATION): the Lv 10 Common
-// custom rod against the Trusty Rod (its own level) and the Angler's Rod (the next rung), and the regression
-// check that no custom set leapfrogs the standard ladder. Two scenarios: the design as approved, and the
-// proposed Common fix (an override of the Common rod piece's mean fish; PARAMS itself is not changed).
+// LADDER GUARD (PARAMS.ladderGuard, PARAMS.levelGate; P-RODS-CUSTOM-LEVEL-RULE / P-RODS-CUSTOM-RELATION):
+// the Lv 10 Common custom rod against the Trusty Rod (its own level) and the Angler's Rod (the next rung),
+// and the regression check that no custom set a player can craft and equip leapfrogs the standard ladder.
+// Two scenarios: the final rule (PARAMS: Common rod piece 1.05, the L6B gate) and, for comparison only, the
+// Common rod piece as first approved (1.10; an override of slots.rod.meanFish.Common, same gate).
 function guardScenarios() {
-	const fix = PARAMS.ladderGuard.proposedCommonRodMeanFish;
+	const old = PARAMS.ladderGuard.supersededCommonRodMeanFish;
 	return {
-		approved: { label: `as approved (Common rod piece ${PARAMS.slots.rod.meanFish.Common.toFixed(2)} fish)`, commonRodMeanFish: PARAMS.slots.rod.meanFish.Common, rodMeans: null },
-		proposed: { label: `proposed fix (Common rod piece ${fix.toFixed(2)} fish)`, commonRodMeanFish: fix, rodMeans: { ...PARAMS.slots.rod.meanFish, Common: fix } },
+		final: { label: `final rule (Common rod piece ${PARAMS.slots.rod.meanFish.Common.toFixed(2)} fish)`, commonRodMeanFish: PARAMS.slots.rod.meanFish.Common, rodMeans: null },
+		superseded: { label: `as first approved (Common rod piece ${old.toFixed(2)} fish; superseded)`, commonRodMeanFish: old, rodMeans: { ...PARAMS.slots.rod.meanFish, Common: old } },
 	};
 }
 /** Hourly cash, XP and net $/h (cash after repair upkeep) of a rod in a biome, design overhead. */
@@ -1388,7 +1405,7 @@ function commonSetAssembly() {
 	return {
 		crate: def.name, crateTier: 1, unlockLevel: PARAMS.crates.tiers[1].unlockLevel, price, expectedCrates: d.expected, p90Crates: d.p90,
 		expectedCost: d.expected * price, p90Cost: d.p90 * price, salvageRefund, netCostAfterSalvage: d.expected * price - salvageRefund,
-		// A Common-or-better part per slot (usable at Lv 10 under the level cap, but it shows a higher requirement).
+		// A Common-or-better part per slot (any Uncommon/Rare part raises the requirement: gated at Lv 10).
 		commonOrBetter: { expectedCrates: any.expected, p90Crates: any.p90, expectedCost: any.expected * price },
 	};
 }
@@ -1400,12 +1417,13 @@ const rodView = (rod, biomes) => ({
 let guardCache = null;
 /**
  * The Lv 10 sidegrade table and the ladder regression checks (cached). For each scenario and each standard
- * rod level L: (1) LEGAL sets (requirement = highest part level <= L, full strength) must earn less net $/h
- * than the NEXT standard rod (unlock > L) in that rod's home biome; (2) their mean fish stays <= the 1.80
- * ceiling; (3) at Lv 10, the best legal set earns at most sidegradeMargin more net $/h than the Trusty Rod
- * at River. Supplementary: sets USABLE at L under the level cap (parts from the crates unlocked by L, or any
- * catalog part for legacy/admin stock) must also stay below the next rod; their edge over the own-level rod
- * is reported, not gated (they show a higher requirement).
+ * rod level L: (1) LEGAL sets (requirement = highest part level <= L) must earn less net $/h than the NEXT
+ * standard rod (unlock > L) in that rod's home biome; (2) their mean fish stays <= the 1.80 ceiling; (3) at
+ * Lv 10, the best legal set earns at most sidegradeMargin more net $/h than the Trusty Rod at River. GATE
+ * checks (L6B, rodGate part by part): of the sets a Lv L player can OWN (parts from the crates unlocked by L,
+ * or any catalog part: legacy stock, admin grants), the ones the gate lets them craft and equip must stay
+ * below the next rod and contain no part above Lv L. At Lv 10 the sets the gate blocks are reported at full
+ * strength (what the gate prevents), not gated by a limit.
  */
 function ladderGuard() {
 	if (guardCache) return guardCache;
@@ -1424,12 +1442,6 @@ function ladderGuard() {
 	};
 	const sets = allPartSets();
 	const crafted = Object.fromEntries(Object.entries(SC).map(([k, s]) => [k, sets.map((set) => craftRod(set, { rodMeans: s.rodMeans }))]));
-	const cappedAt = new Map();
-	const capped = (k, L) => {
-		const key = `${k}|${L}`;
-		if (!cappedAt.has(key)) cappedAt.set(key, sets.map((set) => craftRod(set, { playerLevel: L, rodMeans: SC[k].rodMeans })));
-		return cappedAt.get(key);
-	};
 	const best = (rods, biome, ref) => {
 		const refNet = rateOf(ref, biome).net;
 		let top = null;
@@ -1439,6 +1451,13 @@ function ladderGuard() {
 		}
 		return top;
 	};
+	// Set indices a Lv L player can own: parts from the crates unlocked by L ('crate'), or any catalog part ('any').
+	const ownableIdx = (L, pool) => {
+		const obtL = obtainableRarities(L);
+		return sets.map((set, i) => i).filter((i) => pool === 'any' || Object.values(sets[i]).every((p) => obtL.has(canon(p.rarity))));
+	};
+	// The L6B gate, read part by part (rodGate), independent of craftRod's requirement.
+	const gateOf = (i, L) => rodGate(sets[i], L);
 
 	// Lv 10 detail: the legal (all-Common) sets, the Trusty Rod and the Angler's Rod, per scenario.
 	const cost = commonSetAssembly();
@@ -1466,28 +1485,28 @@ function ladderGuard() {
 		});
 		return [k, { label: s.label, commonRodMeanFish: s.commonRodMeanFish, legalSets }];
 	}));
-	// Specialisations usable at Lv 10 under the level cap (parts a Lv 10 player can draw: Fishing Crate rarities).
-	const obt = obtainableRarities(G.level);
-	const usable = (k) => capped(k, G.level).filter((r) => Object.values(r.rarities).every((x) => obt.has(x)));
+	// What the gate blocks at Lv 10: sets a Lv 10 player can own from the Fishing Crate (Common, Uncommon, Rare
+	// parts) whose requirement is above Lv 10, at full strength (final rule). The Workshop preview shows each
+	// one's required level and the part that sets it; /craft and /equip refuse it until then.
+	const blocked10 = ownableIdx(G.level, 'crate').filter((i) => !gateOf(i, G.level).allowed);
+	const blockedRods = blocked10.map((i) => crafted.final[i]);
 	const GOALS = {
 		'Best net $/h': (r) => rateOf(r, home).net,
 		'Volume': (r) => r.meanFish,
 		'Workhorse (durability)': (r) => r.lifeHoursRegular,
 	};
 	const pickBy = (rods, f) => rods.reduce((b, r) => (f(r) > f(b) + 1e-12 || (Math.abs(f(r) - f(b)) <= 1e-12 && rateOf(r, home).net > rateOf(b, home).net) ? r : b), rods[0]);
-	const usableProposed = usable('proposed');
-	const usableApproved = usable('approved');
-	const builds = Object.entries(GOALS).map(([goal, f]) => {
-		const r = pickBy(usableProposed, f);
-		const i = usableProposed.indexOf(r);
-		const a = usableApproved[i];
+	const blockedView = (goal, r) => {
+		const i = crafted.final.indexOf(r);
+		const g = gateOf(i, G.level);
 		return {
-			goal, parts: r.names, requirementShown: r.level, meanFish: { approved: a.meanFish, proposed: r.meanFish }, stats: r.stats, lifeHoursRegular: r.lifeHoursRegular, repairCost: r.repairCost,
-			netVsOwn: { approved: rateOf(a, home).net / trusty.rates[home].net, proposed: rateOf(r, home).net / trusty.rates[home].net },
-			xpVsOwn: { approved: rateOf(a, home).xp / trusty.rates[home].xp, proposed: rateOf(r, home).xp / trusty.rates[home].xp },
-			netVsNext: { approved: rateOf(a, next.homeBiome).net / angler.rates[next.homeBiome].net, proposed: rateOf(r, next.homeBiome).net / angler.rates[next.homeBiome].net },
+			goal, parts: r.names, requiredLevel: g.requiredLevel, setBy: g.setBy, blockedParts: g.blockedParts, meanFish: r.meanFish, stats: r.stats, lifeHoursRegular: r.lifeHoursRegular, repairCost: r.repairCost,
+			ifUngated: { netVsOwn: rateOf(r, home).net / trusty.rates[home].net, xpVsOwn: rateOf(r, home).xp / trusty.rates[home].xp, netVsNext: rateOf(r, next.homeBiome).net / angler.rates[next.homeBiome].net },
 		};
-	});
+	};
+	// The Rare-handle case (user decision): the all-Common set with a Rare handle instead.
+	const rareHandle = blockedRods.find((r) => r.rarities.rod === 'Common' && r.rarities.reel === 'Common' && r.rarities.hook === 'Common' && r.rarities.handle === 'Rare');
+	const builds = [...Object.entries(GOALS).map(([goal, f]) => blockedView(goal, pickBy(blockedRods, f))), ...(rareHandle ? [blockedView('Rare handle on the Common set', rareHandle)] : [])];
 
 	// Regression checks over every standard level.
 	const thinnestUpgrade = Math.min(...TIERS.map((c) => {
@@ -1497,34 +1516,39 @@ function ladderGuard() {
 	}));
 	const checks = [];
 	const add = (row) => checks.push({ ...row, pass: Object.fromEntries(Object.entries(row.values).map(([k, v]) => [k, v === null ? null : row.op === '<' ? v < row.limit : v <= row.limit + 1e-12])) });
+	const perScenario = (f) => Object.fromEntries(Object.keys(SC).map((k) => [k, f(k)]));
 	for (const L of stds.map((r) => r.level)) {
 		const nx = stds.find((r) => r.level > L);
 		const me = stds.find((r) => r.level === L);
 		const legalBy = (k) => crafted[k].filter((r) => r.level <= L);
-		const any = legalBy('approved').length > 0;
+		const any = legalBy('final').length > 0;
 		if (!any) continue;
 		if (nx) {
-			add({ id: `legal-vs-next-${L}`, hard: true, level: L, sets: `custom sets legal at Lv ${L} (${legalBy('approved').length.toLocaleString('en-US')} combinations)`, check: `best net $/h vs the next standard rod (${nx.name}, Lv ${nx.level}) in ${nx.homeBiome}`, op: '<', limit: 1, kind: 'ratio', values: Object.fromEntries(Object.keys(SC).map((k) => [k, best(legalBy(k), nx.homeBiome, nx).ratio])), detail: Object.fromEntries(Object.keys(SC).map((k) => [k, best(legalBy(k), nx.homeBiome, nx)])) });
+			add({ id: `legal-vs-next-${L}`, hard: true, level: L, sets: `custom sets legal at Lv ${L} (${legalBy('final').length.toLocaleString('en-US')} combinations)`, check: `best net $/h vs the next standard rod (${nx.name}, Lv ${nx.level}) in ${nx.homeBiome}`, op: '<', limit: 1, kind: 'ratio', values: perScenario((k) => best(legalBy(k), nx.homeBiome, nx).ratio), detail: perScenario((k) => best(legalBy(k), nx.homeBiome, nx)) });
 		}
-		add({ id: `legal-ceiling-${L}`, hard: true, level: L, sets: `custom sets legal at Lv ${L}`, check: 'highest mean fish per cast vs the normal ceiling', op: '<=', limit: PARAMS.multi.ceilingMean, kind: 'fish', values: Object.fromEntries(Object.keys(SC).map((k) => [k, Math.max(...legalBy(k).map((r) => r.meanFish))])) });
+		add({ id: `legal-ceiling-${L}`, hard: true, level: L, sets: `custom sets legal at Lv ${L}`, check: 'highest mean fish per cast vs the normal ceiling', op: '<=', limit: PARAMS.multi.ceilingMean, kind: 'fish', values: perScenario((k) => Math.max(...legalBy(k).map((r) => r.meanFish))) });
 		if (L === G.level) {
-			add({ id: `legal-sidegrade-${L}`, hard: true, level: L, sets: `custom sets legal at Lv ${L} (all-Common)`, check: `best net $/h vs the own-level standard rod (${me.name}) in ${me.homeBiome}: sidegrade margin`, op: '<=', limit: 1 + G.sidegradeMargin, kind: 'ratio', values: Object.fromEntries(Object.keys(SC).map((k) => [k, best(legalBy(k), me.homeBiome, me).ratio])) });
+			add({ id: `legal-sidegrade-${L}`, hard: true, level: L, sets: `custom sets legal at Lv ${L} (all-Common)`, check: `best net $/h vs the own-level standard rod (${me.name}) in ${me.homeBiome}: sidegrade margin`, op: '<=', limit: 1 + G.sidegradeMargin, kind: 'ratio', values: perScenario((k) => best(legalBy(k), me.homeBiome, me).ratio) });
 		}
 		if (nx) {
 			const obtL = obtainableRarities(L);
-			const usableL = (k) => capped(k, L).filter((r) => Object.values(r.rarities).every((x) => obtL.has(x)));
-			add({ id: `capped-vs-next-${L}`, hard: true, level: L, sets: `sets usable at Lv ${L} under the level cap (parts from crates unlocked by Lv ${L}: ${RARITY_ORDER.filter((r) => obtL.has(r)).join(', ')})`, check: `best net $/h vs ${nx.name} in ${nx.homeBiome}`, op: '<', limit: 1, kind: 'ratio', values: Object.fromEntries(Object.keys(SC).map((k) => [k, best(usableL(k), nx.homeBiome, nx).ratio])) });
-			add({ id: `capped-any-vs-next-${L}`, hard: true, level: L, sets: `sets usable at Lv ${L} under the level cap (any catalog part: legacy stock, admin grants)`, check: `best net $/h vs ${nx.name} in ${nx.homeBiome}`, op: '<', limit: 1, kind: 'ratio', values: Object.fromEntries(Object.keys(SC).map((k) => [k, best(capped(k, L), nx.homeBiome, nx).ratio])) });
+			const crate = ownableIdx(L, 'crate');
+			const anyIdx = ownableIdx(L, 'any');
+			const usable = (idx) => idx.filter((i) => gateOf(i, L).allowed);
+			const blockedN = (idx) => idx.length - usable(idx).length;
+			add({ id: `gated-crate-${L}`, hard: true, level: L, sets: `sets a Lv ${L} player can own from the crates unlocked by Lv ${L} (${RARITY_ORDER.filter((r) => obtL.has(r)).join(', ')}): ${crate.length.toLocaleString('en-US')}; the gate blocks ${blockedN(crate).toLocaleString('en-US')} at /craft and /equip`, check: `best net $/h of the sets the gate lets a Lv ${L} player craft and equip, vs ${nx.name} in ${nx.homeBiome}`, op: '<', limit: 1, kind: 'ratio', values: perScenario((k) => best(usable(crate).map((i) => crafted[k][i]), nx.homeBiome, nx).ratio), blocked: blockedN(crate) });
+			add({ id: `gated-any-${L}`, hard: true, level: L, sets: `sets a Lv ${L} player can own from any catalog part (legacy stock, admin grants): ${anyIdx.length.toLocaleString('en-US')}; the gate blocks ${blockedN(anyIdx).toLocaleString('en-US')}`, check: `highest part level in any set the gate lets a Lv ${L} player craft or equip (read part by part)`, op: '<=', limit: L, kind: 'level', values: perScenario(() => Math.max(...usable(anyIdx).map((i) => Math.max(...Object.values(sets[i]).map((p) => PARAMS.partLevel[canon(p.rarity)]))))), blocked: blockedN(anyIdx) });
 			if (L === G.level) {
-				add({ id: `capped-vs-own-${L}`, hard: false, level: L, sets: `sets usable at Lv ${L} under the level cap (Fishing Crate parts; they show a higher requirement)`, check: `best net $/h vs ${me.name} in ${me.homeBiome} (reported, not gated)`, op: '<=', limit: 1 + G.sidegradeMargin, kind: 'ratio', values: Object.fromEntries(Object.keys(SC).map((k) => [k, best(usableL(k), me.homeBiome, me).ratio])), detail: Object.fromEntries(Object.keys(SC).map((k) => [k, best(usableL(k), me.homeBiome, me)])) });
+				const blk = crate.filter((i) => !gateOf(i, L).allowed);
+				add({ id: `blocked-vs-own-${L}`, hard: false, level: L, sets: `sets a Lv ${L} player can own from the ${PARAMS.crates.tiers[1].name} but the gate blocks (requirement Lv ${rng({ min: Math.min(...blk.map((i) => gateOf(i, L).requiredLevel)), max: Math.max(...blk.map((i) => gateOf(i, L).requiredLevel)) }, (x) => x)})`, check: `best net $/h at full strength vs ${me.name} in ${me.homeBiome}, if the gate did not exist (what it prevents)`, op: '<=', limit: 1 + G.sidegradeMargin, kind: 'ratio', values: perScenario((k) => best(blk.map((i) => crafted[k][i]), me.homeBiome, me).ratio), detail: perScenario((k) => best(blk.map((i) => crafted[k][i]), me.homeBiome, me)) });
 			}
 		}
 	}
-	add({ id: 'margin-below-upgrade-edge', hard: true, level: null, sets: 'the margin itself', check: 'sidegrade margin vs the thinnest Lv 20-60 balanced custom upgrade edge (rods-custom-relation)', op: '<=', limit: thinnestUpgrade, kind: 'pctEdge', values: { approved: G.sidegradeMargin, proposed: G.sidegradeMargin } });
-	const pass = Object.fromEntries(Object.keys(SC).map((k) => [k, checks.filter((c) => c.hard).every((c) => c.pass[k] !== false)]));
+	add({ id: 'margin-below-upgrade-edge', hard: true, level: null, sets: 'the margin itself', check: 'sidegrade margin vs the thinnest Lv 20-60 balanced custom upgrade edge (rods-custom-relation)', op: '<=', limit: thinnestUpgrade, kind: 'pctEdge', values: perScenario(() => G.sidegradeMargin) });
+	const pass = perScenario((k) => checks.filter((c) => c.hard).every((c) => c.pass[k] !== false));
 	guardCache = {
-		level: G.level, biome: home, margin: G.sidegradeMargin, thinnestUpgradeEdge: thinnestUpgrade, trusty, angler, cost, scenarios, builds,
-		checks, pass, failing: Object.fromEntries(Object.keys(SC).map((k) => [k, checks.filter((c) => c.hard && c.pass[k] === false).map((c) => c.id)])),
+		level: G.level, biome: home, margin: G.sidegradeMargin, thinnestUpgradeEdge: thinnestUpgrade, trusty, angler, cost, scenarios, builds, blockedAtLevel: blocked10.length,
+		checks, pass, hardChecks: checks.filter((c) => c.hard).length, failing: perScenario((k) => checks.filter((c) => c.hard && c.pass[k] === false).map((c) => c.id)),
 	};
 	return guardCache;
 }
@@ -1677,13 +1701,13 @@ function buildReport() {
 		const legacy = legacyCraft(parts);
 		const stored = { capabilities: legacy.capabilities, durability: 4200, maxDurability: legacy.durability, repairCost: legacy.repairCost, requirements: { level: legacy.level }, state: 'destroyed' };
 		const view = (c) => ({ method: c.method, tier: c.rod.tier, level: c.rod.level, meanFish: c.rod.meanFish, stats: c.rod.stats, cooldownMs: c.rod.cooldownMs, durability: c.durability, state: c.state, repairCost: c.repairCost, repairs: 'unlimited' });
-		const lowLevel = craftRod(referenceSet(4), { playerLevel: 35 });
+		const gate35 = rodGate(referenceSet(4), 35);
 		return {
 			stored: { parts: names, capabilities: legacy.capabilities, legacyLevel: legacy.level, legacyFishPerCast: legacy.fishPerCast, legacyRepairCost: legacy.repairCost, durability: `4200/${legacy.durability}`, state: 'destroyed' },
 			pathA: view(convertLegacyRod(stored, parts)),
 			pathB: view(convertLegacyRod(stored, null)),
 			pathC: view(convertLegacyRod({ capabilities: ['weak', '99', '9 count', '123 durability'], durability: 50, maxDurability: 123, state: 'broken' }, null)),
-			levelCap: { rod: 'Tier 4 Legendary set', playerLevel: 35, performsAs: Object.fromEntries(Object.entries(lowLevel.parts).map(([k, x]) => [k, x.effectiveRarity])), meanFish: lowLevel.meanFish, stats: lowLevel.stats, requirementShown: lowLevel.level },
+			gate: { rod: 'Tier 4 Legendary set', playerLevel: 35, requiredLevel: gate35.requiredLevel, craft: gate35.craft, equip: gate35.equip, blockedParts: gate35.blockedParts.length },
 		};
 	})();
 
@@ -1810,7 +1834,9 @@ function buildReport() {
 	const levelRule = RARITY_ORDER.filter((r) => combos.some((c) => rank(maxRarity(c.rarities)) === rank(r))).map((r) => {
 		const rows = combos.filter((c) => maxRarity(c.rarities) === r);
 		const pure = rows.filter((c) => Object.values(c.rarities).every((x) => x === r));
-		return { rarity: r, combos: rows.length, proposed: PARAMS.partLevel[r], todayLevel: spread(rows.map((c) => c.legacy.level)), matchedTodayLevel: pure.length ? spread(pure.map((c) => c.legacy.level)) : null };
+		// Under the L6B gate an existing rod whose proposed requirement is above today's can no longer be equipped
+		// between the two levels (it stays owned and repairable).
+		return { rarity: r, combos: rows.length, proposed: PARAMS.partLevel[r], todayLevel: spread(rows.map((c) => c.legacy.level)), matchedTodayLevel: pure.length ? spread(pure.map((c) => c.legacy.level)) : null, risesAboveToday: rows.filter((c) => PARAMS.partLevel[r] > c.legacy.level).length };
 	});
 	// 5b.4 -> 5b.5 delta: the 5b.4 ladder (crafted T1-T5, no upgrades) on today's model, every archetype.
 	const life4 = Object.fromEntries(PLAYERS.map((k) => [k, lifecycle(k, { ladder: 'crafted5b4' })]));
@@ -1907,6 +1933,12 @@ function report() {
 // Proposed design decisions (join decisions.js's registry). Status is only ever 'proposed': the user
 // approves. `get` reads the value this module runs; decisions.verify() checks it equals `expected`.
 const listOf = (o, f = (v) => v) => Object.entries(o).map(([k, v]) => `${k} ${f(v)}`).join(', ');
+// The Rare-handle case of the final D1 rule: a seeded all-Common set (first catalog Common per slot) with the
+// seeded Rare handle instead of the Common one.
+const RARE_HANDLE_SET = () => {
+	const first = (type, r) => CATALOG.find((p) => p.type === type && canon(p.rarity) === r);
+	return { rod: first('part_rod', 'Common'), reel: first('part_reel', 'Common'), hook: first('part_hook', 'Common'), handle: first('part_handle', 'Rare') };
+};
 const DECISIONS = [
 	{
 		id: 'P-RODS-TIER', status: 'proposed',
@@ -1917,13 +1949,27 @@ const DECISIONS = [
 		get: () => PARAMS.tierOfRarity, expected: { Common: 1, Uncommon: 1, Rare: 2, Ultra: 3, Legendary: 4, Lucky: 5 },
 	},
 	{
+		// Final D1 rod rule (user decision): the 5b.5 draft level CAP (parts above the player's level performing
+		// at the best unlocked rarity) is replaced by a hard gate. The id is kept for the registry.
 		id: 'P-RODS-LEVEL-CAP', status: 'proposed',
-		title: 'Part level caps: a part works at full strength from its level; below it, it performs at the best rarity the player has unlocked',
-		modelled: `partLevel: ${listOf(PARAMS.partLevel, (L) => `Lv ${L}`)}; e.g. a Legendary part at Lv 35 performs as ${capRarity('Legendary', 35)}`,
-		alternatives: ['a strict equip gate at the tier level', 'no cap (today)'],
-		source: 'rods design', why: 'one rule covers new crafts, existing rods, jackpot parts and admin grants; parts can still be collected and crafted early',
-		get: () => ({ partLevel: PARAMS.partLevel, legendaryAtLv35: capRarity('Legendary', 35) }),
-		expected: { partLevel: { Common: 10, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 }, legendaryAtLv35: 'Rare' },
+		title: 'Rod level gate (hotfix L6B): a custom rod\'s required level is its highest-rarity part\'s level; below it the rod can be neither crafted (/craft, Rod Workshop) nor equipped (/equip); owning the parts is fine; the Rod Workshop previews the required level before crafting; parts always work at full strength',
+		get modelled() {
+			const rh = rodGate(RARE_HANDLE_SET(), PARAMS.ladderGuard.level);
+			const lg = rodGate(referenceSet(4), 35);
+			return `partLevel: ${listOf(PARAMS.partLevel, (L) => `Lv ${L}`)}; gate at ${PARAMS.levelGate.enforcedAt.map((x) => `/${x}`).join(' and ')}; e.g. a Lv ${rh.playerLevel} player with a Common rod piece, reel and hook and a Rare handle: requires Lv ${rh.requiredLevel} (set by the ${rh.setBy.map((p) => p.name).join(', ')}), craft ${rh.craft ? 'allowed' : 'refused'}, equip ${rh.equip ? 'allowed' : 'refused'}; a Lv 35 player with a Legendary set: requires Lv ${lg.requiredLevel}, ${lg.allowed ? 'allowed' : 'refused'}`;
+		},
+		alternatives: ['a level cap: parts above the player\'s level perform at the best rarity unlocked (5b.5 draft; a Rare handle\'s durability still reached Lv 10)', 'weaken the higher-rarity part so it fits the lower level (rejected: a Rare handle stays a higher-tier part)', 'no gate (today)'],
+		source: 'user decision (final D1 rod rule)', why: 'one consistent rule: the rarity the player sees sets the level; parts can be collected early but never used early, and no higher-tier part is weakened to fit',
+		get: () => {
+			const view = (g) => ({ requiredLevel: g.requiredLevel, craft: g.craft, equip: g.equip });
+			return { partLevel: PARAMS.partLevel, gate: PARAMS.levelGate, rareHandleAtLv10: view(rodGate(RARE_HANDLE_SET(), 10)), legendarySetAtLv35: view(rodGate(referenceSet(4), 35)) };
+		},
+		expected: {
+			partLevel: { Common: 10, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 },
+			gate: { requirement: 'highest-part-level', enforcedAt: ['craft', 'equip'], partsOwnable: true, workshopPreview: true, ships: 'L6B' },
+			rareHandleAtLv10: { requiredLevel: 30, craft: false, equip: false },
+			legendarySetAtLv35: { requiredLevel: 50, craft: false, equip: false },
+		},
 	},
 	{
 		id: 'P-RODS-CRAFT', status: 'proposed',
@@ -1937,10 +1983,13 @@ const DECISIONS = [
 		id: 'P-RODS-MEAN-FISH', status: 'proposed',
 		title: 'The rod piece sets mean fish per cast by rarity (framework multi-catch chain), capped at the endgame ceiling',
 		modelled: `meanFish: ${listOf(PARAMS.slots.rod.meanFish)}; ceiling ${PARAMS.multi.ceilingMean}`,
-		alternatives: ['today: draws x per-draw (4-15 fish per cast, most combinations at the 15 cap)', 'other per-rarity means inside the approved ~1.0 to 1.5-1.8 band'],
-		source: 'rods design (approved direction A-MULTICATCH; the numbers are proposed)', why: 'progression-based, probabilistic multi-catch with rare 3-5 fish jackpots; removes the 16x cliff',
+		get alternatives() {
+			const old = report().ladderGuard.scenarios.superseded.legalSets[0];
+			return ['today: draws x per-draw (4-15 fish per cast, most combinations at the 15 cap)', `Common ${old.meanFish.toFixed(2)} (as first approved: the Lv 10 Common set earns ${rel(old.vsOwn.net)} net $/h over the Trusty Rod, above the +${pct(PARAMS.ladderGuard.sidegradeMargin)} sidegrade margin; rods.md §5.1.1)`, 'other per-rarity means inside the approved ~1.0 to 1.5-1.8 band'];
+		},
+		source: 'rods design (approved direction A-MULTICATCH; the numbers are proposed); Common 1.05: user decision (final D1 rod rule)', why: 'progression-based, probabilistic multi-catch with rare 3-5 fish jackpots; removes the 16x cliff; the Lv 10 Common set stays a sidegrade of the Trusty Rod',
 		get: () => ({ meanFish: PARAMS.slots.rod.meanFish, ceilingMean: PARAMS.multi.ceilingMean }),
-		expected: { meanFish: { Common: 1.1, Uncommon: 1.2, Rare: 1.3, Ultra: 1.5, Legendary: 1.65, Lucky: 1.8 }, ceilingMean: 1.8 },
+		expected: { meanFish: { Common: 1.05, Uncommon: 1.2, Rare: 1.3, Ultra: 1.5, Legendary: 1.65, Lucky: 1.8 }, ceilingMean: 1.8 },
 	},
 	{
 		id: 'P-RODS-SLOT-FAMILIES', status: 'proposed',
@@ -2034,7 +2083,7 @@ const DECISIONS = [
 		title: 'Tier part crates (Gacha V2): independent slots, unique duplicates, slot-balanced featured weights, rarity floors, a guaranteed slot 0, Lucky pity on T5; each unlocks one stage early',
 		modelled: TIERS.map((t) => `${PARAMS.crates.tiers[t].name} (Lv ${PARAMS.crates.tiers[t].unlockLevel}, floor ${PARAMS.crates.tiers[t].rarityFloor || 'none'}, slot 0 >= ${PARAMS.crates.tiers[t].guaranteed || 'none'}${PARAMS.crates.tiers[t].pity ? ', pity' : ''})`).join('; '),
 		alternatives: ['one crate for every tier', 'no floors or guarantees (coupon-collector tail)'],
-		source: 'rods design', why: 'a tier-appropriate set in a few crates with a bounded tail; the next tier\'s parts appear rarely as exciting, level-capped pulls',
+		source: 'rods design', why: 'a tier-appropriate set in a few crates with a bounded tail; the next tier\'s parts appear rarely as exciting pulls, usable once the player reaches their level (L6B gate)',
 		get: () => PARAMS.crates,
 		expected: {
 			slots: 3, strategy: 'independent', duplicates: 'unique', balanceSlots: true,
@@ -2122,28 +2171,28 @@ const DECISIONS = [
 		get modelled() {
 			const r = report().customRelation;
 			const G = report().ladderGuard;
-			const a = G.scenarios.approved.legalSets[0];
-			const p = G.scenarios.proposed.legalSets[0];
-			const lv10 = `Lv ${G.level} sidegrade (margin +${pct(G.margin)} net $/h over the ${G.trusty.name} at ${G.biome}): Common set as approved ${a.meanFish.toFixed(2)} fish ${rel(a.vsOwn.net)} net $/h (${G.pass.approved ? 'passes' : 'FAILS'}); proposed Common rod piece ${p.meanFish.toFixed(2)}: ${rel(p.vsOwn.net)} net $/h, ${rel(p.vsOwn.xp)} XP/h, ${rel(p.vsNext.atNextHome)} vs the ${G.angler.name} in ${G.angler.homeBiome}; ${G.cost.expectedCrates.toFixed(2)} ${G.cost.crate}s (${usd(G.cost.netCostAfterSalvage)} net of salvage vs ${usd(G.trusty.price)}); ladder check (${G.checks.filter((c) => c.hard).length} hard checks, Lv 10-60) as approved ${G.pass.approved ? 'PASS' : `FAIL: ${G.failing.approved.join(', ')}`}, with the fix ${G.pass.proposed ? 'PASS' : 'FAIL'}`;
+			const a = G.scenarios.superseded.legalSets[0];
+			const p = G.scenarios.final.legalSets[0];
+			const lv10 = `Lv ${G.level} sidegrade (margin +${pct(G.margin)} net $/h over the ${G.trusty.name} at ${G.biome}): Common set, Common rod piece ${p.meanFish.toFixed(2)} (final): ${rel(p.vsOwn.net)} net $/h, ${rel(p.vsOwn.xp)} XP/h, ${rel(p.vsNext.atNextHome)} vs the ${G.angler.name} in ${G.angler.homeBiome}; ${G.cost.expectedCrates.toFixed(2)} ${G.cost.crate}s (${usd(G.cost.netCostAfterSalvage)} net of salvage vs ${usd(G.trusty.price)}); as first approved (${a.meanFish.toFixed(2)}) ${rel(a.vsOwn.net)} (${G.pass.superseded ? 'passed' : 'failed'}); ladder check with the L6B gate (${G.hardChecks} hard checks, Lv 10-60) ${G.pass.final ? 'PASS' : `FAIL: ${G.failing.final.join(', ')}`}`;
 			return [lv10, ...r.map((c) => `Lv ${c.level}: ${c.standard} ${c.meanFish.standard.toFixed(2)} fish / ${usd(c.cost.standard)} vs custom ${c.meanFish.custom.toFixed(2)} fish / ${usd(c.cost.customNetOfSalvage)} net of salvage (${rel(c.netCashPerHour.custom / c.netCashPerHour.standard)} net $/h)`)].join('; ');
 		},
 		alternatives: ['custom always strictly stronger in every stat (removes the standard rod\'s sturdiness/speed identity)', 'custom = standard power with cosmetic choice only'],
 		source: 'rods design (user direction: custom can beat or specialise beyond the store rod at the same stage)', why: 'crafting stays worth it for optimisers without being mandatory: its edge is a few percent, bought with more cash, crate luck and effort',
 		get: () => ({ customOffset: PARAMS.standard.customOffset, ceilingMean: PARAMS.multi.ceilingMean, ladderGuard: PARAMS.ladderGuard, ladderCheck: report().ladderGuard.pass }),
-		expected: { customOffset: 1, ceilingMean: 1.8, ladderGuard: { level: 10, sidegradeMargin: 0.025, proposedCommonRodMeanFish: 1.05 }, ladderCheck: { approved: false, proposed: true } },
+		expected: { customOffset: 1, ceilingMean: 1.8, ladderGuard: { level: 10, sidegradeMargin: 0.025, supersededCommonRodMeanFish: 1.1 }, ladderCheck: { final: true, superseded: false } },
 	},
 	{
 		id: 'P-RODS-CUSTOM-LEVEL-RULE', status: 'proposed',
-		title: 'Custom rod level requirement = the highest part\'s rarity level (Common Lv 10 ... Lucky Lv 60), replacing the inherited 10 x the summed "N count"; parts above the player\'s level work at the best rarity unlocked',
+		title: 'Custom rod level requirement = the highest-rarity part\'s level (Common Lv 10 ... Lucky Lv 60), replacing the inherited 10 x the summed "N count"; a rod above the player\'s level can be neither crafted nor equipped (L6B gate, P-RODS-LEVEL-CAP)',
 		get modelled() {
 			const G = report().ladderGuard;
-			const legal = G.scenarios.approved.legalSets[0];
-			return `partLevel ${listOf(PARAMS.partLevel, (x) => `Lv ${x}`)}; four seeded Commons: Lv ${PARAMS.partLevel.Common} (seeded catalog today: Lv ${rng(report().levelRule[0].todayLevel, (x) => x)}). Legal at Lv ${G.level}: the ${legal.combos} all-Common combinations (one balanced rod), a sidegrade of the ${G.trusty.name} (P-RODS-CUSTOM-RELATION; ${rel(legal.vsOwn.net)} net $/h as approved, ${rel(G.scenarios.proposed.legalSets[0].vsOwn.net)} with the proposed Common rod piece ${G.scenarios.proposed.commonRodMeanFish.toFixed(2)}); no set legal at any level beats the next standard rod in its home biome (ladder check, rods.md §5.1.2)`;
+			const legal = G.scenarios.final.legalSets[0];
+			return `partLevel ${listOf(PARAMS.partLevel, (x) => `Lv ${x}`)}; four seeded Commons: Lv ${PARAMS.partLevel.Common} (seeded catalog today: Lv ${rng(report().levelRule[0].todayLevel, (x) => x)}). Usable at Lv ${G.level}: only the ${legal.combos} all-Common combinations (one balanced rod, Common rod piece ${legal.meanFish.toFixed(2)}), a sidegrade of the ${G.trusty.name} (P-RODS-CUSTOM-RELATION; ${rel(legal.vsOwn.net)} net $/h); the gate blocks the other ${n0(G.blockedAtLevel)} sets a Lv ${G.level} player can own from the ${G.cost.crate}; no set usable at any level beats the next standard rod in its home biome (ladder check, ${G.hardChecks} hard checks, rods.md §5.1.2)`;
 		},
-		alternatives: ['keep 10 x summed counts (a matched Legendary set needs Lv 70 today; bare-number draws bypass it)', 'the rod piece alone sets the requirement'],
-		source: 'rods design (live rod gates are held until this is decided)', why: 'the requirement reads from the rarity the player sees, matches the standard ladder\'s levels and cannot be bypassed',
-		get: () => ({ partLevel: PARAMS.partLevel, fourCommons: craftRod(matchedSet('Common')).level, legalAtLv10: report().ladderGuard.scenarios.approved.legalSets.reduce((n, x) => n + x.combos, 0), noLeapfrog: report().ladderGuard.checks.filter((c) => /vs-next/.test(c.id)).every((c) => c.pass.approved && c.pass.proposed) }),
-		expected: { partLevel: { Common: 10, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 }, fourCommons: 10, legalAtLv10: 2, noLeapfrog: true },
+		alternatives: ['keep 10 x summed counts (a matched Legendary set needs Lv 70 today; bare-number draws bypass it)', 'the rod piece alone sets the requirement', 'a level cap instead of a gate (5b.5 draft)'],
+		source: 'rods design; user decision (final D1 rod rule: highest-rarity part sets the level, gated at /craft and /equip, releases L6B)', why: 'the requirement reads from the rarity the player sees, matches the standard ladder\'s levels and cannot be bypassed',
+		get: () => ({ partLevel: PARAMS.partLevel, fourCommons: craftRod(matchedSet('Common')).level, legalAtLv10: report().ladderGuard.scenarios.final.legalSets.reduce((n, x) => n + x.combos, 0), ladderCheck: report().ladderGuard.pass.final, hardChecks: report().ladderGuard.hardChecks }),
+		expected: { partLevel: { Common: 10, Uncommon: 20, Rare: 30, Ultra: 40, Legendary: 50, Lucky: 60 }, fourCommons: 10, legalAtLv10: 2, ladderCheck: true, hardChecks: 23 },
 	},
 	{
 		id: 'P-SHOP-LAYOUT', status: 'proposed',
@@ -2208,8 +2257,8 @@ function markdownTables() {
 	const ST = R.standard;
 	const CR = R.customRelation;
 	const LG = R.ladderGuard;
-	const lgA = LG.scenarios.approved.legalSets[0];
-	const lgP = LG.scenarios.proposed.legalSets[0];
+	const lgA = LG.scenarios.superseded.legalSets[0];
+	const lgP = LG.scenarios.final.legalSets[0];
 	const common = R.levelRule.find((x) => x.rarity === 'Common');
 	const noneWin = Object.entries(L.noUpgrades.regular.targets);
 	out['rods-headline'] = mdTable(['Figure', 'Value', 'Detail'], [
@@ -2217,7 +2266,7 @@ function markdownTables() {
 		['Standard rod prices (Lv 10 → Lv 60)', refs.map((s) => usd(s.price)).join(' / '), 'Standard ladder'],
 		['Custom reference sets, mean fish per cast (Lv 20–60)', `${CR.map((c) => c.meanFish.custom.toFixed(2)).join(' / ')} (the ${R.combos.atCeiling.ceilingMean} normal ceiling is reached only by a Lv 60 custom rod)`, 'Custom vs standard'],
 		['Custom set vs the standard rod of the same level', `net $/h ${minMax(CR.map((c) => c.netCashPerHour.custom / c.netCashPerHour.standard), (x) => rel(x))}, for ${minMax(CR.map((c) => c.cost.customNetOfSalvage / c.cost.standard), times)} the standard price (net of salvage)`, 'Custom vs standard'],
-		['Lv 10 Common custom rod vs the Trusty Rod (sidegrade)', `net $/h at ${LG.biome} ${rel(lgA.vsOwn.net)} as approved (margin +${pct(LG.margin)}: **${LG.pass.approved ? 'passes' : 'fails'}**); ${rel(lgP.vsOwn.net)} with the proposed Common rod piece ${lgP.meanFish.toFixed(2)} (**${LG.pass.proposed ? 'passes' : 'fails'}**); never above the Angler's Rod (${rel(lgA.vsNext.atNextHome)} of it in ${LG.angler.homeBiome})`, 'Ladder regression check'],
+		['Lv 10 Common custom rod vs the Trusty Rod (sidegrade)', `net $/h at ${LG.biome} **${rel(lgP.vsOwn.net)}** with the Common rod piece ${lgP.meanFish.toFixed(2)} (margin +${pct(LG.margin)}; ${lgA.meanFish.toFixed(2)} as first approved gave ${rel(lgA.vsOwn.net)}); ${rel(lgP.vsNext.atNextHome)} of the ${LG.angler.name} in ${LG.angler.homeBiome}; higher-rarity parts gated (L6B); ladder check **${LG.pass.final ? 'PASS' : 'FAIL'}** (${LG.hardChecks} hard checks)`, 'Ladder regression check'],
 		['Custom rod level requirement', `highest part's level: four Commons Lv ${common.proposed} (seeded catalog today: Lv ${rng(common.todayLevel, (x) => x)}); ${listOf(PARAMS.partLevel, (x) => `Lv ${x}`)}`, 'Custom level rule'],
 		['Every crafted rod, mean fish per cast', `${minMax(Object.keys(R.combos.meanFishHistogram).map(Number), (x) => x.toFixed(2))}; ${pct(R.combos.atCeiling.share)} of combinations at the ceiling (Lv ${rng(ceilingLv, (x) => x)} only); today ${pct(R.combos.today.atCap15.share)} at the 15-fish cap`, 'All combinations'],
 		['Mandatory upkeep in the home biome (standard rods)', minMax(refs.map((s) => s.upkeepShareHome), (x) => pct(x)), 'Upkeep'],
@@ -2238,7 +2287,7 @@ function markdownTables() {
 		['Buying a rod', 'The shop\'s **Fishing Rod** button lists catalog rods with `shopItem: true`; the only rod in the catalog is the Old Rod (`shopItem: false`), so **no rod can be bought**. Better rods come only from crafting', `**Six standard rods in the shop's Rods tab**, one per biome level: ${refs.map((s) => `${s.name} (Lv ${s.level}, ${usd(s.price)})`).join(', ')}. Priced from the income of the stage before each (${refs.map((s) => `${s.priceHours} h`).join(' / ')})`, 'A player who never crafts has a clear save → buy ladder (user direction: Virtual Fisher\'s skeleton).'],
 		['Fish per cast', `crafted: draws × per-draw, ${rng(T.crafted.fishPerCast, (x) => x)}. **${n0(R.combos.today.atCap15.count)} of ${n0(R.combos.total)} combinations (${pct(R.combos.today.atCap15.share)}) at the 15-fish cap**`, `Standard: ${refs.map((s) => s.meanFish.toFixed(2)).join(', ')}. Crafted: the rod piece sets the mean (${hist.map(([m]) => m).join(', ')}, variants included). **${n0(R.combos.atCeiling.count)} combinations (${pct(R.combos.atCeiling.share)}) at the ${R.combos.atCeiling.ceilingMean} ceiling**, all Lv ${rng(ceilingLv, (x) => x)}; no normal rod exceeds it`, 'Approved ceiling 1.80 (A-MULTICATCH). Removes the cliff.'],
 		['Crafting', 'The only way to a better rod', `**Rod Workshop** (its own menu, from Lv ${PARAMS.craft.minLevel}): the optional depth path. A custom set beats or specialises beyond the standard rod of its level (custom vs standard table)`, 'Crafting stays the deeper optimisation path, not mandatory onboarding.'],
-		['Custom level requirement', `10 × Σ "N count" (Lv ${rng(T.crafted.level, (x) => x)}). Bare-number draws cost no level: the best rod usable at Lv 20 lands ${R.combos.bestAtLevel[20].todayFishPerCast} fish, at Lv 30 ${R.combos.bestAtLevel[30].todayFishPerCast}`, `The highest part's level (${listOf(PARAMS.partLevel, (x) => `Lv ${x}`)}); tier = that part's tier. **Level cap:** a part performs at the best rarity the player has unlocked`, 'Part rarity matters and nothing bypasses its level. Existing rods need no gate or data change.'],
+		['Custom level requirement', `10 × Σ "N count" (Lv ${rng(T.crafted.level, (x) => x)}). Bare-number draws cost no level: the best rod usable at Lv 20 lands ${R.combos.bestAtLevel[20].todayFishPerCast} fish, at Lv 30 ${R.combos.bestAtLevel[30].todayFishPerCast}`, `The highest-rarity part's level (${listOf(PARAMS.partLevel, (x) => `Lv ${x}`)}); tier = that part's tier. **Gate (L6B):** below it the rod can be neither crafted nor equipped; parts can be owned early; the Rod Workshop previews the requirement`, 'Part rarity matters and nothing bypasses its level. No data change: existing rods stay owned and repairable; /equip applies the same gate.'],
 		['Part stats', `\`PART_RARITY_STATS\`: the same bundle for every part of a rarity, summed; +${pct(T.quickFishingSpeed, 0)} speed per \`quick\``, 'Each slot has its own stat family, scaled by rarity and summed (slot table)', 'Rods differ by specialty, not volume.'],
 		['Same-rarity parts', 'Identical apart from legacy numbers', `${Object.keys(PARAMS.variants).length} named **side-grade variants**: net $/h within ±${(specialtyNet * 100).toFixed(1)}% of the balanced part (specialties table)`, 'Collecting variants is aspirational, not pay-to-win.'],
 		['Strong access', 'Union of part qualities: an all-Common rod is weak-only', `Every standard rod from the ${refs[0].name} and every crafted rod catches weak + strong`, 'The first purchase unlocks strong fish.'],
@@ -2368,9 +2417,9 @@ function markdownTables() {
 
 	// Custom vs standard at each level, and the custom builds.
 	const lv10Row = [
-		`Lv ${LG.level} (${LG.biome})`, LG.trusty.name, `Custom Lv ${LG.level} (Common set): **sidegrade**, Common rod piece ${lgP.meanFish.toFixed(2)} (proposed; approved ${lgA.meanFish.toFixed(2)})`,
+		`Lv ${LG.level} (${LG.biome})`, LG.trusty.name, `Custom Lv ${LG.level} (Common set): **sidegrade**, Common rod piece ${lgP.meanFish.toFixed(2)} (final; ${lgA.meanFish.toFixed(2)} as first approved)`,
 		`${LG.trusty.meanFish.toFixed(2)} → **${lgP.meanFish.toFixed(2)}**`, `${statsLine(LG.trusty.stats)} → ${statsLine(lgP.stats)}`,
-		`${usd(LG.trusty.rates[LG.biome].net)} → **${usd(lgP.rates[LG.biome].net)}** (${rel(lgP.vsOwn.net)}; as approved ${usd(lgA.rates[LG.biome].net)}, ${rel(lgA.vsOwn.net)})`,
+		`${usd(LG.trusty.rates[LG.biome].net)} → **${usd(lgP.rates[LG.biome].net)}** (${rel(lgP.vsOwn.net)}; at ${lgA.meanFish.toFixed(2)} it was ${usd(lgA.rates[LG.biome].net)}, ${rel(lgA.vsOwn.net)})`,
 		`${n0(LG.trusty.rates[LG.biome].xp)} → ${n0(lgP.rates[LG.biome].xp)} (${rel(lgP.vsOwn.xp)})`,
 		`${usd(LG.trusty.price)} → E ${usd(LG.cost.expectedCost)}, P90 ${usd(LG.cost.p90Cost)}, net of salvage ${usd(LG.cost.netCostAfterSalvage)} (${LG.cost.expectedCrates.toFixed(2)} × ${LG.cost.crate}, four exact Commons)`,
 		`${LG.trusty.lifeHoursRegular.toFixed(1)} → ${lgP.lifeHoursRegular.toFixed(1)}`, `sidegrade, not an upgrade (${lgP.paybackHoursVsOwn ? hrs(lgP.paybackHoursVsOwn) : 'never'})`,
@@ -2411,46 +2460,46 @@ function markdownTables() {
 	];
 	const C0 = LG.cost;
 	out['rods-lv10-sidegrade'] = [
-		`The only custom sets legal at Lv ${LG.level} (requirement = highest part level) are the ${scen('approved').combos} all-Common catalog combinations: ${scen('approved').parts.join(' + ')}. They are one rod: both Common reels are balanced, and the catalog has no Common variant part, so no legal Lv ${LG.level} specialisation exists beyond the balanced set. Figures at ${LG.biome} (the Lv ${LG.level} home) and ${LG.angler.homeBiome} (the ${LG.angler.name}'s home), design overhead:`,
+		`The only custom sets a Lv ${LG.level} player can craft and equip (requirement = highest part level ≤ ${LG.level}) are the ${scen('final').combos} all-Common catalog combinations: ${scen('final').parts.join(' + ')}. They are one rod: both Common reels are balanced, and the catalog has no Common variant part, so no Lv ${LG.level} specialisation exists beyond the balanced set. Figures at ${LG.biome} (the Lv ${LG.level} home) and ${LG.angler.homeBiome} (the ${LG.angler.name}'s home), design overhead:`,
 		'',
 		mdTable(['Rod', 'Fish/cast', 'P(3+ fish)', 'Rare Find / Luck / Trophy / Speed / Sell', 'Cooldown', `Net $/h ${LG.biome} (vs ${LG.trusty.name})`, `XP/h ${LG.biome}`, `Net $/h ${LG.angler.homeBiome} (vs ${LG.angler.name})`, 'Durability (life)', 'Repair (upkeep)'], [
 			lvRow(`**${LG.trusty.name}** (Lv ${LG.trusty.level}, shop ${usd(LG.trusty.price)})`, LG.trusty, 'own'),
-			lvRow(`Common set, ${LG.scenarios.approved.label}`, scen('approved')),
-			lvRow(`**Common set, ${LG.scenarios.proposed.label}**`, scen('proposed')),
+			lvRow(`**Common set, ${LG.scenarios.final.label}**`, scen('final')),
+			lvRow(`Common set, ${LG.scenarios.superseded.label}`, scen('superseded')),
 			lvRow(`${LG.angler.name} (Lv ${LG.angler.level}, shop ${usd(LG.angler.price)}): the next rung`, LG.angler, 'next'),
 		]),
 		'',
-		`**Cost** (the ${C0.crate}, tier-1 part crate, ${usd(C0.price)}, shop from Lv ${C0.unlockLevel}: the crate the design assigns Common parts to; slot 0 is guaranteed Uncommon, so only slots 1–2 can give Commons): four exact Commons take E ${C0.expectedCrates.toFixed(2)} crates (P90 ${C0.p90Crates}) = ${usd(C0.expectedCost)} (P90 ${usd(C0.p90Cost)}), ${usd(C0.netCostAfterSalvage)} net of the leftovers' salvage: ${times(C0.netCostAfterSalvage / LG.trusty.price, 1)} the ${LG.trusty.name}. A Common-or-better part per slot takes ${C0.commonOrBetter.expectedCrates.toFixed(2)} crates (${usd(C0.commonOrBetter.expectedCost)}), but any Uncommon/Rare part raises the requirement shown (next table). Payback of the extra net cost from the extra net $/h: ${scen('approved').paybackHoursVsOwn ? hrs(scen('approved').paybackHoursVsOwn) : 'never'} as approved, ${scen('proposed').paybackHoursVsOwn ? hrs(scen('proposed').paybackHoursVsOwn) : 'never'} with the fix: not an investment, a choice of play style.`,
+		`**Cost** (the ${C0.crate}, tier-1 part crate, ${usd(C0.price)}, shop from Lv ${C0.unlockLevel}: the crate the design assigns Common parts to; slot 0 is guaranteed Uncommon, so only slots 1–2 can give Commons): four exact Commons take E ${C0.expectedCrates.toFixed(2)} crates (P90 ${C0.p90Crates}) = ${usd(C0.expectedCost)} (P90 ${usd(C0.p90Cost)}), ${usd(C0.netCostAfterSalvage)} net of the leftovers' salvage: ${times(C0.netCostAfterSalvage / LG.trusty.price, 1)} the ${LG.trusty.name}. A Common-or-better part per slot takes ${C0.commonOrBetter.expectedCrates.toFixed(2)} crates (${usd(C0.commonOrBetter.expectedCost)}), but any Uncommon or Rare part raises the requirement, and the gate then blocks the rod at Lv ${LG.level} (next table). Payback of the extra net cost from the extra net $/h: ${scen('final').paybackHoursVsOwn ? hrs(scen('final').paybackHoursVsOwn) : 'never'} (${scen('superseded').paybackHoursVsOwn ? hrs(scen('superseded').paybackHoursVsOwn) : 'never'} at ${scen('superseded').meanFish.toFixed(2)}): not an investment, a choice of play style.`,
 		'',
-		`**Sidegrade identity (with the fix).** Custom: ${scen('proposed').meanFish.toFixed(2)} fish per cast and ${pct(scen('proposed').jackpot3plus)} 3+ fish jackpots (Trusty: 1.00, none), ${rel(scen('proposed').vsOwn.xp)} XP/h; the ${LG.trusty.name}: +${pct(LG.trusty.stats.fishingSpeed, 0)} speed, ${LG.trusty.lifeHoursRegular.toFixed(1)} h life vs ${scen('proposed').lifeHoursRegular.toFixed(1)} h, ${usd(LG.trusty.repairCost)} repair vs ${usd(scen('proposed').repairCost)}, and ${times(C0.netCostAfterSalvage / LG.trusty.price, 1)} cheaper. Net $/h ends ${rel(scen('proposed').vsOwn.net)} (margin +${pct(LG.margin)}). The Common repair is priced at T1's home (${homeBiome(1)}), so at ${LG.biome} it is ${pct(scen('proposed').rates[LG.biome].upkeep)} of income rather than ${pct(PARAMS.repair.upkeepShare, 0)}; the check counts it.`,
+		`**Sidegrade identity.** Custom: ${scen('final').meanFish.toFixed(2)} fish per cast and ${pct(scen('final').jackpot3plus)} 3+ fish jackpots (Trusty: 1.00, none), ${rel(scen('final').vsOwn.xp)} XP/h; the ${LG.trusty.name}: +${pct(LG.trusty.stats.fishingSpeed, 0)} speed, ${LG.trusty.lifeHoursRegular.toFixed(1)} h life vs ${scen('final').lifeHoursRegular.toFixed(1)} h, ${usd(LG.trusty.repairCost)} repair vs ${usd(scen('final').repairCost)}, and ${times(C0.netCostAfterSalvage / LG.trusty.price, 1)} cheaper. Net $/h ends **${rel(scen('final').vsOwn.net)}** (margin +${pct(LG.margin)}). The Common repair is priced at T1's home (${homeBiome(1)}), so at ${LG.biome} it is ${pct(scen('final').rates[LG.biome].upkeep)} of income rather than ${pct(PARAMS.repair.upkeepShare, 0)}; the check counts it.`,
 		'',
-		`**As approved** (Common rod piece ${scen('approved').meanFish.toFixed(2)}) the set earns ${rel(scen('approved').vsOwn.net)} net $/h and ${rel(scen('approved').vsOwn.xp)} XP/h over the ${LG.trusty.name}: more than the thinnest custom upgrade (Lv 30, ${rel(1 + LG.thinnestUpgradeEdge)}), so it reads as an upgrade, not a sidegrade. It never leapfrogs the ladder (${rel(scen('approved').vsNext.atNextHome)} of the ${LG.angler.name} in ${LG.angler.homeBiome}).`,
+		`**As first approved** (Common rod piece ${scen('superseded').meanFish.toFixed(2)}) the set earned ${rel(scen('superseded').vsOwn.net)} net $/h and ${rel(scen('superseded').vsOwn.xp)} XP/h over the ${LG.trusty.name}: more than the thinnest custom upgrade (Lv 30, ${rel(1 + LG.thinnestUpgradeEdge)}), so it read as an upgrade, not a sidegrade. It never leapfrogged the ladder (${rel(scen('superseded').vsNext.atNextHome)} of the ${LG.angler.name} in ${LG.angler.homeBiome}).`,
 		'',
-		`Specialisations usable at Lv ${LG.level} under the level cap (\`P-RODS-LEVEL-CAP\`): parts a Lv ${LG.level} player can draw from the ${C0.crate} (Common, Uncommon, Rare) perform at Common strength but keep their own durability and repair. The rod shows the higher requirement. Picked with the fix:`,
+		`**What the gate blocks at Lv ${LG.level}** (\`P-RODS-LEVEL-CAP\`, L6B). A Lv ${LG.level} player can own parts from the ${C0.crate} (Common, Uncommon, Rare): ${n0(LG.blockedAtLevel)} of the sets they could assemble contain a part above Lv ${LG.level}. The Rod Workshop previews each one's required level; \`/craft\` and \`/equip\` refuse it until then. Parts are not weakened: at their level they work at full strength. The best of them, at full strength, and the Rare-handle case:`,
 		'',
-		mdTable(['Goal', 'Parts (requirement shown)', 'Fish/cast (approved → fix)', 'Stats', 'Life / repair', `Net $/h vs ${LG.trusty.name} (approved → fix)`, 'XP/h (approved → fix)', `Net $/h vs ${LG.angler.name} in ${LG.angler.homeBiome}`], LG.builds.map((b) => [
-			b.goal, `${b.parts.join(' + ')} (Lv ${b.requirementShown})`, `${b.meanFish.approved.toFixed(2)} → ${b.meanFish.proposed.toFixed(2)}`, statsLine(b.stats), `${b.lifeHoursRegular.toFixed(1)} h / ${usd(b.repairCost)}`,
-			`${rel(b.netVsOwn.approved)} → **${rel(b.netVsOwn.proposed)}**`, `${rel(b.xpVsOwn.approved)} → ${rel(b.xpVsOwn.proposed)}`, `${rel(b.netVsNext.approved)} → ${rel(b.netVsNext.proposed)}`,
+		mdTable(['Case', 'Parts', 'Workshop preview', 'Fish/cast', 'Stats', 'Life / repair', `If ungated: net $/h vs ${LG.trusty.name} (${LG.biome})`, 'XP/h', `vs ${LG.angler.name} in ${LG.angler.homeBiome}`], LG.builds.map((b) => [
+			b.goal, b.parts.join(' + '), `requires **Lv ${b.requiredLevel}** (set by ${b.setBy.length === 4 ? 'every part' : b.setBy.map((x) => `the ${x.rarity} ${x.name}`).join(', ')}): 🔒 at Lv ${LG.level}`, b.meanFish.toFixed(2), statsLine(b.stats), `${b.lifeHoursRegular.toFixed(1)} h / ${usd(b.repairCost)}`,
+			rel(b.ifUngated.netVsOwn), rel(b.ifUngated.xpVsOwn), rel(b.ifUngated.netVsNext),
 		])),
 		'',
-		`No Speed, Trophy or Rare Hunter build exists at Lv ${LG.level}: a Common reel has 0% speed and trophy (reel variants multiply zero), and the hook variants are Legendary (not in the ${C0.crate}). The durability of a higher-rarity handle or rod piece is never capped, so a Rare handle adds life at Lv ${LG.level}; that edge is reported in the check table, not gated (the rod shows Lv 30).`,
+		`Without the gate a full Rare set from the ${C0.crate} would out-earn the ${LG.angler.name} at Lv ${LG.level} (a leapfrog). The Rare handle alone would lift the Common set to ${rel(LG.builds.find((b) => b.goal.startsWith('Rare handle'))?.ifUngated.netVsOwn ?? 1)} over the ${LG.trusty.name} (its sell bonus and durability), above the margin. Under the gate both are refused until Lv ${PARAMS.partLevel.Rare}, where they compete with the Pro Angler Rod (custom-vs-standard and builds tables).`,
 	].join('\n');
 	const checkCell = (c, k) => {
 		const v = c.values[k];
-		const txt = c.kind === 'fish' ? v.toFixed(2) : c.kind === 'pctEdge' ? `+${pct(v, 2)}` : `${pct(v)} of it (${rel(v)})`;
-		const mark = c.pass[k] === null ? '' : c.pass[k] ? ' ✓' : c.hard ? ' **✗ FAIL**' : ' (over; reported)';
+		const txt = c.kind === 'fish' ? v.toFixed(2) : c.kind === 'level' ? `Lv ${v}` : c.kind === 'pctEdge' ? `+${pct(v, 2)}` : `${pct(v)} of it (${rel(v)})`;
+		const mark = c.pass[k] === null ? '' : c.pass[k] ? ' ✓' : c.hard ? ' **✗ FAIL**' : ' (blocked by the gate)';
 		return `${txt}${mark}`;
 	};
-	const lim = (c) => (c.kind === 'fish' ? `≤ ${c.limit.toFixed(2)}` : c.kind === 'pctEdge' ? `≤ +${pct(c.limit, 2)}` : c.op === '<' ? '< 100%' : `≤ ${pct(c.limit)} (+${pct(c.limit - 1)})`);
+	const lim = (c) => (c.kind === 'fish' ? `≤ ${c.limit.toFixed(2)}` : c.kind === 'level' ? `≤ Lv ${c.limit}` : c.kind === 'pctEdge' ? `≤ +${pct(c.limit, 2)}` : c.op === '<' ? '< 100%' : `≤ ${pct(c.limit)} (+${pct(c.limit - 1)})`);
 	out['rods-ladder-checks'] = [
-		mdTable(['Level', 'Sets', 'Check', 'Limit', 'As approved', 'Proposed fix', 'Gate'], LG.checks.map((c) => [
-			c.level === null ? '—' : `Lv ${c.level}`, c.sets, c.check, lim(c), checkCell(c, 'approved'), checkCell(c, 'proposed'), c.hard ? 'hard' : 'reported',
+		mdTable(['Level', 'Sets', 'Check', 'Limit', `Final rule (Common ${LG.scenarios.final.commonRodMeanFish.toFixed(2)})`, `Common ${LG.scenarios.superseded.commonRodMeanFish.toFixed(2)} (superseded)`, 'Gate'], LG.checks.map((c) => [
+			c.level === null ? '—' : `Lv ${c.level}`, c.sets, c.check, lim(c), checkCell(c, 'final'), checkCell(c, 'superseded'), c.hard ? 'hard' : 'reported',
 		])),
 		'',
-		`Result: as approved **${LG.pass.approved ? 'PASS' : `FAIL (${LG.failing.approved.join(', ')})`}**; with the proposed Common rod piece ${LG.scenarios.proposed.commonRodMeanFish.toFixed(2)} **${LG.pass.proposed ? 'PASS' : `FAIL (${LG.failing.proposed.join(', ')})`}**. The next-rod check compares each set with the first standard rod that unlocks above its level, in that rod's home biome (net $/h after repair upkeep, design overhead). The Lv 60 row has no next rod (ceiling only). Legal = requirement (highest part level) at or below the level, at full strength; usable under the level cap = any set, parts capped at the player's level, durability not capped.`,
+		`Result (final D1 rod rule: Common rod piece ${LG.scenarios.final.commonRodMeanFish.toFixed(2)}, requirement = highest-rarity part's level, gated at /craft and /equip): **${LG.pass.final ? 'PASS' : `FAIL (${LG.failing.final.join(', ')})`}**, ${LG.checks.filter((c) => c.hard && c.pass.final).length} of ${LG.hardChecks} hard checks. The superseded Common rod piece ${LG.scenarios.superseded.commonRodMeanFish.toFixed(2)} ${LG.pass.superseded ? 'also passes' : `fails ${LG.failing.superseded.join(', ')}`}. The next-rod check compares each set with the first standard rod that unlocks above its level, in that rod's home biome (net $/h after repair upkeep, design overhead). The Lv 60 row has no next rod (ceiling only). Legal = requirement (highest part level) at or below the level; the gate checks read each part's level (\`rodGate\`), so a set the gate lets a player use is exactly a legal set, and a rule that let one part set the requirement (for example the rod piece alone) would fail them. The reported row shows what the gate prevents; it is not a limit.`,
 	].join('\n');
-	out['rods-level-rule'] = mdTable(['Highest part rarity', 'Combinations', 'Today: inherited requirement (all combinations)', 'Today: a matched set of that rarity', 'Proposed requirement'], R.levelRule.map((x) => [
-		x.rarity, n0(x.combos), `Lv ${rng3(x.todayLevel, (v) => v)}`, x.matchedTodayLevel ? `Lv ${rng(x.matchedTodayLevel, (v) => v)}` : '—', `**Lv ${x.proposed}**`,
+	out['rods-level-rule'] = mdTable(['Highest part rarity', 'Combinations', 'Today: inherited requirement (all combinations)', 'Today: a matched set of that rarity', 'Proposed requirement (gated at /craft and /equip)', 'Combinations whose requirement rises'], R.levelRule.map((x) => [
+		x.rarity, n0(x.combos), `Lv ${rng3(x.todayLevel, (v) => v)}`, x.matchedTodayLevel ? `Lv ${rng(x.matchedTodayLevel, (v) => v)}` : '—', `**Lv ${x.proposed}**`, n0(x.risesAboveToday),
 	]));
 
 	// Crates.
@@ -2527,7 +2576,7 @@ function markdownTables() {
 			['Repair', `${usd(S.stored.legacyRepairCost)}, max ${T.crafted.maxRepairs}`, `${usd(S.pathA.repairCost)}, ${S.pathA.repairs}`],
 		]),
 		'',
-		`Level cap example: a Lv ${S.levelCap.playerLevel} player with a ${S.levelCap.rod} gets a ${Object.values(S.levelCap.performsAs)[0]}-set rod (${S.levelCap.meanFish.toFixed(2)} fish, ${statsLine(S.levelCap.stats)} Rare Find / Luck / Trophy / Speed / Sell); the rod still shows Lv ${S.levelCap.requirementShown}.`,
+		`Gate example (L6B): a Lv ${S.gate.playerLevel} player who owns a ${S.gate.rod} keeps it (and can repair it), but \`/equip\` refuses it until Lv ${S.gate.requiredLevel} (${S.gate.blockedParts === 4 ? 'all four of its parts are' : `${S.gate.blockedParts} of its four parts are`} above Lv ${S.gate.playerLevel}); it performs at full strength once equipped. No performance cap exists.`,
 	].join('\n');
 
 	// Integrated lifecycle.
@@ -2603,6 +2652,31 @@ function markdownTables() {
 
 	// Shop mock: the Rods tab and the Rod Workshop with the modelled prices (layout in §5).
 	const up = UR.table;
+	// Rod Workshop craft preview (L6B gate): the resulting required level is shown BEFORE crafting, with the part
+	// that sets it; a rod above the player's level cannot be crafted (or equipped). Lv 10 player, the Rare-handle case.
+	const workshopPreview = () => {
+		const lv = PARAMS.ladderGuard.level;
+		const parts = RARE_HANDLE_SET();
+		const allCommon = matchedSet('Common');
+		const rod = craftRod(parts);
+		const g = rodGate(parts, lv);
+		const alt = craftRod(allCommon);
+		const line = (t) => `│ ${t}`.padEnd(92) + '│';
+		const partLine = (slot, p) => line(`${slot.padEnd(10)} ${`${p.name} (${canon(p.rarity)}, Lv ${PARAMS.partLevel[canon(p.rarity)]})`.padEnd(36)}${g.setBy.some((x) => x.name === p.name) ? '← sets the requirement' : ''}`);
+		const title = `┌ 🔧 Rod Workshop · Craft · you are Lv ${lv} `;
+		return [
+			`${title}${'─'.repeat(91 - title.length)}┐`,
+			...Object.entries(bySlot(parts)).map(([k, p]) => partLine({ rod: 'Rod piece', reel: 'Reel', hook: 'Hook', handle: 'Handle' }[k], p)),
+			line(''),
+			line(`Preview: requires Lv ${g.requiredLevel} (T${rod.tier}) · ${rod.meanFish.toFixed(2)} fish · ${statsLine(rod.stats)} · ${rod.lifeHoursRegular.toFixed(1)} h life`),
+			line(`🔒 Needs Lv ${g.requiredLevel} because of the ${g.setBy.map((x) => `${x.rarity} ${x.name}`).join(', ')}. You are Lv ${lv}.`),
+			line(`   Keep the part, or use a Common ${g.setBy[0].slot} to craft now (requires Lv ${alt.level}).`),
+			'└──────────────────────────────────────────────────────────────────────────────────────────┘',
+			`[Craft 🔒 Lv ${g.requiredLevel}] (disabled)   [Change parts]   [Salvage]`,
+			'',
+			`/equip on a rod above your level: "🔒 This rod requires Lv ${g.requiredLevel} (${g.setBy.map((x) => `${x.rarity} ${x.name}`).join(', ')}). You are Lv ${lv}."`,
+		];
+	};
 	out['rods-shop-mock'] = [
 		'```text',
 		'┌ 🎣 Shop · Rods ─────────────────────────────── (ephemeral; only the invoker can click) ┐',
@@ -2617,6 +2691,8 @@ function markdownTables() {
 		'┌ 🎣 Shop · Upgrades ─────────────────────────────────────────────────────────────────────┐',
 		...up.map((u) => `│ ${u.name.padEnd(18)} L1 ${usd(u.prices[0]).padStart(7)} → L${U.PARAMS.levels} ${usd(u.prices[U.PARAMS.levels - 1]).padStart(8)}  +${pct(u.perLevel, 1)} ${u.stat}/level`.padEnd(92) + '│'),
 		'└──────────────────────────────────────────────────────────────────────────────────────────┘',
+		'',
+		...workshopPreview(),
 		'```',
 	].join('\n');
 
@@ -2685,7 +2761,7 @@ function markdownTables() {
 
 module.exports = {
 	PARAMS, RARITY_ORDER, SLOTS, CATALOG, ARCHETYPES, TARGETS, SYSTEM_DEFAULTS, SYSTEM_PARITY, ENGINE_VALIDATION, DECISIONS,
-	tierLevel, homeBiome, stageBiome, capRarity, partProfile, matchedSet, referenceSet, performance, craftRod, oldRod,
+	tierLevel, homeBiome, stageBiome, rodGate, partProfile, matchedSet, referenceSet, performance, craftRod, oldRod,
 	rodOutcome, rodHourly, upkeepShare, baseDurability, repairCostFor,
 	legacyCombine, legacyCraft, verifyLegacyParity, legacySignature, convertLegacyRod, evaluateAllCombos,
 	crateDefinition, crateDefinitions, crateSlotOdds, openOutcomes, cratesDistribution, validateCratesWithEngine, cratePrice, stageIncome, assembly, salvageValue, slotBalanceFeatured,
