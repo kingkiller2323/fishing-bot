@@ -66,7 +66,7 @@ const withApproval = (d) => (APPROVED[d.id] || isApprovedModule(d.id) ? { ...d, 
 
 // Subsystem modules export their own proposed decisions (same shape) as DECISIONS; they join the
 // registry here so there is ONE list for the Phase 5B report.
-const MODULES = ['rods', 'bait', 'quests', 'streak', 'aquarium', 'founder', 'buffs', 'world'];
+const MODULES = ['rods', 'upgrades', 'bait', 'quests', 'streak', 'aquarium', 'founder', 'buffs', 'world'];
 function all() {
 	const out = DECISIONS.map((d) => ({ module: 'framework', ...d }));
 	for (const m of MODULES) {

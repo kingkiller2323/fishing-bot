@@ -27,7 +27,7 @@
 //                            one integrated lifecycle with the world system (reference loop or a stress
 //                            configuration); returns the simulate() result, permitSummary() and rod equip times
 //   referenceStages()        the reference player's stages (integrated, no permits): hours, stage $/h, earnings
-//   permitPrice(biome, {share}), permitPriceMap(share)
+//   permitPrice(biome, {share}), permitPriceMap(share), formulaPermitPrice(biome, {share})
 //                            INTEGRATOR ENTRY POINT: one-time permit prices (0 for Ocean)
 //   permitTable()            every permit: formula inputs, price, payback, standalone and integrated time to afford
 //   timeToAfford({config, share}), sensitivity(), shareSweep(), budget(), levelTimes()
@@ -75,6 +75,11 @@ const PARAMS = deepFreeze({
 		// H(k) = stageShare x stage hours of the income the player is earning right before the level.
 		stageShare: 0.1,
 		priceSigDigits: 2,
+		// USER-APPROVED and locked (Phase 5B decision set, P-WORLD-PERMIT-PRICES): the formula's output at framework
+		// 5b.4. From 5b.5 (standard rod ladder) permitPrice() returns these at the default stage share; the formula at
+		// the current framework is formulaPermitPrice() (reported for information; sensitivities at other shares
+		// still use the formula).
+		approved: { River: 1000, Lake: 6200, Pond: 23000, Coast: 62000, Swamp: 160000, 'Mountain Stream': 380000 },
 		// Biomes that never need a permit (the starting biome).
 		free: ['Ocean'],
 		// A permit can be bought once the player's gate level reaches the biome's level (money can be saved
@@ -580,12 +585,21 @@ function referenceStages() {
 	return stagesCache;
 }
 
-/** One-time permit price for a biome (0 for a free biome). opts: { share } (sensitivity only). */
-function permitPrice(biome, { share = PARAMS.permits.stageShare } = {}) {
+/** The price rule's output at the current framework (stageShare x E(k)); informational from 5b.5. */
+function formulaPermitPrice(biome, { share = PARAMS.permits.stageShare } = {}) {
 	if (isFree(biome)) return 0;
 	const s = referenceStages()[biome];
 	if (!s) throw new Error(`permitPrice: unknown biome ${biome}`);
 	return nicePrice(share * s.expectedEarnings);
+}
+/**
+ * One-time permit price for a biome (0 for a free biome): the user-approved, locked price at the default stage
+ * share (PARAMS.permits.approved); opts.share (sensitivity only) prices by the formula at that share.
+ */
+function permitPrice(biome, { share = PARAMS.permits.stageShare } = {}) {
+	if (isFree(biome)) return 0;
+	if (share === PARAMS.permits.stageShare && PARAMS.permits.approved[biome] !== undefined) return PARAMS.permits.approved[biome];
+	return formulaPermitPrice(biome, { share });
 }
 const priceMapCache = new Map();
 /** Every permit's price at a stage share (default PARAMS.permits.stageShare). */
@@ -1566,7 +1580,7 @@ function markdownTables() {
 	return T;
 }
 
-module.exports = {
+module.exports = { formulaPermitPrice,
 	PARAMS, DECISIONS, CONFIGS, RETIRED_LOOP_PARITY,
 	system, permitPriority, permitSummary,
 	lifecycle, referenceStages, permitPrice, permitPriceMap, permitTable, timeToAfford, sensitivity, shareSweep, budget, levelTimes,

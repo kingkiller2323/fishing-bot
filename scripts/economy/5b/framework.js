@@ -22,7 +22,13 @@ const A = require('./assumptions');
 // distribution override, durability rule, Lucky-item split, species override; Mountain Stream value 149.
 // 5b.4: R1 on the integrated lifecycle (curve.js integrated): at 0.0475 every window passed but L40 was
 // 0.02 h from its edge; the integrated best fit is 0.0525 (L20 5.27 h, L30 12.58, L40 25.13, L50 43.65).
-const FRAMEWORK_VERSION = '5b.4';
+// 5b.5: STANDARD ROD LADDER + ANGLER UPGRADES. The reference gear path is the standard shop ladder
+// (assumptions GEAR_PATH_LADDER 'standard': Old Rod + six shop rods, Lv 10-60; crafted sets are the optional
+// custom variant); the reference loop buys permanent upgrades under UPGRADE_POLICY 'reference' (upgrades.js);
+// the gear-path digest now covers each step's kind, name, price and unlock level. The curve is LOCKED at
+// 0.0525 (user decision A-CURVE): the ladder was tuned, never the curve, so the regular player stays in every
+// window at 0.0525 with and without upgrades (curve-integrated.json).
+const FRAMEWORK_VERSION = '5b.5';
 
 // ---------------------------------------------------------------------------------------------
 // XP curve: xp(L) = 100·L² + QUARTIC·L⁴. Smooth everywhere (no kink at Lv 20); close to today at low
@@ -216,7 +222,7 @@ function hourly(o, overheadS = A.DESIGN_OVERHEAD_S) {
 // Shared digest: a hash of every shared value (the assumptions above + this file's constants, and the
 // designed gear path once GEAR_PATH_SOURCE is 'rods'). Each FRAMEWORK_VERSION pins its digest, so a
 // shared value cannot change without a version bump; every subsystem report carries both.
-const VERSION_DIGESTS = { '5b.1': '7a3ceb5551f3e41f', '5b.2': '26bbca823c8b2b8b', '5b.3': 'e73d1be6aec26cdd', '5b.4': 'd9e4938f85074918' };
+const VERSION_DIGESTS = { '5b.1': '7a3ceb5551f3e41f', '5b.2': '26bbca823c8b2b8b', '5b.3': 'e73d1be6aec26cdd', '5b.4': 'd9e4938f85074918', '5b.5': 'd7374a03d62e8b81' };
 const canonical = (v) => {
 	if (Array.isArray(v)) return v.map(canonical);
 	if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical(v[k])]));
