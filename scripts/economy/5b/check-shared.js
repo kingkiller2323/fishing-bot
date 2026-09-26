@@ -17,7 +17,12 @@ const path = require('node:path');
 const F = require('./framework');
 
 const DIR = __dirname;
-const SHARED_FILES = new Set(['framework.js', 'assumptions.js', 'check-shared.js', 'curve.js', 'lifecycle.js', 'integrate.js', 'decisions.js']);
+// Where shared values legitimately live (never scanned): the framework, its assumptions, the decision
+// registry's assertions and this guard.
+const SOURCE_FILES = new Set(['framework.js', 'assumptions.js', 'decisions.js', 'check-shared.js']);
+// Infrastructure and runners: scanned for local copies, but not subsystem modules (no report() stamp;
+// runners print on load, so they are never required here).
+const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js']);
 const num = (n) => String(n).replace('.', '\\.').replace(/^0\\\./, '0?\\.');
 
 const RULES = [
@@ -42,8 +47,9 @@ const RULES = [
 ];
 
 const problems = [];
-const modules = fs.readdirSync(DIR).filter((f) => f.endsWith('.js') && !SHARED_FILES.has(f)).sort();
-for (const file of modules) {
+const scanned = fs.readdirSync(DIR).filter((f) => f.endsWith('.js') && !SOURCE_FILES.has(f)).sort();
+const modules = scanned.filter((f) => !NOT_MODULES.has(f));
+for (const file of scanned) {
 	const lines = fs.readFileSync(path.join(DIR, file), 'utf8').split('\n');
 	lines.forEach((line, i) => {
 		if (/\/\/\s*shared-ok:/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) return;

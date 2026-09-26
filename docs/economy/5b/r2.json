@@ -1,0 +1,748 @@
+{
+ "frameworkVersion": "5b.4",
+ "sharedDigest": "d9e4938f85074918",
+ "requirement": "R2 (docs/economy/5b/INTEGRATION_REQUIREMENTS.md)",
+ "model": "integrated core loop: rods (gear purchases, repairs) + world (permits) + quests + streak + buffs, no bait, no aquarium",
+ "decomposition": {
+  "casual": {
+   "20": {
+    "day": 24,
+    "activeHours": 4.98,
+    "totalXp": 48470,
+    "xp": {
+     "fishing": 27889,
+     "quests": 3783,
+     "daily": 16160,
+     "buffs": 638,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.5754,
+     "quests": 0.078,
+     "daily": 0.3334,
+     "buffs": 0.0132,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "30": {
+    "day": 57,
+    "activeHours": 11.73,
+    "totalXp": 132624,
+    "xp": {
+     "fishing": 74070,
+     "quests": 7280,
+     "daily": 49532,
+     "buffs": 1742,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.5585,
+     "quests": 0.0549,
+     "daily": 0.3735,
+     "buffs": 0.0131,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "40": {
+    "day": 108,
+    "activeHours": 22.5,
+    "totalXp": 295386,
+    "xp": {
+     "fishing": 155021,
+     "quests": 17743,
+     "daily": 118926,
+     "buffs": 3696,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.5248,
+     "quests": 0.0601,
+     "daily": 0.4026,
+     "buffs": 0.0125,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "50": {
+    "day": 185,
+    "activeHours": 38.52,
+    "totalXp": 578190,
+    "xp": {
+     "fishing": 298000,
+     "quests": 26313,
+     "daily": 246754,
+     "buffs": 7123,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.5154,
+     "quests": 0.0455,
+     "daily": 0.4268,
+     "buffs": 0.0123,
+     "other": 0
+    },
+    "otherSources": []
+   }
+  },
+  "regular": {
+   "20": {
+    "day": 7,
+    "activeHours": 5.27,
+    "totalXp": 49039,
+    "xp": {
+     "fishing": 39299,
+     "quests": 3742,
+     "daily": 5200,
+     "buffs": 798,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.8014,
+     "quests": 0.0763,
+     "daily": 0.106,
+     "buffs": 0.0163,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "30": {
+    "day": 17,
+    "activeHours": 12.58,
+    "totalXp": 132679,
+    "xp": {
+     "fishing": 106327,
+     "quests": 6922,
+     "daily": 16955,
+     "buffs": 2476,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.8014,
+     "quests": 0.0522,
+     "daily": 0.1278,
+     "buffs": 0.0187,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "40": {
+    "day": 34,
+    "activeHours": 25.13,
+    "totalXp": 294416,
+    "xp": {
+     "fishing": 233038,
+     "quests": 17602,
+     "daily": 38230,
+     "buffs": 5546,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.7915,
+     "quests": 0.0598,
+     "daily": 0.1299,
+     "buffs": 0.0188,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "50": {
+    "day": 59,
+    "activeHours": 43.65,
+    "totalXp": 578216,
+    "xp": {
+     "fishing": 456674,
+     "quests": 26662,
+     "daily": 83885,
+     "buffs": 10995,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.7898,
+     "quests": 0.0461,
+     "daily": 0.1451,
+     "buffs": 0.019,
+     "other": 0
+    },
+    "otherSources": []
+   }
+  },
+  "active": {
+   "20": {
+    "day": 3,
+    "activeHours": 5.05,
+    "totalXp": 48441,
+    "xp": {
+     "fishing": 42393,
+     "quests": 2812,
+     "daily": 2795,
+     "buffs": 441,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.8751,
+     "quests": 0.058,
+     "daily": 0.0577,
+     "buffs": 0.0091,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "30": {
+    "day": 7,
+    "activeHours": 12.67,
+    "totalXp": 132630,
+    "xp": {
+     "fishing": 121057,
+     "quests": 4858,
+     "daily": 5400,
+     "buffs": 1315,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.9127,
+     "quests": 0.0366,
+     "daily": 0.0407,
+     "buffs": 0.0099,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "40": {
+    "day": 13,
+    "activeHours": 25.28,
+    "totalXp": 294529,
+    "xp": {
+     "fishing": 264878,
+     "quests": 12678,
+     "daily": 13820,
+     "buffs": 3153,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.8993,
+     "quests": 0.043,
+     "daily": 0.0469,
+     "buffs": 0.0107,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "50": {
+    "day": 22,
+    "activeHours": 44.02,
+    "totalXp": 578504,
+    "xp": {
+     "fishing": 521298,
+     "quests": 17238,
+     "daily": 33775,
+     "buffs": 6193,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.9011,
+     "quests": 0.0298,
+     "daily": 0.0584,
+     "buffs": 0.0107,
+     "other": 0
+    },
+    "otherSources": []
+   }
+  },
+  "grinder": {
+   "20": {
+    "day": 1,
+    "activeHours": 4.8,
+    "totalXp": 48490,
+    "xp": {
+     "fishing": 46050,
+     "quests": 2440,
+     "daily": 0,
+     "buffs": 0,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.9497,
+     "quests": 0.0503,
+     "daily": 0,
+     "buffs": 0,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "30": {
+    "day": 3,
+    "activeHours": 11.4,
+    "totalXp": 132635,
+    "xp": {
+     "fishing": 124166,
+     "quests": 4046,
+     "daily": 3770,
+     "buffs": 654,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.9361,
+     "quests": 0.0305,
+     "daily": 0.0284,
+     "buffs": 0.0049,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "40": {
+    "day": 5,
+    "activeHours": 23.08,
+    "totalXp": 294566,
+    "xp": {
+     "fishing": 277078,
+     "quests": 10826,
+     "daily": 5320,
+     "buffs": 1342,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.9406,
+     "quests": 0.0368,
+     "daily": 0.0181,
+     "buffs": 0.0046,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "50": {
+    "day": 9,
+    "activeHours": 40.23,
+    "totalXp": 578241,
+    "xp": {
+     "fishing": 547940,
+     "quests": 13586,
+     "daily": 14075,
+     "buffs": 2640,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.9476,
+     "quests": 0.0235,
+     "daily": 0.0243,
+     "buffs": 0.0046,
+     "other": 0
+    },
+    "otherSources": []
+   }
+  }
+ },
+ "catchUp": {
+  "20": 0.946,
+  "30": 0.932,
+  "40": 0.895,
+  "50": 0.882
+ },
+ "dailyShareAtL50": {
+  "casual": 0.4268,
+  "regular": 0.1451,
+  "active": 0.0584,
+  "grinder": 0.0243
+ },
+ "calendar": {
+  "casual": {
+   "7": {
+    "level": 11,
+    "activeHours": 1.467,
+    "xpPerActiveHour": 9533
+   },
+   "28": {
+    "level": 21,
+    "activeHours": 5.85,
+    "xpPerActiveHour": 10202
+   },
+   "91": {
+    "level": 37,
+    "activeHours": 18.967,
+    "xpPerActiveHour": 12802
+   },
+   "182": {
+    "level": 49,
+    "activeHours": 37.933,
+    "xpPerActiveHour": 15021
+   },
+   "365": {
+    "level": 65,
+    "activeHours": 76.05,
+    "xpPerActiveHour": 18747
+   }
+  },
+  "regular": {
+   "7": {
+    "level": 20,
+    "activeHours": 5.267,
+    "xpPerActiveHour": 9311
+   },
+   "28": {
+    "level": 37,
+    "activeHours": 21,
+    "xpPerActiveHour": 11554
+   },
+   "91": {
+    "level": 59,
+    "activeHours": 68.267,
+    "xpPerActiveHour": 14805
+   },
+   "182": {
+    "level": 76,
+    "activeHours": 136.5,
+    "xpPerActiveHour": 17118
+   },
+   "365": {
+    "level": 94,
+    "activeHours": 273.75,
+    "xpPerActiveHour": 18322
+   }
+  },
+  "active": {
+   "7": {
+    "level": 31,
+    "activeHours": 14,
+    "xpPerActiveHour": 10724
+   },
+   "28": {
+    "level": 54,
+    "activeHours": 56.017,
+    "xpPerActiveHour": 13967
+   },
+   "91": {
+    "level": 82,
+    "activeHours": 182,
+    "xpPerActiveHour": 17221
+   },
+   "182": {
+    "level": 101,
+    "activeHours": 364.017,
+    "xpPerActiveHour": 18046
+   },
+   "365": {
+    "level": 122,
+    "activeHours": 730.017,
+    "xpPerActiveHour": 18468
+   }
+  },
+  "grinder": {
+   "7": {
+    "level": 47,
+    "activeHours": 35.017,
+    "xpPerActiveHour": 13973
+   },
+   "28": {
+    "level": 78,
+    "activeHours": 140,
+    "xpPerActiveHour": 18474
+   },
+   "91": {
+    "level": 110,
+    "activeHours": 455.017,
+    "xpPerActiveHour": 19942
+   },
+   "182": {
+    "level": 133,
+    "activeHours": 910.017,
+    "xpPerActiveHour": 20268
+   },
+   "365": {
+    "level": 160,
+    "activeHours": 1825.017,
+    "xpPerActiveHour": 20435
+   }
+  },
+  "minimumDaily": {
+   "7": {
+    "level": 7,
+    "activeHours": 0.35,
+    "xpPerActiveHour": 17909
+   },
+   "28": {
+    "level": 17,
+    "activeHours": 1.9,
+    "xpPerActiveHour": 17622
+   },
+   "91": {
+    "level": 31,
+    "activeHours": 7.283,
+    "xpPerActiveHour": 21194
+   },
+   "182": {
+    "level": 44,
+    "activeHours": 16.383,
+    "xpPerActiveHour": 24597
+   },
+   "365": {
+    "level": 60,
+    "activeHours": 36.767,
+    "xpPerActiveHour": 29390
+   }
+  }
+ },
+ "minimumDaily": {
+  "archetype": {
+   "name": "minimumDaily",
+   "session": "minimumDaily",
+   "overheadS": 4,
+   "daysPerWeek": 7,
+   "maxMinutesPerDay": 120
+  },
+  "minutesPerDayAverage": 6.04,
+  "calendar": {
+   "7": {
+    "level": 7,
+    "activeHours": 0.35,
+    "xpPerActiveHour": 17909
+   },
+   "28": {
+    "level": 17,
+    "activeHours": 1.9,
+    "xpPerActiveHour": 17622
+   },
+   "91": {
+    "level": 31,
+    "activeHours": 7.283,
+    "xpPerActiveHour": 21194
+   },
+   "182": {
+    "level": 44,
+    "activeHours": 16.383,
+    "xpPerActiveHour": 24597
+   },
+   "365": {
+    "level": 60,
+    "activeHours": 36.767,
+    "xpPerActiveHour": 29390
+   }
+  },
+  "xpPerActiveHourVsRegular": 1.604,
+  "leadsAnEngagedArchetypeOnDays": [],
+  "decomposition": {
+   "20": {
+    "day": 38,
+    "activeHours": 2.73,
+    "totalXp": 48609,
+    "xp": {
+     "fishing": 20396,
+     "quests": 3460,
+     "daily": 24276,
+     "buffs": 477,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.4196,
+     "quests": 0.0712,
+     "daily": 0.4994,
+     "buffs": 0.0098,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "30": {
+    "day": 83,
+    "activeHours": 6.43,
+    "totalXp": 132639,
+    "xp": {
+     "fishing": 54291,
+     "quests": 6309,
+     "daily": 70746,
+     "buffs": 1292,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.4093,
+     "quests": 0.0476,
+     "daily": 0.5334,
+     "buffs": 0.0097,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "40": {
+    "day": 147,
+    "activeHours": 12.88,
+    "totalXp": 295005,
+    "xp": {
+     "fishing": 119414,
+     "quests": 15957,
+     "daily": 156772,
+     "buffs": 2862,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.4048,
+     "quests": 0.0541,
+     "daily": 0.5314,
+     "buffs": 0.0097,
+     "other": 0
+    },
+    "otherSources": []
+   },
+   "50": {
+    "day": 240,
+    "activeHours": 22.18,
+    "totalXp": 578147,
+    "xp": {
+     "fishing": 231735,
+     "quests": 23089,
+     "daily": 317756,
+     "buffs": 5567,
+     "other": 0
+    },
+    "share": {
+     "fishing": 0.4008,
+     "quests": 0.0399,
+     "daily": 0.5496,
+     "buffs": 0.0096,
+     "other": 0
+    },
+    "otherSources": []
+   }
+  },
+  "verdict": "PASS: never leads any engaged archetype in level at days 7/28/91/182/365; its XP per active hour is 1.604x the regular player's (expected: short sessions are dense), but levels per calendar week trail every engaged player."
+ },
+ "noMissGrinder": {
+  "shift": {
+   "20": {
+    "withDailySystems": 4.8,
+    "fishingOnly": 5.05,
+    "hoursSaved": 0.25,
+    "share": 0.0495
+   },
+   "30": {
+    "withDailySystems": 11.4,
+    "fishingOnly": 12.17,
+    "hoursSaved": 0.77,
+    "share": 0.063
+   },
+   "40": {
+    "withDailySystems": 23.08,
+    "fishingOnly": 24.53,
+    "hoursSaved": 1.45,
+    "share": 0.0591
+   },
+   "50": {
+    "withDailySystems": 40.23,
+    "fishingOnly": 42.5,
+    "hoursSaved": 2.27,
+    "share": 0.0533
+   }
+  },
+  "maxShareOfHoursSaved": 0.063,
+  "regularWindowsWithEverything": {
+   "20": {
+    "hours": 5.27,
+    "window": [
+     5,
+     6
+    ],
+    "ok": true
+   },
+   "30": {
+    "hours": 12.58,
+    "window": [
+     12,
+     15
+    ],
+    "ok": true
+   },
+   "40": {
+    "hours": 25.13,
+    "window": [
+     24,
+     30
+    ],
+    "ok": true
+   },
+   "50": {
+    "hours": 43.65,
+    "window": [
+     40,
+     45
+    ],
+    "ok": true
+   }
+  },
+  "verdict": "PASS: with every daily, weekly, streak and repeatable reward the regular player stays in every approved window; a no-miss grinder saves at most 6.3% of play-hours versus fishing alone."
+ },
+ "guardrailSensitivity": {
+  "1": {
+   "minimumDaily": {
+    "7": 7,
+    "28": 17,
+    "91": 31,
+    "182": 44,
+    "365": 60
+   },
+   "casual": {
+    "7": 11,
+    "28": 21,
+    "91": 37,
+    "182": 49,
+    "365": 65
+   },
+   "minimumDailyXpPerHourVsRegularDay365": 1.604,
+   "casualCatchUpL50": 0.882,
+   "regularHours": {
+    "20": 5.27,
+    "30": 12.58,
+    "40": 25.13,
+    "50": 43.65
+   },
+   "regularInWindows": true
+  },
+  "0.75": {
+   "minimumDaily": {
+    "7": 7,
+    "28": 15,
+    "91": 29,
+    "182": 41,
+    "365": 56
+   },
+   "casual": {
+    "7": 10,
+    "28": 20,
+    "91": 35,
+    "182": 47,
+    "365": 62
+   },
+   "minimumDailyXpPerHourVsRegularDay365": 1.396,
+   "casualCatchUpL50": 0.944,
+   "regularHours": {
+    "20": 5.37,
+    "30": 13.05,
+    "40": 26.13,
+    "50": 45.47
+   },
+   "regularInWindows": false
+  },
+  "0.5": {
+   "minimumDaily": {
+    "7": 7,
+    "28": 14,
+    "91": 27,
+    "182": 38,
+    "365": 52
+   },
+   "casual": {
+    "7": 10,
+    "28": 19,
+    "91": 34,
+    "182": 45,
+    "365": 59
+   },
+   "minimumDailyXpPerHourVsRegularDay365": 1.173,
+   "casualCatchUpL50": 1.035,
+   "regularHours": {
+    "20": 5.53,
+    "30": 13.5,
+    "40": 27.02,
+    "50": 47.27
+   },
+   "regularInWindows": false
+  }
+ }
+}

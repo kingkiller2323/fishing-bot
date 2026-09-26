@@ -527,7 +527,8 @@ const SYSTEM_NAME = 'quests';
 /** Ledger sources the quest system writes (XP and cash), plus the Daily Box contents (cash only). */
 const QUEST_SOURCES = ['daily', 'weekly', 'repeatable', 'story'];
 const BOX_SOURCE = 'questBoxes';
-const SYSTEM_DEFAULTS = Object.freeze({ terms: 'issue', weekly: 'period', session: 'fish', boxValue: 'liquid', weekdayOfDay0: 0 });
+// rewardScale: SENSITIVITY ONLY (R2 guardrail alternatives); the proposed design is 1 for every kind.
+const SYSTEM_DEFAULTS = Object.freeze({ terms: 'issue', weekly: 'period', session: 'fish', boxValue: 'liquid', weekdayOfDay0: 0, rewardScale: Object.freeze({ daily: 1, weekly: 1, repeatable: 1, story: 1 }) });
 /** lifecycle()'s conventions, for the exact replay in validateSystem(). */
 const LIFECYCLE_CONVENTIONS = Object.freeze({ terms: 'lastStep', weekly: 'smoothed', session: 'time', boxValue: 'none' });
 
@@ -1312,7 +1313,7 @@ function build(gearPathInput, gearSource) {
 	 *   weekdayOfDay0  ISO weekday of calendar day 0, 0 = Monday (default 0) }
 	 */
 	function system(opts = {}) {
-		const cfg = { ...SYSTEM_DEFAULTS, ...opts, parts: { daily: true, weekly: true, repeatable: true, story: true, ...(opts.parts || {}) } };
+		const cfg = { ...SYSTEM_DEFAULTS, ...opts, parts: { daily: true, weekly: true, repeatable: true, story: true, ...(opts.parts || {}) }, rewardScale: { ...SYSTEM_DEFAULTS.rewardScale, ...(opts.rewardScale || {}) } };
 		if (!['issue', 'lastStep'].includes(cfg.terms)) throw new Error(`Unknown quest terms rule ${cfg.terms}`);
 		if (!['period', 'smoothed'].includes(cfg.weekly)) throw new Error(`Unknown weekly rule ${cfg.weekly}`);
 		if (!['fish', 'time'].includes(cfg.session)) throw new Error(`Unknown session rule ${cfg.session}`);
@@ -1341,8 +1342,9 @@ function build(gearPathInput, gearSource) {
 		}
 		function credit(state, ctx, kind, reward) {
 			const m = multipliers(state);
-			if (reward.xp) ctx.addXp(kind, reward.xp * m.questXp, reward.xp);
-			if (reward.cash) ctx.addCash(kind, reward.cash * m.questCash);
+			const k = cfg.rewardScale[kind] ?? 1;
+			if (reward.xp) ctx.addXp(kind, reward.xp * k * m.questXp, reward.xp * k);
+			if (reward.cash) ctx.addCash(kind, reward.cash * k * m.questCash);
 			grantBoxes(state, ctx, kind, reward.boxes);
 		}
 		return {
