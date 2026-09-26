@@ -76,8 +76,11 @@ const APPROVED = {
 	'P-UPGRADES-CATEGORIES': 'D1: seven categories', 'P-UPGRADES-LEVELS': 'D1: six levels each', 'P-UPGRADES-PRICES': 'D1', 'P-UPGRADES-REFERENCE-POLICY': 'D1', 'P-UPGRADES-OPTIONAL': 'D1: optional, never mandatory', 'P-UPGRADES-BAIT-CONSERVATION': 'D1',
 	'P-EVENTS': 'D2: keep 1 Double Cash + 1 Lucky Draw per 30 days',
 	'P-BUFFS-TARGETS': 'D2: steady-state target excludes events; event guard 20% / 10% / 7% / 5%',
+	'P-FOUNDER-HYBRID': 'D4: 7 private rolls/cast, XP x35, sell x25, 40% private repair rebate; public cast identical to Normal; private pity; gacha luck on non-buff slots only; non-competitive',
+	'P-FOUNDER-HYBRID-SURFACES': 'D4: /sell and /boosters ephemeral for everyone; private rolls never advance quests/streak/bait; private delivery only; /aquarium and /pet stay public',
 };
-const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id); // "aquarium redesign: approve the overall design"
+// "Aquarium redesign: approve the overall design."
+const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id);
 const withApproval = (d) => (APPROVED[d.id] || isApprovedModule(d.id) ? { ...d, status: 'approved', approval: APPROVED[d.id] || 'aquarium redesign approved' } : d);
 
 // Subsystem modules export their own proposed decisions (same shape) as DECISIONS; they join the

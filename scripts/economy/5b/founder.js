@@ -18,10 +18,17 @@
 //
 // Exports (pure and synchronous; no database, no randomness):
 //   PARAMS, DECISIONS            design parameters; the proposed decisions (decisions.js shape, joined there)
-//   founderProfile()             the PROPOSED Founder profile (balance.js PROFILES.founder shape plus the new
-//                                fields): kept rarity table, stats, pity and gacha luck; solved private
-//                                multipliers (xp, sell), luck and durability efficiency; visible bonus fish
+//   founderProfile()             THE Founder profile: the stealth-hybrid (P-FOUNDER-HYBRID, user decision D4:
+//                                7 private rolls, XP x35, sell x25, 40% rebate, gacha luck on non-buff box slots),
+//                                = hybridProfile(); inside an integrated run, that run's Founder profile (quests,
+//                                streak and buffs read it through here)
+//   visibleProfile()             SUPERSEDED, historical comparison: the visible proposal (balance.js PROFILES.founder
+//                                shape plus the new fields): kept rarity table, stats, pity and gacha luck; solved
+//                                private multipliers (xp, sell), luck and durability efficiency; visible bonus fish
 //                                capped at the normal maximum; questXp/questCash; Lucky-item rule; level gate
+//   founderBoxEV(box, {level, profile}), boxProfileKey(profile)
+//                                a Founder's box open (streak.boxEV shape): under the hybrid, buffs at a normal
+//                                player's odds and gacha luck on the non-buff slots; the cache key of a profile's box
 //   profileWith({luck, xp, sell, durabilityEfficiency})
 //                                the same profile with trial values (the solver and the counterfactual use it)
 //   founderOutcome(stage, {profile, overheadS}), normalOutcome(stage, {overheadS})
@@ -40,7 +47,7 @@
 //                                `profile` is set; null = Normal): hours to each real and public level, XP by
 //                                source (base and profile bonus), tier purchases, the public tell, day 30
 //   today()                      TODAY's Founder power per stage and as ratios to TODAY's Normal (measured)
-//   solve()                      the private values from the targets (cached); M2 on integrated lifecycles
+//   solve()                      the visible proposal's private values (superseded; cached); M2 integrated
 //   gacha(), founderCrates(t)    Founder vs Normal box luck; exact crates-to-assemble for tier t
 //   publicLevelStatus()          F1 and every other public surface: what shipped (commit 14e27f1), what stays
 //                                proposed and which public tells are open, with file:line read from src/
@@ -56,7 +63,7 @@
 //                                (M1-M4 on pre-multiplier rewards; M2 on integrated lifecycles, opts.gates);
 //                                solve() uses it for the proposal, solveHybrid() for the hybrid
 //   hybridProfileWith(), hybridProfile(), solveHybrid(), hybridOutcome(), hybridCastOutcome(), hybridTradeoff(),
-//   hybridReport()               the STEALTH-HYBRID Founder (P-FOUNDER-HYBRID, RECOMMENDED): public cast exactly a
+//   hybridReport()               the STEALTH-HYBRID Founder (P-FOUNDER-HYBRID, the Founder model): public cast exactly a
 //                                normal player's; private reward rolls (today's Founder table + pity), private XP
 //                                and sell multipliers, private repair rebate, Founder gacha luck. solveHybrid():
 //                                rolls from M5 (Legendary+ and Lucky), rebate from M6, then solveMultipliers()
@@ -84,7 +91,7 @@ const GACHA_EV = require('../../../docs/economy/gacha-ev.json');
 const BOX_CATALOG = require('../../../src/bootstrap/data/gacha');
 const BUFF_CATALOG = require('../../../src/bootstrap/data/buffs');
 const { BOXES: GACHA_BOXES } = require('../../../src/engine/gachaBoxes');
-// integrate.js loads this module through its registry, and quests/buffs read founderProfile(): all lazy.
+// integrate.js loads this module through its registry, and quests/streak/buffs read founderProfile(): all lazy.
 const INTEGRATE = () => require('./integrate');
 const QUESTS = () => require('./quests');
 const BUFFS = () => require('./buffs');
@@ -157,7 +164,7 @@ const PARAMS = deepFreeze({
 	// Lucky fish.
 	luckyItems: 'normal-base',
 	hybrid: {
-		// The stealth-hybrid Founder (decision P-FOUNDER-HYBRID, the recommended model). PUBLIC layer: the cast
+		// The stealth-hybrid Founder (decision P-FOUNDER-HYBRID, the Founder model: user decision D4). PUBLIC layer: the cast
 		// is exactly a normal player's at the same public level and gear (normal rarity table, the rod's normal
 		// multi-catch roll, normal cooldown, normal durability, no pity). PRIVATE layer, never on the card: `rolls`
 		// hidden reward rolls per cast from today's Founder rarity table (plus the gear's rarity stats) with
@@ -517,7 +524,7 @@ function founderOutcome(stage, { profile = null, overheadS = stage?.overheadS ??
 }
 
 // ---------------------------------------------------------------------------------------------
-// STEALTH-HYBRID (decision P-FOUNDER-HYBRID, the recommended Founder model; PARAMS.hybrid). Two layers per cast:
+// STEALTH-HYBRID (decision P-FOUNDER-HYBRID, the Founder model, user decision D4; PARAMS.hybrid). Two layers per cast:
 //   PUBLIC   F.castOutcome of the cast input exactly as a normal player's (normal table, the rod's normal
 //            multi-catch roll or fishDist, gear + other systems' stats, normal cooldown and durability, no
 //            pity). It is the catch card, publicXp and the rod's durability.
@@ -2182,7 +2189,7 @@ function hybridReport() {
 		const ahead = Object.keys(n).filter((id) => x[id] != null).map((id) => n[id] - x[id]);
 		return { archetype: a, maxHoursAhead: ahead.length ? maxOf(ahead) : 0 };
 	});
-	const drift = { rule: h.boxLuck, before: driftOf(legacyLc), after: driftOf(hybridLc), afterNoUpgrades: driftNoUpgrades, upgradeTiming, stepHours: F.LIFECYCLE.stepH };
+	const drift = { rule: h.boxLuck, before: driftOf(legacyLc), after: driftOf(hybridLc), afterNoUpgrades: driftNoUpgrades, upgradeTiming };
 	const purchases = (lc) => lc.upgrades;
 	const upgrades = Object.fromEntries(archetypes.map((a) => [a, { normal: purchases(normalLc[a]), hybrid: purchases(hybridLc[a]) }]));
 	const upgradeGaps = archetypes.flatMap((a) => Object.entries(upgrades[a].normal).map(([t, hn]) => ({ archetype: a, tier: Number(t), normal: hn, hybrid: upgrades[a].hybrid[t] ?? null })));
@@ -2550,7 +2557,7 @@ const DECISIONS = [
 				`(b) stealth: normal rarity table, normal visible count (one fish on the Old Rod, so below public Lv 20), normal cadence and durability, luck 0, no pity, normal box odds; XP ×${st.xp}, sell ×${st.sell}. M5 (Legendary+ per hour) and M6 (rod life) cannot be met privately; the public level and world access advance at a normal player's pace (regular: public Lv ${st.regular.level} after ${num(st.regular.publicL50, 2)} h against ${num(st.regular.normalL50, 2)} h); no card, durability, /stats or /open tell remains (Detection; One reply); what remains is account-level: money where it is still shown (P-FOUNDER-WALLET), how soon gear is bought, and absence from competitive boards (Stealth)`,
 				'(a) with the one-reply surfaces made ephemeral (P-FOUNDER-SURFACES): the catch-card tells remain',
 				'(a) with luck 0 (P-FOUNDER-LUCK): the printed-rarity tell is almost unchanged (Detection)',
-				`(c) the stealth-hybrid (P-FOUNDER-HYBRID, RECOMMENDED after the user's Founder redesign decision: neither (a) as final nor (b)): (b)'s public layer plus private reward rolls, private pity, a private repair rebate and the Founder's gacha luck; M1-M6 all met with XP ×${solveHybrid().xp} and sell ×${solveHybrid().sell} (Stealth-hybrid)`,
+				`(c) the stealth-hybrid (P-FOUNDER-HYBRID, the Founder model since user decision D4, which supersedes (a) and (b)): (b)'s public layer plus private reward rolls, private pity, a private repair rebate and the Founder's gacha luck; M1-M6 all met with XP ×${solveHybrid().xp} and sell ×${solveHybrid().sell} (Stealth-hybrid)`,
 			];
 		},
 		source: 'founder design; adversarial review FND-1, FND-2, FND-3, FND-4, C4, C5',
@@ -3014,7 +3021,7 @@ function markdownTables() {
 	const ev = P1.status.evidence;
 	T['founder-headline'] = mdTable(['Figure', 'Value', 'Table'], [
 		['Visible fish per cast (Founder)', `${range(R.visible.map((v) => v.founder.mean), (x) => num(x, 2))} from the Old Rod to T${lastTier.tier}, every cast 1–${F.MULTI.maxFish} fish (today up to ${int(TODAY.limits.maxDraws * TODAY.limits.maxPerDraw)})`, 'Visible catch'],
-		[`Visible proposal's private profile (solved at ${F.FRAMEWORK_VERSION})`, `XP ×${S.xp}, sell ×${S.sell}, Luck +${S.luck}, durability efficiency ${S.durabilityEfficiency}; quests ×${prof.multipliers.questXp} / ×${prof.multipliers.questCash} kept`, 'Current → proposed; Targets'],
+		[`Visible proposal's private profile (superseded; solved at ${F.FRAMEWORK_VERSION})`, `XP ×${S.xp}, sell ×${S.sell}, Luck +${S.luck}, durability efficiency ${S.durabilityEfficiency}; quests ×${prof.multipliers.questXp} / ×${prof.multipliers.questCash} kept`, 'Current → proposed; Targets'],
 		['XP/h at equal gear, Founder ÷ Normal', `${range(R.power.flatMap((p) => [p.ratio.xp.min, p.ratio.xp.max]), (x) => times(x, 0))} (today ${range(R.power.flatMap((p) => p.ratio.xp.today), (x) => times(x, 1))})`, 'Per tier'],
 		['$/h at equal gear, Founder ÷ Normal', `${range(R.power.flatMap((p) => [p.ratio.cash.min, p.ratio.cash.max]), (x) => times(x, 0))} (today ${range(R.power.flatMap((p) => p.ratio.cash.today), (x) => times(x, 0))})`, 'Per tier'],
 		['Regular Founder, hours to real Lv 50 (integrated)', `${hrs(time(ref, 50).founderReal.public)} (public gate) / ${hrs(time(ref, 50).founderReal.real)} (real gate); today ${hrs(time(ref, 50).todayFounder)}`, 'Hours to each level'],
@@ -3023,7 +3030,7 @@ function markdownTables() {
 		['F1 public level', `shipped (${F1_COMMITS.main}) for the /fish level-up, /profile, the /inventory level line and /fishing-stats; the model's public XP ${P1.definition.matchesShipped ? 'matches' : '**differs from**'} the shipped definition`, 'Public level'],
 		['Open public tells', openTells.length ? openTells.map((x) => x.surface.replace(/`/g, '').replace(/ \(public repl(y|ies)\)$/, '')).join('; ') : 'none', 'Fix first; Public level'],
 		['Detection (proposed profile, same rod as a normal player)', `1000:1 likelihood after a median of ${TT.rarity} casts from the printed rarities, ${TT.colour} from the card colour, ${TT.oldRodCount} from an Old Rod fish count; one /stats or /collection reply after about ${TT.statsFish} fish`, 'Detection; One reply'],
-		['Stealth alternative (sensitivity, `P-FOUNDER-STEALTH` b)', `XP ×${SE.stealth.xp}, sell ×${SE.stealth.sell}; no card, durability, /stats or /open tell; M5 and M6 not met; regular public Lv ${SE.stealth.regular.level} after ${hrs(SE.stealth.regular.publicL50)} (Normal ${hrs(SE.stealth.regular.normalL50)})`, 'Stealth'],
+		['Pure stealth (superseded sensitivity, `P-FOUNDER-STEALTH` b)', `XP ×${SE.stealth.xp}, sell ×${SE.stealth.sell}; no card, durability, /stats or /open tell; M5 and M6 not met; regular public Lv ${SE.stealth.regular.level} after ${hrs(SE.stealth.regular.publicL50)} (Normal ${hrs(SE.stealth.regular.normalL50)})`, 'Stealth'],
 		['Live production bug (fix first)', ev.unfilteredSelectCollectors.length ? `${ev.unfilteredSelectCollectors.map((x) => `/${x.split('/').pop().replace('.js', '').replace('startQuest', 'start-quest')}`).join(' and ')}: any member's click acts on the invoker's account (F3)` : 'none found', 'Fix first'],
 		['Design checks', failing.length ? `**${failing.length} fail:** ${failing.join(', ')}` : `all ${Object.keys(R.checks).length - 1} pass`, 'Checks'],
 		['Retired private loop', `system() matched it exactly: ${PR.exactMilestones}/${PR.milestonesCompared} milestones step-exact (${PR.commit})`, 'Retired-loop parity'],
@@ -3252,13 +3259,16 @@ function markdownTables() {
 	T['founder-curve-floor'] = mdTable(['Level today (100·L²)', 'XP', 'Level on the new curve without a stored floor', 'Live biomes it would lose'], R.publicLevel.curveFloor.map((x) => [x.level, int(x.xp), x.newLevel, x.lost.length ? x.lost.join(', ') : 'none'])) + '\n\nWhat a site that reads the new curve without the stored floor would return for an existing player (framework `P-CURVE-EXISTING`, `P-FOUNDER-PUBLIC-LEVEL`). The public level has the same problem: the shipped public level is derived on read, so without a stored `publicLevel` every member\'s public level drops like this, and with `P-FOUNDER-GATE` = public so does every member\'s gate level.';
 	T['founder-level-sites'] = mdTable(['Level read or write site', 'Where (read at render time)', 'Today', 'At the curve change'], R.publicLevel.levelSites.map((x) => [x.site, x.found ? x.where : `**${x.where}**`, x.today, x.change])) + '\n\nEvery site must go through max(stored, curve) at the curve change, for the level and for the public level of every player; a single site on the bare curve demotes (Curve floor). The gates that read these levels are in Level gate (`getLevel()` → `getGateLevel()`).';
 
-	// ----- Stealth-hybrid (P-FOUNDER-HYBRID, recommended) -----
+	// ----- Stealth-hybrid (P-FOUNDER-HYBRID, the Founder model) -----
 	const HY = R.hybrid;
 	const HS = HY.solved;
 	const hp = HY.profile;
 	const stepName = (x) => `${tierName(x.tier)}${x.name && x.name !== tierName(x.tier) ? ` ${x.name}` : ''} (Lv ${x.level}, ${x.biome})`;
 	const hb = bindingText(HS);
+	const DR = HY.drift;
+	const ratioRange = (x) => range([x.min, x.max], (y) => times(y, 3));
 	T['founder-hybrid-headline'] = mdTable(['Figure', 'Value', 'Table'], [
+		['The Founder profile', `\`founderProfile()\` returns this stealth-hybrid (${HY.checks.canonicalProfile ? 'checked' : '**not the hybrid**'}); quests, streak and buffs read it (quest multipliers, box fish at sell ×${HS.sell}, box odds), and the integrated Founder runs cast with it. The visible proposal and the pure stealth profile are superseded comparison columns`, 'Decisions'],
 		['Public catch card, cadence, durability', `a normal player's at the same public level and gear: normal rarity table, the rod's normal fish count (${range(HY.steps.map((x) => x.fishPerCast.public), (x) => num(x, 2))} fish per cast), normal cooldown (${range(HY.steps.map((x) => x.cooldownMs.hybrid / 1000), (x) => `${num(x, 2)} s`)}), one durability point per fish, no pity`, 'Design'],
 		['Private reward rolls per cast', `**${num(HS.rolls, 1)}** from today's Founder rarity table + gear stats, today's Founder pity on the private rolls (${num(HS.rolls, 1)} private fish per cast on top of the public catch)`, 'Solved; Production'],
 		['Private multipliers', `**XP ×${HS.xp}, sell ×${HS.sell}** on every base reward (public and private); quests ×${hp.multipliers.questXp} / ×${hp.multipliers.questCash} kept`, 'Solved'],
@@ -3267,7 +3277,8 @@ function markdownTables() {
 		['Lucky fish per hour ÷ Normal at equal gear', `${range(HY.steps.map((x) => x.lucky.ratio), (x) => times(x, 0))} (today's × ${PARAMS.targets.margin}: ${range(HY.steps.map((x) => x.lucky.target * PARAMS.targets.margin), (x) => times(x, 0))})`, 'Production'],
 		[`${cap(ref)}: hours to real Lv 50 / public Lv 50`, `${hrs(HY.time[ref][50].hybridReal)} / ${hrs(HY.time[ref][50].hybridPublic)} (today's Founder ${hrs(HY.time[ref][50].todayFounder)}; new Normal ${hrs(HY.time[ref][50].normal)})`, 'Time to level'],
 		['Public detection', HY.neverOnCard ? '**never** from the card, its colour, its fish count, the cadence or the rod\'s durability: each is exactly a normal player\'s distribution at the same public level and gear' : '**some card tell remains** (Detection)', 'Detection'],
-		['Public level pace ÷ Normal', `${range([HY.pace.min, HY.pace.max], (x) => times(x, 3))} (Founder box luck holds more Double XP buffs; closes with the box-luck fix in Remaining tells)`, 'Remaining tells'],
+		['Founder gacha luck', `today's Founder box stats and pity on non-buff slots only: buffs per open = a normal player's (${HY.buffOdds.map((x) => `${x.box} ${pct(x.hybrid, 2)}`).join(', ')}; with luck on buff slots ${HY.buffOdds.map((x) => pct(x.luckOnBuffSlots, 2)).join(', ')})`, 'Public-level drift'],
+		['Public level pace ÷ Normal', `${ratioRange(DR.after)} of Normal's hours (before the box-luck rule ${ratioRange(DR.before)}, up to ${hrs(DR.before.maxHoursAhead)} ahead); exactly Normal's (${ratioRange(DR.afterNoUpgrades)}) with Angler Upgrades held equal: the residual (at most ${hrs(DR.after.maxHoursAhead)}) is upgrade purchase timing`, 'Public-level drift'],
 		['M1–M6', HY.checks.pass ? 'every target met' : `**failing:** ${Object.entries(HY.checks).filter(([k, v]) => k !== 'pass' && v !== true).map(([k]) => k).join(', ')}`, 'Checks'],
 	]);
 	T['founder-hybrid-design'] = mdTable(['Layer', 'Part', 'Hybrid', 'Where it shows'], [
@@ -3282,7 +3293,8 @@ function markdownTables() {
 		['Private', 'XP multiplier', `×${HS.xp} on base XP (public + private fish, buffs); quests ×${hp.multipliers.questXp}`, '`/fishing-stats` real level (ephemeral)'],
 		['Private', 'Sell multiplier', `×${HS.sell}, baked into each fish's stored value (public and private fish); quests ×${hp.multipliers.questCash}`, '`/balance`, `/inventory` (ephemeral since L4)'],
 		['Private', 'Repair rebate', `${pct(HS.repairRebate, 0)} of each repair, refunded privately`, 'balance (ephemeral); the public repair reply shows the normal cost'],
-		['Private', 'Gacha luck', `today's Founder box stats (${statText(hp.gacha.stats)}) and box pity ${pityText(hp.gacha.pity.legendaryPlus)}`, '`/open` (ephemeral since L4); see Remaining tells for buff slots'],
+		['Private', 'Gacha luck', `today's Founder box stats (${statText(hp.gacha.stats)}) and box pity ${pityText(hp.gacha.pity.legendaryPlus)}, on NON-BUFF slots only: each slot is a buff (Double XP, Double Cash, Lucky Draw) at exactly a normal player's odds, otherwise a Founder-luck draw over the box's non-buff pool`, '`/open` (ephemeral since L4); `/boosters` ephemeral for everyone; buff stock and public XP a normal player\'s'],
+		['Private', 'Progress', 'private rolls never advance quest, streak or bait progress (they count the public catch)', '`/quests` (public) shows a normal player\'s progress'],
 		['Account', 'Competitive', 'non-competitive (`competitiveEligible` false)', 'absent from competitive boards'],
 		['Account', 'Level gate', `the public level (\`P-FOUNDER-GATE\`); the hybrid is solved under the ${HY.gate} gate only`, 'biome and shop access at a normal player\'s level'],
 	]);
@@ -3292,7 +3304,7 @@ function markdownTables() {
 		['Private repair rebate', `**${pct(HS.repairRebate, 0)}**`, HS.rebateNeed.length ? `${tierName([...HS.rebateNeed].sort((a, b) => b.need - a.need)[0].tier)}: ${pct(HS.rebateRaw, 1)} (rounded up to ${pct(PARAMS.hybrid.rounding.repairRebate, 0)})` : 'no step wears', 'M6: hours of play per repair dollar paid, Founder ÷ Normal ≥ today\'s rod-life ratio × margin'],
 		['Sell multiplier', `**×${HS.sell}**`, `${hb.sell}; M3 alone ×${HS.sellFromCashRatioOnly}`, 'M3 ($/h ratio at equal gear) and M4 (time to afford the gear bought at today\'s Lv 20 and Lv 30 purchases)'],
 		['XP multiplier', `**×${HS.xp}**`, `${hb.xp}; M1 alone ×${HS.xpFromRatioOnly}`, `M1 (XP/h ratio at equal gear) and M2 (hours to every real-level milestone ≤ today's Founder, every archetype, ${HS.gates.join('/')} gate, integrated)`],
-	]) + `\n\nSame targets, margin (×${PARAMS.targets.margin}) and rounding as the visible proposal (Targets); M1–M4 use the pre-multiplier rewards (public + private base), M2 runs \`integrate.run\` (${HS.timeModel}). The rolls are solved first because collection pace (M5) is the one target the multipliers cannot carry; the multipliers then close M1–M4.`;
+	]) + `\n\nSame targets, margin (×${PARAMS.targets.margin}) and rounding as the visible proposal (Targets); M1–M4 use the pre-multiplier rewards (public + private base), M2 runs \`integrate.run\` (${HS.timeModel}). The rolls are solved first because collection pace (M5) is the one target the multipliers cannot carry; the multipliers then close M1–M4. Every integrated run reads the hybrid itself (quests, streak and buffs value its boxes at sell ×${HS.sell} with gacha luck on non-buff slots only). These are the approved setting (user decision D4): 7 rolls, XP ×35, sell ×25, 40% rebate; nothing moved when the box-luck rule was applied.`;
 	T['founder-hybrid-production'] = mdTable(['Gear step', 'Fish per cast: public (= Normal) + private', 'Legendary+/h: Normal / hybrid (private) / today\'s Founder', 'L+ ratio ≥ target', 'Lucky fish/h: Normal / hybrid / today\'s Founder', 'Lucky ratio ≥ target'], HY.steps.map((x) => [
 		stepName(x), `${num(x.fishPerCast.public, 2)} + ${num(x.fishPerCast.privateFish, 2)}`,
 		`${num(x.legendaryPlus.normal, 2)} / **${num(x.legendaryPlus.total, 1)}** (${num(x.legendaryPlus.private, 1)}) / ${num(x.legendaryPlus.todayFounder, 1)}`, legT(x),
@@ -3308,7 +3320,14 @@ function markdownTables() {
 	T['founder-hybrid-time'] = mdTable(['Player', 'Level', 'Today: Founder', 'New: Normal', 'Hybrid: real level', 'Hybrid: public level', 'Visible proposal: real / public'], archetypes.flatMap((a) => F.LIFECYCLE.milestones.map((lv) => {
 		const x = HY.time[a][lv];
 		return [cap(a), lv, hrs(x.todayFounder), hrs(x.normal), `**${hrs(x.hybridReal)}**`, hrs(x.hybridPublic), `${hrs(x.visibleReal)} / ${hrs(x.visiblePublic)}`];
-	}))) + `\n\nIntegrated lifecycles (\`integrate.run\`: ${INTEGRATE().REFERENCE.join(', ')} + founder), ${HY.gate} gate, hours of play. The hybrid's public level is its public catch plus base quest XP, so it rises at a normal player's pace (${range([HY.pace.min, HY.pace.max], (y) => times(y, 3))} of Normal's hours; the gap is the box-luck buff drift in Remaining tells).`;
+	}))) + `\n\nIntegrated lifecycles (\`integrate.run\`: ${INTEGRATE().REFERENCE.join(', ')} + founder), ${HY.gate} gate, hours of play. The hybrid's public level is its public catch plus base quest XP, so it rises at a normal player's pace (${range([HY.pace.min, HY.pace.max], (y) => times(y, 3))} of Normal's hours; with Founder gacha luck on non-buff slots only, the residual is Angler Upgrade purchase timing: Public-level drift).`;
+	T['founder-hybrid-drift'] = mdTable(['Player', 'Level', 'Normal: hours', 'Hybrid public level, luck on buff slots too (before)', 'Hybrid public level, luck on non-buff slots only (approved)', 'Both without Angler Upgrades: Normal / hybrid'], archetypes.flatMap((a) => F.LIFECYCLE.milestones.map((lv) => {
+		const b = DR.before.rows.find((x) => x.archetype === a && x.level === lv);
+		const x = DR.after.rows.find((y) => y.archetype === a && y.level === lv);
+		const n = DR.afterNoUpgrades.rows.find((y) => y.archetype === a && y.level === lv);
+		const cell = (r) => (r ? `${hrs(r.founder)} (${times(r.ratio, 3)})` : '—');
+		return [cap(a), lv, b ? hrs(b.normal) : '—', cell(b), `**${cell(x)}**`, n ? `${hrs(n.normal)} / ${hrs(n.founder)}` : '—'];
+	}))) + `\n\nIntegrated lifecycles, ${HY.gate} gate, hours of play. Before: the same solved hybrid with today's box rule (Founder gacha luck on every slot): its boxes hold ${range(HY.buffOdds.map((x) => x.luckOnBuffSlots / x.normal), (y) => times(y, 1))} a normal player's buffs, and the extra Double XP runs its public level up to ${hrs(DR.before.maxHoursAhead)} ahead (public buff XP ${range(DR.before.buffPublicXp.map((x) => x.founder / x.normal), (y) => times(y, 2))} Normal's). Approved: buff odds per open are Normal's, public buff XP ${range(DR.after.buffPublicXp.map((x) => x.founder / x.normal), (y) => times(y, 3))} Normal's, and every public milestone is within ${hrs(DR.after.maxHoursAhead)} of Normal's. That residual is not box luck: with no Angler Upgrades for either player the public milestones are ${DR.afterNoUpgrades.identical ? 'identical' : '**not identical**'} (last column). It is purchase timing: the private money buys each upgrade level as it unlocks (up to ${hrs(maxOf(DR.upgradeTiming.map((x) => x.maxHoursAhead)))} before the reference player can afford it), and the Experience upgrade raises base catch XP. A normal player who saves and buys at unlock does the same, so this is not a tell (Remaining tells).`;
 	T['founder-hybrid-afford'] = mdTable(['Gear step', 'Bought as', 'Cost', 'Normal: minutes of stage income', 'Hybrid: minutes', 'Visible proposal: minutes', 'Today\'s Founder, same purchase'], HY.afford.map((x) => [
 		tierName(x.tier), `${x.name || '—'} (${x.source === 'shop' ? 'shop price' : 'expected crates'})`, x.cost.normal === x.cost.founder ? usd(x.cost.normal) : `${usd(x.cost.normal)} / ${usd(x.cost.founder)}`,
 		num(x.minutes.normal, 1), `**${num(x.minutes.hybrid, 2)}**`, num(x.minutes.visible, 2), x.minutes.todayFounder === null ? '—' : `${num(x.minutes.todayFounder, 2)} (${x.todayStage})`,
@@ -3324,17 +3343,17 @@ function markdownTables() {
 	const gapMax = maxOf(HY.upgradeGaps.filter((x) => x.hybrid !== null).map((x) => Math.abs(x.hybrid - x.normal) / x.normal));
 	T['founder-hybrid-tells'] = mdTable(['Public surface', 'What it shows for the hybrid Founder', 'Evidence', 'Fix / status'], [
 		...HY.tells.map((x) => [x.surface, x.shows, `${x.where}${x.public ? ' (public reply)' : ''}`, x.fix]),
-		['Public level pace', `a normal player's catch and quests, plus the extra Double XP buffs of Founder box luck: public milestones at ${range([HY.pace.min, HY.pace.max], (y) => times(y, 3))} of Normal's hours (players cannot see hours played, so this is weak)`, 'Time to level (integrated)', 'Founder box luck on non-buff slots only (closes it); or accept'],
-		['Gear purchase timing', `each shop rod is bought when its level unlocks, as a normal player on the reference loop does: at most ${pct(gapMax, 1)} apart in hours (the public-level drift above)`, 'Time to level (integrated purchases)', 'none needed'],
-		['Money', 'private: `/balance`, `/inventory`, `/info rod` and `/open` reply ephemerally (hotfix L4); the catch card, quest lines and `/sell` show base values', 'hotfix L4 (1c5ae41)', '`/sell`: row above'],
-		['Private rewards themselves', 'never on the card', 'design', 'requirement: deliver them in an ephemeral follow-up to the cast and in the private surfaces only; never in the public reply'],
-	]) + `\n\nBox-fish money in the integrated run: quests, streak and buffs value the Founder's box fish at the visible proposal's sell multiplier (×${HY.boxSellNote.visibleSell}, not ×${HY.boxSellNote.hybridSell}); those sources are ${pct(HY.boxSellNote.share, 2)} of the regular hybrid's income, and no target reads them.`;
+		['Public level pace', `a normal player's catch, quests and buffs (Founder gacha luck on non-buff slots only): public milestones at ${ratioRange(DR.after)} of Normal's hours, down from ${ratioRange(DR.before)} with luck on buff slots; the residual is Angler Upgrade purchase timing (next row)`, 'Public-level drift (integrated)', 'closed by P-FOUNDER-HYBRID-SURFACES (box luck on non-buff slots only)'],
+		['Upgrade and gear purchase timing', `private money buys each Angler Upgrade level as it unlocks (up to ${hrs(maxOf(DR.upgradeTiming.map((x) => x.maxHoursAhead)))} before the reference player), which moves public milestones by at most ${hrs(DR.after.maxHoursAhead)}; each shop rod is bought when its level unlocks, as the reference player does (at most ${pct(gapMax, 1)} apart in hours)`, 'Public-level drift; Time to level (integrated purchases)', 'accept: a normal player who buys at unlock looks the same, and hours played are not public'],
+		['Money', 'private: `/balance`, `/inventory`, `/info rod` and `/open` reply ephemerally (hotfix L4); `/sell` ephemeral for everyone (P-FOUNDER-HYBRID-SURFACES); the catch card and quest lines show base values', 'hotfix L4 (1c5ae41)', '`/sell`: row above'],
+		['Private rewards themselves', 'never on the card', 'design', 'P-FOUNDER-HYBRID-SURFACES requirement: deliver them in an ephemeral follow-up to the cast and in the private surfaces only; never in the public reply'],
+	]) + `\n\nEvidence reads \`src/\` at render time, so "(public reply)" is the code today: the /sell and /boosters changes are approved direction for implementation, not shipped. Box-fish money in the integrated run: quests, streak and buffs value the Founder's box fish with the hybrid itself (sell ×${HY.boxSellNote.sell}); those sources are ${pct(HY.boxSellNote.share, 2)} of the regular hybrid's income.`;
 	T['founder-hybrid-tradeoff'] = mdTable(['Private rolls per cast', 'XP multiplier (binding)', 'Sell multiplier (binding)', 'Fish per hour, public + private (over the steps)'], HY.tradeoff.points.map((x) => [
 		x.rolls === HS.rolls ? `**${num(x.rolls, 1)} (solved)**` : num(x.rolls, 1), `×${x.xp} (${x.binding.xp})`, `×${x.sell} (${x.binding.sell})`, `${int(x.fishPerHour.min)}–${int(x.fishPerHour.max)}`,
-	])) + `\n\nEach row re-solves M1–M4 (M2 integrated) with that many private rolls; M5 and M6 hold on every row (more rolls only raise collection pace). M2 binds early (today's Founder reaches Lv 60 after ${range(archetypes.map((a) => td.lifecycles[a]?.founderHours?.[60] ?? 0), (x) => num(x, 2))} h of play, while the hybrid is still on its first rods under the public gate), so the XP multiplier falls roughly in proportion to the rolls. Today's Founder lands ${range(Object.values(td.byRod).map((r) => r.fishPerCast.founder), (x) => num(x, 1))} fish per cast (${range(Object.values(td.byRod).map((r) => r.castsPerHour.founder * r.fishPerCast.founder), int)} per hour).`;
+	])) + `\n\n**Not to be used:** the user approved ${num(HS.rolls, 1)} rolls (decision D4); the other rows are a record of the trade-off only. Each row re-solves M1–M4 (M2 integrated) with that many private rolls; M5 and M6 hold on every row (more rolls only raise collection pace). M2 binds early (today's Founder reaches Lv 60 after ${range(archetypes.map((a) => td.lifecycles[a]?.founderHours?.[60] ?? 0), (x) => num(x, 2))} h of play, while the hybrid is still on its first rods under the public gate), so the XP multiplier falls roughly in proportion to the rolls. Today's Founder lands ${range(Object.values(td.byRod).map((r) => r.fishPerCast.founder), (x) => num(x, 1))} fish per cast (${range(Object.values(td.byRod).map((r) => r.castsPerHour.founder * r.fishPerCast.founder), int)} per hour).`;
 	const C = HY.compare;
 	const cm = [C.visible, C.stealth, C.hybrid];
-	T['founder-hybrid-compare'] = mdTable(['', 'Visible proposal (a)', 'Stealth (b), sensitivity', '**Stealth-hybrid (recommended)**'], [
+	T['founder-hybrid-compare'] = mdTable(['', 'Visible proposal (a): superseded, comparison only', 'Pure stealth (b): superseded, comparison only', '**Stealth-hybrid (the Founder model, D4)**'], [
 		['Public card', 'Founder table, Luck, bonus fish, fast cadence, efficiency', 'a normal player\'s', 'a normal player\'s'],
 		['Private rolls per cast', ...cm.map((x) => (x.rolls ? num(x.rolls, 1) : 'none'))],
 		['XP / sell multipliers', ...cm.map((x) => `×${x.xp} / ×${x.sell}`)],
@@ -3354,6 +3373,9 @@ function markdownTables() {
 		m6RodLifeCost: 'M6: cost-equivalent rod life ≥ today\'s ratio × margin, every step that wears',
 		publicCardIdentical: 'Public card, colour, count, cadence and durability: exactly a normal player\'s (detection never)',
 		noLevelGateTell: 'Never fishes a biome or step above its public level (integrated)',
+		buffOddsNormal: 'Founder gacha luck on non-buff slots only: buff odds per open = Normal\'s (Streak Crate, Streak Chest, Daily Box)',
+		boxLuckDriftClosed: 'Box-luck public-level drift closed: public milestones = Normal\'s with Angler Upgrades held equal (integrated)',
+		canonicalProfile: '`founderProfile()` is the stealth-hybrid (quests, streak, buffs and the integrated Founder runs read it)',
 		competitiveEligibleFalse: 'Non-competitive',
 	};
 	T['founder-hybrid-checks'] = mdTable(['Check', 'Result'], Object.entries(HY.checks).filter(([k]) => k !== 'pass').map(([k, v]) => [HCHECK[k] || k, v === true ? 'pass' : '**fail**']));

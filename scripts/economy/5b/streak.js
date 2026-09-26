@@ -1040,7 +1040,7 @@ function founderView() {
 			chest: chestR,
 			cycle: { normal: cycle('normal'), founder: cycle('founder'), ratio: cycle('founder') / cycle('normal') },
 			sameAtEveryStage,
-			surface: '/open (public reply; every slot\'s rarity, Legendary/Lucky marked)',
+			surface: '/open (ephemeral since hotfix L4; every slot\'s rarity, Legendary/Lucky marked)',
 		},
 		stages: F.LIVE_BIOMES.map((b) => {
 			const L = F.BIOME_LEVEL[b];
@@ -1212,8 +1212,8 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-STREAK-FOUNDER', status: 'proposed',
-		title: 'Founder: the same gate, boxes and public catch-card line. The sell multiplier on box contents is private; the Founder gacha stats (and gacha pity) roll the box, so the rarity edge shows on the public /open reveal',
-		modelled: 'boxContents(..., \'founder\') = founder.founderBoxEV() with founder.founderProfile() (the stealth-hybrid: gacha stats on non-buff slots only, buffs at normal odds; sell multiplier); gate counts casts; /open stays a public reply rolled with the opener\'s gacha stats and pity (Founder reveal table)',
+		title: 'Founder: the same gate, boxes and public catch-card line. The sell multiplier on box contents is private; the Founder gacha stats (and gacha pity) roll the box, which /open (ephemeral for everyone since hotfix L4) shows only to the opener',
+		modelled: 'boxContents(..., \'founder\') = founder.founderBoxEV() with founder.founderProfile() (the stealth-hybrid: gacha stats on non-buff slots only, buffs at normal odds; sell multiplier); gate counts casts; /open is ephemeral for everyone (hotfix L4), so the reveal is private; rolled with the opener\'s gacha stats and pity on non-buff slots (Founder reveal table)',
 		alternatives: [
 			'accept the visible rarity edge on /open, as with the kept catch-card rarity edge (P-FOUNDER-KEPT)',
 			'roll Founder box opens on the normal table and pay the Founder edge privately as extra value (the reveal then matches a normal player\'s odds)',
@@ -1591,10 +1591,10 @@ function markdownTables() {
 		`${s.biome} (Lv ${s.level})`, usd(s.crate.normal), usd(s.crate.founder), `${fx(s.crate.ratio, 1)}×`, fx(s.crate.normalLegendaryPlus, 3), fx(s.crate.founderLegendaryPlus, 3), usd(s.chest.normal), usd(s.chest.founder), `${fx(s.chest.ratio, 1)}×`,
 	])) + `\n\nLiquid value (fish + salvage). Founder: the Founder profile (\`${fv.profile.source}\`${fv.profile.variant ? `, ${fv.profile.variant}` : ''}): gacha stats ${Object.entries(fv.profile.gachaStats).map(([k, v]) => `${k} +${pct(v, 0)}`).join(', ')}${fv.profile.buffSlots === 'normal' ? ' on non-buff slots only (buffs at normal odds)' : ''}, sell ×${fv.profile.sell} (today's profile: ×${fv.profile.todaySell}). Founder pity is not modelled (it can only raise these).`;
 
-	// Founder: what the public /open reveal shows.
+	// Founder: what the /open reveal shows (ephemeral since hotfix L4: seen by the opener only).
 	const rv = fv.reveal;
 	const pityText = fv.profile.gachaPity ? `The Founder gacha pity (a Legendary+ slot ramps from open ${fv.profile.gachaPity.softStart} and is certain by open ${fv.profile.gachaPity.hard} without one) is not modelled: it can only raise the Founder column.` : 'The Founder profile has no gacha pity.';
-	out['streak-founder-reveal'] = mdTable(['Opens shown on the public /open reveal', 'Normal: holds a Legendary/Lucky slot', 'Founder', 'Founder ÷ normal'], [
+	out['streak-founder-reveal'] = mdTable(['Opens shown on the /open reveal (private since hotfix L4)', 'Normal: holds a Legendary/Lucky slot', 'Founder', 'Founder ÷ normal'], [
 		[P.ladder.dailyBox, pct(rv.crate.normal, 2), pct(rv.crate.founder, 2), `${fx(rv.crate.ratio, 1)}×`],
 		[P.ladder.milestoneBox, pct(rv.chest.normal, 2), pct(rv.chest.founder, 2), `${fx(rv.chest.ratio, 1)}×`],
 		[`One ${P.ladder.cycle}-day cycle (${P.ladder.cycle - 1} crates + 1 chest): at least one`, pct(rv.cycle.normal, 1), pct(rv.cycle.founder, 1), `${fx(rv.cycle.ratio, 1)}×`],
