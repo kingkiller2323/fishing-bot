@@ -170,6 +170,6 @@ test('reconcile migration runs once (marker) and logs its result; the boot check
 	finally {
 		config.users.founders = saved.founders;
 	}
-	assert.ok(warn.some(([l, s]) => /^Check publicXp: 1 of \d+ member\(s\) have publicXp != xp \(e\.g\. rc-once\)\.$/.test(l) && s === 'warn'), JSON.stringify(warn));
+	assert.ok(warn.some(([l, s]) => /^Check publicXp: 1 of \d+ member\(s\) have publicXp != xp \(e\.g\. …once\)\.$/.test(l) && s === 'warn'), JSON.stringify(warn));
 	await UserModel.collection.updateOne({ userId: 'rc-once' }, { $set: { publicXp: 800 } });
 });
