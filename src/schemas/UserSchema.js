@@ -19,6 +19,17 @@ const UserSchema = new Schema ({
 	publicXp: {
 		type: Number,
 	},
+	// No-demotion level floors (P-CURVE-EXISTING, P-FOUNDER-PUBLIC-LEVEL): the level is
+	// max(levelFloor, curve(xp)) and the public level max(publicLevelFloor, curve(publicXp))
+	// (engine/levels.js). Written from today's curve by the startup migration, raised with $max on
+	// every level write, never lowered (except an explicit, audited /dev xp set). No default: the
+	// migration finds accounts without them.
+	levelFloor: {
+		type: Number,
+	},
+	publicLevelFloor: {
+		type: Number,
+	},
 	commands: {
 		type: Number,
 		default: 0,

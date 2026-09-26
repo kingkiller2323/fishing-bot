@@ -6,6 +6,7 @@ const { FishData } = require('../schemas/FishSchema');
 const { Cast } = require('../schemas/CastSchema');
 const { Item } = require('../schemas/ItemSchema');
 const { migratePublicXp } = require('../engine/publicLevel');
+const { migrateLevelFloors } = require('../engine/levels');
 
 /**
  * autoLock.species: before Foundation V2, locking a species also locked future catches of it.
@@ -43,8 +44,11 @@ async function runMigrations(log) {
 	if (autoLock.scanned > 0) log(`Migration autoLock.species: ${autoLock.scanned} player(s) initialised, ${autoLock.withRules} with species auto-lock.`, 'done');
 	const publicXp = await migratePublicXp({ UserModel, Cast });
 	if (publicXp.scanned > 0) log(`Migration publicXp: ${publicXp.scanned} player(s) initialised, ${publicXp.withBonus} with private profile bonuses excluded.`, 'done');
+	// Level floors from TODAY's curve, after publicXp is final (the public floor anchors on it).
+	const floors = await migrateLevelFloors({ UserModel });
+	if (floors.scanned > 0) log(`Migration levelFloors: ${floors.scanned} player(s); ${floors.levelFloors} levelFloor and ${floors.publicLevelFloors} publicLevelFloor written from today's curve.`, 'done');
 	const crate = await migrateDelistFishingCrate();
 	if (crate.delisted > 0) log(`Migration delistFishingCrate: ${crate.delisted} catalog row(s) removed from the shop (shopItem -> false); owned crates untouched.`, 'done');
 }
 
-module.exports = { runMigrations, migrateAutoLockSpecies, migratePublicXp, migrateDelistFishingCrate };
+module.exports = { runMigrations, migrateAutoLockSpecies, migratePublicXp, migrateLevelFloors, migrateDelistFishingCrate };

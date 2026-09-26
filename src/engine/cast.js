@@ -28,11 +28,12 @@ const { Cast } = require('../schemas/CastSchema');
 const { WeatherPattern } = require('../class/WeatherPattern');
 const { Season } = require('../class/Season');
 const { rng } = require('./rng');
-const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, levelForXp, activeEvent } = require('./balance');
+const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, activeEvent } = require('./balance');
 const { resolveModifiers, rollDraws } = require('./modifiers');
 const { applyPity, roll, toPercent } = require('./rarity');
 const { oid, notApplied, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
-const { publicXpOf, publicXpOfResult } = require('./publicLevel');
+const { publicXpOf, publicXpOfResult, publicLevelOf } = require('./publicLevel');
+const { levelOf, levelWithFloor } = require('./levels');
 const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
@@ -324,14 +325,16 @@ async function castLine({ userId, guildId = null, channelId = null, now = new Da
 
 	const xpTotal = catchXp + questXp;
 	const cashTotal = questCash;
-	const levelBefore = user.level || 1;
-	const levelAfter = levelForXp((user.xp || 0) + xpTotal);
+	// Levels go through max(stored floor, curve) (levels.js): never below the floor, and a level-up only
+	// when the curve rises above the level the player already had.
+	const levelBefore = levelOf(user);
+	const levelAfter = levelWithFloor(user.levelFloor, (user.xp || 0) + xpTotal);
 	// Public level: from the base XP the card shows (publicXp). The real level above includes private
 	// profile bonuses and must never be what other players see level up.
 	const publicXpBefore = publicXpOf(user);
 	const publicXpGain = catchXpWithoutProfile + quests.reduce((s, q) => s + q.reward.xp.base, 0);
-	const publicBefore = levelForXp(publicXpBefore);
-	const publicAfter = levelForXp(publicXpBefore + publicXpGain);
+	const publicBefore = publicLevelOf(user);
+	const publicAfter = levelWithFloor(user.publicLevelFloor, publicXpBefore + publicXpGain);
 
 	// Counters reset only when the qualifying tier was actually caught (Legendary+ = Legendary or Lucky).
 	const hit = (rarity) => catches.some((c) => c.rarity === rarity);
@@ -442,7 +445,10 @@ async function writeCast(result, { session, fault }) {
 		'pity.castsSinceLucky': result.pity.after.castsSinceLucky,
 		updatedAt: now,
 	};
-	const update = { $inc: inc, $set: set, $push: { 'inventory.fish': { $each: fishIds }, ...guardPush(castId) } };
+	// Level floors only ever rise ($max). Journals from before the public level have no level.public.
+	const max = { levelFloor: result.level.after };
+	if (Number.isFinite(result.level.public?.after)) max.publicLevelFloor = result.level.public.after;
+	const update = { $inc: inc, $set: set, $max: max, $push: { 'inventory.fish': { $each: fishIds }, ...guardPush(castId) } };
 	if (result.bait?.depleted) {
 		set['inventory.equippedBait'] = null;
 		update.$pull = { 'inventory.baits': oid(result.bait.id) };

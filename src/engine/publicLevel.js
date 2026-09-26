@@ -7,7 +7,9 @@
 //
 // publicXp is written in the same atomic commit as xp (cast.js) and initialised for existing accounts by
 // an additive, idempotent migration (xp minus every profile bonus recorded in the cast journals).
-const { levelForXp } = require('./balance');
+//
+// The public level is max(stored publicLevelFloor, curve(publicXp)), like the real level (levels.js).
+const { curveLevel, floorOf, progressText } = require('./levels');
 
 /** The profile XP bonus one cast journal recorded (every result shape since the Phase 2 journal). */
 function journalProfileBonus(result) {
@@ -39,15 +41,12 @@ function publicXpOf(user) {
 	return Number.isFinite(user?.publicXp) ? Math.min(user.publicXp, xp) : xp;
 }
 
-const publicLevelOf = (user) => levelForXp(publicXpOf(user));
+/** The public level: max(stored publicLevelFloor, curve(publicXp)). */
+const publicLevelOf = (user) => Math.max(floorOf(user?.publicLevelFloor), curveLevel(publicXpOf(user)));
 
 /** "progress / needed" to the next public level (same formula as User.getXPToNextLevel). */
 function publicProgressOf(user) {
-	const xp = publicXpOf(user);
-	const level = levelForXp(xp);
-	const progress = Math.max(xp - level ** 2 * 100, 0);
-	const next = (level + 1) ** 2 * 100 - level ** 2 * 100;
-	return `${progress.toLocaleString()} / ${next.toLocaleString()}`;
+	return progressText(publicXpOf(user), publicLevelOf(user));
 }
 
 /**

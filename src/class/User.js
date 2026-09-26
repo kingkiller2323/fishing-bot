@@ -8,7 +8,7 @@ const config = require('../config');
 const fetch = require('node-fetch');
 const { QuestData } = require('../schemas/QuestSchema');
 const { assertRemovable, partitionProtected, isProtected } = require('../engine/protection');
-const { levelForXp } = require('../engine/balance');
+const { levelOf, floorOf, progressText } = require('../engine/levels');
 const { publicLevelOf, publicProgressOf } = require('../engine/publicLevel');
 
 class User {
@@ -240,8 +240,9 @@ class User {
 		return await this.save();
 	}
 
+	/** The real level: max(stored levelFloor, curve(xp)) (engine/levels.js). */
 	async getLevel() {
-		return levelForXp(await this.getXP());
+		return levelOf(this.user);
 	}
 
 	/** Level other players see (base/competitive XP; equal to getLevel() for normal players). */
@@ -254,12 +255,9 @@ class User {
 		return publicProgressOf(this.user);
 	}
 
+	/** Progress to the next level on the active curve, from the displayed level. */
 	async getXPToNextLevel() {
-		const xp = await this.getXP();
-		const level = await this.getLevel(xp);
-		const progress = Math.max((xp - (level ** 2 * 100)), 0);
-		const nextLevelProgress = ((level + 1) ** 2 * 100) - (level ** 2 * 100);
-		return `${progress.toLocaleString()} / ${nextLevelProgress.toLocaleString()}`;
+		return progressText(await this.getXP(), await this.getLevel());
 	}
 
 	async getInventoryValue() {
@@ -557,6 +555,8 @@ class User {
 		const level = await this.getLevel();
 		const oldLevel = user.level;
 		user.level = level;
+		// The floor only ever rises.
+		user.levelFloor = Math.max(floorOf(user.levelFloor), level);
 		await this.save();
 
 		return oldLevel < level;
@@ -637,6 +637,8 @@ class User {
 			commands: 0,
 			xp: 0,
 			publicXp: 0,
+			levelFloor: 1,
+			publicLevelFloor: 1,
 			inventory: {
 				equippedRod: null,
 				equippedBait: null,
