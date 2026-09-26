@@ -289,39 +289,6 @@ class User {
 		return matching[0] || null;
 	}
 
-	async decreaseRodDurability(amount) {
-		const user = this.user;
-		const rod = await ItemData.findById(user.inventory.equippedRod);
-
-		if (rod.durability - amount <= 0) {
-			rod.state = 'broken';
-			rod.durability = 0;
-
-			if (rod.repairs >= rod.maxRepairs) {
-				rod.state = 'destroyed';
-				user.equippedRod = null;
-			}
-		}
-		else {
-			rod.durability -= amount;
-		}
-
-		await rod.save();
-		await this.save();
-		return rod;
-	}
-
-	async repairRod() {
-		const user = this.user;
-		const rod = await ItemData.findById(user.inventory.equippedRod);
-
-		rod.repairs += 1;
-		rod.durability = rod.maxDurability;
-		rod.state = 'repaired';
-		await rod.save();
-		return rod;
-	}
-
 	async getEquippedBait() {
 		const user = this.user;
 		const baitId = user.inventory.equippedBait?.valueOf() || null;

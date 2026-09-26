@@ -1,11 +1,30 @@
 const { ButtonStyle, ActionRowBuilder, ButtonBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { RodData } = require('../../schemas/RodSchema');
+const mongoose = require('mongoose');
+const { ItemData } = require('../../schemas/ItemSchema');
 const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
 const { purchase } = require('../../engine/purchase');
 
+/**
+ * C1: repairs the rod through the base ItemData model. A crafted rod is a CustomRodData document, so the
+ * old RodData.findByIdAndUpdate matched nothing (the discriminator filter) and the player paid for no
+ * repair. Guarded: it applies only while the rod is still broken (a second confirm, or a rod repaired in
+ * the meantime, matches nothing); `repairs` is incremented atomically. Throws NOT_REPAIRABLE when nothing
+ * matched, so purchase() refunds the debit. Today's rules: a broken rod goes back to its maxDurability.
+ */
+async function repairRod(rod) {
+	// Raw collection write (as the cast engine does): the base ItemData schema has no state/durability/
+	// repairs paths, so a model update would silently strip them.
+	const res = await ItemData.collection.updateOne(
+		{ _id: new mongoose.Types.ObjectId(String(rod._id)), state: 'broken' },
+		{ $set: { durability: rod.maxDurability, state: 'repaired', updatedAt: new Date() }, $inc: { repairs: 1 } },
+	);
+	if (res.matchedCount !== 1) throw Object.assign(new Error('The rod is no longer broken; nothing was repaired.'), { code: 'NOT_REPAIRABLE' });
+}
+
 module.exports = {
+	repairRod,
 	customId: 'repair-rod',
 	/**
 	 *
@@ -77,21 +96,24 @@ module.exports = {
 			}
 
 			if (confirmation.customId === 'confirm') {
-				const newDurability = rod.maxDurability;
-				const newRepairs = rod.repairs + 1;
-				const newRodState = 'repaired';
-
 				// Guarded atomic debit at confirm time (not the balance loaded when the prompt opened);
-				// the repair only happens if the debit did, and a failed repair is refunded.
+				// the repair only happens if the debit did, and a repair that does not apply is refunded.
 				let result;
 				try {
-					result = await purchase(interaction.user.id, rod.repairCost, () => RodData.findByIdAndUpdate(rod._id, {
-						durability: newDurability,
-						repairs: newRepairs,
-						state: newRodState,
-					}));
+					result = await purchase(interaction.user.id, rod.repairCost, () => repairRod(rod));
 				}
 				catch (error) {
+					if (error?.code === 'NOT_REPAIRABLE') {
+						await confirmation.update({
+							embeds: [
+								new EmbedBuilder()
+									.setTitle('Nothing to Repair')
+									.setDescription('Your rod is no longer broken, so it was not repaired. You have not been charged.'),
+							],
+							components: [],
+						});
+						return;
+					}
 					if (process.env.ANALYTICS || config.client.analytics) {
 						await analyticsObject.setStatus('failed');
 						await analyticsObject.setStatusMessage(error);
