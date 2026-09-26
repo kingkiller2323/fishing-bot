@@ -219,7 +219,7 @@ function openChecksTable() {
 	const streak = require('./streak');
 	const cap = streak.PARAMS.targets.regular30dShareMax;
 	const reg30 = streak.archetypeValue().regular.periods[30];
-	if (reg30 && reg30.withLuckyDrawShareOfFishing > cap) rows.push({ module: 'streak', text: `Regular player's 30-day streak value ≤ ${pct(cap, 0)} of fishing income (P-STREAK-TARGETS), once the Lucky Draw from streak boxes is attributed`, detail: `${pct(reg30.streakShareOfFishing)} without the Lucky Draw (the target's basis, passes); ${pct(reg30.withLuckyDrawShareOfFishing)} with it` });
+	if (reg30 && (reg30.checkedShareOfFishing ?? reg30.withLuckyDrawShareOfFishing) > cap) rows.push({ module: 'streak', text: `Regular player's 30-day streak value ≤ ${pct(cap, 0)} of fishing income (P-STREAK-TARGETS), once the Lucky Draw from streak boxes is attributed`, detail: `${pct(reg30.checkedShareOfFishing ?? reg30.withLuckyDrawShareOfFishing)} including the buffs streak boxes grant` });
 	const detail = (d) => (d == null ? '—' : typeof d === 'string' ? d : JSON.stringify(d).slice(0, 220));
 	if (!rows.length) return 'Every module design check passes.';
 	return `${table(['Module', 'Check', 'Result'], rows.map((c) => [c.module, c.text, detail(c.detail)]))}\n\nNone of these was tuned away: each is a design choice for you, with its options in the module doc and in §17.`;

@@ -101,6 +101,10 @@ const PARAMS = deepFreeze({
 		// The Voter's Crate pool, adapted: no Old Rod ('rod'), no rod part above Uncommon (tiered crates
 		// own those), fish from the opener's highest accessible biome, a fixed fish share per rarity.
 		types: ['bait', 'buff', 'part_rod', 'part_reel', 'part_hook', 'part_handle'],
+		// Buffs the streak boxes never contain (user decision: Lucky Draw stays a rarer Daily Box / Booster
+		// Pack / event reward). Excluded by name, so the rest of the Rare item pool (Double XP, Double Cash,
+		// Rare bait) shares the Rare item slot uniformly, as the engine rolls it; no cash replaces it.
+		excludeBuffs: ['Lucky Draw'],
 		fish: 'highestUnlocked',
 		fishShare: 0.75,
 		maxPartRarity: 'uncommon',
@@ -119,7 +123,10 @@ const PARAMS = deepFreeze({
 		legacyVotersCrate: { keep: true, excludeOldRod: true },
 	},
 	// Design targets checked by checks(); shares are of the archetype's own fishing income (integrated).
+	// shareBasis 'withAttributedBuffs': streak value = box contents + the buffs system's cash value of every
+	// buff from streak boxes (Double Cash by source, Lucky Draw attributed pro rata; user decision).
 	targets: {
+		shareBasis: 'withAttributedBuffs',
 		casual30dShare: [0.15, 0.35],
 		regular30dShareMax: 0.05,
 		grinder30dShareMax: 0.01,
@@ -205,7 +212,7 @@ const BUFF_NAMES = BUFF_CATALOG.map((b) => b.name);
 /** Proposed Gacha V2 definitions (engine format; `fish: 'highestUnlocked'` and `fishShare` are new pool options). */
 function boxDefinitions() {
 	const P = PARAMS.pool;
-	const exclude = ITEMS.filter((i) => isPart(i) && rIdx(i.rarity) > rIdx(P.maxPartRarity)).map((i) => i.name);
+	const exclude = [...ITEMS.filter((i) => isPart(i) && rIdx(i.rarity) > rIdx(P.maxPartRarity)).map((i) => i.name), ...P.excludeBuffs];
 	return Object.fromEntries(Object.entries(PARAMS.boxes).map(([name, b]) => [name, {
 		id: b.id,
 		slots: b.slots,
@@ -669,6 +676,8 @@ function figures(snap) {
 		credits: st?.credits || 0,
 	};
 }
+/** Streak value on the checked basis (PARAMS.targets.shareBasis): box contents + attributed buff cash. */
+const checkedValue = (f) => f.cashBy.streak + f.streakBy.luckyDrawAttributed;
 const finalSnap = (run) => ({ hours: run.hours, day: run.days, ledger: run.ledger, streak: run.sys[SYSTEM_NAME] || null, buffs: run.sys.buffs || null });
 const dayRow = (run, d) => {
 	const t = run.timeline.find((x) => x.day === d);
@@ -751,6 +760,10 @@ function archetypeValue() {
 				doubleCashShareOfStreak: s.streakBy.doubleCash / s.cashBy.streak,
 				luckyDrawAttributed: s.streakBy.luckyDrawAttributed,
 				withLuckyDrawShareOfFishing: (s.cashBy.streak + s.streakBy.luckyDrawAttributed) / s.cashBy.fishing,
+				// The checked basis (PARAMS.targets.shareBasis): box contents + every attributed buff's cash.
+				attributedBuffCash: s.streakBy.doubleCash + s.streakBy.luckyDrawAttributed,
+				checkedValue: checkedValue(s),
+				checkedShareOfFishing: checkedValue(s) / s.cashBy.fishing,
 				streakXpShare: s.xpBy.streak / s.xpTotal,
 				items: s.items,
 				credits: s.credits,
@@ -926,8 +939,8 @@ function topggComparison() {
 			fishing30d: s.cashBy.fishing,
 			topggRule30d: topgg30,
 			topggShareOfFishing: topgg30 / s.cashBy.fishing,
-			streak30d: s.cashBy.streak,
-			streakShareOfFishing: s.cashBy.streak / s.cashBy.fishing,
+			streak30d: checkedValue(s),
+			streakShareOfFishing: checkedValue(s) / s.cashBy.fishing,
 		};
 	}
 	return { todayModel: today, newValueModel: proposed, votersCrateTodayLiquid: GACHA_EV['Voter\'s Crate'].expectedLiquidValuePerOpen };
@@ -1147,12 +1160,12 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-STREAK-ITEM-POOL', status: 'proposed',
-		title: 'Streak box items: the Voter\'s Crate pool without the Old Rod, rod parts up to Uncommon, bait and buffs, never a Booster Pack; the Voter\'s table without Common; unique duplicates',
-		modelled: `types ${PARAMS.pool.types.join(', ')}; parts <= ${PARAMS.pool.maxPartRarity}; table ${Object.entries(PARAMS.pool.rarityTable).map(([r, w]) => `${r} ${w}`).join(', ')}; floor ${PARAMS.pool.rarityFloor}; duplicates ${PARAMS.pool.duplicates}`,
-		alternatives: ['today\'s Voter\'s pool (Old Rod, parts of every rarity, a Common tier)'],
-		source: 'streak design', why: 'free rare+ parts would undercut the tiered crates; Booster Packs stay an Easter egg (decision 12); every reward is Uncommon or better',
-		get: () => ({ types: PARAMS.pool.types, maxPartRarity: PARAMS.pool.maxPartRarity, rarityTable: PARAMS.pool.rarityTable, rarityFloor: PARAMS.pool.rarityFloor, duplicates: PARAMS.pool.duplicates }),
-		expected: { types: ['bait', 'buff', 'part_rod', 'part_reel', 'part_hook', 'part_handle'], maxPartRarity: 'uncommon', rarityTable: { common: 0, uncommon: 2500, rare: 500, ultra: 100, giant: 50, legendary: 20, lucky: 1 }, rarityFloor: 'uncommon', duplicates: 'unique' },
+		title: 'Streak box items: the Voter\'s Crate pool without the Old Rod, rod parts up to Uncommon, bait, and the Double XP and Double Cash buffs (never a Lucky Draw, never a Booster Pack); the Voter\'s table without Common; unique duplicates',
+		modelled: `types ${PARAMS.pool.types.join(', ')}; buffs excluded: ${PARAMS.pool.excludeBuffs.join(', ')} (the Rare item slot is shared uniformly by Double XP, Double Cash and the Rare bait; no cash added); parts <= ${PARAMS.pool.maxPartRarity}; table ${Object.entries(PARAMS.pool.rarityTable).map(([r, w]) => `${r} ${w}`).join(', ')}; floor ${PARAMS.pool.rarityFloor}; duplicates ${PARAMS.pool.duplicates}`,
+		alternatives: ['Lucky Draw kept in streak boxes (the earlier proposal: the regular player\'s 30-day streak value then crosses 5% of fishing income once its Lucky Draw rebates are attributed)', 'Double XP / Double Cash per-open odds held at their earlier values by Gacha V2 featured weights (a lower Double Cash rate; not needed for the 5% cap)', 'today\'s Voter\'s pool (Old Rod, parts of every rarity, a Common tier)'],
+		source: 'streak design; user decision (Lucky Draw removed from Streak Crates and Streak Chests; it stays a rarer Daily Box / Booster Pack / event reward)', why: 'free rare+ parts would undercut the tiered crates; Booster Packs stay an Easter egg (decision 12); every reward is Uncommon or better. Lucky Draw rebates on tier assemblies were the largest buff value the streak carried, so without it the streak stays a small bonus for engaged players (lifecycle table) and the Lucky Draw keeps its rarity',
+		get: () => ({ types: PARAMS.pool.types, excludeBuffs: PARAMS.pool.excludeBuffs, maxPartRarity: PARAMS.pool.maxPartRarity, rarityTable: PARAMS.pool.rarityTable, rarityFloor: PARAMS.pool.rarityFloor, duplicates: PARAMS.pool.duplicates }),
+		expected: { types: ['bait', 'buff', 'part_rod', 'part_reel', 'part_hook', 'part_handle'], excludeBuffs: ['Lucky Draw'], maxPartRarity: 'uncommon', rarityTable: { common: 0, uncommon: 2500, rare: 500, ultra: 100, giant: 50, legendary: 20, lucky: 1 }, rarityFloor: 'uncommon', duplicates: 'unique' },
 	},
 	{
 		id: 'P-STREAK-BAIT-PACK', status: 'proposed',
@@ -1208,11 +1221,11 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-STREAK-TARGETS', status: 'proposed',
-		title: 'Value targets the streak is checked against: casual 30-day value in a band of its own fishing income, caps for regular and grinder, a streak-XP cap, a no-miss-grinder shift cap, and the T1 part set not free for regular players',
-		modelled: `casual ${PARAMS.targets.casual30dShare.map((x) => `${100 * x}%`).join('-')}; regular <= ${100 * PARAMS.targets.regular30dShareMax}%; grinder <= ${100 * PARAMS.targets.grinder30dShareMax}%; streak XP <= ${100 * PARAMS.targets.streakXpShareMax}%; grinder shift <= ${100 * PARAMS.targets.grinderHoursDeltaMax}%; T1 set median >= ${PARAMS.targets.minT1Days} days`,
-		alternatives: ['other bands (the streak as a larger share of casual income, or a flat share for everyone)'],
-		source: 'streak design', why: 'a catch-up for casual players and a small bonus for engaged ones (checks table)',
-		get: () => PARAMS.targets, expected: { casual30dShare: [0.15, 0.35], regular30dShareMax: 0.05, grinder30dShareMax: 0.01, streakXpShareMax: 0.02, grinderHoursDeltaMax: 0.01, minT1Days: 14 },
+		title: 'Value targets the streak is checked against: casual 30-day value in a band of its own fishing income, caps for regular and grinder, a streak-XP cap, a no-miss-grinder shift cap, and the T1 part set not free for regular players. Streak value counts the box contents AND the cash value of every buff from streak boxes (Double Cash; Lucky Draw attributed pro rata, none since the pools exclude it)',
+		modelled: `basis '${PARAMS.targets.shareBasis}' (box contents + attributed buff cash); casual ${PARAMS.targets.casual30dShare.map((x) => `${100 * x}%`).join('-')}; regular <= ${100 * PARAMS.targets.regular30dShareMax}%; grinder <= ${100 * PARAMS.targets.grinder30dShareMax}%; streak XP <= ${100 * PARAMS.targets.streakXpShareMax}%; grinder shift <= ${100 * PARAMS.targets.grinderHoursDeltaMax}%; T1 set median >= ${PARAMS.targets.minT1Days} days`,
+		alternatives: ['basis \'boxAndDoubleCash\' (the earlier basis: box contents + Double Cash, Lucky Draw rebates left to the buffs design)', 'other bands (the streak as a larger share of casual income, or a flat share for everyone)'],
+		source: 'streak design; user decision (regular 30-day streak value including attributed buff value <= 5% of fishing income)', why: 'a catch-up for casual players and a small bonus for engaged ones (checks table); every buff a streak box grants is streak value, whichever system books it',
+		get: () => PARAMS.targets, expected: { shareBasis: 'withAttributedBuffs', casual30dShare: [0.15, 0.35], regular30dShareMax: 0.05, grinder30dShareMax: 0.01, streakXpShareMax: 0.02, grinderHoursDeltaMax: 0.01, minT1Days: 14 },
 	},
 	{
 		id: 'P-STREAK-SUPPORTER-FLAIR', status: 'proposed',
@@ -1224,6 +1237,8 @@ const DECISIONS = [
 ];
 
 // ---------------------------------------------------------------------------------------------
+/** archetypeValue() period field each PARAMS.targets.shareBasis reads. */
+const SHARE_BASIS = Object.freeze({ withAttributedBuffs: 'checkedShareOfFishing', boxAndDoubleCash: 'streakShareOfFishing' });
 function checks() {
 	const T = PARAMS.targets;
 	const av = archetypeValue();
@@ -1231,7 +1246,9 @@ function checks() {
 	const t1 = t1PartsFromStreak();
 	const defs = boxDefinitions();
 	const pools = Object.values(defs).flatMap((d) => d.pool.types);
-	const shares = Object.fromEntries(Object.entries(av).map(([k, v]) => [k, v.periods[30].streakShareOfFishing]));
+	const basis = SHARE_BASIS[T.shareBasis];
+	if (!basis) throw new Error(`Unknown streak share basis ${T.shareBasis}`);
+	const shares = Object.fromEntries(Object.entries(av).map(([k, v]) => [k, v.periods[30][basis]]));
 	const order = ARCHETYPE_NAMES;
 	const maxStreakXpShare = Math.max(...Object.values(r.archetypes).flatMap((a) => Object.values(a.decomposition).map((d) => d.share.streak)));
 	const minDailyXpShare = Math.max(...['streakOnly', 'reference'].flatMap((v) => r.minimumDaily[v].rows.map((x) => x.minimumDaily.streakXpShare)));
@@ -1242,15 +1259,20 @@ function checks() {
 		const received = sumValues(run.sys.buffs.receivedBySource[SYSTEM_NAME]);
 		return Math.abs(sumValues(st.buffs) - received) <= 1e-9 * Math.max(1, received) && run.ledger.cash[CASH_SOURCE] === st.value.cash;
 	});
+	// User decision: no Lucky Draw in streak boxes, at any stage or profile, and none received from the streak.
+	const excluded = PARAMS.pool.excludeBuffs;
+	const noExcludedBuffs = Object.keys(defs).every((box) => F.LIVE_BIOMES.every((b) => ['normal', 'founder'].every((p) => excluded.every((n) => !(boxContents(box, F.BIOME_LEVEL[b], p).buffs[n] > 0)))))
+		&& refRuns.every((run) => excluded.every((n) => !(run.sys.buffs.receivedBySource[SYSTEM_NAME]?.[n] > 0)));
 	const list = [
+		{ id: 'no-lucky-draw-in-streak-boxes', value: excluded, pass: excluded.includes('Lucky Draw') && noExcludedBuffs },
 		{ id: 'no-direct-cash-or-xp', pass: PARAMS.direct.cash === 0 && PARAMS.direct.xp === 0 && refRuns.every((run) => !(SYSTEM_NAME in run.ledger.xp)) },
 		{ id: 'buffs-counted-once', pass: countedOnce },
 		{ id: 'recorder-observational', pass: recorderParity().exact },
 		{ id: 'milestones-covered', value: F.LIFECYCLE.maxLevel, pass: ARCHETYPE_NAMES.every((a) => integratedRun(a).milestones[F.LIFECYCLE.maxLevel]) },
 		{ id: 'no-booster-pack-no-old-rod', pass: !pools.includes('gacha') && !pools.includes('rod') },
-		{ id: 'casual-30d-share-in-band', value: shares.casual, band: T.casual30dShare, pass: shares.casual >= T.casual30dShare[0] && shares.casual <= T.casual30dShare[1] },
-		{ id: 'regular-30d-share-max', value: shares.regular, max: T.regular30dShareMax, pass: shares.regular <= T.regular30dShareMax },
-		{ id: 'grinder-30d-share-max', value: shares.grinder, max: T.grinder30dShareMax, pass: shares.grinder <= T.grinder30dShareMax },
+		{ id: 'casual-30d-share-in-band', basis: T.shareBasis, value: shares.casual, band: T.casual30dShare, pass: shares.casual >= T.casual30dShare[0] && shares.casual <= T.casual30dShare[1] },
+		{ id: 'regular-30d-share-max', basis: T.shareBasis, value: shares.regular, max: T.regular30dShareMax, pass: shares.regular <= T.regular30dShareMax },
+		{ id: 'grinder-30d-share-max', basis: T.shareBasis, value: shares.grinder, max: T.grinder30dShareMax, pass: shares.grinder <= T.grinder30dShareMax },
 		{ id: 'casual-gains-relatively-most', value: order.map((k) => round(shares[k], 4)), pass: order.every((k, i) => i === 0 || shares[order[i - 1]] > shares[k]) },
 		{ id: 'streak-xp-share-max', value: maxStreakXpShare, max: T.streakXpShareMax, pass: maxStreakXpShare <= T.streakXpShareMax },
 		{ id: 'streak-xp-within-double-xp-bound', value: { archetypes: maxStreakXpShare, minimumDaily: minDailyXpShare }, max: bound, pass: maxStreakXpShare <= bound && minDailyXpShare <= bound },
@@ -1372,7 +1394,7 @@ function markdownTables() {
 	const maxStreakXp = Math.max(...allDecomp.map((d) => d.share.streak));
 	out['streak-headline'] = mdTable(['Figure', 'Value', 'Table'], [
 		['Play gate', `${G} successful casts per DCC day: ${range(Object.values(R.gate.minutesByArchetype), (x) => fx(x, 1))} min of play`, 'Gate'],
-		['Streak value in the first 30 days, share of own fishing income (integrated)', ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].streakShareOfFishing)}`).join(', '), 'Lifecycle'],
+		['Streak value in the first 30 days incl. the cash value of its buffs, share of own fishing income (integrated)', ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].checkedShareOfFishing)}`).join(', '), 'Lifecycle'],
 		['Streak XP share at L20–L50 (Double XP from streak boxes, integrated)', `at most ${pct(maxStreakXp, 2)}; structural bound ${pct(R.doubleXpDayShare, 2)}`, 'R2 decomposition'],
 		['Minimum-daily player vs casual (R2)', r2r.minimumDaily.verdict.split(':')[0], 'R2 minimum-daily'],
 		['No-miss grinder: largest milestone shift from the streak', `${pct(r2r.noMissGrinder.maxHoursDelta, 2)} (${r2r.noMissGrinder.verdict.split(':')[0]})`, 'R2 grinder'],
@@ -1399,7 +1421,7 @@ function markdownTables() {
 		['Reward', `Cash + a Voter's Crate: ${VOTERS.slots} slots, fish from **every** biome, the Old Rod, parts of every rarity, bait, buffs`, `${P.ladder.dailyBox} (${crateDef.slots} slots) or, every ${P.ladder.cycle}th streak day, the ${P.ladder.milestoneBox} (${chestDef.slots} slots, slot 0 ${chestDef.guaranteedSlots[0].minRarity}+). Fish from the player's highest biome; parts up to ${P.pool.maxPartRarity}; no cash`],
 		['Rarity table', `Voter's: ${RARITIES.map((r) => `${r} ${vt[r]}`).join(', ')}`, `The same table with common ${P.pool.rarityTable.common}, rarity floor ${P.pool.rarityFloor}`],
 		['Streak, grace, decay', 'None', `Count, best, total; grace tokens (${P.grace.start} → max ${P.grace.max}); −${P.decay.perUncoveredMiss} days per uncovered miss; reset after ${P.decay.resetAfterMissedDays} missed days`],
-		['Value in the first 30 days, share of own fishing income', `${ARCHETYPE_NAMES.map((a) => `${a} ${pctAuto(todayC[a].votesShareOfFishing)}`).join(', ')} (Phase 5 model, \`simulation.json\`)`, `${ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].streakShareOfFishing)}`).join(', ')} (integrated, framework ${R.frameworkVersion})`],
+		['Value in the first 30 days, share of own fishing income', `${ARCHETYPE_NAMES.map((a) => `${a} ${pctAuto(todayC[a].votesShareOfFishing)}`).join(', ')} (Phase 5 model, \`simulation.json\`)`, `${ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].checkedShareOfFishing)}`).join(', ')} (integrated, incl. the cash value of streak-box buffs; framework ${R.frameworkVersion})`],
 		['XP', 'None from votes', `None direct. Double XP buffs in streak boxes only: at most ${pct(maxStreakXp, 2)} of XP at L20–L50`],
 		['Voter\'s Crate', 'Granted per vote', 'No longer granted. Owned crates open forever, minus the Old Rod reward (`P-STREAK-VOTERS-CRATE`)'],
 		['Vote counters', '`stats.lastVoted` is written. `stats.totalVotes` is never incremented (`User.vote()` increments `stats.votes`, which the schema does not define)', 'Both kept read-only. New additive `streak.*` fields'],
@@ -1500,10 +1522,16 @@ function markdownTables() {
 	})) + '\n\nBox columns: liquid value (fish + salvage); per claimed day adds usable bait (7-day cycle average). Stage $/h: `F.castOutcome` at the typical tier, the core\'s base fishing rate for the reference loop. Buffs are not in these columns (the buffs system values them; lifecycle table).';
 
 	// Integrated lifecycle totals.
-	out['streak-lifecycle'] = mdTable(['Player', 'Day', 'Level', 'Fishing income', 'Box contents', 'Double Cash (buffs system)', 'Streak / fishing', 'Streak per day', 'Double Cash share', 'Streak XP share', 'Lucky Draw (attributed)', 'With Lucky Draw / fishing'], ARCHETYPE_NAMES.flatMap((a) => PERIODS.map((d) => {
+	out['streak-lifecycle'] = mdTable(['Player', 'Day', 'Level', 'Fishing income', 'Box contents', 'Double Cash (buffs system)', 'Lucky Draw (attributed)', 'Streak value / fishing', 'Streak per day', 'Double Cash share', 'Streak XP share'], ARCHETYPE_NAMES.flatMap((a) => PERIODS.map((d) => {
 		const s = av[a].periods[d];
-		return [d === PERIODS[0] ? `${cap(a)} (${F.ARCHETYPES[a].minutesPerDay} min/day)` : '', d, s.level, usd(s.fishingIncome), usd(s.boxContents), usd(s.doubleCash), `**${pct(s.streakShareOfFishing)}**`, usd(s.streakPerDay), pct(s.doubleCashShareOfStreak, 0), pct(s.streakXpShare, 2), usd(s.luckyDrawAttributed), pct(s.withLuckyDrawShareOfFishing)];
-	}))) + `\n\nIntegrated reference loop (${I.REFERENCE_NOTE}); every archetype plays every day. Streak = box contents (the streak's ledger) + the Double Cash of streak boxes (the buffs system's value by source). Lucky Draw: the buffs system's Lucky Draw value (assembly rebates and Streak Crate bonus slots) attributed to streak boxes pro rata to the Lucky Draw units received; outside the streak share the design targets use (last column: with it).` + '\n\n' +
+		return [d === PERIODS[0] ? `${cap(a)} (${F.ARCHETYPES[a].minutesPerDay} min/day)` : '', d, s.level, usd(s.fishingIncome), usd(s.boxContents), usd(s.doubleCash), usd(s.luckyDrawAttributed), `**${pct(s.checkedShareOfFishing)}**`, usd(s.checkedValue / d), pct(s.doubleCashShareOfStreak, 0), pct(s.streakXpShare, 2)];
+	}))) + `\n\nIntegrated reference loop (${I.REFERENCE_NOTE}); every archetype plays every day. Streak value (the checked basis, \`PARAMS.targets.shareBasis\` '${P.targets.shareBasis}') = box contents (the streak's ledger) + the cash value of every buff from streak boxes: their Double Cash (the buffs system's value by source) and their Lucky Draw (the buffs system's Lucky Draw value attributed pro rata to the units received). Streak boxes hold no Lucky Draw (\`P-STREAK-ITEM-POOL\`), so that column is zero by construction; it stays in the basis so a pool change that reintroduces a buff is counted.` + '\n\n' +
+		mdTable(['Buffs per open (Lv 0)', ...BUFF_NAMES.map((b) => `${b}: earlier pool`), ...BUFF_NAMES.map((b) => `${b}: proposed`)], Object.keys(boxDefinitions()).map((box) => {
+			const def = boxDefinitions()[box];
+			const earlier = { ...def, pool: { ...def.pool, exclude: def.pool.exclude.filter((n) => !P.pool.excludeBuffs.includes(n)) } };
+			const [e, p] = [boxEV(earlier), boxEV(box)];
+			return [box, ...BUFF_NAMES.map((b) => pct(e.buffs[b] || 0, 2)), ...BUFF_NAMES.map((b) => pct(p.buffs[b] || 0, 2))];
+		})) + `\n\nThe earlier pool held ${P.pool.excludeBuffs.join(', ')}; without it the Rare item slot is shared uniformly by the remaining Rare items (Double XP, Double Cash and the Rare bait, as the engine rolls it), so each keeps a slightly larger share of that slot. No cash replaces the Lucky Draw.` + '\n\n' +
 		mdTable(['Per 30 days (integrated)', ...ARCHETYPE_NAMES.map(cap)], [
 			['Streak days credited', ...ARCHETYPE_NAMES.map((a) => n0(s30[a].credits))],
 			['Crates / chests', ...ARCHETYPE_NAMES.map((a) => `${n0(s30[a].items.crates)} / ${n0(s30[a].items.chests)}`)],

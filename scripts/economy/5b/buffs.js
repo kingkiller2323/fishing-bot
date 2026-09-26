@@ -132,8 +132,12 @@ const PARAMS = deepFreeze({
 		withGearAndProfile: F.BUFFS.stacking.withGearAndProfile,
 	},
 	sources: {
-		// Streak Crate / Streak Chest pools exactly as the streak design proposes (buff odds via streak.boxEV).
+		// Streak Crate / Streak Chest pools exactly as the streak design proposes (buff odds via streak.boxEV):
+		// Double XP and Double Cash, never a Lucky Draw (user decision; streak.js P-STREAK-ITEM-POOL).
 		streak: { from: 'streak.js' },
+		// Where a Lucky Draw can come from: a rarer reward than the streak (user decision). The Booster Pack
+		// keeps its Lucky Draw too but is never valued (below). checks() 'lucky-draw-sources' verifies it.
+		luckyDrawFrom: ['quests', 'events'],
 		// Daily/weekly quest Daily Boxes (the quests system's 'box' events), today's Daily Box pool unchanged.
 		quests: { from: 'quests.js' },
 		// The deliberate, tunable lever: an event calendar grants at most this many buffs per 30 days to
@@ -1289,7 +1293,7 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-BUFFS-LUCKY-DRAW', status: 'proposed',
-		title: `Lucky Draw becomes charges: +${F.BUFFS.luckyDraw.bonusSlots} bonus slot on each of the next ${F.BUFFS.luckyDraw.opens} box opens (any box except the Booster Pack), replacing today's +${Math.round(100 * TODAY_LUCKY_STATS.rareFind)}% rare+ weights for an hour`,
+		title: `Lucky Draw becomes charges: +${F.BUFFS.luckyDraw.bonusSlots} bonus slot on each of the next ${F.BUFFS.luckyDraw.opens} box opens (any box except the Booster Pack), replacing today's +${Math.round(100 * TODAY_LUCKY_STATS.rareFind)}% rare+ weights for an hour. A rarer reward: Daily Box, events and the Booster Pack, never a streak box (P-BUFFS-SOURCES)`,
 		modelled: `${buffOf('Lucky Draw').bonusSlots} bonus slot x ${buffOf('Lucky Draw').duration.opens} opens; the slot rolls the box's own table (floors, unique, pity respected); the charge is spent in the open's journal commit`,
 		alternatives: ['keep today\'s rare+ weights for an hour (inert on floored tier crates; rewards opening a stockpile in one hour)', `K = ${PARAMS.alternatives.luckyDrawOpens.filter((k) => k !== F.BUFFS.luckyDraw.opens).join(' or ')} opens (Lucky Draw K table)`],
 		source: 'buffs design', why: 'never inert, bounded at K opens however many boxes are saved, worth up to about a Double Cash hour on an assembly (Lucky Draw tables)',
@@ -1307,12 +1311,12 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-BUFFS-SOURCES', status: 'proposed',
-		title: 'Buff sources: the streak boxes and the quest Daily Boxes (pools unchanged) plus the event budget; no shop sale; the Booster Pack keeps its buffs and is never valued',
-		modelled: 'streak (Streak Crate / Chest), quests (Daily Box), events (F.EVENTS, P-EVENTS); Booster Pack unvalued; shop none',
-		alternatives: ['a shop sale (converts cash into levels, or a guaranteed-return investment)', 're-weighted streak/quest pools (a Gacha V2 featured change)'],
-		source: 'buffs design', why: 'Double XP stays at the streak rate (the regular player\'s windows have little headroom); the event budget is the one lever the operator can schedule, measure and switch off (sources tables)',
-		get: () => ({ sources: [...SYSTEM_DEFAULTS.sources], boosterPackValued: PARAMS.sources.boosterPack.valued, shop: PARAMS.sources.shop }),
-		expected: { sources: ['streak', 'quests', 'events'], boosterPackValued: false, shop: false },
+		title: 'Buff sources: the streak boxes (Double XP and Double Cash only, no Lucky Draw), the quest Daily Boxes (pool unchanged) and the event budget; the Lucky Draw is a rarer reward from the Daily Box, events and the Booster Pack; no shop sale; the Booster Pack keeps its buffs and is never valued',
+		modelled: `streak (Streak Crate / Chest, without ${streak.PARAMS.pool.excludeBuffs.join(', ')}: streak.js P-STREAK-ITEM-POOL), quests (Daily Box), events (F.EVENTS, P-EVENTS); Lucky Draw from ${PARAMS.sources.luckyDrawFrom.join(', ')} (+ the unvalued Booster Pack); Booster Pack unvalued; shop none`,
+		alternatives: ['Lucky Draw in streak boxes too (the earlier proposal: about a Lucky Draw more per 30 days for a daily player, most of it an early-assembly rebate)', 'a shop sale (converts cash into levels, or a guaranteed-return investment)', 're-weighted streak/quest pools (a Gacha V2 featured change)'],
+		source: 'buffs design; user decision (Lucky Draw removed from Streak Crates and Streak Chests; kept in the Daily Box, the Booster Pack and events)', why: 'Double XP stays at the streak rate (the regular player\'s windows have little headroom); the Lucky Draw is worth the most on a tier assembly, so a daily source made it common and its rebate the largest buff value for casual players; the event budget is the one lever the operator can schedule, measure and switch off (sources tables)',
+		get: () => ({ sources: [...SYSTEM_DEFAULTS.sources], streakExcludes: [...streak.PARAMS.pool.excludeBuffs], luckyDrawFrom: [...PARAMS.sources.luckyDrawFrom], boosterPackValued: PARAMS.sources.boosterPack.valued, shop: PARAMS.sources.shop }),
+		expected: { sources: ['streak', 'quests', 'events'], streakExcludes: ['Lucky Draw'], luckyDrawFrom: ['quests', 'events'], boosterPackValued: false, shop: false },
 	},
 	{
 		id: 'P-BUFFS-PUBLIC', status: 'proposed',
@@ -1355,6 +1359,12 @@ function checks() {
 		add(`xp-share-${name}`, s.xp <= T.xpShareMax, `Double XP adds ${(100 * s.xp).toFixed(2)}% of XP in 30 days (max ${100 * T.xpShareMax}%)`);
 	}
 	const reg = buffIncomeShare(F.REFERENCE_ARCHETYPE, { days: 30 });
+	// User decision: the Lucky Draw arrives only from PARAMS.sources.luckyDrawFrom (never a streak box).
+	const ldFrom = PARAMS.sources.luckyDrawFrom;
+	const ldBySource = Object.fromEntries(Object.entries(reg.bySource).map(([src, v]) => [src, v.buffsPer30d['Lucky Draw']]));
+	const streakLd = ['Streak Crate', 'Streak Chest'].map((b) => boxBuffOdds(b, 0)['Lucky Draw'] || 0);
+	add('lucky-draw-sources', streakLd.every((x) => x === 0) && Object.entries(ldBySource).every(([src, u]) => ldFrom.includes(src) || !(u > 0)) && ldFrom.every((src) => ldBySource[src] > 0),
+		`regular, 30 days: Lucky Draws by source ${Object.entries(ldBySource).map(([src, u]) => `${src} ${u.toFixed(2)}`).join(', ')} (allowed: ${ldFrom.join(', ')}); Streak Crate / Chest odds ${streakLd.map((x) => x.toFixed(4)).join(' / ')}`);
 	add('buffs-per-30-days', reg.buffsPer30dTotal >= T.buffsPerThirtyDays[0] && reg.buffsPer30dTotal <= T.buffsPerThirtyDays[1], `${reg.buffsPer30dTotal.toFixed(2)} buffs per 30 days for the regular player (target ${T.buffsPerThirtyDays.join('-')})`);
 	const R = r2();
 	add('regular-in-windows-with-buffs', Object.values(R.windows).every((w) => w.inside), Object.entries(R.windows).map(([L, w]) => `L${L} ${w.with} h`).join(', '));
@@ -1520,7 +1530,7 @@ function markdownTables() {
 		['With events', 'buff x event', `**Additive**: 1 + (buff - 1) + (event - 1) = x${temporaryMultiplier(2, 2)} for a x2 buff in a x2 event`],
 		['With gear / aquarium / profile', 'Multiply', 'Multiply (unchanged): raw x (1 + sellBonus) x temporary x profile'],
 		['Lucky Draw', `+${Math.round(100 * TODAY_LUCKY_STATS.rareFind)}% to every rare+ weight for 1 h; inert on ${C.luckyToday.tierCrates.filter((x) => x.inert).length} tier crates`, `+${P.catalog['Lucky Draw'].bonusSlots} bonus slot on each of the next ${P.catalog['Lucky Draw'].duration.opens} opens (any box except the Booster Pack)`],
-		['Sources', `Daily Box ${pct(m['Daily Box'].buffShareOfSlots, 2)} of slots, Voter's Crate ${pct(m['Voter\'s Crate'].buffShareOfSlots, 2)}, Booster Pack ${pct(m['Booster Pack'].buffShareOfSlots, 0)}`, `Streak Crate / Chest (${pct(perOpen['Streak Crate']['Double Cash'], 2)} / ${pct(perOpen['Streak Chest']['Double Cash'], 2)} per type per open), Daily Box unchanged, events (P-EVENTS: ${BUFF_NAMES.map((n) => `${P.sources.events.perThirtyDays[n]} ${n}`).join(', ')} per 30 days), Booster Pack unvalued, no shop`],
+		['Sources', `Daily Box ${pct(m['Daily Box'].buffShareOfSlots, 2)} of slots, Voter's Crate ${pct(m['Voter\'s Crate'].buffShareOfSlots, 2)}, Booster Pack ${pct(m['Booster Pack'].buffShareOfSlots, 0)}`, `Streak Crate / Chest: Double XP and Double Cash only (${pct(perOpen['Streak Crate']['Double Cash'], 2)} / ${pct(perOpen['Streak Chest']['Double Cash'], 2)} per type per open), no Lucky Draw; Daily Box unchanged; Lucky Draw from ${PARAMS.sources.luckyDrawFrom.map((x) => ({ quests: 'the Daily Box', events: 'events' })[x] || x).join(', ')} and the Booster Pack; events (P-EVENTS: ${BUFF_NAMES.map((n) => `${P.sources.events.perThirtyDays[n]} ${n}`).join(', ')} per 30 days), Booster Pack unvalued, no shop`],
 		['Buffs per 30 days (regular player)', `${fx(C.buffsPer30dToday.dailyBoxOnly)} (Daily Box); ${fx(C.buffsPer30dToday.withTopggVotes)} with Top.gg votes (being retired)`, `**${fx(reg30.buffsPer30dTotal)}** (${fx(noEv.regular.buffsPer30dTotal)} without events)`],
 		['Share of fishing income from buffs (30 d)', `Not measured in production: an activated buff applies to every button cast and button sale until the next slash command and is reusable (B2, B3). If B1 + B2 shipped while cash still pays at sale, the uncapped hoarder over ${HORIZON_DAYS} days at today's arrival rates (proposed economy): ${range(ARCHETYPE_NAMES.map((a) => R.frequency[FREQUENCY_SETS[0][0]][a].saleTimeHoarderUncapped), (x) => pct(x))} of fishing income (${FREQUENCY_SETS[0][0]}), ${range(ARCHETYPE_NAMES.map((a) => R.frequency[FREQUENCY_SETS[1][0]][a].saleTimeHoarderUncapped), (x) => pct(x))} (${FREQUENCY_SETS[1][0]}); frequency table`, `${ARCHETYPE_NAMES.map((a) => `${a} ${pct(s30[a].cash)}`).join(', ')}; XP ${range(ARCHETYPE_NAMES.map((a) => s30[a].xp), (x) => pct(x))}`],
 		['Public presentation', 'The sale message shows base x cash buff', 'Catch card: base values, which include the buff, plus one line with the time left; the sale message shows the sum of `valueBase`'],
