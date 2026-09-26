@@ -29,9 +29,13 @@
 //                                one INTEGRATED lifecycle (integrate.run, reference loop + variant.bait
 //                                policy): hours to each milestone, XP by source (the bait's share carved out of
 //                                'fishing'), bait spend and extra value against income, baits used
-//   lifecycleSensitivity()       every archetype x 'none'/'cash'/'xp', the approved windows, the XP-bait
-//                                speed-up check and the XP-bait sizing sensitivity (xpSizing())
-//   xpSizing()                   the regular always-on XP-bait player under alternative XP-bait sizings
+//   lifecycleSensitivity()       every archetype x 'none'/'cash'/'xp', the approved windows (informational:
+//                                they describe the no-bait reference player), the XP-bait guard and the
+//                                XP-bait sizing sensitivity (xpSizing())
+//   xpBaitGuard(model)           the XP-bait guard for every archetype: always-on XP bait is a net sink and
+//                                reaches each milestone from Lv 20 at most maxXpBaitSpeedup sooner than the
+//                                same archetype without bait (P-BAIT-XP-SIZING)
+//   xpSizing()                   every archetype's always-on XP-bait run under alternative XP-bait sizings
 //   RETIRED_LOOP_PARITY          the recorded parity of system() with the retired private loop (a83b5f0)
 //   SYSTEM_NAME, SPEND_ITEM      'bait' and its one ledger item { category: 'optional', item: 'bait' }
 //   report(opts), markdownTables()
@@ -87,15 +91,25 @@ const PARAMS = deepFreeze({
 		// Strong access is the largest lever (it opens half the catalog to an Old Rod); at the target
 		// return its net gain in Ocean lands just under this cap (Pricing checks).
 		netShareMax: 0.06,
-		// XP baits are an optional money-to-progress converter, not a second curve: the regular player
-		// who runs the XP bait at every stage where one exists may reach any milestone from Lv 20 at most
-		// this much sooner than the same player without bait (lifecycleSensitivity(), integrated model).
+		// XP baits are an optional money-to-progress converter, not a second curve. Guard (user decision on
+		// P-BAIT-XP-SIZING), checked for EVERY archetype on the integrated model (xpBaitGuard()): a player who
+		// runs the XP bait at every stage where one exists must (a) remain a net economic sink (bait bought >
+		// the bait's extra catch value) and (b) reach each milestone from Lv 20 at most this much sooner, in
+		// active hours, than the same archetype's no-bait run. The approved R1 progression windows describe the
+		// no-bait reference player; they are not a test for bait buyers.
 		maxXpBaitSpeedup: 0.10,
+		xpBaitNetSink: true,
 		// Sold in packs of `packSize` casts so small per-cast prices keep their precision (money is an
 		// integer). Pack prices round to $1 below $100 and to $5 above.
 		packSize: 10,
 		packRoundTo: [{ below: 100, step: 1 }, { below: Infinity, step: 5 }],
 	},
+	// Volume baits (extra-fish chance: Spinner) work on every rod tier in their biomes, but the rod + bait
+	// chance is capped at the chance whose mean fish per cast is the global normal-player ceiling
+	// (rods.PARAMS.multi.ceilingMean, P-RODS-MEAN-FISH): a rod below it keeps the bait's boost up to the
+	// ceiling, a rod at or above it gets nothing from the bait (the bait never lowers a rod's own chance).
+	// Not a per-tier or per-band clamp (user decision on P-BAIT-SPINNER-TIERS).
+	volume: { clampAt: 'ceiling' },
 	bands: {
 		starter: { biomes: ['Ocean', 'River'], note: 'Old Rod stage: strong-fish access only' },
 		mid: { biomes: ['Lake', 'Pond'], note: 'Tier 1-2: one specialist per role' },
@@ -169,7 +183,7 @@ const BAIT_NAMES = Object.keys(PARAMS.baits);
 
 // Sensitivity inputs for the XP-bait sizing decision (P-BAIT-XP-SIZING). NOT proposals: the alternative
 // the design stage measured, and the bisection that finds the largest uniform scale of the XP-class baits'
-// XP effects keeping the regular always-on buyer inside every approved window (xpSizing()).
+// XP effects passing the XP-bait guard for every archetype (xpSizing()).
 const XP_SIZING = deepFreeze({
 	designStage: { 'Lure': { stats: { xpBonus: 0.08 } }, 'Magic Lure': { stats: { xpBonus: 0.08 } }, 'Spinner': { multiChance: 0.05 } },
 	bisectSteps: 8,
@@ -218,6 +232,26 @@ function normaliseGear(path) {
 }
 const chanceOf = (gear) => (gear.multiChance !== undefined ? gear.multiChance : F.chanceForMean(gear.mean ?? gear.meanFish ?? 1));
 
+let volumeCapMemo = null;
+/** The global normal-player fish-per-cast ceiling (rods design) and the multi-catch chance with that mean. */
+function volumeCap() {
+	if (!volumeCapMemo) {
+		const mean = require('./rods').PARAMS.multi.ceilingMean;
+		volumeCapMemo = Object.freeze({ mean, chance: F.chanceForMean(mean) });
+	}
+	return volumeCapMemo;
+}
+/**
+ * A volume bait's extra-fish chance on top of `current` (the rod's chance plus anything already added),
+ * clamped per PARAMS.volume: the combined chance never passes the ceiling's chance, and the bait never
+ * lowers it. Returns the chance the bait actually adds.
+ */
+function volumeAdd(current, baitChance) {
+	if (!(baitChance > 0)) return 0;
+	const limit = PARAMS.volume.clampAt === 'ceiling' ? volumeCap().chance : 1;
+	return Math.max(0, Math.min(current + baitChance, limit, 1) - current);
+}
+
 const stageLabel = (s) => (typeof s === 'string' ? s : `${cap(s.biome).toLowerCase()}-${s.tier || 'custom'}`);
 
 const outcomeCache = new Map();
@@ -228,7 +262,7 @@ function outcome(g, bait, rules = null) {
 		biome: g.biome,
 		qualities,
 		stats: addStats(g.stats, bait ? bait.stats : {}),
-		multiChance: Math.min(1, g.multiChance + (bait ? bait.multiChance || 0 : 0)),
+		multiChance: g.multiChance + (bait ? volumeAdd(g.multiChance, bait.multiChance || 0) : 0),
 		table: g.table,
 		sellMult: g.sellMult,
 		xpMult: g.xpMult,
@@ -500,20 +534,29 @@ function createBaitModel(gearPath = null, overrides = null) {
 				for (const h of home) if (h.utilityReturn < P.xpUtilityBand[0] || h.utilityReturn > P.xpUtilityBand[1]) issues.push(`${name} @ ${h.biome}/${h.tier}: utility return ${r2(h.utilityReturn)} outside ${P.xpUtilityBand}`);
 			}
 		}
-		return { pass: issues.length === 0, issues, summary, bands: { moneyReturn: P.moneyReturnBand, xpUtility: P.xpUtilityBand, netShareMax: P.netShareMax } };
+		// Volume baits: the rod + bait mean fish per cast stays at or under the global ceiling on every rod tier.
+		const vol = volumeCheck();
+		for (const [name, v] of Object.entries(vol.summary)) {
+			summary[name].volumeCeiling = { ceiling: v.ceiling, maxMeanWith: v.maxMeanWith, pass: !v.tiersAboveCeiling.length };
+			if (v.tiersAboveCeiling.length) issues.push(`${name}: mean fish per cast above the ${v.ceiling} ceiling on ${v.tiersAboveCeiling.join(', ')}`);
+		}
+		return { pass: issues.length === 0, issues, summary, bands: { moneyReturn: P.moneyReturnBand, xpUtility: P.xpUtilityBand, netShareMax: P.netShareMax, fishPerCastCeiling: vol.ceiling } };
 	}
 
 	/**
 	 * Volume baits (extra-fish chance) on EVERY rod tier in every biome they work in. P-BAIT-WHERE-IT-WORKS
-	 * gates by biome only, so a Tier 3-5 rod taken back to a mid-band biome gets the bait too. Mean fish per
-	 * cast with the bait is compared with (a) the highest rod mean of the tiers typical in the bait's biomes
-	 * (the band's rod range) and (b) the rods design's endgame ceiling (P-RODS-MEAN-FISH). The alternatives
-	 * of P-BAIT-SPINNER-TIERS are computed as a sensitivity (not proposals): clamp the rod + bait mean at the
-	 * ceiling, clamp it at the band's rod range, or apply the bait only on rods up to the band's top tier.
-	 * The XP and cash columns show why a high-tier rod would use it: XP per cast does not depend on the biome.
+	 * gates by biome only, so a Tier 3-5 rod taken back to a mid-band biome gets the bait too; PARAMS.volume
+	 * caps the rod + bait chance at the global ceiling's chance (P-BAIT-SPINNER-TIERS, rods.PARAMS.multi.
+	 * ceilingMean). Mean fish per cast with the bait (clamped) is checked against the ceiling (the pass
+	 * condition) and compared with the highest rod mean of the tiers typical in the bait's biomes (the band's
+	 * rod range: informational, the user chose not to clamp there). The unclamped mean (the bait's intended
+	 * boost) and the other alternatives (clamp at the band's range, bait only up to the band's top tier) are a
+	 * sensitivity. The XP and cash columns show why a high-tier rod would use it: XP per cast does not depend
+	 * on the biome.
 	 */
 	function volumeCheck() {
-		const ceiling = require('./rods').PARAMS.multi.ceilingMean;
+		const vcap = volumeCap();
+		const ceiling = vcap.mean;
 		const meanOf = (chance) => F.fishDistribution(Math.min(1, chance));
 		const rows = [];
 		const summary = {};
@@ -533,29 +576,37 @@ function createBaitModel(gearPath = null, overrides = null) {
 					const e = evaluate(name, { biome, tier });
 					const chance = chanceOf(TIERS[tier]);
 					const base = meanOf(chance);
-					const w = meanOf(chance + b.multiChance);
-					const clampAt = (limit) => Math.min(w.mean, Math.max(base.mean, limit));
+					const intended = meanOf(chance + b.multiChance);
+					const w = meanOf(chance + volumeAdd(chance, b.multiChance));
+					const clampAt = (limit) => Math.min(intended.mean, Math.max(base.mean, limit));
 					rows.push({
 						bait: name, tier, level: TIERS[tier].level, biome,
-						meanWithout: r3(base.mean), meanWith: r3(w.mean), p3plusWith: r4(w.p3plus), p5With: r4(w.p5),
+						meanWithout: r3(base.mean), meanUnclamped: r3(intended.mean), meanWith: r3(w.mean), addedMean: r3(w.mean - base.mean),
+						clamped: w.mean < intended.mean - 1e-9, noEffect: w.mean <= base.mean + 1e-9,
+						p3plusWith: r4(w.p3plus), p5With: r4(w.p5),
 						aboveBand: w.mean > bandTop + 1e-9, aboveCeiling: w.mean > ceiling + 1e-9,
 						xpPerCastWith: r2(e.baseXpPerCast + e.extraXpPerCast), topBiome, xpPerCastTopBiome: r2(home.xpPerCast),
 						netCashPerCastWith: r2(e.baseValuePerCast + e.extraValuePerCast - price), cashPerCastTopBiome: r2(home.valuePerCast),
 						alternatives: {
-							clampAtCeiling: r3(clampAt(ceiling)),
+							noClamp: r3(intended.mean),
 							clampAtBand: r3(clampAt(bandTop)),
-							upToBandTier: r3(SHARED.tierOrder.indexOf(tier) <= SHARED.tierOrder.indexOf(topBandTier) ? w.mean : base.mean),
+							upToBandTier: r3(SHARED.tierOrder.indexOf(tier) <= SHARED.tierOrder.indexOf(topBandTier) ? intended.mean : base.mean),
 						},
 					});
 				}
 			}
 			const mine = rows.filter((r) => r.bait === name);
+			const tiersWhere = (pred) => [...new Set(mine.filter(pred).map((r) => r.tier))];
 			summary[name] = {
-				biomes: [...b.biomes], bandTiers, topBandTier, bandTop: r3(bandTop), ceiling,
-				tiersAboveBand: [...new Set(mine.filter((r) => r.aboveBand).map((r) => r.tier))],
-				tiersAboveCeiling: [...new Set(mine.filter((r) => r.aboveCeiling).map((r) => r.tier))],
+				biomes: [...b.biomes], bandTiers, topBandTier, bandTop: r3(bandTop), ceiling, clampAt: PARAMS.volume.clampAt,
+				tiersAboveBand: tiersWhere((r) => r.aboveBand),
+				tiersAboveCeiling: tiersWhere((r) => r.aboveCeiling),
+				tiersClamped: tiersWhere((r) => r.clamped),
+				tiersNoEffect: tiersWhere((r) => r.noEffect),
+				tiersAboveCeilingUnclamped: tiersWhere((r) => r.meanUnclamped > ceiling + 1e-9),
 				maxMeanWith: r3(Math.max(...mine.map((r) => r.meanWith))),
-				// Home-stage effect under each alternative (unchanged effect = unchanged price).
+				maxMeanUnclamped: r3(Math.max(...mine.map((r) => r.meanUnclamped))),
+				// Home-stage effect under the clamp and under each alternative (unchanged effect = unchanged price).
 				homeStageEffectKept: {
 					clampAtCeiling: b.homeStages.every((s) => clampKeeps(s, b.multiChance, ceiling)),
 					clampAtBand: b.homeStages.every((s) => clampKeeps(s, b.multiChance, bandTop)),
@@ -568,8 +619,9 @@ function createBaitModel(gearPath = null, overrides = null) {
 			const g = stageGear(stage);
 			return meanOf(g.multiChance + multiChance).mean <= Math.max(meanOf(g.multiChance).mean, limit) + 1e-9;
 		}
-		const pass = Object.values(summary).every((s) => !s.tiersAboveCeiling.length && !s.tiersAboveBand.length);
-		return { pass, ceiling, summary, rows };
+		// The ceiling is the pass condition; the band's rod range is informational (P-BAIT-SPINNER-TIERS).
+		const pass = Object.values(summary).every((x) => !x.tiersAboveCeiling.length);
+		return { pass, ceiling, ceilingChance: vcap.chance, clampAt: PARAMS.volume.clampAt, summary, rows };
 	}
 
 	/**
@@ -826,7 +878,8 @@ function withoutBait(input, applied) {
  *   modifyCast  baitOption({ biome: input.biome, tier: the equipped tier on the run's gear path
  *               (ctx.path[input.tier]) }, { goal: policy }), memoised per stage in state.sys.bait.stages.
  *               When a bait fits, it adds the bait's stats to input.stats (Rare Find, Trophy Chance, Luck,
- *               xpBonus, and Spinner's extra-fish chance as stats.multiChance) and strong access for the
+ *               xpBonus, and Spinner's extra-fish chance as stats.multiChance, only up to the ceiling's
+ *               chance on top of the cast's current chance, PARAMS.volume) and strong access for the
  *               starter baits (input.qualities). It then pushes the per-cast cost { category: 'optional',
  *               item: 'bait', perCast: shop price per cast }: one unit per cast, only where the bait works
  *               (PARAMS.consumption). Nothing happens where no bait fits.
@@ -894,7 +947,10 @@ function system(opts = {}) {
 			s.current = null;
 			if (!stage.bait) return;
 			const b = model.baits[stage.bait];
-			const add = { ...b.stats, ...(b.multiChance ? { multiChance: b.multiChance } : {}) };
+			// A volume bait adds its extra-fish chance only up to the ceiling (PARAMS.volume), on top of the
+			// rod's chance and whatever other systems already added this cast.
+			const extra = b.multiChance ? volumeAdd((input.multiChance || 0) + (input.stats.multiChance || 0), b.multiChance) : 0;
+			const add = { ...b.stats, ...(extra > 0 ? { multiChance: extra } : {}) };
 			const before = {};
 			const after = {};
 			for (const [k, v] of Object.entries(add)) {
@@ -1037,19 +1093,72 @@ function scaledXpBaits(scale) {
 	return out;
 }
 
-/** One sizing row: the regular always-on XP-bait player (integrated) with a model's XP-bait definitions. */
+/** The XP-class baits (pricing 'xp') of a model. */
+const xpClassOf = (model) => BAIT_NAMES.filter((n) => model.baits[n].pricing === 'xp');
+
+/**
+ * The XP-bait guard for one archetype (user decision on P-BAIT-XP-SIZING): the always-on XP-bait run
+ * (policy 'xp') against the same archetype's no-bait run, both integrated.
+ *   speedups   1 - hours(xp) / hours(none) at every milestone from Lv 20 both runs reach (active hours)
+ *   netSink    bait bought > the bait's extra catch value, for the whole policy (it buys the starter
+ *              money baits too) and for the XP-class baits alone; the guard reads the whole policy
+ *   pass       netSink (when PARAMS.pricing.xpBaitNetSink) and every speed-up <= maxXpBaitSpeedup
+ */
+function guardRow(archetype, model = DEFAULT) {
+	const none = lifecycle('none', archetype);
+	const run = lifecycle('xp', archetype, { model });
+	const sp = speedups(run, none);
+	const top = largest(sp);
+	const xpClass = xpClassOf(model);
+	const xpOnly = xpClass.reduce((a, n) => {
+		const t = run.byBait[n];
+		return t ? { spend: a.spend + t.spend, extraValue: a.extraValue + t.extraValue } : a;
+	}, { spend: 0, extraValue: 0 });
+	const limit = PARAMS.pricing.maxXpBaitSpeedup;
+	const netSink = run.income.baitSpend > run.income.baitExtraValue;
+	const overLimit = Object.keys(sp).filter((L) => sp[L] > limit + 1e-9).map(Number);
+	return {
+		archetype, minutesPerDay: F.ARCHETYPES[archetype].minutesPerDay,
+		speedups: sp, maxSpeedup: top.speedup, maxSpeedupAt: top.level, overLimit,
+		hoursNone: none.hoursToLevel, hoursXp: run.hoursToLevel,
+		baitSpend: run.income.baitSpend, baitExtraValue: run.income.baitExtraValue, netEffectShareOfIncome: run.netEffectShareOfIncome,
+		netSink, xpClassNetSink: xpOnly.spend > xpOnly.extraValue, xpClassSpend: Math.round(xpOnly.spend), xpClassExtraValue: Math.round(xpOnly.extraValue),
+		pass: (!PARAMS.pricing.xpBaitNetSink || netSink) && !overLimit.length,
+	};
+}
+
+/** The XP-bait guard for every archetype (F.ARCHETYPES) with a model's XP-bait definitions. */
+function xpBaitGuard(model = DEFAULT) {
+	const rows = Object.keys(F.ARCHETYPES).map((a) => guardRow(a, model));
+	return {
+		rule: `always-on XP bait remains a net economic sink and reaches each milestone from Lv 20 at most ${pctOf(PARAMS.pricing.maxXpBaitSpeedup)} sooner (active hours) than the same archetype without bait; every archetype`,
+		limit: PARAMS.pricing.maxXpBaitSpeedup, netSinkRequired: PARAMS.pricing.xpBaitNetSink,
+		rows,
+		overLimit: rows.filter((r) => r.overLimit.length).map((r) => r.archetype),
+		notNetSink: rows.filter((r) => !r.netSink).map((r) => r.archetype),
+		pass: rows.every((r) => r.pass),
+	};
+}
+
+/**
+ * One sizing row: every archetype's always-on XP-bait run with a model's XP-bait definitions (the guard),
+ * plus the regular player's hours and the approved windows (informational: the windows describe the no-bait
+ * reference player).
+ */
 function sizingRow(id, label, model) {
 	const ref = F.REFERENCE_ARCHETYPE;
 	const none = lifecycle('none', ref);
 	const run = lifecycle('xp', ref, { model });
-	const windows = windowRows(run, none);
-	const xpBaits = BAIT_NAMES.filter((n) => model.baits[n].pricing === 'xp');
-	const top = largest(speedups(run, none));
+	const guard = xpBaitGuard(model);
+	const worst = guard.rows.reduce((a, r) => (r.maxSpeedup > a.maxSpeedup ? r : a));
 	return {
 		id, label,
-		effects: Object.fromEntries(xpBaits.map((n) => [n, { xpBonus: model.baits[n].stats.xpBonus || 0, multiChance: model.baits[n].multiChance || 0, pricePerCast: model.prices()[n].price }])),
-		hoursToLevel: run.hoursToLevel, windows, inEveryWindow: windows.every((w) => w.inWindow),
-		maxSpeedup: top.speedup, maxSpeedupAt: top.level,
+		effects: Object.fromEntries(xpClassOf(model).map((n) => [n, { xpBonus: model.baits[n].stats.xpBonus || 0, multiChance: model.baits[n].multiChance || 0, pricePerCast: model.prices()[n].price }])),
+		hoursToLevel: run.hoursToLevel,
+		windows: windowRows(run, none),
+		byArchetype: Object.fromEntries(guard.rows.map((r) => [r.archetype, { maxSpeedup: r.maxSpeedup, at: r.maxSpeedupAt, netSink: r.netSink, netEffectShareOfIncome: r.netEffectShareOfIncome, pass: r.pass }])),
+		maxSpeedupAny: worst.maxSpeedup, maxSpeedupAnyArchetype: worst.archetype, maxSpeedupAnyAt: worst.maxSpeedupAt,
+		guardPass: guard.pass, overLimit: guard.overLimit, notNetSink: guard.notNetSink,
 		baitSpendShareOfIncome: run.baitSpendShareOfIncome, netEffectShareOfIncome: run.netEffectShareOfIncome,
 	};
 }
@@ -1057,64 +1166,60 @@ function sizingRow(id, label, model) {
 let sizingMemo = null;
 /**
  * XP-bait sizing on the integrated model (decision P-BAIT-XP-SIZING): the proposed sizing, the design-stage
- * alternative, and the largest uniform scale of the XP-class baits' XP effects that keeps the regular
- * always-on buyer inside every approved window (bisection; a bound, not a proposal). Prices follow each
- * sizing through the same pricing rule (K x extra XP x the stage's $/XP).
+ * alternative, and the largest uniform scale of the XP-class baits' XP effects that passes the guard for
+ * every archetype (bisection; a bound, not a proposal). Prices follow each sizing through the same pricing
+ * rule (K x extra XP x the stage's $/XP).
  */
 function xpSizing() {
 	if (sizingMemo) return sizingMemo;
-	const inWindows = (scale) => sizingRow('probe', '', createBaitModel(null, { baits: scaledXpBaits(scale) })).inEveryWindow;
+	const passes = (scale) => xpBaitGuard(createBaitModel(null, { baits: scaledXpBaits(scale) })).pass;
 	let lo = 0;
 	let hi = 1;
-	if (inWindows(1)) {lo = 1;}
+	if (xpBaitGuard(DEFAULT).pass) {lo = 1;}
 	else {
 		for (let i = 0; i < XP_SIZING.bisectSteps; i++) {
 			const mid = (lo + hi) / 2;
-			if (inWindows(mid)) lo = mid;
+			if (passes(mid)) lo = mid;
 			else hi = mid;
 		}
 	}
 	const rows = [
 		sizingRow('proposed', 'proposed (PARAMS)', DEFAULT),
 		sizingRow('design-stage', 'design-stage alternative', createBaitModel(null, { baits: XP_SIZING.designStage })),
-		sizingRow('window-bound', `largest uniform scale inside every window (×${r3(lo)}; a bound, not a proposal)`, createBaitModel(null, { baits: scaledXpBaits(lo) })),
+		...(lo < 1 ? [sizingRow('guard-bound', `largest uniform scale passing the guard for every archetype (×${r3(lo)}; a bound, not a proposal)`, createBaitModel(null, { baits: scaledXpBaits(lo) }))] : []),
 	];
-	sizingMemo = { archetype: F.REFERENCE_ARCHETYPE, policy: 'xp', scaleBound: r3(lo), bisectSteps: XP_SIZING.bisectSteps, rows };
+	sizingMemo = { policy: 'xp', archetypes: Object.keys(F.ARCHETYPES), scaleBound: r3(lo), bisectSteps: XP_SIZING.bisectSteps, rows };
 	return sizingMemo;
 }
 
 let sensitivityMemo = null;
 /**
- * Every archetype x 'none' / 'cash' / 'xp' on the integrated model; the approved windows (regular player);
- * the XP-bait speed-up check (PARAMS.pricing.maxXpBaitSpeedup, regular player, milestones from Lv 20);
- * the window issue (always-on XP bait below a window's lower edge) and the XP-bait sizing sensitivity.
+ * Every archetype x 'none' / 'cash' / 'xp' on the integrated model; the approved windows (regular player;
+ * informational: they describe the no-bait reference player); the XP-bait guard for every archetype
+ * (xpBaitGuard()) and the XP-bait sizing sensitivity.
  */
 function lifecycleSensitivity() {
 	if (sensitivityMemo) return sensitivityMemo;
 	const ref = F.REFERENCE_ARCHETYPE;
 	const names = Object.keys(F.ARCHETYPES);
 	const runs = Object.fromEntries(names.map((a) => [a, Object.fromEntries(POLICIES.map((p) => [p, lifecycle(p, a)]))]));
-	const limit = PARAMS.pricing.maxXpBaitSpeedup;
+	const guard = xpBaitGuard();
 	const byArchetype = Object.fromEntries(names.map((a) => {
 		const cash = largest(speedups(runs[a].cash, runs[a].none));
 		const xp = largest(speedups(runs[a].xp, runs[a].none));
-		return [a, { hours: mapValues(runs[a], (x) => x.hoursToLevel), cash, xp, xpOverCap: xp.speedup > limit + 1e-9 }];
+		const g = guard.rows.find((r) => r.archetype === a);
+		return [a, { hours: mapValues(runs[a], (x) => x.hoursToLevel), cash, xp, xpOverCap: g.overLimit.length > 0, xpNetSink: g.netSink }];
 	}));
 	const windows = Object.entries(F.TARGET_WINDOWS).map(([L, w]) => ({
 		level: Number(L), window: w,
 		...Object.fromEntries(POLICIES.map((p) => [p, windowRows(runs[ref][p], runs[ref].none).find((x) => x.level === Number(L))])),
 	}));
-	const regularXp = byArchetype[ref].xp;
 	sensitivityMemo = {
 		model: `Model: integrate.run(), the reference core loop (${INTEGRATE().REFERENCE.join(', ')}); the bait columns add system({ policy }) through variant.bait 'cash' | 'xp'`,
 		archetypes: runs,
 		windows,
 		byArchetype,
-		xpBaitSpeedupCheck: { archetype: ref, maxSpeedup: regularXp.speedup, at: regularXp.level, limit, pass: regularXp.speedup <= limit + 1e-9 },
-		windowIssue: {
-			regularXpBelowWindow: windows.filter((w) => !w.xp.inWindow).map((w) => ({ level: w.level, hours: w.xp.hours, window: w.window, shortBy: w.xp.shortBy })),
-			archetypesOverSpeedupCap: names.filter((a) => byArchetype[a].xpOverCap),
-		},
+		xpBaitGuard: guard,
 		xpSizing: xpSizing(),
 	};
 	return sensitivityMemo;
@@ -1147,7 +1252,7 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-BAIT-ROSTER', status: 'proposed',
-		title: 'Ten baits, one clear role each: two starter baits, five mid-band specialists, two late combination baits and one universal luck bait; Spinner (the only volume bait) works only in the mid-band biomes, on any rod tier (P-BAIT-SPINNER-TIERS)',
+		title: 'Ten baits, one clear role each: two starter baits, five mid-band specialists, two late combination baits and one universal luck bait; Spinner (the only volume bait) works only in the mid-band biomes, on any rod tier, its mean capped at the global ceiling (P-BAIT-SPINNER-TIERS)',
 		modelled: BAIT_NAMES.map((n) => `${n}: ${PARAMS.baits[n].role}`).join('; '),
 		alternatives: ['today\'s roster (stacked capabilities, water-type biome lists, XP multipliers everywhere)', 'Spinner in the late band too (Coast, Swamp: Tier 3-5 rods would get it at their own stage)'],
 		source: 'bait design', why: 'the player chooses by goal (collection, trophies, Legendary hunting, jackpots, XP); each band gets one specialist per role (Roster)',
@@ -1206,12 +1311,12 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-BAIT-XP-SIZING', status: 'proposed',
-		title: 'XP bonuses sized so always-on XP bait speeds the regular player by at most the cap; this accepts that always-on buyers fall under some approved windows',
-		modelled: `Lure XP +${pctOf(PARAMS.baits.Lure.stats.xpBonus)}, Magic Lure XP +${pctOf(PARAMS.baits['Magic Lure'].stats.xpBonus)}, Spinner extra-fish chance +${pctOf(PARAMS.baits.Spinner.multiChance)}; cap ${pctOf(P.maxXpBaitSpeedup)} (regular player, milestones from Lv 20)`,
-		alternatives: ['the design-stage alternative (smaller XP bonuses; XP-bait sizing)', 'size to the window bound so even always-on buyers stay inside every window (XP-bait sizing)', 'no XP-class baits'],
-		source: 'bait design', why: 'a paid, optional accelerator; at 5b.4 the integrated model puts the always-on buyer under some windows (Regular player; XP-bait sizing): the user decides whether that is acceptable',
-		get: () => ({ 'Lure': PARAMS.baits.Lure.stats.xpBonus, 'Magic Lure': PARAMS.baits['Magic Lure'].stats.xpBonus, 'Spinner': PARAMS.baits.Spinner.multiChance, 'maxXpBaitSpeedup': P.maxXpBaitSpeedup }),
-		expected: { 'Lure': 0.15, 'Magic Lure': 0.12, 'Spinner': 0.1, 'maxXpBaitSpeedup': 0.1 },
+		title: 'XP bonuses kept at the proposed values. Guard: always-on XP bait must remain a net economic sink and may cut milestone active time by no more than about the cap against the equivalent no-bait run, for every archetype; the approved progression windows describe the no-bait reference player, not bait buyers',
+		modelled: `Lure XP +${pctOf(PARAMS.baits.Lure.stats.xpBonus)}, Magic Lure XP +${pctOf(PARAMS.baits['Magic Lure'].stats.xpBonus)}, Spinner extra-fish chance +${pctOf(PARAMS.baits.Spinner.multiChance)}; guard: net sink ${P.xpBaitNetSink}, speed-up cap ${pctOf(P.maxXpBaitSpeedup)} (hours to each milestone from Lv 20, every archetype against its own no-bait run)`,
+		alternatives: ['the design-stage alternative (smaller XP bonuses; XP-bait sizing)', 'scale the XP bonuses down to the guard bound so every archetype stays under the cap (XP-bait sizing)', 'no XP-class baits', 'superseded test: the always-on buyer must stay inside the approved windows (replaced by the user)'],
+		source: 'bait design; user decision (keep the proposed values, replace the window test with the net-sink and speed-up guard)', why: 'a paid, optional accelerator: it must cost more cash than it returns and must not become a second progression curve; archetypes over the cap are flagged, not tuned away (XP-bait guard; XP-bait sizing)',
+		get: () => ({ 'Lure': PARAMS.baits.Lure.stats.xpBonus, 'Magic Lure': PARAMS.baits['Magic Lure'].stats.xpBonus, 'Spinner': PARAMS.baits.Spinner.multiChance, 'maxXpBaitSpeedup': P.maxXpBaitSpeedup, 'xpBaitNetSink': P.xpBaitNetSink }),
+		expected: { 'Lure': 0.15, 'Magic Lure': 0.12, 'Spinner': 0.1, 'maxXpBaitSpeedup': 0.1, 'xpBaitNetSink': true },
 	},
 	{
 		id: 'P-BAIT-PACK', status: 'proposed',
@@ -1248,17 +1353,16 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-BAIT-SPINNER-TIERS', status: 'proposed',
-		title: 'Spinner\'s extra-fish chance applies on every rod tier in its biomes (biome gating only): higher-tier rods taken back to Lake or Pond go above the mid band\'s rod range, and the top tiers above the endgame fish-per-cast ceiling',
-		modelled: `Spinner +${pctOf(PARAMS.baits.Spinner.multiChance)} extra-fish chance in ${PARAMS.baits.Spinner.biomes.join(', ')} on any rod; no tier gate and no mean clamp (Spinner by rod tier)`,
+		title: 'Spinner keeps its extra-fish boost on every rod tier in its biomes, but the rod + Spinner mean fish per cast is clamped at the global normal-player ceiling (the chance whose mean is the ceiling); rods at or above the ceiling get no extra fish from it; no tier gate and no per-tier or mid-band clamp',
+		modelled: `Spinner +${pctOf(PARAMS.baits.Spinner.multiChance)} extra-fish chance in ${PARAMS.baits.Spinner.biomes.join(', ')} on any rod; combined chance capped at F.chanceForMean(${volumeCap().mean}) (rods.PARAMS.multi.ceilingMean, P-RODS-MEAN-FISH), in the per-cast model and in system() (Spinner by rod tier)`,
 		alternatives: [
-			'accept: an optional, paid overshoot; XP per cast does not depend on the biome, so a top-tier rod with Spinner in Pond earns more XP per cast than at its own stage, at a lower cash rate (Spinner by rod tier)',
-			'clamp the rod + bait mean at the endgame ceiling of P-RODS-MEAN-FISH (Spinner\'s home-stage effect and price unchanged; a rod already at the ceiling gets nothing from it)',
+			'no clamp: an optional, paid overshoot above the ceiling on the top tiers (Spinner by rod tier, unclamped column)',
 			'clamp the rod + bait mean at the mid band\'s rod range (also cuts Spinner\'s home-stage effect: its price would have to be re-derived)',
-			'Spinner only on rods up to the mid band\'s top tier (T2): home-stage effect and price unchanged',
+			'Spinner only on rods up to the mid band\'s top tier (T2)',
 		],
-		source: 'bait design (adversarial review)', why: 'the roster keeps Spinner out of the late biomes so the endgame rods stay inside the approved fish-per-cast range, but the biome list does not stop a higher-tier rod from using it in Lake or Pond; the user decides whether the overshoot is acceptable (Spinner by rod tier; Pricing checks)',
-		get: () => ({ biomes: PARAMS.baits.Spinner.biomes, multiChance: PARAMS.baits.Spinner.multiChance }),
-		expected: { biomes: ['Lake', 'Pond'], multiChance: 0.1 },
+		source: 'bait design (adversarial review); user decision (clamp at the ceiling)', why: 'keeps Spinner\'s intended boost wherever it fits under the ceiling (its home stages and price are unchanged), while no normal player ever averages more fish per cast than the global ceiling (Spinner by rod tier; Pricing checks)',
+		get: () => ({ biomes: PARAMS.baits.Spinner.biomes, multiChance: PARAMS.baits.Spinner.multiChance, clampAt: PARAMS.volume.clampAt, ceilingMean: volumeCap().mean }),
+		expected: { biomes: ['Lake', 'Pond'], multiChance: 0.1, clampAt: 'ceiling', ceilingMean: 1.8 },
 	},
 ];
 
@@ -1347,8 +1451,8 @@ function markdownTables() {
 	const xpRatios = homeRows.filter((x) => PARAMS.baits[x.name].pricing === 'xp').map((x) => x.h.xpPriceRatio);
 	const xpUtility = homeRows.filter((x) => PARAMS.baits[x.name].pricing === 'xp').map((x) => x.h.utilityReturn);
 	const netShares = homeRows.filter((x) => PARAMS.baits[x.name].pricing === 'money').map((x) => x.h.netShareOfCast);
-	const check = L.xpBaitSpeedupCheck;
-	const issue = L.windowIssue;
+	const G = L.xpBaitGuard;
+	const gReg = G.rows.find((r) => r.archetype === ref);
 	const cashTop = L.byArchetype[ref].cash;
 	const anyXp = Object.entries(L.byArchetype).reduce((a, [name, x]) => (x.xp.speedup > a.speedup ? { name, ...x.xp } : a), { speedup: -Infinity });
 	const tiersNonOld = R.consumption.byTier.filter((t) => t.tier !== 'old');
@@ -1360,12 +1464,11 @@ function markdownTables() {
 		['Money baits: cash return per $1 at their home stages', `${range(moneyReturns, (x) => num(x, 2))} (target ${P.returnTarget}, accepted ${P.moneyReturnBand.join('–')})`, 'Home stages'],
 		['XP baits: net $ per extra XP against the stage\'s own rate', `${range(xpRatios, (x) => `${num(x, 2)}×`)} (target K = ${P.xpPriceK})`, 'Home stages'],
 		['Pricing checks', `${bc.pass ? 'all pass' : `${bc.issues.length} issue(s)`}`, 'Pricing checks'],
-		['Spinner on any rod tier in Lake and Pond', `mean fish per cast up to ${num(vs.maxMeanWith, 3)}; above the mid band's rod range (${num(vs.bandTop, 2)}) on ${vs.tiersAboveBand.map(tierName).join(', ') || 'no tier'}; above the endgame ceiling (${num(vs.ceiling, 2)}) on ${vs.tiersAboveCeiling.map(tierName).join(', ') || 'no tier'} (\`P-BAIT-SPINNER-TIERS\`)`, 'Spinner by rod tier'],
+		['Spinner on any rod tier in Lake and Pond, clamped at the ceiling', `mean fish per cast up to ${num(vs.maxMeanWith, 3)} (ceiling ${num(vs.ceiling, 2)}: ${vs.tiersAboveCeiling.length ? `**above on ${vs.tiersAboveCeiling.map(tierName).join(', ')}**` : 'never above'}); the clamp binds on ${vs.tiersClamped.map(tierName).join(', ') || 'no tier'}, no extra fish on ${vs.tiersNoEffect.map(tierName).join(', ') || 'no tier'}; unclamped it would reach ${num(vs.maxMeanUnclamped, 3)} (\`P-BAIT-SPINNER-TIERS\`)`, 'Spinner by rod tier'],
 		['Bait held below its shop level (legacy stacks, box grants)', `waits through biome access, except ${R.legacyLevel.needUseTimeCheck.join(', ') || 'none'}: needs a use-time level check (\`P-BAIT-LEGACY-STACKS\`)`, 'Legacy stacks below the shop level'],
 		['Money bait always on, regular player (integrated)', `net ${spct(reg.cash.netEffectShareOfIncome)} of income; milestones at most ${pct(cashTop.speedup)} sooner`, 'Regular player; Income and XP sources'],
-		['XP bait always on, regular player (integrated)', `L50 ${hrs(reg.none.hoursToLevel[50])} → ${hrs(reg.xp.hoursToLevel[50])}; largest speed-up ${pct(check.maxSpeedup)} at L${check.at} (cap ${pct(check.limit, 0)}: ${check.pass ? 'pass' : '**fail**'}); net ${spct(reg.xp.netEffectShareOfIncome)} of income`, 'Regular player'],
-		['Approved windows with always-on XP bait (regular player)', issue.regularXpBelowWindow.length ? `**under the lower edge at ${issue.regularXpBelowWindow.map((w) => `L${w.level}`).join(', ')}**` : 'every window met', 'Regular player; XP-bait sizing'],
-		['Largest XP-bait speed-up, any archetype', `${pct(anyXp.speedup)} (${anyXp.name}, L${anyXp.level})`, 'Every archetype'],
+		['XP bait always on, regular player (integrated)', `L50 ${hrs(reg.none.hoursToLevel[50])} → ${hrs(reg.xp.hoursToLevel[50])}; largest speed-up ${pct(gReg.maxSpeedup)} at L${gReg.maxSpeedupAt}; net ${spct(reg.xp.netEffectShareOfIncome)} of income`, 'Regular player'],
+		['XP-bait guard, every archetype: a net sink, and at most the cap sooner than its own no-bait run', `net sink: ${G.notNetSink.length ? `**not for ${G.notNetSink.join(', ')}**` : 'every archetype'}; cap ${pct(G.limit, 0)}: ${G.overLimit.length ? `**over for ${G.overLimit.join(', ')}**` : 'every archetype within'}; largest ${pct(anyXp.speedup)} (${anyXp.name}, L${anyXp.level})`, 'XP-bait guard'],
 		['Retired private loop', `system() matched it exactly: ${PR.exactMilestones}/${PR.milestonesCompared} milestones step-exact (${PR.commit})`, 'Retired-loop parity'],
 	]);
 
@@ -1421,20 +1524,20 @@ function markdownTables() {
 		['Money baits: net gain, share of the cast', `≤ ${pct(P.netShareMax, 0)}`, `≤ ${pct(Math.max(...netShares))}`, lim(Math.max(...netShares) <= P.netShareMax)],
 		['XP baits: utility return at every home stage', P.xpUtilityBand.join('–'), range(xpUtility, (x) => num(x, 2)), lim(xpUtility.every((x) => x >= P.xpUtilityBand[0] && x <= P.xpUtilityBand[1]))],
 		['XP baits: net $ per extra XP against the stage rate', `centre K = ${P.xpPriceK}`, range(xpRatios, (x) => `${num(x, 2)}×`), 'reported'],
-		['Volume bait (Spinner): mean fish per cast on every rod tier in its biomes', `≤ the mid band's rod range (${num(vs.bandTop, 2)}) and ≤ the endgame ceiling (${num(vs.ceiling, 2)})`, `up to ${num(vs.maxMeanWith, 3)}; above the range on ${vs.tiersAboveBand.map(tierName).join(', ') || 'none'}; above the ceiling on ${vs.tiersAboveCeiling.map(tierName).join(', ') || 'none'}`, vc.pass ? 'pass' : '**flag for the user** (`P-BAIT-SPINNER-TIERS`)'],
+		['Volume bait (Spinner, clamped): mean fish per cast on every rod tier in its biomes', `≤ the global ceiling (${num(vs.ceiling, 2)}, \`P-BAIT-SPINNER-TIERS\`)`, `up to ${num(vs.maxMeanWith, 3)}; above the ceiling on ${vs.tiersAboveCeiling.map(tierName).join(', ') || 'none'}`, lim(vc.pass)],
+		['Volume bait (Spinner): against the mid band\'s rod range', `${num(vs.bandTop, 2)} (informational: the clamp is at the ceiling, not here)`, `above the range on ${vs.tiersAboveBand.map(tierName).join(', ') || 'none'}`, 'reported'],
 		['No money bait above the band at a typical stage outside its home', `≤ ${P.moneyReturnBand[1]}`, bc.issues.filter((s) => s.includes('not home')).length ? bc.issues.filter((s) => s.includes('not home')).join('; ') : 'none above', lim(!bc.issues.some((s) => s.includes('not home')))],
-		['Always-on XP bait speed-up, regular player (integrated, from L20)', `≤ ${pct(check.limit, 0)}`, `${pct(check.maxSpeedup)} (L${check.at})`, lim(check.pass)],
-		['Always-on XP bait, regular player: approved windows (integrated)', 'inside every window', issue.regularXpBelowWindow.length ? issue.regularXpBelowWindow.map((w) => `L${w.level} ${hrs(w.hours)} (${hrs(w.shortBy)} under)`).join('; ') : 'inside', issue.regularXpBelowWindow.length ? '**flag for the user** (`P-BAIT-XP-SIZING`)' : 'pass'],
-		['Always-on XP bait speed-up, every archetype (integrated; the cap is defined on the regular player)', `≤ ${pct(check.limit, 0)} (informative)`, Object.entries(L.byArchetype).map(([a, x]) => `${a} ${pct(x.xp.speedup)}`).join(', '), issue.archetypesOverSpeedupCap.length ? `over the cap: ${issue.archetypesOverSpeedupCap.join(', ')}` : 'all under'],
+		['Always-on XP bait remains a net economic sink, every archetype (integrated)', 'bait bought > extra catch value', G.rows.map((r) => `${r.archetype} ${spct(r.netEffectShareOfIncome)} of income`).join(', '), G.notNetSink.length ? `**fail**: ${G.notNetSink.join(', ')}` : 'pass'],
+		['Always-on XP bait: milestone active time against the same archetype without bait, every milestone from L20 (integrated)', `≤ ${pct(G.limit, 0)} sooner (roughly)`, G.rows.map((r) => `${r.archetype} ${pct(r.maxSpeedup)} (L${r.maxSpeedupAt})`).join(', '), G.overLimit.length ? `**flag for the user**: over for ${G.overLimit.join(', ')} (\`P-BAIT-XP-SIZING\`)` : 'pass'],
 	]);
 
 	// ----- Spinner by rod tier -----
 	const flag = (b) => (b ? '**yes**' : 'no');
-	T['bait-volume'] = mdTable(['Rod (from Lv)', 'Biome', 'Mean fish/cast: rod → with Spinner', 'With Spinner: P(3+) / P(5)', `Above the mid band's rod range (${num(vs.bandTop, 2)})`, `Above the endgame ceiling (${num(vs.ceiling, 2)})`, 'XP/cast: with Spinner here → rod\'s usual biome, no bait', '$/cast after bait → rod\'s usual biome, no bait', 'Alternative: clamp at the ceiling', 'Alternative: clamp at the mid band\'s range', `Alternative: Spinner only up to ${tierName(vs.topBandTier)}`], vc.rows.filter((r) => r.bait === 'Spinner').map((r) => [
-		`${tierName(r.tier)} (Lv ${r.level})`, r.biome, `${num(r.meanWithout, 2)} → ${num(r.meanWith, 3)}`, `${pct(r.p3plusWith)} / ${pct(r.p5With, 2)}`, flag(r.aboveBand), flag(r.aboveCeiling),
+	T['bait-volume'] = mdTable(['Rod (from Lv)', 'Biome', 'Mean fish/cast: rod → with Spinner (clamped)', 'Spinner adds', 'With Spinner: P(3+) / P(5)', `Above the ceiling (${num(vs.ceiling, 2)})`, `Above the mid band's rod range (${num(vs.bandTop, 2)}, informational)`, 'XP/cast: with Spinner here → rod\'s usual biome, no bait', '$/cast after bait → rod\'s usual biome, no bait', 'Alternative: no clamp', 'Alternative: clamp at the mid band\'s range', `Alternative: Spinner only up to ${tierName(vs.topBandTier)}`], vc.rows.filter((r) => r.bait === 'Spinner').map((r) => [
+		`${tierName(r.tier)} (Lv ${r.level})`, r.biome, `${num(r.meanWithout, 2)} → ${num(r.meanWith, 3)}${r.clamped ? ' (clamped)' : ''}`, r.noEffect ? '**nothing**' : `+${num(r.addedMean, 3)}`, `${pct(r.p3plusWith)} / ${pct(r.p5With, 2)}`, flag(r.aboveCeiling), r.aboveBand ? 'yes' : 'no',
 		`${num(r.xpPerCastWith, 2)} → ${num(r.xpPerCastTopBiome, 2)} (${r.topBiome})`, `${usd(r.netCashPerCastWith)} → ${usd(r.cashPerCastTopBiome)}`,
-		num(r.alternatives.clampAtCeiling, 3), num(r.alternatives.clampAtBand, 3), num(r.alternatives.upToBandTier, 3),
-	])) + `\n\n\`volumeCheck()\`: framework multi-catch chain on the rod's chance + Spinner's ${pct(PARAMS.baits.Spinner.multiChance, 0)}. The mid band's rod range is the highest mean of the rods typical in ${vs.biomes.join(' and ')} (${vs.bandTiers.map(tierName).join(', ')}); the ceiling is \`rods.PARAMS.multi.ceilingMean\` (\`P-RODS-MEAN-FISH\`). "Rod's usual biome" is the highest biome open at the rod's level (at least ${vs.biomes[0]}). Alternatives are a sensitivity for \`P-BAIT-SPINNER-TIERS\`, not proposals. Spinner's effect at its home stages (and so its price) is ${vs.homeStageEffectKept.clampAtCeiling ? 'unchanged' : '**changed**'} by the ceiling clamp, ${vs.homeStageEffectKept.clampAtBand ? 'unchanged' : '**changed**'} by the mid-band clamp and ${vs.homeStageEffectKept.upToBandTier ? 'unchanged' : '**changed**'} by the tier limit.`;
+		num(r.alternatives.noClamp, 3), num(r.alternatives.clampAtBand, 3), num(r.alternatives.upToBandTier, 3),
+	])) + `\n\n\`volumeCheck()\`: framework multi-catch chain on the rod's chance + Spinner's ${pct(PARAMS.baits.Spinner.multiChance, 0)}, the combined chance capped at the chance whose mean is the ceiling (\`rods.PARAMS.multi.ceilingMean\`, \`P-RODS-MEAN-FISH\`; \`PARAMS.volume\`, the same clamp in \`system()\`). The mid band's rod range is the highest mean of the rods typical in ${vs.biomes.join(' and ')} (${vs.bandTiers.map(tierName).join(', ')}). "Rod's usual biome" is the highest biome open at the rod's level (at least ${vs.biomes[0]}). The alternative columns are a sensitivity for \`P-BAIT-SPINNER-TIERS\`, not proposals. Spinner's effect at its home stages (and so its price) is ${vs.homeStageEffectKept.clampAtCeiling ? 'unchanged' : '**changed**'} by the ceiling clamp, and would be ${vs.homeStageEffectKept.clampAtBand ? 'unchanged' : '**changed**'} by the mid-band clamp and ${vs.homeStageEffectKept.upToBandTier ? 'unchanged' : '**changed**'} by the tier limit.`;
 
 	// ----- Bait held below its shop level -----
 	T['bait-legacy-level'] = mdTable(['Bait', 'Shop level', 'Works in (biome level)', 'Usable below the shop level in', 'The wait is enforced by'], R.legacyLevel.rows.map((r) => [
@@ -1459,12 +1562,13 @@ function markdownTables() {
 	]));
 
 	// ----- Integrated lifecycle -----
-	T['bait-lifecycle'] = mdTable(['Level', 'Approved window', 'No bait', 'Money bait (goal cash)', 'XP bait (goal xp)', 'XP-bait speed-up', 'XP bait inside the window'], F.LIFECYCLE.milestones.map((lv) => {
+	T['bait-lifecycle'] = mdTable(['Level', 'Approved window (no-bait reference)', 'No bait', 'No bait inside the window', 'Money bait (goal cash)', 'XP bait (goal xp)', 'XP-bait speed-up', `Within the ${pct(G.limit, 0)} guard`], F.LIFECYCLE.milestones.map((lv) => {
 		const w = F.TARGET_WINDOWS[lv];
 		const h = (p) => reg[p].hoursToLevel[lv];
-		const inW = w ? (h('xp') >= w[0] && h('xp') <= w[1] ? 'yes' : `**no** (${hrs(w[0] - h('xp'))} under)`) : '—';
-		return [`L${lv}`, w ? `${w[0]}–${w[1]} h` : '—', hrs(h('none')), hrs(h('cash')), `${w && !(h('xp') >= w[0]) ? '**' : ''}${hrs(h('xp'))}${w && !(h('xp') >= w[0]) ? '**' : ''}`, lv >= 20 ? pct(1 - h('xp') / h('none')) : '—', inW];
-	})) + `\n\nRegular player (${F.ARCHETYPES[ref].minutesPerDay} min/day). ${L.model}.`;
+		const sp = gReg.speedups[lv];
+		const inW = w ? (h('none') >= w[0] && h('none') <= w[1] ? 'yes' : '**no**') : '—';
+		return [`L${lv}`, w ? `${w[0]}–${w[1]} h` : '—', hrs(h('none')), inW, hrs(h('cash')), hrs(h('xp')), sp === undefined ? '—' : pct(sp), sp === undefined ? '—' : sp > G.limit + 1e-9 ? '**no**' : 'yes'];
+	})) + `\n\nRegular player (${F.ARCHETYPES[ref].minutesPerDay} min/day). ${L.model}. The approved windows describe the no-bait reference player; a bait buyer is held to the XP-bait guard instead (\`P-BAIT-XP-SIZING\`).`;
 	const xpAt = 50;
 	const srcCols = ['fishing', 'bait', 'quests', 'daily', 'buffs'];
 	T['bait-lifecycle-income'] = mdTable(['Policy', 'Bait bought (share of income)', 'Extra catch value', 'Net effect on income', `XP at L${xpAt}: ${srcCols.join(' / ')}`, 'Baits used'], POLICIES.map((p) => {
@@ -1472,9 +1576,15 @@ function markdownTables() {
 		const s = x.xpSources[xpAt];
 		return [p === 'none' ? 'no bait' : p === 'cash' ? 'money bait' : 'XP bait', pct(x.baitSpendShareOfIncome), pct(x.baitExtraValueShareOfIncome), `**${spct(x.netEffectShareOfIncome)}**`, s ? srcCols.map((k) => pct(s.share[k])).join(' / ') : '—', x.baitsUsed.join(', ') || '—'];
 	})) + '\n\nShares of the run\'s income to L60 before the bait\'s effect (every cash source minus the bait\'s extra catch value). XP sources as R2 groups them: quests = story + repeatable, daily = daily + weekly quests, buffs = the Double XP bonus (on the whole catch, bait included); the bait\'s share is carved out of fishing.';
-	T['bait-archetypes'] = mdTable(['Archetype', 'L50 no bait', 'L50 money bait', 'L50 XP bait', 'Largest money-bait speed-up', 'Largest XP-bait speed-up', `Over the ${pct(check.limit, 0)} cap`], Object.entries(L.byArchetype).map(([a, x]) => [
+	T['bait-archetypes'] = mdTable(['Archetype', 'L50 no bait', 'L50 money bait', 'L50 XP bait', 'Largest money-bait speed-up', 'Largest XP-bait speed-up', `Over the ${pct(G.limit, 0)} guard`], Object.entries(L.byArchetype).map(([a, x]) => [
 		`${a} (${F.ARCHETYPES[a].minutesPerDay} min/day)`, hrs(x.hours.none[50]), hrs(x.hours.cash[50]), hrs(x.hours.xp[50]), `${pct(x.cash.speedup)} (L${x.cash.level})`, `${pct(x.xp.speedup)} (L${x.xp.level})`, x.xpOverCap ? '**yes**' : 'no',
-	])) + '\n\nSpeed-ups are measured from L20 (no XP bait exists before Lake). The cap is a design check on the regular player only.';
+	])) + '\n\nSpeed-ups are measured from L20 (no XP bait exists before Lake), each archetype against its own no-bait run.';
+	const guardLevels = [...new Set(G.rows.flatMap((r) => Object.keys(r.speedups).map(Number)))].sort((x, y) => x - y);
+	T['bait-xp-guard'] = mdTable(['Archetype', ...guardLevels.map((lv) => `L${lv} sooner`), 'Largest', `Within ${pct(G.limit, 0)}`, 'Bait bought → extra catch value (whole policy)', 'Net effect on income', 'Net sink (policy / XP-class baits)', 'Guard'], G.rows.map((r) => [
+		`${r.archetype} (${r.minutesPerDay} min/day)`, ...guardLevels.map((lv) => (r.speedups[lv] === undefined ? '—' : r.speedups[lv] > G.limit + 1e-9 ? `**${pct(r.speedups[lv])}**` : pct(r.speedups[lv]))),
+		`${pct(r.maxSpeedup)} (L${r.maxSpeedupAt})`, r.overLimit.length ? `**no** (${r.overLimit.map((lv) => `L${lv}`).join(', ')})` : 'yes',
+		`${usd(r.baitSpend, 0)} → ${usd(r.baitExtraValue, 0)}`, spct(r.netEffectShareOfIncome), `${yes(r.netSink)} / ${yes(r.xpClassNetSink)}`, r.pass ? 'pass' : '**flag**',
+	])) + `\n\n\`xpBaitGuard()\`: every archetype's always-on XP-bait run (\`variant.bait: 'xp'\`) against its own no-bait run, integrated. "Sooner" = 1 − hours with XP bait ÷ hours without, in active play hours, at every milestone from L20 both runs reach. The policy also buys the starter money baits where no XP bait exists; the XP-class column counts ${xpNames.join(', ')} alone. The cap is "roughly" ${pct(G.limit, 0)}: every milestone over it is flagged for you, nothing is tuned away.`;
 	T['bait-by-bait'] = mdTable(['Policy', 'Bait', 'Casts with it', 'Spent', 'Extra catch value', 'Realised cash return', 'Extra XP', 'Net $ per extra XP'], ['cash', 'xp'].flatMap((p) => Object.entries(reg[p].byBait).map(([name, t]) => [
 		p === 'cash' ? 'money bait' : 'XP bait', name, int(t.units), usd(t.spend, 0), usd(t.extraValue, 0), num(t.extraValue / t.spend, 2), int(t.extraXp), t.extraXp > 1 ? usd((t.spend - t.extraValue) / t.extraXp) : '—',
 	]))) + '\n\nRegular player to L60, integrated: what each bait actually did on the core\'s own casts (gear, buffs and stage mix included).';
@@ -1483,10 +1593,16 @@ function markdownTables() {
 		const e = row.effects[n];
 		return e.xpBonus ? `+${num(e.xpBonus * 100, 1)}% XP` : `+${num(e.multiChance * 100, 1)}% extra-fish`;
 	};
-	T['bait-xp-sizing'] = mdTable(['XP-bait sizing', ...xpNames.map((n) => `${n}`), 'Price/cast (' + xpNames.join(' / ') + ')', ...Object.keys(F.TARGET_WINDOWS).filter((lv) => Number(lv) >= 30).map((lv) => `L${lv} (${F.TARGET_WINDOWS[lv].join('–')} h)`), 'Largest speed-up', 'Every window', 'Net effect on income'], SZ.rows.map((row) => [
+	const archNames = Object.keys(F.ARCHETYPES);
+	T['bait-xp-sizing'] = mdTable(['XP-bait sizing', ...xpNames.map((n) => `${n}`), 'Price/cast (' + xpNames.join(' / ') + ')', ...archNames.map((a) => `Largest speed-up: ${a}`), 'Every archetype a net sink', `Every archetype within ${pct(G.limit, 0)}`, 'Net effect on income (regular)'], SZ.rows.map((row) => [
 		row.label, ...xpNames.map((n) => effect(row, n)), xpNames.map((n) => usd(row.effects[n].pricePerCast)).join(' / '),
-		...row.windows.filter((w) => w.level >= 30).map((w) => (w.inWindow ? hrs(w.hours) : `**${hrs(w.hours)}**`)), `${pct(row.maxSpeedup)} (L${row.maxSpeedupAt})`, yes(row.inEveryWindow), spct(row.netEffectShareOfIncome),
-	])) + `\n\nRegular player, always-on XP bait, integrated. Prices follow each sizing through the same rule (K × extra XP × stage $/XP). The window bound is found by bisection (${SZ.bisectSteps} steps) on a uniform scale of the XP-class baits' XP effects; it is a bound for the decision, not a proposal.`;
+		...archNames.map((a) => {
+			const x = row.byArchetype[a];
+			const t = `${pct(x.maxSpeedup)} (L${x.at})`;
+			return x.maxSpeedup > G.limit + 1e-9 ? `**${t}**` : t;
+		}),
+		yes(!row.notNetSink.length), row.overLimit.length ? `**no** (${row.overLimit.join(', ')})` : 'yes', spct(row.netEffectShareOfIncome),
+	])) + `\n\nAlways-on XP bait, every archetype, integrated, each against its own no-bait run (the XP-bait guard). Prices follow each sizing through the same rule (K × extra XP × stage $/XP). ${SZ.scaleBound < 1 ? `The guard bound is found by bisection (${SZ.bisectSteps} steps) on a uniform scale of the XP-class baits' XP effects; it is a bound for the decision, not a proposal.` : 'The proposed sizing passes the guard for every archetype, so no bound row is shown.'}`;
 
 	// ----- Booster Packs, crates -----
 	const B = R.boosterPack;
@@ -1517,7 +1633,7 @@ module.exports = {
 	currentBaits,
 	...Object.fromEntries(Object.entries(DEFAULT).filter(([k]) => k !== 'report')),
 	SYSTEM_NAME, SPEND_ITEM, POLICIES, system, RETIRED_LOOP_PARITY,
-	lifecycle, lifecycleSensitivity, xpSizing, legacyLevelCheck,
+	lifecycle, lifecycleSensitivity, xpBaitGuard, xpSizing, legacyLevelCheck, volumeCap,
 	report, markdownTables,
 };
 

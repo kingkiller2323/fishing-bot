@@ -214,9 +214,8 @@ function openChecksTable() {
 		const sp = vol.summary.Spinner;
 		rows.push({ module: 'bait', text: 'Spinner keeps every rod tier inside its multi-catch band (decision 2; P-BAIT-SPINNER-TIERS)', detail: `tiers above the mid band: ${sp.tiersAboveBand.join(', ')}; above the ${fmt(sp.ceiling, 2)} ceiling: ${sp.tiersAboveCeiling.join(', ')}; highest mean ${fmt(sp.maxMeanWith, 2)}` });
 	}
-	const xpRow = bait.xpSizing().rows.find((r) => r.id === 'proposed');
-	const out = xpRow.windows.filter((w) => !w.inWindow);
-	if (out.length) rows.push({ module: 'bait', text: 'A regular player on XP bait every cast stays inside the approved windows (P-BAIT-XP-SIZING)', detail: out.map((w) => `Lv ${w.level} ${fmt(w.hours, 2)} h (window ${w.window[0]}–${w.window[1]} h)`).join('; ') });
+	const guard = bait.xpBaitGuard();
+	if (!guard.pass) rows.push({ module: 'bait', text: 'Always-on XP bait stays a net sink and reaches each milestone at most ~10% sooner than the same archetype without bait (P-BAIT-XP-SIZING)', detail: `over the limit: ${guard.overLimit.join(', ') || 'none'}; not a net sink: ${guard.notNetSink.join(', ') || 'none'}` });
 	const streak = require('./streak');
 	const cap = streak.PARAMS.targets.regular30dShareMax;
 	const reg30 = streak.archetypeValue().regular.periods[30];
