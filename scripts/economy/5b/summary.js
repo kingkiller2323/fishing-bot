@@ -139,21 +139,75 @@ function dailyFactorTable() {
 	return `${table(
 		['Daily/weekly factor', ...WINDOW_LEVELS.map((L) => `Regular Lv ${L}`), 'Regular in every window', 'Casual ÷ regular hours at Lv 50', `Minimum-daily / casual level at days ${days.join(', ')}`, `Minimum-daily XP per active hour ÷ regular (day ${lastDay})`],
 		rows,
-	)}\n\nSame curve (q = ${F.CURVE.quartic}) in every row; only the daily and weekly quest reward scale changes (analysis option \`quests.system({ rewardScale })\`). Record: \`docs/economy/5b/r2.json\` guardrailSensitivity.`;
+	)}\n\nSame curve (q = ${F.CURVE.quartic}) in every row; only the daily and weekly quest reward scale changes (analysis option \`quests.system({ rewardScale })\`). Record: \`docs/economy/5b/r2.json\` guardrailSensitivity. The day-365 ratio compares different levels (the regular player is far past Lv 60 by then); at equal level the proposed default gives ${equalLevelRatios(readJson('5b/r2.json')).map(([L, x]) => `Lv ${L} ${fmt(x, 2)}×`).join(', ')}.`;
 }
 
 function sinksTable() {
 	const rows = [];
 	const add = (label, r) => {
 		const s = I.sinkSummary(r);
-		const share = (c) => s.byCategory[c]?.share ?? 0;
-		rows.push([label, money(s.income), pct((s.sources.fishing || 0) / s.income), pct(share('upkeep')), pct(share('progression')), pct(share('optional')), pct(share('aspirational')), `${pct(s.savedShare)} (${money(s.saved)})`]);
+		// Shares from the raw ledger totals (sinkSummary's shares are pre-rounded).
+		const spend = (c) => Object.values(r.ledger.spend[c] || {}).reduce((a, b) => a + b, 0);
+		const income = s.income;
+		// Salvage refunds and Lucky Draw assembly credits reduce what the crates really cost.
+		const rebates = (r.ledger.cash.salvage || 0) + (r.ledger.cash.luckyDraw || 0);
+		rows.push([
+			label, money(income), pct((r.ledger.cash.fishing || 0) / income), pct(spend('upkeep') / income), pct(spend('progression') / income),
+			pct(spend('optional') / income), pct(spend('aspirational') / income), `${pct(r.final.money / income)} (${money(r.final.money)})`, pct(r.final.money / (income - rebates)),
+		]);
 	};
 	for (const a of ARCH) add(`${a} — reference loop`, reference(a));
 	for (const [label, variant] of [['bait: money baits', { bait: 'cash' }], ['bait: XP baits', { bait: 'xp' }], ['aquarium', { aquarium: true }], ['money baits + aquarium', { bait: 'cash', aquarium: true }]]) {
 		add(`regular + ${label}`, run(`regular:${JSON.stringify(variant)}`, { archetype: 'regular', variant }));
 	}
-	return `${table(['Player (to Lv 60)', 'All income', 'From fishing', 'Upkeep', 'Progression', 'Optional', 'Aspirational', 'Saved at Lv 60'], rows)}\n\nSinks are split by category (decision 10); shares are of all income to Lv 60. Upkeep = repairs; progression = rod-tier crates and permits; optional = bait and aquarium licenses; aspirational = display tanks.`;
+	return `${table(['Player (to Lv 60)', 'All income', 'From fishing', 'Upkeep', 'Progression', 'Optional', 'Aspirational', 'Saved at Lv 60', 'Saved, net of crate rebates'], rows)}\n\nSinks are split by category (decision 10); shares are of all income to Lv 60. Upkeep = repairs; progression = rod-tier crates and permits; optional = bait and aquarium licenses; aspirational = display tanks. "Net of crate rebates" removes salvage refunds and Lucky Draw assembly credits from income (they lower what the crates cost). Money bait is a gross sink but a small net source (its return per $1 is above 1 at home: P-BAIT-MONEY-RETURN), so it raises the dollars saved; XP bait and the aquarium lower them.`;
+}
+
+function valueModelTable() {
+	const rar = Object.keys(F.RARITY_VALUE);
+	const rarity = table(['', ...rar], [
+		['Sale value × (RARITY_VALUE)', ...rar.map((k) => `×${F.RARITY_VALUE[k]}`)],
+		['XP weight × (XP_RARITY; mean roll ' + F.XP_PER_FISH_MEAN + ')', ...rar.map((k) => `×${F.XP_RARITY[k]}`)],
+		['Mean XP per fish', ...rar.map((k) => fmt(F.XP_PER_FISH_MEAN * F.XP_RARITY[k], 1))],
+	]);
+	const biomes = F.LIVE_BIOMES;
+	const base = table(['', ...biomes], [['Common weak fish base value (BIOME_VALUE)', ...biomes.map((b) => `$${F.BIOME_VALUE[b]}`)]]);
+	return `Proposed expected sale value of a species = BIOME_VALUE × RARITY_VALUE × QUALITY_VALUE (strong ×${F.QUALITY_VALUE.strong}) × species factor (today's value relative to its biome/rarity group, clamped to ${F.SPECIES_CLAMP[0]}–${F.SPECIES_CLAMP[1]}). Today every fish has its own catalog value and every fish rolls a flat 10–25 XP whatever its rarity (decisions \`P-VALUE-MODEL\`, \`P-XP-RARITY\`).\n\n${base}\n\n${rarity}`;
+}
+
+// Adversarial review record (docs/economy/5b/review.json): every finding, the skeptic's verdict and
+// final severity, and what was done about it.
+function reviewTable() {
+	const R = readJson('5b/review.json');
+	const order = { blocker: 0, major: 1, minor: 2, info: 3 };
+	const rows = [...R.findings].sort((a, b) => order[a.finalSeverity] - order[b.finalSeverity] || a.id.localeCompare(b.id));
+	const count = (k) => rows.filter((f) => f.finalSeverity === k).length;
+	const refuted = rows.filter((f) => f.verdict === 'refuted').length;
+	const head = `Reviewed commit \`${R.reviewedCommit}\`: ${rows.length} findings (${Object.keys(order).map((k) => `${count(k)} ${k}`).join(', ')} after the skeptic's check; ${refuted} refuted).`;
+	return `${head}\n\n${table(['ID', 'Dimension', 'Finding', 'Severity (reviewer → final)', 'Resolution'], rows.map((f) => [f.id, f.dimension, f.title, `${f.severity} → **${f.finalSeverity}**`, f.resolution]))}`;
+}
+
+// Design checks that fail a module's own target: collected from each module's checks, never hand-listed.
+function normalizeChecks(module, raw) {
+	if (!raw) return [];
+	if (Array.isArray(raw)) {
+		return raw.map((c) => ({ module, id: c.id || c.name || c.check, text: c.check || c.text || c.name || c.id, pass: c.pass ?? c.ok, detail: c.detail ?? c.value }));
+	}
+	if (Array.isArray(raw.checks)) return normalizeChecks(module, raw.checks);
+	return Object.entries(raw).filter(([k]) => k !== 'pass').map(([k, v]) => ({ module, id: k, text: k, pass: v === true || (typeof v === 'string' && !/fail/i.test(v)), detail: v }));
+}
+function openChecksTable() {
+	const rows = [];
+	for (const m of Object.keys(REEMIT)) {
+		const mod = require(`./${m}`);
+		let raw = null;
+		if (typeof mod.checks === 'function') raw = mod.checks();
+		else if (typeof mod.report === 'function' && m === 'founder') raw = mod.report().checks;
+		for (const c of normalizeChecks(m, raw)) if (c.pass === false) rows.push(c);
+	}
+	const detail = (d) => (d == null ? '—' : typeof d === 'string' ? d : JSON.stringify(d).slice(0, 220));
+	if (!rows.length) return 'Every module design check passes.';
+	return `${table(['Module', 'Check', 'Result'], rows.map((c) => [c.module, c.text, detail(c.detail)]))}\n\nNone of these was tuned away: each is a design choice for you, with its options in the module doc and in §17.`;
 }
 
 function decisionsTable() {
@@ -165,7 +219,18 @@ function decisionsTable() {
 	};
 	const rows = D.table().map((d) => [`\`${d.id}\``, d.status === 'proposed' ? 'proposed' : 'direction approved, numbers pending', d.module, d.title, short(d.modelled), short(Array.isArray(d.alternatives) ? d.alternatives.join('; ') : d.alternatives)]);
 	const counts = D.table().reduce((a, d) => ({ ...a, [d.status]: (a[d.status] || 0) + 1 }), {});
-	return `${Object.entries(counts).map(([k, v]) => `**${v}** ${k}`).join(' · ')}. Nothing in this table is user-approved as a final rule; \`decisions.verify()\` proves each modelled value is what the model runs.\n\n${table(['ID', 'Status', 'Module', 'Decision', 'Modelled (proposed)', 'Alternatives'], rows)}`;
+	return `${Object.entries(counts).map(([k, v]) => `**${v}** ${k}`).join(' · ')}. Nothing in this table is user-approved as a final rule. For the ${D.all().filter((d) => d.get).length} entries that carry a concrete model value, \`decisions.verify()\` proves it is the value the model runs.\n\n${table(['ID', 'Status', 'Module', 'Decision', 'Modelled (proposed)', 'Alternatives'], rows)}`;
+}
+
+/** Minimum-daily XP per active hour ÷ the regular player's, compared at the same level (R2 records). */
+function equalLevelRatios(r2) {
+	const md = r2.minimumDaily.decomposition;
+	const reg = r2.decomposition.regular;
+	return Object.keys(md).filter((L) => md[L] && reg[L]).map((L) => [Number(L), (md[L].totalXp / md[L].activeHours) / (reg[L].totalXp / reg[L].activeHours)]);
+}
+function equalLevelRange(r2) {
+	const xs = equalLevelRatios(r2).map(([, x]) => x);
+	return `${fmt(Math.min(...xs), 2)}–${fmt(Math.max(...xs), 2)}×`;
 }
 
 function headlineTable() {
@@ -192,7 +257,7 @@ function headlineTable() {
 		['Chance of a 3+ fish jackpot by gear step', gear.map((t) => pct(t.jackpot3plus ?? 0)).join(' · ')],
 		['Permit prices', Object.entries(prices).map(([b, p]) => `${b} ${money(p)}`).join(' · ')],
 		['Share of all income to Lv 60: upkeep / progression / saved', `${range(sinks.map((s) => share(s, 'upkeep')), pct)} / ${range(sinks.map((s) => share(s, 'progression')), pct)} / ${range(sinks.map((s) => s.savedShare), pct)}`],
-		['Minimum-daily player (R2)', `${r2.minimumDaily.leadsAnEngagedArchetypeOnDays.length ? 'LEADS an engaged player' : 'never leads an engaged player by calendar day'}; XP per active hour ${fmt(r2.minimumDaily.xpPerActiveHourVsRegular, 2)}× the regular player's (day 365)`],
+		['Minimum-daily player (R2)', `${r2.minimumDaily.leadsAnEngagedArchetypeOnDays.length ? 'LEADS an engaged player' : 'never leads an engaged player by calendar day'}; XP per active hour ${equalLevelRange(r2)} the regular player's at equal level (Lv 20–50), ${fmt(r2.minimumDaily.xpPerActiveHourVsRegular, 2)}× on day 365`],
 		['No-miss grinder (R2): play-hours saved by every daily/streak/repeatable reward', `at most ${pct(r2.noMissGrinder.maxShareOfHoursSaved)}`],
 		['Decisions awaiting approval', Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(' · ')],
 	]);
@@ -215,7 +280,7 @@ function stampTable() {
 // Module tables re-emitted verbatim (same block ids as in the module docs).
 const REEMIT = {
 	rods: ['rods-current-proposed', 'rods-gear-path', 'rods-crates', 'rods-upkeep'],
-	world: ['world-current-proposed', 'world-permit-table', 'world-time-to-afford', 'world-ms-ladder'],
+	world: ['world-current-proposed', 'world-permit-table', 'world-time-to-afford', 'world-ms-ladder', 'world-value-per-fish', 'world-value-per-hour'],
 	bait: ['bait-current', 'bait-proposed', 'bait-xp-sizing'],
 	quests: ['quests-fixes', 'quests-kinds', 'quests-bands', 'quests-story'],
 	streak: ['streak-current-proposed', 'streak-ladder'],
@@ -234,6 +299,9 @@ function markdownTables() {
 		...r2Tables(),
 		'summary-daily-factor': dailyFactorTable(),
 		'summary-sinks': sinksTable(),
+		'summary-value-model': valueModelTable(),
+		'summary-review': reviewTable(),
+		'summary-open-checks': openChecksTable(),
 		'summary-decisions': decisionsTable(),
 	};
 	for (const [m, ids] of Object.entries(REEMIT)) {
