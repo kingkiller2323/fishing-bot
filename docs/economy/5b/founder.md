@@ -549,7 +549,7 @@ What a site that reads the new curve without the stored floor would return for a
 | cast.js: level after the cast | **src/engine/cast.js (**pattern not found**)** | `levelForXp(xp + gain)` (100·L²) | max(stored level, curve(xp + gain)) |
 | cast.js: public level before | **src/engine/cast.js (**pattern not found**)** | `levelForXp(publicXp)` | max(stored publicLevel, curve(publicXp)) |
 | cast.js: public level after (the card's "Level up!") | **src/engine/cast.js (**pattern not found**)** | `levelForXp(publicXp + gain)` | max(stored publicLevel, curve(publicXp + gain)); a level-up only above the floor |
-| cast.js: level write in the commit | src/engine/cast.js:452 | `$set level` = the cast's level after | writes the max (never lower); also writes `publicLevel` the same way |
+| cast.js: level write in the commit | **src/engine/cast.js (**pattern not found**)** | `$set level` = the cast's level after | writes the max (never lower); also writes `publicLevel` the same way |
 | User.getLevel() | **src/class/User.js (**pattern not found**)** | derived from `xp` (100·L²) | max(stored level, curve(xp)) |
 | User.getXPToNextLevel() | **src/class/User.js (**pattern not found**)** | hard-coded 100·L² | the new curve, from the displayed level |
 | publicLevel.js: public level (getPublicLevel) | src/engine/publicLevel.js:48 | `levelForXp(min(publicXp, xp))`, derived on read | max(stored publicLevel, curve(min(publicXp, xp))) |
