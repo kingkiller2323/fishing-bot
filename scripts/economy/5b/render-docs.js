@@ -16,10 +16,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const F = require('./framework');
 
-const MODULES = ['rods', 'upgrades', 'bait', 'quests', 'streak', 'aquarium', 'founder', 'buffs', 'world', 'summary'];
+const MODULES = ['rods', 'upgrades', 'bait', 'quests', 'streak', 'aquarium', 'founder', 'buffs', 'world', 'summary', 'delta'];
 const DOCS = path.join(__dirname, '../../../docs/economy/5b');
 // Docs that do not live at docs/economy/5b/<name>.md.
-const DOC_PATHS = { summary: path.join(DOCS, '../PHASE5B_REPORT.md') };
+const DOC_PATHS = { summary: path.join(DOCS, '../PHASE5B_REPORT.md'), delta: path.join(DOCS, '../PHASE5B_DELTA.md') };
 const docName = (name) => path.basename(DOC_PATHS[name] || `${name}.md`);
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 

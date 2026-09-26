@@ -25,7 +25,7 @@ const DIR = __dirname;
 const SOURCE_FILES = new Set(['framework.js', 'assumptions.js', 'decisions.js', 'check-shared.js']);
 // Infrastructure and runners: scanned for local copies, but not subsystem modules (no report() stamp;
 // runners print on load, so they are never required here).
-const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js', 'render-docs.js', 'summary.js']);
+const NOT_MODULES = new Set(['lifecycle.js', 'integrate.js', 'curve.js', 'r2.js', 'render-docs.js', 'summary.js', 'delta.js']);
 const num = (n) => String(n).replace('.', '\\.').replace(/^0\\\./, '0?\\.');
 
 const RULES = [

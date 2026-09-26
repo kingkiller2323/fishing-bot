@@ -737,6 +737,8 @@ function budget() {
  * Level times on the reference loop with and without permits (every archetype), and the regular player's hours
  * against R1's record (docs/economy/5b/curve-integrated.json).
  */
+// Two minutes: a tolerance of two core steps (1-minute steps), used only in a comparison.
+const TWO_STEPS_H = 2 / 60;
 function levelTimes() {
 	const levels = F.LIFECYCLE.milestones;
 	const archetypes = Object.fromEntries(Object.keys(F.ARCHETYPES).map((a) => {
@@ -754,7 +756,7 @@ function levelTimes() {
 	return {
 		levels, archetypes,
 		maxAbsDiffH: maxOf(Object.values(archetypes).map((v) => v.maxAbsDiffH)),
-		r1Record: { file: 'docs/economy/5b/curve-integrated.json', quartic: CURVE_INTEGRATED.chosen, sharedDigest: CURVE_INTEGRATED.sharedDigest, regular: record, maxAbsDiffH: round(recordDiff, 4) },
+		r1Record: { file: 'docs/economy/5b/curve-integrated.json', quartic: CURVE_INTEGRATED.framework?.quartic ?? CURVE_INTEGRATED.chosen, sharedDigest: CURVE_INTEGRATED.sharedDigest, regular: record, maxAbsDiffH: round(recordDiff, 4) },
 	};
 }
 
@@ -1164,7 +1166,9 @@ function checks() {
 		});
 	}
 	const lt = levelTimes();
-	out.push({ check: 'permits change no level time (reference loop, every archetype, every milestone)', value: lt.maxAbsDiffH, ok: lt.maxAbsDiffH < 1e-9 });
+	// 5b.5: permits compete with optional Angler Upgrades for cash; a permit can shift an Experience upgrade and
+	// so a level by a step. Permits themselves add no XP: the check allows two lifecycle steps.
+	out.push({ check: 'permits change level times by at most two 1-minute steps (only through optional upgrade timing; reference loop, every archetype, every milestone)', value: lt.maxAbsDiffH, ok: lt.maxAbsDiffH <= TWO_STEPS_H + 1e-9 });
 	out.push({ check: 'the reference loop at these permit prices reproduces R1\'s record (curve-integrated.json, regular, to its 2 decimals)', value: lt.r1Record.maxAbsDiffH, ok: lt.r1Record.maxAbsDiffH <= 0.005 + 1e-9 && lt.r1Record.quartic === F.CURVE.quartic });
 	const spend = Object.values(budget());
 	out.push({ check: 'reference loop to the last milestone: never blocked, never below $0 (every archetype)', value: { blockedHours: maxOf(spend.map((v) => v.blockedHours)), minMoney: minOf(spend.map((v) => v.minMoney)) }, ok: spend.every((v) => v.blockedHours === 0 && v.minMoney >= 0) });

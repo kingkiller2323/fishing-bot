@@ -1,6 +1,6 @@
 # Phase 5B: final proposed balance
 
-**Framework 5b.4 · shared digest `d9e4938f85074918`**
+**Framework 5b.5 · shared digest `d7374a03d62e8b81`** (5b.4 approved decisions + the hybrid rod redesign; see PHASE5B_DELTA.md)
 
 <!-- generated:summary-stamp -->
 | Item | Value |
@@ -144,15 +144,15 @@ The coefficient was not adjusted separately for each subsystem. It was re-swept 
 <!-- generated:summary-r1 -->
 | Quartic q | Lv 20 (5–6 h) | Lv 30 (12–15 h) | Lv 40 (24–30 h) | Lv 50 (40–45 h) | Fit score (lower is better) |
 | --- | --- | --- | --- | --- | --- |
+| 0.0425 | 4.95 h (out) | 11.97 h (out) | 22.68 h (out) | 38.50 h (out) | 1.5821 |
 | 0.045 | 5.00 h | 12.12 h | 23.27 h (out) | 39.75 h (out) | 0.2881 |
 | 0.0475 | 5.05 h | 12.33 h | 23.85 h (out) | 40.90 h | 0.0795 |
 | 0.05 | 5.10 h | 12.57 h | 24.38 h | 42.03 h | 0.0456 |
-| 0.0525 | 5.15 h | 12.75 h | 24.90 h | 42.93 h | 0.0315 |
-| **0.055** (chosen) | 5.20 h | 12.93 h | 25.52 h | 44.18 h | 0.0300 |
+| **0.0525** (approved, locked) | 5.15 h | 12.75 h | 24.90 h | 42.93 h | 0.0315 |
+| 0.055 (best fit, informational) | 5.20 h | 12.93 h | 25.52 h | 44.18 h | 0.0300 |
 | 0.0575 | 5.25 h | 13.17 h | 26.10 h | 45.33 h (out) | 0.0853 |
 | 0.06 | 5.27 h | 13.38 h | 26.62 h | 46.57 h (out) | 1.0581 |
 | 0.0625 | 5.27 h | 13.52 h | 27.02 h | 47.78 h (out) | 3.2082 |
-| 0.065 | 5.32 h | 13.78 h | 27.55 h | 48.73 h (out) | 5.7254 |
 
 Sweep on the integrated reference loop (shared lifecycle core; integrated core loop: rods (standard shop ladder, repairs) + world (permits) + quests + streak + buffs + upgrades (policy 'reference'), no bait, no aquarium); record `docs/economy/5b/curve-integrated.json`, generated at framework 5b.5 (digest d7374a03d62e8b81). The regular player is in every approved window: **yes**.
 
@@ -1396,12 +1396,8 @@ The reviewers confirmed the following:
 <!-- generated:summary-open-checks -->
 | Module | Check | Result |
 | --- | --- | --- |
-| world | permits change no level time (reference loop, every archetype, every milestone) | 0.01670000000000016 |
-| world | the reference loop at these permit prices reproduces R1's record (curve-integrated.json, regular, to its 2 decimals) | 0 |
 | buffs | cash-share-casual | buffs add 16.45% of fishing income in 30 days (max 8%) |
 | buffs | cash-share-regular | buffs add 8.28% of fishing income in 30 days (max 8%) |
-| aquarium | the aquarium adds no XP: every level is reached on the same step with the same XP by source, with and without it (integrated: every archetype and the minimum-daily player; reference loop and money bait) | false |
-| aquarium | licenses never delay progression: every rod assembly or permit they move is still bought by the time its level is reached, and none is dropped (integrated) | false |
 | founder | visible count feasible for normal (`visibleCountFeasibleForNormal`) | fails (founder.md, Checks) |
 | founder | day 30 xp and money ratio preserved (`day30XpAndMoneyRatioPreserved`) | fails (founder.md, Checks) |
 | bait | Always-on XP bait stays a net sink and reaches each milestone at most ~10% sooner than the same archetype without bait (P-BAIT-XP-SIZING) | over the limit: regular, active, grinder; not a net sink: none |

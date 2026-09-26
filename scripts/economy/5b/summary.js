@@ -84,9 +84,9 @@ function progressionTable() {
 
 function r1Table() {
 	const c = readJson('5b/curve-integrated.json');
-	const near = c.sweep.filter((s) => Math.abs(s.quartic - c.chosen) <= 0.0101);
+	const near = c.sweep.filter((s) => Math.abs(s.quartic - F.CURVE.quartic) <= 0.0101);
 	const rows = near.map((s) => [
-		s.quartic === c.chosen ? `**${s.quartic}** (chosen)` : String(s.quartic),
+		s.quartic === F.CURVE.quartic ? `**${s.quartic}** (approved, locked)` : s.quartic === c.chosen ? `${s.quartic} (best fit, informational)` : String(s.quartic),
 		...WINDOW_LEVELS.map((L) => {
 			const h = s.regular[L];
 			const [lo, hi] = F.TARGET_WINDOWS[L];

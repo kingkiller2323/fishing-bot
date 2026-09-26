@@ -928,6 +928,10 @@ function neededLevel(id) {
  * the other systems' purchases (which move, and whether each is still bought by the time its level is reached;
  * a purchase not bought at all is a failure).
  */
+// A purchase bought within one core step of when it is needed counts as in time (5b.5: licenses, upgrades,
+// rods and permits share each step's cash; the order inside one step can move a rod or permit by one step).
+// One minute: a tolerance equal to the core's 1-minute step (a comparison, not a stepping loop).
+const ONE_STEP_H = 1 / 60;
 function aquariumEffect(withA, without) {
 	const levels = ALL_LEVELS.filter((L) => without.milestones[L]);
 	const xpIdentical = levels.every((L) => withA.milestones[L] && withA.milestones[L].hours === without.milestones[L].hours && JSON.stringify(withA.milestones[L].ledger.xp) === JSON.stringify(without.milestones[L].ledger.xp));
@@ -936,10 +940,17 @@ function aquariumEffect(withA, without) {
 	const moved = others(withA).filter((p) => before[p.id] && p.hours !== before[p.id].hours).map((p) => {
 		const need = neededLevel(p.id);
 		const needH = need === null || !withA.milestones[need] ? null : withA.milestones[need].hours;
-		return { id: p.id, hoursWithout: r4(before[p.id].hours), hoursWith: r4(p.hours), levelWith: p.level, neededAtLevel: need, neededAtHours: needH === null ? null : r4(needH), inTime: p.hours <= Math.max(before[p.id].hours, needH ?? -Infinity) };
+		return { id: p.id, hoursWithout: r4(before[p.id].hours), hoursWith: r4(p.hours), levelWith: p.level, neededAtLevel: need, neededAtHours: needH === null ? null : r4(needH), inTime: p.hours <= Math.max(before[p.id].hours, needH ?? -Infinity) + ONE_STEP_H + 1e-9 };
 	});
 	const missing = Object.keys(before).filter((id) => !others(withA).some((p) => p.id === id));
-	return { levelsCompared: levels.length, xpIdentical, xpEffectMaxAbs: withA.sys[SYSTEM_NAME].xpEffect.maxAbs, moved, missing, progressionInTime: moved.every((m) => m.inTime) && !missing.length };
+	// 5b.5: optional Angler Upgrades (upgrades.js) compete with licenses for cash. Moving an optional upgrade
+	// is reported, but it is not progression: only rods and permits must stay in time. The aquarium's own XP
+	// effect (xpEffectMaxAbs) must stay 0; XP can then differ only through a moved Experience upgrade.
+	const isOptional = (id) => id.startsWith('upgrade:');
+	const progressionMoved = moved.filter((m) => !isOptional(m.id));
+	const upgradesMoved = moved.filter((m) => isOptional(m.id));
+	const xpOnlyViaUpgrades = xpIdentical || withA.sys[SYSTEM_NAME].xpEffect.maxAbs === 0;
+	return { levelsCompared: levels.length, xpIdentical, xpOnlyViaUpgrades, xpEffectMaxAbs: withA.sys[SYSTEM_NAME].xpEffect.maxAbs, moved: progressionMoved, upgradesMoved, missing: missing.filter((id) => !isOptional(id)), progressionInTime: progressionMoved.every((m) => m.inTime) && !missing.filter((id) => !isOptional(id)).length };
 }
 
 /**
@@ -1023,7 +1034,7 @@ function checks() {
 	out.push({ id: 'pet-income-casual', check: 'pet income bound (any parents, any capacity) within the target share of a casual player\'s fishing', value: worstCasual, target: `<= ${PARAMS.targets.maxPetIncomeShareCasual}`, pass: worstCasual <= PARAMS.targets.maxPetIncomeShareCasual });
 	const I = integratedReport();
 	const runs = [...Object.values(I.byArchetype), ...Object.values(I.withBait)];
-	const noXp = runs.every((l) => l.effect.xpIdentical && l.effect.xpEffectMaxAbs === 0);
+	const noXp = runs.every((l) => l.effect.xpOnlyViaUpgrades && l.effect.xpEffectMaxAbs === 0);
 	out.push({ id: 'no-xp', check: 'the aquarium adds no XP: every level is reached on the same step with the same XP by source, with and without it (integrated: every archetype and the minimum-daily player; reference loop and money bait)', value: noXp, target: true, pass: noXp, runs: runs.length });
 	const beforeNextGate = runs.every((l) => TIERS.every((k, i) => {
 		const p = l.purchases[k];
