@@ -5,7 +5,8 @@ module.exports = [
 		description: 'A crate containing a random assortment of fishing supplies.',
 		rarity: 'Common',
 		capabilities: ['bait', 'part_rod', 'part_reel', 'part_hook', 'part_handle'],
-		shopItem: true,
+		// Delisted from the shop (hotfix L5); existing databases are updated by migrateDelistFishingCrate.
+		shopItem: false,
 		price: 750,
 		items: 3,
 		icon: {

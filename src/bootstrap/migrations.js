@@ -1,8 +1,10 @@
 // Additive, idempotent migrations of player data. They only fill fields that are missing and
-// never remove or rewrite existing progression.
+// never remove or rewrite existing progression. Catalog migrations use guarded updates on catalog
+// rows only (no owner); player-owned copies are never touched.
 const { User: UserModel } = require('../schemas/UserSchema');
 const { FishData } = require('../schemas/FishSchema');
 const { Cast } = require('../schemas/CastSchema');
+const { Item } = require('../schemas/ItemSchema');
 const { migratePublicXp } = require('../engine/publicLevel');
 
 /**
@@ -21,11 +23,28 @@ async function migrateAutoLockSpecies() {
 	return { scanned: users.length, withRules };
 }
 
+/**
+ * Hotfix L5: the $750 Fishing Crate is removed from the shop. The seed only inserts missing catalog
+ * rows, so deployed databases keep `shopItem: true` until this guarded update flips it. Only the
+ * catalog row(s) are matched (catalog lives in `items` and has no owner: `user` null or missing);
+ * owned crates are per-user `itemdatas` documents and are never touched. Price and the box
+ * definition are unchanged, so owned crates still open. Idempotent: once delisted, nothing matches.
+ */
+async function migrateDelistFishingCrate() {
+	const res = await Item.collection.updateMany(
+		{ name: 'Fishing Crate', user: null, shopItem: true },
+		{ $set: { shopItem: false } },
+	);
+	return { delisted: res.modifiedCount };
+}
+
 async function runMigrations(log) {
 	const autoLock = await migrateAutoLockSpecies();
 	if (autoLock.scanned > 0) log(`Migration autoLock.species: ${autoLock.scanned} player(s) initialised, ${autoLock.withRules} with species auto-lock.`, 'done');
 	const publicXp = await migratePublicXp({ UserModel, Cast });
 	if (publicXp.scanned > 0) log(`Migration publicXp: ${publicXp.scanned} player(s) initialised, ${publicXp.withBonus} with private profile bonuses excluded.`, 'done');
+	const crate = await migrateDelistFishingCrate();
+	if (crate.delisted > 0) log(`Migration delistFishingCrate: ${crate.delisted} catalog row(s) removed from the shop (shopItem -> false); owned crates untouched.`, 'done');
 }
 
-module.exports = { runMigrations, migrateAutoLockSpecies, migratePublicXp };
+module.exports = { runMigrations, migrateAutoLockSpecies, migratePublicXp, migrateDelistFishingCrate };
