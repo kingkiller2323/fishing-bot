@@ -4,6 +4,7 @@ const { Item } = require('../../schemas/ItemSchema');
 const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
+const { purchase, replaceCollector } = require('../../engine/purchase');
 
 module.exports = {
 	customId: 'buy-rod',
@@ -28,7 +29,7 @@ module.exports = {
 
 			const response = await updateInteraction(interaction, row, components);
 
-			await getSelection(response, user.id, analyticsObject);
+			await getSelection(response, user.id, analyticsObject, interaction.message.id);
 		}
 		catch (err) {
 			// console.error(err);
@@ -77,8 +78,9 @@ const updateInteraction = async (interaction, row, components) => {
 	});
 };
 
-const getSelection = async (response, userId, analyticsObject) => {
+const getSelection = async (response, userId, analyticsObject, messageId) => {
 	const collector = response.createMessageComponentCollector({ filter: Utils.getCollectionFilter(['select-rod'], userId), time: 90_000 });
+	replaceCollector('buy-rod:select', messageId, userId, collector);
 
 	collector.on('collect', async i => {
 		if (process.env.ANALYTICS || config.client.analytics) {
@@ -119,7 +121,25 @@ const processRodSelection = async (selection, userData, analyticsObject) => {
 		});
 	}
 	else if (canBuy) {
-		await buyItem(originalItem, userData);
+		const result = await buyItem(originalItem, await userData.getUserId());
+		if (!result.ok) {
+			if (process.env.ANALYTICS || config.client.analytics) {
+				await analyticsObject.setStatus('failed');
+				await analyticsObject.setStatusMessage('User does not have enough money to buy this item!');
+			}
+			return await selection.reply({
+				embeds: [new EmbedBuilder()
+					.setTitle('Shop')
+					.setColor('Red')
+					.addFields(
+						{ name: 'Uh-oh!', value: 'You do not have enough money to buy that item', inline: false },
+						{ name: 'Price', value: `$${(originalItem.price).toLocaleString()}`, inline: true },
+						{ name: 'Balance', value: `$${(result.balance).toLocaleString()}`, inline: true },
+					)],
+				flags: MessageFlags.Ephemeral,
+				components: [],
+			});
+		}
 		if (process.env.ANALYTICS || config.client.analytics) {
 			await analyticsObject.setStatus('completed');
 			await analyticsObject.setStatusMessage('User has successfully bought a fishing rod!');
@@ -130,7 +150,7 @@ const processRodSelection = async (selection, userData, analyticsObject) => {
 			.setColor('Green')
 			.addFields(
 				{ name: 'Congrats!', value: `You have successfully bought ${originalItem.name}`, inline: false },
-				{ name: 'New Balance', value: `$${(await userData.getMoney()).toLocaleString()}`, inline: true },
+				{ name: 'New Balance', value: `$${(result.balance).toLocaleString()}`, inline: true },
 			),
 		);
 		return await selection.reply({
@@ -171,7 +191,7 @@ const checkItemRequirements = async (item, userData) => {
 	return userLevel >= item.toJSON().requirements.level;
 };
 
-const buyItem = async (item, userData) => {
-	await userData.addMoney(-item.price);
-	await userData.sendToInventory(item);
+/** Pays and grants in one locked step (see engine/purchase). Resolves { ok, balance }. */
+const buyItem = async (item, userId) => {
+	return purchase(userId, item.price, (userData) => userData.sendToInventory(item));
 };

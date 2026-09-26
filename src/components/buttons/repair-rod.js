@@ -3,6 +3,7 @@ const { RodData } = require('../../schemas/RodSchema');
 const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
+const { purchase } = require('../../engine/purchase');
 
 module.exports = {
 	customId: 'repair-rod',
@@ -76,32 +77,19 @@ module.exports = {
 			}
 
 			if (confirmation.customId === 'confirm') {
-				if (await user.getMoney() < rod.repairCost) {
-					if (process.env.ANALYTICS || config.client.analytics) {
-						await analyticsObject.setStatus('failed');
-						await analyticsObject.setStatusMessage('User does not have enough money to repair rod!');
-					}
-					await confirmation.update({
-						// content: 'You do not have enough money to repair your rod!',
-						embeds: [
-							new EmbedBuilder()
-								.setTitle('Insufficient Balance')
-								.setDescription('You do not have enough money to repair your rod!'),
-						],
-						components: [] });
-					return;
-				}
-
 				const newDurability = rod.maxDurability;
 				const newRepairs = rod.repairs + 1;
 				const newRodState = 'repaired';
 
+				// Guarded atomic debit at confirm time (not the balance loaded when the prompt opened);
+				// the repair only happens if the debit did, and a failed repair is refunded.
+				let result;
 				try {
-					await RodData.findByIdAndUpdate(rod._id, {
+					result = await purchase(interaction.user.id, rod.repairCost, () => RodData.findByIdAndUpdate(rod._id, {
 						durability: newDurability,
 						repairs: newRepairs,
 						state: newRodState,
-					});
+					}));
 				}
 				catch (error) {
 					if (process.env.ANALYTICS || config.client.analytics) {
@@ -120,7 +108,21 @@ module.exports = {
 					return;
 				}
 
-				await user.addMoney(-rod.repairCost);
+				if (!result.ok) {
+					if (process.env.ANALYTICS || config.client.analytics) {
+						await analyticsObject.setStatus('failed');
+						await analyticsObject.setStatusMessage('User does not have enough money to repair rod!');
+					}
+					await confirmation.update({
+						// content: 'You do not have enough money to repair your rod!',
+						embeds: [
+							new EmbedBuilder()
+								.setTitle('Insufficient Balance')
+								.setDescription('You do not have enough money to repair your rod!'),
+						],
+						components: [] });
+					return;
+				}
 
 				if (process.env.ANALYTICS || config.client.analytics) {
 					await analyticsObject.setStatus('completed');
