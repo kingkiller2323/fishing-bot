@@ -232,7 +232,7 @@ function decisionsTable() {
 		const s = typeof v === 'string' ? v : JSON.stringify(v);
 		return s.length > 160 ? `${s.slice(0, 157)}…` : s;
 	};
-	const rows = D.table().map((d) => [`\`${d.id}\``, d.status === 'proposed' ? 'proposed' : 'direction approved, numbers pending', d.module, d.title, short(d.modelled), short(Array.isArray(d.alternatives) ? d.alternatives.join('; ') : d.alternatives)]);
+	const rows = D.table().map((d) => [`\`${d.id}\``, d.status === 'proposed' ? 'proposed' : d.status === 'approved' ? '**approved**' : 'direction approved, numbers pending', d.module, d.title, short(d.modelled), short(Array.isArray(d.alternatives) ? d.alternatives.join('; ') : d.alternatives)]);
 	const counts = D.table().reduce((a, d) => ({ ...a, [d.status]: (a[d.status] || 0) + 1 }), {});
 	return `${Object.entries(counts).map(([k, v]) => `**${v}** ${k}`).join(' · ')}. Nothing in this table is user-approved as a final rule. For the ${D.all().filter((d) => d.get).length} entries that carry a concrete model value, \`decisions.verify()\` proves it is the value the model runs.\n\n${table(['ID', 'Status', 'Module', 'Decision', 'Modelled (proposed)', 'Alternatives'], rows)}`;
 }

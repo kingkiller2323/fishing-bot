@@ -48,6 +48,9 @@ Already live on `main` (`71fde4d`):
 - **Aquarium:** A3–A5 and A7–A9 (breeding cooldown record, capacity await, success XP, duplicate licences, atomic pet sale, temperature clamp). **A2 (the breeding chance fix) is not a step-B item.** It is held until A1 (the play → sell loop) closes in the balance release (step C.10).
 - **Stealth closure (D4 privacy part):** `/sell` and `/boosters` ephemeral for everyone. Plus the `/dev founder` override hardening (`P-FOUNDER-DEV-OVERRIDE`).
 - **L6B rod gates** use the final D1 rule: a custom rod's required level is that of its highest-rarity part, enforced at `/craft` and `/equip`, and the Rod Workshop previews that level before crafting. The Common rod piece is 1.05 fish per cast. L6B ships **with** step C's standard shop rods, never before, so no one is stranded on the Old Rod.
+  - **Open item to confirm:** under the final rule, 944 existing crafted-rod combinations get a higher requirement than today.
+    - **The plan's default follows your L6 instruction:** an already-equipped rod stays equipped and keeps working, with no forced unequip or cast-time fallback. Only a new `/equip` or `/craft` is gated.
+    - **The alternative in rods.md §18:** the cast path reads the gate and falls back to the best usable rod. It is not adopted unless you choose it.
 
 ### Step C: the balance release (built dark behind `BALANCE_5B`, one PR per system, merged in this order)
 1. **Curve, value model, XP per rarity** (`balance.js`, `cast.js`, `rewards.js`, `publicLevel.js`): the new curve behind the flag, with the floors from step A.
