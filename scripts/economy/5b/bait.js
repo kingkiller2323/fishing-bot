@@ -97,7 +97,8 @@ const PARAMS = deepFreeze({
 		// the bait's extra catch value) and (b) reach each milestone from Lv 20 at most this much sooner, in
 		// active hours, than the same archetype's no-bait run. The approved R1 progression windows describe the
 		// no-bait reference player; they are not a test for bait buyers.
-		maxXpBaitSpeedup: 0.10,
+		// User decision D3: the hard guard is 12% (approved; was 'roughly 10%').
+		maxXpBaitSpeedup: 0.12,
 		xpBaitNetSink: true,
 		// Sold in packs of `packSize` casts so small per-cast prices keep their precision (money is an
 		// integer). Pack prices round to $1 below $100 and to $5 above.
@@ -1316,7 +1317,7 @@ const DECISIONS = [
 		alternatives: ['the design-stage alternative (smaller XP bonuses; XP-bait sizing)', 'scale the XP bonuses down to the guard bound so every archetype stays under the cap (XP-bait sizing)', 'no XP-class baits', 'superseded test: the always-on buyer must stay inside the approved windows (replaced by the user)'],
 		source: 'bait design; user decision (keep the proposed values, replace the window test with the net-sink and speed-up guard)', why: 'a paid, optional accelerator: it must cost more cash than it returns and must not become a second progression curve; archetypes over the cap are flagged, not tuned away (XP-bait guard; XP-bait sizing)',
 		get: () => ({ 'Lure': PARAMS.baits.Lure.stats.xpBonus, 'Magic Lure': PARAMS.baits['Magic Lure'].stats.xpBonus, 'Spinner': PARAMS.baits.Spinner.multiChance, 'maxXpBaitSpeedup': P.maxXpBaitSpeedup, 'xpBaitNetSink': P.xpBaitNetSink }),
-		expected: { 'Lure': 0.15, 'Magic Lure': 0.12, 'Spinner': 0.1, 'maxXpBaitSpeedup': 0.1, 'xpBaitNetSink': true },
+		expected: { 'Lure': 0.15, 'Magic Lure': 0.12, 'Spinner': 0.1, 'maxXpBaitSpeedup': 0.12, 'xpBaitNetSink': true },
 	},
 	{
 		id: 'P-BAIT-PACK', status: 'proposed',
@@ -1528,7 +1529,7 @@ function markdownTables() {
 		['Volume bait (Spinner): against the mid band\'s rod range', `${num(vs.bandTop, 2)} (informational: the clamp is at the ceiling, not here)`, `above the range on ${vs.tiersAboveBand.map(tierName).join(', ') || 'none'}`, 'reported'],
 		['No money bait above the band at a typical stage outside its home', `≤ ${P.moneyReturnBand[1]}`, bc.issues.filter((s) => s.includes('not home')).length ? bc.issues.filter((s) => s.includes('not home')).join('; ') : 'none above', lim(!bc.issues.some((s) => s.includes('not home')))],
 		['Always-on XP bait remains a net economic sink, every archetype (integrated)', 'bait bought > extra catch value', G.rows.map((r) => `${r.archetype} ${spct(r.netEffectShareOfIncome)} of income`).join(', '), G.notNetSink.length ? `**fail**: ${G.notNetSink.join(', ')}` : 'pass'],
-		['Always-on XP bait: milestone active time against the same archetype without bait, every milestone from L20 (integrated)', `≤ ${pct(G.limit, 0)} sooner (roughly)`, G.rows.map((r) => `${r.archetype} ${pct(r.maxSpeedup)} (L${r.maxSpeedupAt})`).join(', '), G.overLimit.length ? `**flag for the user**: over for ${G.overLimit.join(', ')} (\`P-BAIT-XP-SIZING\`)` : 'pass'],
+		['Always-on XP bait: milestone active time against the same archetype without bait, every milestone from L20 (integrated)', `≤ ${pct(G.limit, 0)} sooner (hard guard, user decision D3)`, G.rows.map((r) => `${r.archetype} ${pct(r.maxSpeedup)} (L${r.maxSpeedupAt})`).join(', '), G.overLimit.length ? `**flag for the user**: over for ${G.overLimit.join(', ')} (\`P-BAIT-XP-SIZING\`)` : 'pass'],
 	]);
 
 	// ----- Spinner by rod tier -----
@@ -1584,7 +1585,7 @@ function markdownTables() {
 		`${r.archetype} (${r.minutesPerDay} min/day)`, ...guardLevels.map((lv) => (r.speedups[lv] === undefined ? '—' : r.speedups[lv] > G.limit + 1e-9 ? `**${pct(r.speedups[lv])}**` : pct(r.speedups[lv]))),
 		`${pct(r.maxSpeedup)} (L${r.maxSpeedupAt})`, r.overLimit.length ? `**no** (${r.overLimit.map((lv) => `L${lv}`).join(', ')})` : 'yes',
 		`${usd(r.baitSpend, 0)} → ${usd(r.baitExtraValue, 0)}`, spct(r.netEffectShareOfIncome), `${yes(r.netSink)} / ${yes(r.xpClassNetSink)}`, r.pass ? 'pass' : '**flag**',
-	])) + `\n\n\`xpBaitGuard()\`: every archetype's always-on XP-bait run (\`variant.bait: 'xp'\`) against its own no-bait run, integrated. "Sooner" = 1 − hours with XP bait ÷ hours without, in active play hours, at every milestone from L20 both runs reach. The policy also buys the starter money baits where no XP bait exists; the XP-class column counts ${xpNames.join(', ')} alone. The cap is "roughly" ${pct(G.limit, 0)}: every milestone over it is flagged for you, nothing is tuned away.`;
+	])) + `\n\n\`xpBaitGuard()\`: every archetype's always-on XP-bait run (\`variant.bait: 'xp'\`) against its own no-bait run, integrated. "Sooner" = 1 − hours with XP bait ÷ hours without, in active play hours, at every milestone from L20 both runs reach. The policy also buys the starter money baits where no XP bait exists; the XP-class column counts ${xpNames.join(', ')} alone. The hard guard is ${pct(G.limit, 0)} (user decision D3): a milestone over it fails the check; nothing is tuned away.`;
 	T['bait-by-bait'] = mdTable(['Policy', 'Bait', 'Casts with it', 'Spent', 'Extra catch value', 'Realised cash return', 'Extra XP', 'Net $ per extra XP'], ['cash', 'xp'].flatMap((p) => Object.entries(reg[p].byBait).map(([name, t]) => [
 		p === 'cash' ? 'money bait' : 'XP bait', name, int(t.units), usd(t.spend, 0), usd(t.extraValue, 0), num(t.extraValue / t.spend, 2), int(t.extraXp), t.extraXp > 1 ? usd((t.spend - t.extraValue) / t.extraXp) : '—',
 	]))) + '\n\nRegular player to L60, integrated: what each bait actually did on the core\'s own casts (gear, buffs and stage mix included).';

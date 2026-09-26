@@ -63,9 +63,19 @@ const APPROVED = {
 	// Approved with a change; each module now models the chosen option.
 	'P-RODS-FISHING-CRATE': 'option B: delisted now; owned units snapshotted into an additive legacyCount and opened under the old definition first; never converted',
 	'P-BAIT-SPINNER-TIERS': 'clamp the final normal-player mean at 1.80; no tier limit, no per-tier clamp',
-	'P-BAIT-XP-SIZING': 'keep the proposed values; guard = net economic sink and at most ~10% sooner milestones than the same no-bait run',
+	'P-BAIT-XP-SIZING': 'D3: keep the proposed values; hard guard = net economic sink and no milestone more than 12% sooner than the same no-bait run',
 	'P-STREAK-ITEM-POOL': 'no Lucky Draw in Streak Crates/Chests; no replacement cash',
 	'P-STREAK-TARGETS': 'regular streak value including attributed buffs <= 5% of fishing income',
+	// Delta decision set (5b.5).
+	'P-RODS-STANDARD-LADDER': 'D1: Old Rod, Trusty Lv10, Angler\'s Lv20, Pro Angler Lv30, Expedition Lv40, Master\'s Lv50, Summit Lv60',
+	'P-RODS-STANDARD-PRICES': 'D1: $5,100 / $13,000 / $57,000 / $140,000 / $390,000 / $880,000',
+	'P-RODS-REFERENCE-LADDER': 'D1: standard rods are the reference path; custom rods the specialisation path',
+	'P-RODS-CUSTOM-RELATION': 'D1 (with the Lv 10 Common sidegrade check required before L6B)',
+	'P-RODS-CUSTOM-LEVEL-RULE': 'D1: highest-part-rarity gate; releases L6B', 'P-RODS-CRAFT': 'D1: crafting from Lv 10', 'P-RODS-LEVEL-CAP': 'D1',
+	'P-SHOP-LAYOUT': 'D1: Rods | Bait | Upgrades | Supplies | Aquarium | Special, Rod Workshop separate',
+	'P-UPGRADES-CATEGORIES': 'D1: seven categories', 'P-UPGRADES-LEVELS': 'D1: six levels each', 'P-UPGRADES-PRICES': 'D1', 'P-UPGRADES-REFERENCE-POLICY': 'D1', 'P-UPGRADES-OPTIONAL': 'D1: optional, never mandatory', 'P-UPGRADES-BAIT-CONSERVATION': 'D1',
+	'P-EVENTS': 'D2: keep 1 Double Cash + 1 Lucky Draw per 30 days',
+	'P-BUFFS-TARGETS': 'D2: steady-state target excludes events; event guard 20% / 10% / 7% / 5%',
 };
 const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id); // "aquarium redesign: approve the overall design"
 const withApproval = (d) => (APPROVED[d.id] || isApprovedModule(d.id) ? { ...d, status: 'approved', approval: APPROVED[d.id] || 'aquarium redesign approved' } : d);

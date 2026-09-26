@@ -162,7 +162,11 @@ const PARAMS = deepFreeze({
 	},
 	// Design targets checked by checks(); shares are of the archetype's own fishing income / XP.
 	targets: {
+		// Steady-state target (user decision D2): buffs from ordinary recurring sources (streak, quests), events
+		// EXCLUDED; events are meant to feel unusually rewarding and have their own guard below.
 		cashShareMax30d: { casual: 0.08, regular: 0.08, active: 0.05, grinder: 0.03 },
+		// Event-inclusive guard (user decision D2): every source including the event budget (P-EVENTS).
+		eventInclusiveMax30d: { casual: 0.20, regular: 0.10, active: 0.07, grinder: 0.05 },
 		xpShareMax: 0.03,
 		windowShiftMax: 0.03,
 		buffsPerThirtyDays: [3, 6],
@@ -1283,6 +1287,16 @@ const DECISIONS = [
 		expected: { sameKind: 'queue', maxQueued: 3, acrossKinds: 'independent' },
 	},
 	{
+		id: 'P-BUFFS-TARGETS', status: 'proposed',
+		title: 'Buff income targets: the steady-state check excludes events; the event budget has its own event-inclusive guard',
+		modelled: 'steady state (streak + quest buffs) <= 8% / 8% / 5% / 3% of fishing income in the first 30 days (casual / regular / active / grinder); with the event budget <= 20% / 10% / 7% / 5%',
+		alternatives: ['one combined target including events (fails for casual and regular while P-EVENTS stays)', 'cut or stretch the event Lucky Draw'],
+		source: 'buffs design; user decision D2',
+		why: 'every archetype passes the steady-state target without events; events are meant to feel unusually rewarding, so they get a separate ceiling rather than a nerf',
+		get: () => ({ steady: PARAMS.targets.cashShareMax30d, withEvents: PARAMS.targets.eventInclusiveMax30d }),
+		expected: { steady: { casual: 0.08, regular: 0.08, active: 0.05, grinder: 0.03 }, withEvents: { casual: 0.2, regular: 0.1, active: 0.07, grinder: 0.05 } },
+	},
+	{
 		id: 'P-BUFFS-EVENT-STACKING', status: 'proposed',
 		title: `A buff and an event of the same category ADD their bonuses (x2 + x2 = x${temporaryMultiplier(2, 2)}); gear, aquarium and the private profile keep multiplying`,
 		modelled: 'stored value = raw x (1 + sellBonus) x (1 + (buff - 1) + (event - 1)) x profile.sell; XP the same shape',
@@ -1355,7 +1369,9 @@ function checks() {
 	add('lucky-chain-reproduces-rods', TIERS.every((t) => Math.abs(luckyAssembly(t, { opens: 0 }) - rods.cratesDistribution(t).expected) < 1e-9), 'Lucky Draw chain with 0 lucky opens = rods.cratesDistribution(t).expected, T1-T5');
 	for (const name of ARCHETYPE_NAMES) {
 		const s = buffIncomeShare(name, { days: 30 });
-		add(`cash-share-${name}`, s.cash <= T.cashShareMax30d[name], `buffs add ${(100 * s.cash).toFixed(2)}% of fishing income in 30 days (max ${100 * T.cashShareMax30d[name]}%)`);
+		const steady = buffIncomeShare(name, { days: 30, sources: ['streak', 'quests'] });
+		add(`cash-share-${name}`, steady.cash <= T.cashShareMax30d[name], `steady state (events excluded): buffs add ${(100 * steady.cash).toFixed(2)}% of fishing income in 30 days (max ${+(100 * T.cashShareMax30d[name]).toFixed(2)}%)`);
+		add(`event-budget-${name}`, s.cash <= T.eventInclusiveMax30d[name], `with the event budget: buffs add ${(100 * s.cash).toFixed(2)}% of fishing income in 30 days (max ${+(100 * T.eventInclusiveMax30d[name]).toFixed(2)}%)`);
 		add(`xp-share-${name}`, s.xp <= T.xpShareMax, `Double XP adds ${(100 * s.xp).toFixed(2)}% of XP in 30 days (max ${100 * T.xpShareMax}%)`);
 	}
 	const reg = buffIncomeShare(F.REFERENCE_ARCHETYPE, { days: 30 });
@@ -1591,15 +1607,16 @@ function markdownTables() {
 			return [label(a), fx(w.buffsPer30dTotal), pct(w.cash, 2), pct(w.xp, 2), fx(p.buffsPer30dTotal), pct(p.cash, 2), pct(p.xp, 2), SOURCES.map((s) => pct(p.bySource[s]?.cashShare || 0, 2)).join(' / ')];
 		}));
 
-	const failingShare = R.checks.list.filter((c) => c.id.startsWith('cash-share-') && !c.pass).map((c) => `\`${c.id}\``);
-	out['buffs-cash-share-checks'] = `${mdTable(['Player', 'Target (first 30 days)', '**Buffs of fishing income (the check)**', 'Double Cash only', 'Lucky Draw only', 'Buffs of all cash income', 'Buffs of fishing income, without events', 'Check'],
+	const failingShare = R.checks.list.filter((c) => (c.id.startsWith('cash-share-') || c.id.startsWith('event-budget-')) && !c.pass).map((c) => `\`${c.id}\``);
+	out['buffs-cash-share-checks'] = `${mdTable(['Player', '**Steady state (events excluded): buffs of fishing income**', 'Target', 'Check', '**With the event budget: buffs of fishing income**', 'Event guard', 'Check', 'Double Cash only (with events)', 'Lucky Draw only (with events)'],
 		ARCHETYPE_NAMES.map((a) => {
 			const t = P.targets.cashShareMax30d[a];
+			const e = P.targets.eventInclusiveMax30d[a];
 			const x = s30[a];
-			const cell = (v) => `${pct(v, 2)}${v > t ? ' (over)' : ''}`;
 			const c = R.checks.list.find((k) => k.id === `cash-share-${a}`);
-			return [label(a), `at most ${pct(t, 0)}`, `**${cell(x.cash)}**`, cell(x.cashDoubleCashOnly), cell(x.cashLuckyDrawOnly), cell(x.cashOfAllIncome), cell(noEv[a].cash), `\`${c.id}\` ${c.pass ? 'passes' : '**fails**'}`];
-		}))}\n\n${failingShare.length ? `Failing: ${failingShare.join(', ')}.` : 'Every cash-share check passes.'} Each column divides the same buff value (or its Double Cash or Lucky Draw part) by the column's income and compares it with the same target (\`PARAMS.targets.cashShareMax30d\`); "(over)" marks a cell above it. No parameter was tuned to pass; the options are in the buffs design (Risks and open issues).`;
+			const g = R.checks.list.find((k) => k.id === `event-budget-${a}`);
+			return [label(a), `**${pct(noEv[a].cash, 2)}**`, `at most ${pct(t, 0)}`, `\`${c.id}\` ${c.pass ? 'passes' : '**fails**'}`, `**${pct(x.cash, 2)}**`, `at most ${pct(e, 0)}`, `\`${g.id}\` ${g.pass ? 'passes' : '**fails**'}`, pct(x.cashDoubleCashOnly, 2), pct(x.cashLuckyDrawOnly, 2)];
+		}))}\n\n${failingShare.length ? `Failing: ${failingShare.join(', ')}.` : 'Every steady-state and event-budget check passes.'} User decision D2: the steady-state target (\`PARAMS.targets.cashShareMax30d\`) excludes events; the event budget (P-EVENTS: 1 Double Cash + 1 Lucky Draw per 30 days) has its own event-inclusive guard (\`PARAMS.targets.eventInclusiveMax30d\`). No reward was tuned.`;
 
 	const lt = C.luckyToday;
 	out['buffs-lucky-today'] = `${mdTable(['Box (Lake-stage fish)', 'P(rare+) per slot: today -> with Lucky Draw', 'Liquid value per open'], lt.boxes.map((b) => [b.box, `${pct(b.rarePlusPerSlot)} -> ${pct(b.rarePlusPerSlotLucky)}`, `${usd(b.liquid)} -> ${usd(b.liquidLucky)} (+${usd(b.liquidGain)})`]))}\n\n${mdTable(['Tier crate (rods design)', 'Expected crates per assembly', 'With **every** open lucky (today)', 'Saved'], lt.tierCrates.map((t) => [`T${t.tier} ${t.crate}`, fx(t.expectedCrates, 3), fx(t.expectedCratesAllOpensLucky, 3), t.inert ? '**0 (inert)**' : fx(t.cratesSaved, 3)]))}`;

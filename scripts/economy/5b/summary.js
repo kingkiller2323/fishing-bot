@@ -215,7 +215,7 @@ function openChecksTable() {
 		rows.push({ module: 'bait', text: 'Spinner keeps every rod tier inside its multi-catch band (decision 2; P-BAIT-SPINNER-TIERS)', detail: `tiers above the mid band: ${sp.tiersAboveBand.join(', ')}; above the ${fmt(sp.ceiling, 2)} ceiling: ${sp.tiersAboveCeiling.join(', ')}; highest mean ${fmt(sp.maxMeanWith, 2)}` });
 	}
 	const guard = bait.xpBaitGuard();
-	if (!guard.pass) rows.push({ module: 'bait', text: 'Always-on XP bait stays a net sink and reaches each milestone at most ~10% sooner than the same archetype without bait (P-BAIT-XP-SIZING)', detail: `over the limit: ${guard.overLimit.join(', ') || 'none'}; not a net sink: ${guard.notNetSink.join(', ') || 'none'}` });
+	if (!guard.pass) rows.push({ module: 'bait', text: 'Always-on XP bait stays a net sink and reaches no milestone more than 12% sooner than the same archetype without bait (P-BAIT-XP-SIZING)', detail: `over the limit: ${guard.overLimit.join(', ') || 'none'}; not a net sink: ${guard.notNetSink.join(', ') || 'none'}` });
 	const streak = require('./streak');
 	const cap = streak.PARAMS.targets.regular30dShareMax;
 	const reg30 = streak.archetypeValue().regular.periods[30];
@@ -268,7 +268,7 @@ function headlineTable() {
 	const catchUp = Object.values(r2.catchUp);
 	const D = require('./decisions');
 	const counts = D.table().reduce((a, d) => ({ ...a, [d.status]: (a[d.status] || 0) + 1 }), {});
-	return table(['Figure (framework 5b.4, integrated model)', 'Value'], [
+	return table([`Figure (framework ${F.FRAMEWORK_VERSION}, integrated model)`, 'Value'], [
 		['Regular player, active hours to each window level', windows],
 		['Regular player to Lv 60 (the Mountain Stream level)', `${fmt(reg.milestones[F.LIFECYCLE.maxLevel].hours, 2)} h (day ${reg.milestones[F.LIFECYCLE.maxLevel].day})`],
 		['Casual ÷ regular active hours per level (Lv 20–50)', range(catchUp, (x) => fmt(x, 3))],
@@ -289,7 +289,7 @@ function stampTable() {
 	return table(['Item', 'Value'], [
 		['Framework version', `**${F.FRAMEWORK_VERSION}**`],
 		['Shared digest', `**${F.sharedDigest()}**`],
-		['XP curve', `xp(L) = ${F.CURVE.base}·L² + ${F.CURVE.quartic}·L⁴ (R1 integrated best fit ${c.chosen})`],
+		['XP curve', `xp(L) = ${F.CURVE.base}·L² + ${F.CURVE.quartic}·L⁴ (approved and locked; the R1 record is evaluated at ${c.framework?.quartic ?? F.CURVE.quartic}, every window held: ${c.framework?.allInWindow ? 'yes' : 'NO'})`],
 		['Gear path (R3)', `${F.GEAR_PATH_SOURCE} (one authoritative path)`],
 		['Reference loop', I.REFERENCE_NOTE],
 		['Decision registry', `${v.count} entries, verify ${v.ok ? 'passes' : `FAILS (${v.problems.length})`}`],
