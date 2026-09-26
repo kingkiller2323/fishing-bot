@@ -43,7 +43,9 @@ async function ensureReplicaSet(uri) {
 	const name = process.env.STAGING_REPLSET;
 	if (!name) return;
 	const host = process.env.STAGING_REPLSET_HOST;
-	const client = new mongoose.mongo.MongoClient(uri, { directConnection: true, serverSelectionTimeoutMS: 30000 });
+	// Direct connection without the replicaSet option: before the initiate the server has no set name.
+	const direct = uri.replace(/([?&])replicaSet=[^&]*&?/, '$1').replace(/[?&]$/, '');
+	const client = new mongoose.mongo.MongoClient(direct, { directConnection: true, serverSelectionTimeoutMS: 60000 });
 	await client.connect();
 	try {
 		const admin = client.db('admin');
@@ -107,7 +109,7 @@ async function main() {
 	guard();
 	const uri = process.env.MONGODB_URI;
 	await ensureReplicaSet(uri);
-	await mongoose.connect(uri, { dbName: DB_NAME, serverSelectionTimeoutMS: 30000 });
+	await mongoose.connect(uri, { dbName: DB_NAME, serverSelectionTimeoutMS: 60000 });
 	if (mongoose.connection.db.databaseName !== DB_NAME) throw new Error('connected to an unexpected database');
 	await mongoose.connection.db.dropDatabase();
 
