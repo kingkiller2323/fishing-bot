@@ -41,7 +41,8 @@ Rehearsed on DCC Fishing Staging **before** it lands on `main` (`scripts/staging
 - **Level floors.** An additive `levelFloor` and `publicLevelFloor` are written for every account from today's curve (`P-CURVE-EXISTING`, `P-FOUNDER-PUBLIC-LEVEL`). Every level read and write goes through `max(stored floor, curve)`. With the flag off the curve is today's, so nothing visible changes.
 
 ### Step B: remaining correctness fixes on today's numbers (each ships alone)
-- **Rods:** C1 (crafted-rod repair uses the wrong model: update through `ItemData` with a state guard) and C4 (remove the dead `decreaseRodDurability`).
+Naming: these are "Step B: privacy", "Step B: rods", "Step B: quests" and "Step B: aquarium". Bare B1–B3 are the buff bugs of the buffs design, so reports never call a Step B item "B3".
+- **Rods:** C1 (crafted-rod repair uses the wrong model: update through `ItemData` with a state guard) and C4 (remove the dead `decreaseRodDurability` and the unguarded `User#repairRod`). No automatic retroactive refund for C1 (`P-RODS-C1-REFUND`): a specific, verifiable report is compensated manually through the audited `/dev` path.
 - **Quests:**
   - Q1 target set;
   - Q3 (prerequisites checked with `every`, not `some`);

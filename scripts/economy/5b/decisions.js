@@ -80,6 +80,7 @@ const APPROVED = {
 	'P-FOUNDER-HYBRID': 'D4: 7 private rolls/cast, XP x35, sell x25, 40% private repair rebate; public cast identical to Normal; private pity; gacha luck on non-buff slots only; non-competitive',
 	'P-FOUNDER-HYBRID-SURFACES': 'D4: /sell and /boosters ephemeral for everyone; private rolls never advance quests/streak/bait; private delivery only; /aquarium and /pet stay public',
 	'P-FOUNDER-DEV-OVERRIDE': 'B1 locked: identity = FOUNDER_IDS only; a real Founder is never competitive and its gates never follow an override (real level until P-FOUNDER-GATE in step C); on only for FOUNDER_IDS; a non-Founder returning to Normal gets publicXp = xp and a coherent public floor, audited; default = identity',
+	'P-RODS-C1-REFUND': 'Step B rods: no automatic retroactive refund (no reliable ledger of failed crafted-rod repair charges); a specific, verifiable report may be compensated manually through the audited /dev path; no migration',
 };
 // "Aquarium redesign: approve the overall design."
 const isApprovedModule = (id) => /^P-AQUARIUM-/.test(id);

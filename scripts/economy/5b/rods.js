@@ -2203,10 +2203,10 @@ const DECISIONS = [
 	},
 	{
 		id: 'P-RODS-C1-REFUND', status: 'proposed',
-		title: 'Refund crafted-rod repair charges lost to bug C1 where Interaction analytics identify them',
-		modelled: 'not modelled: a one-off guarded migration keyed by Interaction id, only after approval',
-		alternatives: ['no refund'],
-		source: 'rods design', why: 'players paid for repairs that never applied',
+		title: 'Crafted-rod repair charges lost to bug C1: no automatic retroactive refund; a specific, verifiable report is compensated manually through the audited /dev path',
+		modelled: 'not modelled: no migration (C1 itself is fixed in step B, rods)',
+		alternatives: ['a one-off guarded refund migration keyed by Interaction id (rejected: no reliable ledger of failed repair charges, a blanket refund could create money for unaffected players)'],
+		source: 'rods design; user decision (step B, rods)', why: 'players paid for repairs that never applied, but no trustworthy record distinguishes those charges from other money movement',
 	},
 ];
 
