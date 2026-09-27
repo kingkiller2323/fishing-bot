@@ -5,6 +5,8 @@ const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
 const { purchase, replaceCollector } = require('../../engine/purchase');
+const { User: UserSchemaModel } = require('../../schemas/UserSchema');
+const { ownedLicenseTiers, licenseOffered } = require('../../engine/aquariumRules');
 
 module.exports = {
 	customId: 'buy-other',
@@ -12,7 +14,7 @@ module.exports = {
 		const user = interaction.user;
 
 		try {
-			const options = await getSelectionOptions();
+			const options = await getSelectionOptions(user.id);
 
 			if (options.length === 0) {
 				return await interaction.reply({
@@ -41,14 +43,26 @@ module.exports = {
 	},
 };
 
-const getSelectionOptions = async () => {
+/** The player's owned license tiers per water type (A7). */
+const licenseTiersOf = async (userId) => {
+	const doc = await UserSchemaModel.findOne({ userId: String(userId) }).select('inventory.items').lean();
+	return ownedLicenseTiers(doc?.inventory?.items || []);
+};
+
+const getSelectionOptions = async (userId) => {
+	// A7: a license is offered only above the tier the player already owns for its water type.
+	const tiers = await licenseTiersOf(userId);
+	const licenseOptions = (await Promise.all(await Utils.selectionOptions('license'))).filter(Boolean);
+	const offered = [];
+	for (const option of licenseOptions) {
+		if (licenseOffered(await Item.findById(option.data.value).lean(), tiers)) offered.push(option);
+	}
 	let options = await Promise.all([
 		...(await Utils.selectionOptions('item')),
 		...(await Utils.selectionOptions('gacha')),
 		...(await Utils.selectionOptions('buff')),
-		...(await Utils.selectionOptions('license')),
 	]);
-	options = options.filter((option) => option !== undefined);
+	options = [...options.filter((option) => option !== undefined), ...offered];
 	return options;
 };
 
@@ -280,7 +294,21 @@ const getAmountFromChoice = async (amountChoice) => {
 
 /** Pays and grants in one locked step; on success replies with the new balance. Returns the purchase result. */
 const buyItem = async (i, originalItem, userId, amount) => {
-	const result = await purchase(userId, originalItem.price * amount, (fresh) => fresh.sendToInventory(originalItem, amount));
+	let result;
+	try {
+		result = await purchase(userId, originalItem.price * amount, async (fresh) => {
+			// A7: re-checked under the player's lock (a menu opened before an earlier purchase is stale).
+			if (originalItem.type === 'license' && !licenseOffered(originalItem, await licenseTiersOf(userId))) {
+				throw Object.assign(new Error('license already owned'), { code: 'LICENSE_OWNED' });
+			}
+			return fresh.sendToInventory(originalItem, amount);
+		});
+	}
+	catch (error) {
+		if (error?.code !== 'LICENSE_OWNED') throw error;
+		await i.reply({ content: 'You already own this license or a higher tier for that water type. You have not been charged.', flags: MessageFlags.Ephemeral, components: [] });
+		return { ok: true, refused: true };
+	}
 	if (!result.ok) return result;
 
 	let embeds = [];

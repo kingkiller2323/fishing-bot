@@ -19,10 +19,11 @@ const AquariumSchema = new Schema({
 		enum: ['Freshwater', 'Saltwater'],
 		required: true,
 	},
+	// A9: new tanks start at the one ideal temperature (25 °C; engine/aquariumRules.js).
 	temperature: {
 		type: Number,
 		required: true,
-		default: 0,
+		default: 25,
 	},
 	cleanliness: {
 		type: Number,

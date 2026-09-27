@@ -1,6 +1,7 @@
 const { default: mongoose } = require('mongoose');
 const { Habitat } = require('../schemas/HabitatSchema');
 const { PetFish } = require('../schemas/PetSchema');
+const { effectiveTemperature } = require('../engine/aquariumRules');
 
 const HOUR_MS = 3_600_000;
 let transactionSupport = null;
@@ -26,8 +27,9 @@ class Aquarium {
 		return this.aquarium.waterType;
 	}
 
+	/** A9: the stored temperature read clamped to the /aquarium adjust range (-30..30 °C); never drifts. */
 	async getTemperature() {
-		return this.aquarium.temperature;
+		return effectiveTemperature(this.aquarium.temperature);
 	}
 
 	async getCleanliness() {
@@ -70,24 +72,19 @@ class Aquarium {
 	}
 
 	/**
-	 * Applies hourly decay since the last time it was applied: cleanliness -1/hour (floor 0),
-	 * temperature +1/hour. The decay clocks advance by the whole hours consumed, so calling this
-	 * repeatedly never re-applies the same elapsed time.
+	 * Applies hourly decay since the last time it was applied: cleanliness -1/hour (floor 0). The decay
+	 * clock advances by the whole hours consumed, so calling this repeatedly never re-applies the same
+	 * elapsed time. A9: the temperature no longer drifts (the heater holds its setting); it is read
+	 * clamped by getTemperature, and nothing stored is rewritten.
 	 */
 	async updateStatus(now = new Date()) {
 		const cleanFrom = new Date(this.aquarium.cleanlinessUpdatedAt || this.aquarium.lastCleaned || now);
-		const tempFrom = new Date(this.aquarium.temperatureUpdatedAt || this.aquarium.lastAdjusted || now);
 		const cleanHours = Math.max(0, Math.floor((now - cleanFrom) / HOUR_MS));
-		const tempHours = Math.max(0, Math.floor((now - tempFrom) / HOUR_MS));
 
 		const fields = {};
 		if (cleanHours > 0 || !this.aquarium.cleanlinessUpdatedAt) {
 			fields.cleanliness = Math.max(0, this.aquarium.cleanliness - cleanHours);
 			fields.cleanlinessUpdatedAt = new Date(cleanFrom.getTime() + cleanHours * HOUR_MS);
-		}
-		if (tempHours > 0 || !this.aquarium.temperatureUpdatedAt) {
-			fields.temperature = this.aquarium.temperature + tempHours;
-			fields.temperatureUpdatedAt = new Date(tempFrom.getTime() + tempHours * HOUR_MS);
 		}
 		if (Object.keys(fields).length > 0) await this.update(fields);
 		return this.aquarium;

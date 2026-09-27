@@ -51,7 +51,8 @@ test('decay is applied once per elapsed hour, never re-applied', async () => {
 
 	await aquarium.updateStatus(new Date(t0.getTime() + 5 * HOUR + 10 * 60_000));
 	assert.equal(await aquarium.getCleanliness(), 95);
-	assert.equal(await aquarium.getTemperature(), 5);
+	// Step B aquarium (A9): the temperature no longer drifts; the heater holds its setting.
+	assert.equal(await aquarium.getTemperature(), 0);
 
 	// Viewing again at the same moment changes nothing.
 	await aquarium.updateStatus(new Date(t0.getTime() + 5 * HOUR + 20 * 60_000));
@@ -61,7 +62,7 @@ test('decay is applied once per elapsed hour, never re-applied', async () => {
 	await aquarium.updateStatus(new Date(t0.getTime() + 6 * HOUR));
 	const stored = await Habitat.findById(await aquarium.getId());
 	assert.equal(stored.cleanliness, 94);
-	assert.equal(stored.temperature, 6);
+	assert.equal(stored.temperature, 0);
 
 	// Cleaning resets the cleanliness clock.
 	const cleanedAt = new Date(t0.getTime() + 6 * HOUR);

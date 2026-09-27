@@ -156,14 +156,24 @@ module.exports = {
 			}
 
 			const pet = new Pet(petData);
-			const aquarium = new Aquarium(await pet.getHabitat())
-			
+			const habitat = await pet.getHabitat();
+			const aquarium = habitat ? new Aquarium(habitat) : null;
+			// A8: the sale claims the pet atomically; a second, concurrent sale of the same pet gets null.
+			const amount = await pet.sell(aquarium);
+			if (amount === null) {
+				if (process.env.ANALYTICS || config.client.analytics) {
+					await analyticsObject.setStatus('failed');
+					await analyticsObject.setStatusMessage('Pet already sold.');
+				}
+				return await interaction.followUp(`${name} has already been sold.`);
+			}
+
 			if (process.env.ANALYTICS || config.client.analytics) {
 				await analyticsObject.setStatus('completed');
 				await analyticsObject.setStatusMessage('Pet sold.');
-			};
+			}
 
-			return await interaction.followUp(`Successfully sold ${name} for $${(await pet.sell(aquarium)).toLocaleString()}.`);
+			return await interaction.followUp(`Successfully sold ${name} for $${amount.toLocaleString()}.`);
 		}
 
 		if (subcommand === 'breed') {
@@ -209,8 +219,11 @@ module.exports = {
 			}
 
 			// check if the user has enough space in the aquarium
+			// A4: the size is awaited (it used to compare with a Promise, so the check never blocked), and the
+			// occupancy counts every pet placed in the tank (babies bred earlier were missing from its fish list).
 			const aquariumPets = await aquarium.getFish();
-			if (aquariumPets.length >= aquarium.getSize()) {
+			const placed = await PetFish.countDocuments({ aquarium: await aquarium.getId(), owner: interaction.user.id });
+			if (Math.max(aquariumPets.length, placed) >= await aquarium.getSize()) {
 				if (process.env.ANALYTICS || config.client.analytics) {
 					await analyticsObject.setStatus('failed');
 					await analyticsObject.setStatusMessage('Aquarium full.');
@@ -244,6 +257,8 @@ module.exports = {
 			}
 
 			const baby = new Pet(result.child);
+			// A4: the baby joins its tank's fish list in the same flow (it used to wait for a later reconcile).
+			await aquarium.addFish(await baby.getId());
 			if (process.env.ANALYTICS || config.client.analytics) {
 				await analyticsObject.setStatus('completed');
 				await analyticsObject.setStatusMessage('Pets bred.');

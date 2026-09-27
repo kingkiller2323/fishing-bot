@@ -4,6 +4,11 @@ const { PetFish } = require('../schemas/PetSchema');
 const { User } = require('../schemas/UserSchema');
 const { Utils } = require('../class/Utils');
 const { rng } = require('../engine/rng');
+const { withUserLock } = require('../engine/userLock');
+const { AQUARIUM_FIXES, breedingCooldownRemaining } = require('../engine/aquariumRules');
+
+// A9: one temperature ideal for hunger, mood, stress and health (25 °C; aquariumRules.js).
+const IDEAL_C = AQUARIUM_FIXES.idealTemperatureC;
 
 // Environmental factors (cleanliness/temperature) affect every pet except one whose unlocked
 // genetic-drift trait is Adaptive.
@@ -167,8 +172,8 @@ class Pet {
 		// Calculate the cleanliness factor (low cleanliness increases hunger)
 		const cleanlinessFactor = 1 + ((100 - cleanliness) / 100);
 
-		// Calculate the temperature factor (deviation from 25°C increases hunger)
-		const temperatureFactor = 1 + (Math.abs(temperature - 25) / 25);
+		// Calculate the temperature factor (deviation from the ideal increases hunger)
+		const temperatureFactor = 1 + (Math.abs(temperature - IDEAL_C) / 25);
 
 		// Retrieve traits
 		const traits = await this.getTraits();
@@ -211,8 +216,8 @@ class Pet {
 		// which made dirty tanks slow mood loss; it was dormant behind the broken Adaptive check.
 		const cleanlinessFactor = 1 + ((100 - cleanliness) / 100);
 
-		// Calculate the temperature factor (deviation from 0 makes mood fall faster)
-		const temperatureDeviation = Math.abs(temperature);
+		// Calculate the temperature factor (deviation from the ideal makes mood fall faster)
+		const temperatureDeviation = Math.abs(temperature - IDEAL_C);
 		const temperatureFactor = 1 + (temperatureDeviation / 100);
 
 		const traits = await this.getTraits();
@@ -265,7 +270,7 @@ class Pet {
 		// A dirtier tank raises stress faster (factor >= 1); previously inverted like mood.
 		const cleanlinessFactor = 1 + ((100 - cleanliness) / 100);
 
-		const temperatureDeviation = Math.abs(temperature);
+		const temperatureDeviation = Math.abs(temperature - IDEAL_C);
 		const temperatureFactor = 1 + (temperatureDeviation / 100);
 
 		const traits = await this.getTraits();
@@ -409,7 +414,7 @@ class Pet {
 
 	async updateHealth(cleanliness, temperature) {
 		const cleanlinessFactor = cleanliness / 100;
-		const temperatureDeviation = Math.abs(temperature);
+		const temperatureDeviation = Math.abs(temperature - IDEAL_C);
 		const temperatureFactor = temperatureDeviation > 0 ? 1 - (temperatureDeviation / 100) : 1;
 
 		// Health Traits:
@@ -494,17 +499,32 @@ class Pet {
 		return this.save();
 	}
 
+	/**
+	 * A8: sells the pet exactly once. Under the owner's lock the pet is claimed atomically (owner and tank
+	 * cleared only while this player still owns it), then the sale is paid with $inc, never a whole-document
+	 * save (which could overwrite concurrent cast income). Returns the amount, or null when the pet was
+	 * already sold / no longer this player's. Amount unchanged: xp x attraction (A1 is step C).
+	 */
 	async sell(aquarium) {
-		const user = await User.findOne({ userId: await this.getOwner() });
-		const amount = await this.getXP() * this.pet.attraction;
-		user.inventory.money += amount;
-		await user.save();
-
-		await this.removeFromHabitat();
-		await aquarium.removeFish(await this.getId());
-		await this.disown();
-		return amount;
+		const ownerId = String(await this.getOwner());
+		const petId = this.pet._id;
+		return withUserLock(ownerId, async () => {
+			const claimed = await PetFish.findOneAndUpdate(
+				{ _id: petId, owner: ownerId },
+				{ $set: { owner: '', aquarium: null } },
+				{ new: false },
+			).lean();
+			if (!claimed) return null;
+			const amount = (claimed.xp || 0) * (claimed.attraction || 0);
+			await User.updateOne({ userId: ownerId }, { $inc: { 'inventory.money': amount } });
+			await Habitat.updateMany({ fish: petId }, { $pull: { fish: petId } });
+			if (aquarium?.aquarium?.fish) aquarium.aquarium.fish = aquarium.aquarium.fish.filter((f) => String(f) !== String(petId));
+			this.pet.owner = '';
+			this.pet.aquarium = null;
+			return amount;
+		});
 	}
+
 
 	async updateBreeding(success) {
 		let xp = 250;
@@ -649,6 +669,15 @@ class Pet {
 		if (await secondPet.getAge() < 20) return { success: false, child: null, reason: `${await firstPet.getName()} is underaged. The minimum requirement is 20 days.` };
 		if (await firstPet.getHealth() < 50) return { success: false, child: null, reason: `${await firstPet.getName()} is unhealthy. Health must be greater than 50%.` };
 		if (await secondPet.getHealth() < 50) return { success: false, child: null, reason: `${await secondPet.getName()} is unhealthy. Health must be greater than 50%.` };
+		// A3: a parent that bred successfully in the last 7 days cannot breed yet (lastBred is now read).
+		const now = Date.now();
+		for (const parent of [firstPet, secondPet]) {
+			const wait = breedingCooldownRemaining(await parent.getLastBred(), now);
+			if (wait > 0) {
+				const days = Math.ceil(wait / (24 * 60 * 60 * 1000));
+				return { success: false, child: null, reason: `${await parent.getName()} bred recently and can breed again in ${days} day${days === 1 ? '' : 's'}` };
+			}
+		}
 	
 		let success = false;
 	
@@ -713,8 +742,9 @@ class Pet {
 			species: species.name,
 		});
 	
-		await firstPet.updateBreeding();
-		await secondPet.updateBreeding();
+		// A5: a successful breed gives the parents the success XP (it used to give the failure XP).
+		await firstPet.updateBreeding(true);
+		await secondPet.updateBreeding(true);
 		await newPet.save();
 		return { success: success, child: newPet, reason: '' };
 	};
