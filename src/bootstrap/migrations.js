@@ -50,19 +50,24 @@ async function migrateDelistFishingCrate() {
 /**
  * Step B quests, Q1: the "Catch 15 Trout" catalog row targeted ['rainbow trout', 'golden trout'] and
  * golden trout does not exist. The seed only inserts missing rows, so deployed databases keep the old
- * target until this guarded update. It matches only the catalog row (no owner) that still holds exactly
- * the old target, so any other edit to the row is left alone; once corrected nothing matches (idempotent).
- * Title, description, reward and progressMax are untouched; players' accepted copies are never touched.
+ * target until this guarded update. It matches only documents that still hold exactly the old target:
+ * the catalog row (no owner) and players' ACTIVE copies (in_progress / pending), so a player who already
+ * accepted the quest is not stuck on Rainbow Trout. Completed / failed history and any target edited some
+ * other way are never touched; once corrected nothing matches (idempotent). Only progressType.fish changes.
  */
 const TROUT_OLD = ['rainbow trout', 'golden trout'];
 async function migrateTroutQuestTarget() {
-	const { Quest } = require('../schemas/QuestSchema');
+	const { Quest, QuestData } = require('../schemas/QuestSchema');
 	const target = require('./data/quests').find((q) => q.title === 'Catch 15 Trout').progressType.fish;
-	const res = await Quest.collection.updateMany(
+	const catalog = await Quest.collection.updateMany(
 		{ title: 'Catch 15 Trout', user: null, 'progressType.fish': TROUT_OLD },
 		{ $set: { 'progressType.fish': target } },
 	);
-	return { corrected: res.modifiedCount };
+	const copies = await QuestData.collection.updateMany(
+		{ title: 'Catch 15 Trout', status: { $in: ['in_progress', 'pending'] }, 'progressType.fish': TROUT_OLD },
+		{ $set: { 'progressType.fish': target } },
+	);
+	return { corrected: catalog.modifiedCount, activeCopies: copies.modifiedCount };
 }
 
 /** The marker collection (one-time migrations). */
@@ -103,7 +108,7 @@ async function runMigrations(log) {
 	if (check.mismatched > 0) log(`Check publicXp: ${check.mismatched} of ${check.members} member(s) have publicXp != xp (e.g. ${check.sample.map(maskId).join(', ')}).`, 'warn');
 	else log(`Check publicXp: all ${check.members} member(s) have publicXp == xp.`, 'info');
 	const trout = await migrateTroutQuestTarget();
-	if (trout.corrected > 0) log(`Migration troutQuestTarget: ${trout.corrected} catalog row(s) of "Catch 15 Trout" now target the River trout family.`, 'done');
+	if (trout.corrected + trout.activeCopies > 0) log(`Migration troutQuestTarget: ${trout.corrected} catalog row(s) and ${trout.activeCopies} active player cop(ies) of "Catch 15 Trout" now target the River trout family.`, 'done');
 	const crate = await migrateDelistFishingCrate();
 	if (crate.delisted > 0) log(`Migration delistFishingCrate: ${crate.delisted} catalog row(s) removed from the shop (shopItem -> false); owned crates untouched.`, 'done');
 }

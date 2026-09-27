@@ -58,6 +58,7 @@ async function main() {
 	const staleId = await legacyQuest('stg-q-stale', { title: 'Catch 1 Legendary Fish', daily: true, status: 'in_progress', progress: 0, startDate: now - 3 * DAY });
 	await UserModel.updateOne({ userId: 'stg-q-stale' }, { $set: { 'stats.lastDailyQuest': now - 3 * DAY } });
 	const acceptedTroutId = await legacyQuest('stg-q-stale', { title: 'Catch 15 Trout', daily: false, status: 'in_progress', progress: 3 });
+	const completedTroutId = await legacyQuest('stg-q-stale', { title: 'Catch 15 Trout', daily: false, status: 'completed', progress: 15 });
 	await player('stg-q-legacy', 900);
 	const legacyNoStart = await legacyQuest('stg-q-legacy', { title: 'Catch 5 Ultra Fish', daily: true, status: 'in_progress', createdAt: new Date(now - 2 * DAY) });
 	await player('stg-q-fresh', 900);
@@ -74,7 +75,8 @@ async function main() {
 	check('q1.catalog-row-corrected', JSON.stringify(row1.progressType.fish) === JSON.stringify(troutTarget), { target: row1.progressType.fish });
 	check('q1.second-boot-no-change', JSON.stringify(row1) === JSON.stringify(row2));
 	check('q1.rewards-unchanged', row1.cash === 500 && row1.xp === 450 && row1.progressMax === 15, { cash: row1.cash, xp: row1.xp, progressMax: row1.progressMax });
-	check('q1.accepted-copy-untouched', JSON.stringify((await QuestData.findById(acceptedTroutId).lean()).progressType.fish) === JSON.stringify(OLD_TROUT));
+	check('q1.active-copy-corrected', JSON.stringify((await QuestData.findById(acceptedTroutId).lean()).progressType.fish) === JSON.stringify(troutTarget));
+	check('q1.completed-copy-kept', JSON.stringify((await QuestData.findById(completedTroutId).lean()).progressType.fish) === JSON.stringify(OLD_TROUT));
 
 	// ---------- Q5: stale dailies ----------
 	const issued = await QuestClass.generateDailyQuest('stg-q-stale', now);

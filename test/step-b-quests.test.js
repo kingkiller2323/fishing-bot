@@ -68,8 +68,8 @@ test('Q1: a fresh seed gets the River trout family; every target is a River fish
 test('Q1: an existing production-shaped row with the old target is corrected exactly once, nothing else changes', async () => {
 	const before = await QuestCatalog.findOne({ title: 'Catch 15 Trout' }).lean();
 	await QuestCatalog.collection.updateOne({ _id: before._id }, { $set: { 'progressType.fish': ['rainbow trout', 'golden trout'] } });
-	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 1 });
-	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 0 }, 'idempotent');
+	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 1, activeCopies: 0 });
+	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 0, activeCopies: 0 }, 'idempotent');
 	const after = await QuestCatalog.findOne({ _id: before._id }).lean();
 	assert.deepEqual(after.progressType.fish, RIVER_TROUT);
 	for (const k of ['title', 'description', 'cash', 'xp', 'progressMax', 'reward', 'requirements', 'daily']) assert.deepEqual(after[k], before[k], k);
@@ -79,16 +79,32 @@ test('Q1: an existing production-shaped row with the old target is corrected exa
 	assert.deepEqual((await QuestCatalog.findOne({ _id: before._id }).lean()).progressType.fish, RIVER_TROUT);
 });
 
-test('Q1: a row whose target was changed some other way, and players\' accepted copies, are never touched', async () => {
+test('Q1: a row whose target was changed some other way is never touched', async () => {
 	const row = await QuestCatalog.findOne({ title: 'Catch 15 Trout' }).lean();
 	await QuestCatalog.collection.updateOne({ _id: row._id }, { $set: { 'progressType.fish': ['rainbow trout'] } });
-	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 0 });
+	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 0, activeCopies: 0 });
 	assert.deepEqual((await QuestCatalog.findOne({ _id: row._id }).lean()).progressType.fish, ['rainbow trout']);
 	await QuestCatalog.collection.updateOne({ _id: row._id }, { $set: { 'progressType.fish': RIVER_TROUT } });
+});
+
+test('Q1: active player copies on the old target are corrected; history and edited copies are not', async () => {
 	await makeUser('q1-player');
-	const copy = await playerQuest('q1-player', { title: 'Catch 15 Trout', status: 'in_progress', progressType: { fish: ['rainbow trout', 'golden trout'], rarity: ['any'], rod: 'any', qualities: ['any'] } });
-	await migrateTroutQuestTarget();
-	assert.deepEqual((await QuestData.findById(copy._id).lean()).progressType.fish, ['rainbow trout', 'golden trout']);
+	const oldTarget = { fish: ['rainbow trout', 'golden trout'], rarity: ['any'], rod: 'any', qualities: ['any'] };
+	const inProgress = await playerQuest('q1-player', { title: 'Catch 15 Trout', status: 'in_progress', progress: 4, progressType: oldTarget });
+	const pending = await playerQuest('q1-player', { title: 'Catch 15 Trout', status: 'pending', progressType: oldTarget });
+	const completed = await playerQuest('q1-player', { title: 'Catch 15 Trout', status: 'completed', progressType: oldTarget });
+	const failed = await playerQuest('q1-player', { title: 'Catch 15 Trout', status: 'failed', progressType: oldTarget });
+	const edited = await playerQuest('q1-player', { title: 'Catch 15 Trout', status: 'in_progress', progressType: { ...oldTarget, fish: ['rainbow trout'] } });
+	const otherTitle = await playerQuest('q1-player', { title: 'Catch 15 Carp', status: 'in_progress', progressType: oldTarget });
+	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 0, activeCopies: 2 });
+	assert.deepEqual(await migrateTroutQuestTarget(), { corrected: 0, activeCopies: 0 }, 'idempotent');
+	const fishOf = async (q) => (await QuestData.findById(q._id).lean()).progressType.fish;
+	assert.deepEqual(await fishOf(inProgress), RIVER_TROUT);
+	assert.deepEqual(await fishOf(pending), RIVER_TROUT);
+	assert.equal((await QuestData.findById(inProgress._id).lean()).progress, 4, 'only the target changes');
+	for (const q of [completed, failed]) assert.deepEqual(await fishOf(q), ['rainbow trout', 'golden trout'], 'history kept');
+	assert.deepEqual(await fishOf(edited), ['rainbow trout']);
+	assert.deepEqual(await fishOf(otherTitle), ['rainbow trout', 'golden trout']);
 });
 
 // ---------- Q3: prerequisites on /start-quest ----------
