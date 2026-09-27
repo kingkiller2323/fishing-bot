@@ -45,7 +45,7 @@ The **Ships on** column separates fixes that change no balance value (Q1 target,
 <!-- generated:quests-fixes -->
 | # | Bug | Evidence | Fix | Ships on |
 | --- | --- | --- | --- | --- |
-| Q1 | **"Catch 15 Trout" targets `golden trout`, which does not exist.** | `catalogIntegrity().today`; 7.5% of River fish match, so 201 fish for 15 | the **River trout family** (10 species, trout table): 22.2% match, 68 fish | today's numbers (a correctness change): a catalog target fix (the target set is `P-QUESTS-TARGETS`); rewards unchanged |
+| Q1 | **Fixed (step B: quests):** "Catch 15 Trout" targets the River trout family; it used to target `golden trout`, which does not exist. | `catalogIntegrity().today`; 22.2% of River fish match, so 68 fish for 15 | the **River trout family** (10 species, trout table): 22.2% match, 68 fish | today's numbers (a correctness change): a catalog target fix (the target set is `P-QUESTS-TARGETS`); rewards unchanged |
 | Q2 | **Non-daily quests repeat without limit.** `/start-quest` only blocks the same title *while it is in progress* (`startQuest.js:110`). | "Help the Village!" pays $3,000 + 300 XP for 30 fish: +468% of Ocean fishing cash and +54% XP (repeatability table) | the kind model (§2): story quests once-only (`questLog`); repeatables with a cooldown and a daily cap | **needs proposed values:** `P-QUESTS-REPEATABLE` (cooldown 12 h, 2 per day); story once-only is a rule of `P-QUESTS-KINDS` (no value) |
 | Q3 | **`/start-quest` never enforces prerequisites.** `if (prereq > 0)` (`startQuest.js:91`) compares the prerequisite *array* with a number (always false), and uses `some` instead of `every`. | latent today (no non-daily quest has prerequisites); the proposed Lucky Fisher requires Magikarp | `canStart()`: `prerequisites.every(k => questLog[k].completions > 0)` | today's numbers (a correctness change) |
 | Q4 | **`/daily` looks for completed prerequisites in the catalog collection** (`Quest.js:130` queries `quests`; per-user copies live in `questdatas`). | Catch 250 Fish, Catch 500 Fish, Catch 750 Fish, Professional Fisher are **never issued**; every ineligible random pick recurses (`Quest.js:111/126/133`) | the eligible pool is filtered up front (kind `daily`, not retired, level) with no recursion; prerequisites come from `questLog` | today's numbers (a correctness change): prerequisites read from the user's quest documents; the retired-title filter comes with `P-QUESTS-RETIRE` |
@@ -64,7 +64,7 @@ The **Ships on** column separates fixes that change no balance value (Q1 target,
 <!-- generated:quests-trout -->
 | Target | Species that count | Not counted | Share of River fish | Expected fish for 15 |
 | --- | --- | --- | --- | --- |
-| "Catch 15 Trout" today | rainbow trout, golden trout | golden trout (not in the catalog) | 7.5% | 201 |
+| "Catch 15 Trout" today | cherry trout, clover trout, fall blue trout, fogtail trout, frostfin trout, frostling trout, rainbow trout, skyfin trout, solaris trout, thunder trout | none (every target is a catalog fish) | 22.2% | 68 |
 | River trout family (proposed) | Cherry Trout, Clover Trout, Fall Blue Trout, Fogtail Trout, Frostfin Trout, Frostling Trout, Rainbow Trout, Skyfin Trout, Solaris Trout, Thunder Trout | Goldenfin Trout (Ocean), Monsoon Trout (Swamp), Cloudspike Trout (Pond), Mistfin Trout (Pond), Breezefin Trout (Pond): the quest says "from the river" | 22.2% | 68 |
 | River carp family (proposed) | Blossom Carp, Carp, Scorpion Carp | — | 29.5% | 51 |
 
@@ -160,7 +160,7 @@ Pre-5B documents have no `kind`. `kindOf()` reports them as `'legacy'`, and `res
 <!-- generated:quests-catalog-today -->
 | Today's quest | Type today | Target; reward today | Fish needed (casual min) | Reward in stage minutes (cash / XP) | Problems | Proposed |
 | --- | --- | --- | --- | --- | --- | --- |
-| Catch 15 Trout | non-daily, Lv 0 | 15 x rainbow trout/golden trout (any); $500, 450 XP | 201 (39.9) | 1.7 / 3.6 | Q1, Q2, Q8 | **story** `story.river-trout`, Lv 10 |
+| Catch 15 Trout | non-daily, Lv 0 | 15 x cherry trout/clover trout/fall blue trout/fogtail trout/frostfin trout/frostling trout/rainbow trout/skyfin trout/solaris trout/thunder trout (any); $500, 450 XP | 68 (13.4) | 1.7 / 3.6 | Q2, Q8 | **story** `story.river-trout`, Lv 10 |
 | Catch 15 Carp | non-daily, Lv 0 | 15 x carp (any); $350, 500 XP | 52 (10.3) | 1.2 / 4.0 | Q2, Q8 | **story** `story.river-carp`, Lv 10 |
 | Find the Lucky Magikarp | non-daily, Lv 0 | 1 x magikarp (any); $1,000, 2,000 XP | 12,714 (2,543) | 7.0 / 16.1 | Q2, Q7 | **story** `story.magikarp`, Lv 0, quest pity |
 | Help the Village! | non-daily, Lv 0 | 30 x any (any); $3,000, 300 XP | 30 (6.0) | 21.1 / 2.4 | Q2 | **repeatable** `repeatable.village`, stage-scaled |

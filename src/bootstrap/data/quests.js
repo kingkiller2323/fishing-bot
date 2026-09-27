@@ -11,7 +11,8 @@ module.exports = [
 			previous: [],
 		},
 		progressType: {
-			fish: ['rainbow trout', 'golden trout'],
+			// The River trout family (step B: quests, Q1). 'golden trout' does not exist.
+			fish: ['cherry trout', 'clover trout', 'fall blue trout', 'fogtail trout', 'frostfin trout', 'frostling trout', 'rainbow trout', 'skyfin trout', 'solaris trout', 'thunder trout'],
 			rarity: ['any'],
 			rod: 'any',
 			qualities: ['any'],

@@ -4,6 +4,7 @@ const { User } = require('../../../class/User');
 const { Quest } = require('../../../class/Quest');
 const config = require('../../../config');
 const { Interaction } = require('../../../class/Interaction');
+const { prerequisitesOf, completedQuestTitles } = require('../../../engine/questRules');
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -95,19 +96,19 @@ module.exports = {
 				return;
 			}
 
-			const prereq = await originalQuest.getPrerequesites()
-			if (prereq > 0) {
-				const existingQuests = await userData.getQuests();
-				const hasPrevious = existingQuests.some(quest => prereq.includes(quest.title) && quest.status === 'completed');
+			// Every prerequisite must be completed (the player's QuestData); none means eligible.
+			const prereq = prerequisitesOf(originalQuest.quest);
+			if (prereq.length > 0) {
+				const completed = await completedQuestTitles(user.id);
 
-				if (!hasPrevious) {
+				if (!prereq.every((t) => completed.has(t))) {
 					if (process.env.ANALYTICS || config.client.analytics) {
 						await analyticsObject.setStatus('failed');
 						await analyticsObject.setStatusMessage('User does not meet previous quest requirements');
 					}
 					canAccept = false;
 					await i.reply({
-						content: `You need to complete the previous quest(s) to start this quest!\n\n**Required Quests:**\n${originalQuest.requirements.previous.join('\n')}`,
+						content: `You need to complete the previous quest(s) to start this quest!\n\n**Required Quests:**\n${prereq.join('\n')}`,
 						flags: MessageFlags.Ephemeral,
 					});
 					return;

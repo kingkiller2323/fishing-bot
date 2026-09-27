@@ -4,6 +4,7 @@ const { User } = require('../class/User');
 const { Quest: QuestSchema, QuestData } = require('../schemas/QuestSchema');
 const { Gacha } = require('../schemas/GachaSchema');
 const { rng } = require('../engine/rng');
+const { DAILY_MS, eligibleDailies, completedQuestTitles, expireStaleDailies } = require('../engine/questRules');
 
 class Quest {
 	constructor(data) {
@@ -95,58 +96,39 @@ class Quest {
 		return this.save();
 	}
 
-	static async generateDailyQuest(userId) {
+	/**
+	 * Issues a daily quest (step B: quests, today's model). Returns the new quest, `false` when the player
+	 * already has a daily in progress or was given one less than 24 hours ago (stats.lastDailyQuest), or
+	 * `null` when no daily is eligible. A daily left unfinished for 24 hours is expired first (failed, kept).
+	 * The pool is computed once: daily templates within the gate level whose prerequisites are all completed;
+	 * the pick is uniform over it (no recursive retries).
+	 */
+	static async generateDailyQuest(userId, now = Date.now()) {
 		const user = new User(await User.get(userId));
-		const inventory = await user.getInventory();
+		if (!user) throw new Error('User not found');
+		await expireStaleDailies(userId, now);
 		const stats = await user.getStats();
-	
-		const dailies = await QuestSchema.find({ daily: true });
-		const randomIndex = Math.floor(rng.random() * dailies.length);
-		const originalQuest = dailies[randomIndex];
-	
-		if (!user) {
-			throw new Error('User not found');
-		}
-		if (inventory.quests.includes(originalQuest.id)) {
-			return await this.generateDailyQuest(userId);
-		}
-	
-		const hasDailyQuest = await Promise.all(inventory.quests.map(async (questId) => {
-			const quest = await QuestData.findById(questId);
-			return (quest && quest.daily && quest.status === 'in_progress');
-		})).then(results => results.some(Boolean));
-	
-		if (hasDailyQuest || Date.now() - stats.lastDailyQuest < 86400000) {
-			return false;
-		}
-		else {
-			// check requirements
-			const level = await user.getGateLevel();
-			if (originalQuest.requirements.level > level) {
-				return await this.generateDailyQuest(userId);
-			}
-	
-			if (originalQuest.requirements.previous.length > 0) {
-				const existingQuests = await QuestSchema.find({ user: userId }) || [];
-				const hasPrevious = existingQuests.some(quest => originalQuest.requirements.previous.includes(quest.title) && quest.status === 'completed');
-				if (!hasPrevious) {
-					return await this.generateDailyQuest(userId);
-				}
-			}
-	
-			const quest = await Utils.clone(originalQuest);
-			quest.status = 'in_progress';
-			quest.user = userId;
-			quest.startDate = Date.now();
-			quest.reward = [];
-			quest.reward.push(await Gacha.findOne({ name: 'Daily Box' }));
-			await quest.save();
-			await user.addQuest(quest._id);
-	
-			stats.lastDailyQuest = Date.now();
-			await user.setStats(stats);
-			return quest;
-		}
+
+		const hasDailyQuest = (await user.getQuests()).some((q) => q.daily && q.status === 'in_progress');
+		if (hasDailyQuest || now - (stats.lastDailyQuest || 0) < DAILY_MS) return false;
+
+		const templates = await QuestSchema.find({ daily: true });
+		const pool = eligibleDailies(templates, { gateLevel: await user.getGateLevel(), completed: await completedQuestTitles(userId) });
+		if (pool.length === 0) return null;
+		const originalQuest = pool[Math.floor(rng.random() * pool.length)];
+
+		const quest = await Utils.clone(originalQuest);
+		quest.status = 'in_progress';
+		quest.user = userId;
+		quest.startDate = now;
+		quest.reward = [];
+		quest.reward.push(await Gacha.findOne({ name: 'Daily Box' }));
+		await quest.save();
+		await user.addQuest(quest._id);
+
+		stats.lastDailyQuest = now;
+		await user.setStats(stats);
+		return quest;
 	};
 
 	static async get(questId) {

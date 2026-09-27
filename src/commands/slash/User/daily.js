@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const { Quest } = require('../../../class/Quest');
 const { Item } = require('../../../schemas/ItemSchema');
 const { User } = require('../../../class/User');
+const { expireStaleDailies } = require('../../../engine/questRules');
 const config = require('../../../config');
 
 module.exports = {
@@ -16,6 +17,8 @@ module.exports = {
      * @param {ChatInputCommandInteraction} interaction
      */
 	run: async (client, interaction, analyticsObject) => {
+		// A daily left unfinished for 24 hours no longer blocks: it is marked failed (kept for history).
+		await expireStaleDailies(interaction.user.id);
 		// check if user already has an incomplete daily quest
 		const user = new User(await User.get(interaction.user.id));
 		const userQuests = await user.getQuests();
@@ -34,6 +37,16 @@ module.exports = {
 
 		const quest = await Quest.generateDailyQuest(interaction.user.id);
 
+		if (quest === null) {
+			if (process.env.ANALYTICS || config.client.analytics) {
+				await analyticsObject.setStatus('failed');
+				await analyticsObject.setStatusMessage('No eligible daily quest.');
+			}
+			return await interaction.reply({
+				content: 'There is no daily quest available for you right now. Try again after you level up or finish more quests!',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
 		if (!quest) {
 			if (process.env.ANALYTICS || config.client.analytics) {
 				await analyticsObject.setStatus('failed');

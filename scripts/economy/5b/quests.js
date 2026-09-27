@@ -1853,7 +1853,7 @@ function markdownTables() {
 		Q8: `${today}: the story level is the target biome's live unlock level (\`P-QUESTS-STORY\`)`,
 	};
 	const questFixRows = [
-		['Q1', `**"Catch 15 Trout" targets ${tr.missingFromCatalog.map((n) => `\`${n}\``).join(', ')}, which does not exist.**`, `\`catalogIntegrity().today\`; ${fmtShare(tr.perFishToday)} of River fish match, so ${fmtN(tr.fishFor15Today)} fish for 15`, `the **River trout family** (${tr.proposedTargets.length} species, trout table): ${fmtShare(tr.perFishProposed)} match, ${fmtN(tr.fishFor15Proposed)} fish`],
+		['Q1', tr.missingFromCatalog.length ? `**"Catch 15 Trout" targets ${tr.missingFromCatalog.map((n) => `\`${n}\``).join(', ')}, which does not exist.**` : '**Fixed (step B: quests):** "Catch 15 Trout" targets the River trout family; it used to target `golden trout`, which does not exist.', `\`catalogIntegrity().today\`; ${fmtShare(tr.perFishToday)} of River fish match, so ${fmtN(tr.fishFor15Today)} fish for 15`, `the **River trout family** (${tr.proposedTargets.length} species, trout table): ${fmtShare(tr.perFishProposed)} match, ${fmtN(tr.fishFor15Proposed)} fish`],
 		['Q2', '**Non-daily quests repeat without limit.** `/start-quest` only blocks the same title *while it is in progress* (`startQuest.js:110`).', `"Help the Village!" pays ${fmtUsd(vil.cash)} + ${fmtN(vil.xp)} XP for ${vil.target.split(' x ')[0]} fish: +${fmtPct(vilBand.today.cashBonusPct, 0)} of Ocean fishing cash and +${fmtPct(vilBand.today.xpBonusPct, 0)} XP (repeatability table)`, 'the kind model (§2): story quests once-only (`questLog`); repeatables with a cooldown and a daily cap'],
 		['Q3', '**`/start-quest` never enforces prerequisites.** `if (prereq > 0)` (`startQuest.js:91`) compares the prerequisite *array* with a number (always false), and uses `some` instead of `every`.', 'latent today (no non-daily quest has prerequisites); the proposed Lucky Fisher requires Magikarp', '`canStart()`: `prerequisites.every(k => questLog[k].completions > 0)`'],
 		['Q4', '**`/daily` looks for completed prerequisites in the catalog collection** (`Quest.js:130` queries `quests`; per-user copies live in `questdatas`).', `${neverIssued.join(', ')} are **never issued**; every ineligible random pick recurses (\`Quest.js:111/126/133\`)`, 'the eligible pool is filtered up front (kind `daily`, not retired, level) with no recursion; prerequisites come from `questLog`'],
@@ -1866,7 +1866,7 @@ function markdownTables() {
 		'\n\n"Today\'s numbers" means the fix changes no balance value. A fix that needs a value ships once the proposed decision that sets it is approved.';
 	const carp = R.fixes.carp;
 	T['quests-trout'] = mdTable(['Target', 'Species that count', 'Not counted', 'Share of River fish', 'Expected fish for 15'], [
-		['"Catch 15 Trout" today', tr.todayTargets.join(', '), `${tr.missingFromCatalog.join(', ')} (not in the catalog)`, fmtShare(tr.perFishToday), fmtN(tr.fishFor15Today)],
+		['"Catch 15 Trout" today', tr.todayTargets.join(', '), `${tr.missingFromCatalog.length ? `${tr.missingFromCatalog.join(', ')} (not in the catalog)` : 'none (every target is a catalog fish)'}`, fmtShare(tr.perFishToday), fmtN(tr.fishFor15Today)],
 		['River trout family (proposed)', tr.proposedTargets.join(', '), `${tr.excluded.join(', ')}: the quest says "from the river"`, fmtShare(tr.perFishProposed), fmtN(tr.fishFor15Proposed)],
 		['River carp family (proposed)', carp.proposedTargets.join(', '), '—', fmtShare(carp.perFishProposed), fmtN(carp.fishFor15Proposed)],
 	]);

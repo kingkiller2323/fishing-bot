@@ -43,11 +43,12 @@ Rehearsed on DCC Fishing Staging **before** it lands on `main` (`scripts/staging
 ### Step B: remaining correctness fixes on today's numbers (each ships alone)
 Naming: these are "Step B: privacy", "Step B: rods", "Step B: quests" and "Step B: aquarium". Bare B1–B3 are the buff bugs of the buffs design, so reports never call a Step B item "B3".
 - **Rods:** C1 (crafted-rod repair uses the wrong model: update through `ItemData` with a state guard) and C4 (remove the dead `decreaseRodDurability` and the unguarded `User#repairRod`). No automatic retroactive refund for C1 (`P-RODS-C1-REFUND`): a specific, verifiable report is compensated manually through the audited `/dev` path.
-- **Quests:**
-  - Q1 target set;
-  - Q3 (prerequisites checked with `every`, not `some`);
-  - Q4 (daily eligibility from `questLog`, no recursion);
-  - Q5 (an unfinished daily no longer blocks `/daily`).
+- **Quests** (correctness on TODAY's quest model: per-user `QuestData`, today's status enum, the rolling 24-hour daily gate; no `questLog`, kinds, retired templates, DCC-day periods, new rewards or sizing, which are step C):
+  - Q1: "Catch 15 Trout" targets the River trout family (10 species); rewards, `progressMax`, title and description unchanged. A guarded, idempotent boot correction fixes the existing catalog row only while it still holds exactly the old target; players' accepted copies are untouched.
+  - Q3: `/start-quest` requires EVERY prerequisite title to have a completed `QuestData` of the player; none = eligible; level gating through `getGateLevel()`.
+  - Q4: `/daily` computes the eligible pool once (daily templates within the gate level, every prerequisite completed) and draws uniformly; an empty pool is a clean private answer, never recursion. Missing or malformed prerequisite lists count as none.
+  - Q5: an in-progress daily issued at least 24 hours ago (its `startDate`, else `createdAt`) is marked `failed` and kept, so it no longer blocks `/daily` or progresses; younger dailies still block; `stats.lastDailyQuest` stays the rolling issuance gate. Step C moves this to `expired` and DCC-day periods.
+  - Q8 (River quest levels) and the story/type migration stay in step C.
 - **Aquarium:** A3–A5 and A7–A9 (breeding cooldown record, capacity await, success XP, duplicate licences, atomic pet sale, temperature clamp). **A2 (the breeding chance fix) is not a step-B item.** It is held until A1 (the play → sell loop) closes in the balance release (step C.10).
 - **B1, stealth closure (D4 privacy part) and `/dev founder` hardening (`P-FOUNDER-DEV-OVERRIDE`, locked):**
   - `/sell` is ephemeral for everyone from the first defer on (success, validation and error replies); `/boosters` is ephemeral for everyone, every page button included. The catch-card Sell button is unchanged (it updates the public card with the base amount).
