@@ -7754,6 +7754,148 @@
 			},
 			"Old Rod": {
 				"unbreakable": true
+			},
+			"Shrimp": {
+				"price": 40,
+				"packSize": 10,
+				"requirements": {
+					"level": 0
+				},
+				"biomes": [
+					"ocean"
+				],
+				"capabilities": [
+					"strong"
+				]
+			},
+			"Worm": {
+				"price": 46,
+				"packSize": 10,
+				"requirements": {
+					"level": 10
+				},
+				"biomes": [
+					"river"
+				],
+				"capabilities": [
+					"strong"
+				]
+			},
+			"Fly": {
+				"price": 52,
+				"packSize": 10,
+				"requirements": {
+					"level": 20
+				},
+				"biomes": [
+					"lake",
+					"pond"
+				],
+				"capabilities": [
+					"weak"
+				]
+			},
+			"Minnow": {
+				"price": 34,
+				"packSize": 10,
+				"requirements": {
+					"level": 20
+				},
+				"biomes": [
+					"lake",
+					"pond"
+				],
+				"capabilities": [
+					"weak"
+				]
+			},
+			"Magnet": {
+				"price": 49,
+				"packSize": 10,
+				"requirements": {
+					"level": 20
+				},
+				"biomes": [
+					"lake",
+					"pond"
+				],
+				"capabilities": [
+					"weak"
+				]
+			},
+			"Spinner": {
+				"price": 225,
+				"packSize": 10,
+				"requirements": {
+					"level": 20
+				},
+				"biomes": [
+					"lake",
+					"pond"
+				],
+				"capabilities": [
+					"weak"
+				]
+			},
+			"Lure": {
+				"price": 120,
+				"packSize": 10,
+				"requirements": {
+					"level": 20
+				},
+				"biomes": [
+					"lake",
+					"pond"
+				],
+				"capabilities": [
+					"weak"
+				]
+			},
+			"Bloodworm": {
+				"price": 160,
+				"packSize": 10,
+				"requirements": {
+					"level": 40
+				},
+				"biomes": [
+					"coast",
+					"swamp"
+				],
+				"capabilities": [
+					"weak"
+				]
+			},
+			"Magic Lure": {
+				"price": 530,
+				"packSize": 10,
+				"requirements": {
+					"level": 40
+				},
+				"biomes": [
+					"coast",
+					"swamp"
+				],
+				"capabilities": [
+					"weak"
+				]
+			},
+			"Strong Magnet": {
+				"price": 255,
+				"packSize": 10,
+				"requirements": {
+					"level": 40
+				},
+				"biomes": [
+					"ocean",
+					"river",
+					"lake",
+					"pond",
+					"coast",
+					"swamp"
+				],
+				"capabilities": [
+					"weak"
+				]
 			}
 		}
 	},
@@ -7769,5 +7911,5 @@
 		"boxLuck": "non-buff",
 		"competitiveEligible": false
 	},
-	"contentHash": "7c6c6a177fe5357e"
+	"contentHash": "dc7d8e4be427afaf"
 }

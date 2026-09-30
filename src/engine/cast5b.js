@@ -16,15 +16,16 @@ const { Season } = require('../class/Season');
 const { activeBuffFilter } = require('./buffs');
 const { rng } = require('./rng');
 const { BALANCE_VERSION_5B, XP_PER_FISH, NORMAL_RARITY_TABLE, resolveProfile, activeEvent, need5b } = require('./balance');
-const { baitStats, buffEffects } = require('./modifiers');
+const { buffEffects } = require('./modifiers');
 const { applyPity, roll, toPercent, normalize } = require('./rarity');
 const { buildFishDoc, rollFishStats } = require('./rewards');
 const { publicXpOf, publicLevelOf } = require('./publicLevel');
 const { levelOf, levelWithFloor } = require('./levels');
-const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
+const { levelOfUserDoc } = require('./levelGate');
 const value5b = require('./b5/value');
 const rods5b = require('./b5/rods');
 const world5b = require('./b5/world');
+const bait5b = require('./b5/bait');
 const { resolveModifiers5b } = require('./b5/modifiers');
 const { rollFishCount } = require('./b5/multicatch');
 const { LEGACY_ONLY } = require('./b5/catalog');
@@ -68,13 +69,6 @@ async function drawTemplates5b({ draws, qualities, table, guarantee = null, biom
 	return picked;
 }
 
-/** Today's bait as a 5B source until the 5B bait roster (step C.4): its stats without legacy draw counts. */
-function baitInput(bait, applied) {
-	if (!bait) return null;
-	const { stats, qualities } = baitStats(bait);
-	const rest = Object.fromEntries(Object.entries(stats).filter(([k]) => k !== 'perDraw' && k !== 'multiCatch'));
-	return { id: String(bait._id), name: bait.name, applied, stats: rest, qualities };
-}
 
 /** One XP roll per fish unit (today's 10-25 roll), weighted by that unit's rarity and floored per fish. */
 function rollCatchXp(catches) {
@@ -129,9 +123,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	if (rodState === 'broken') return failure(base, 'ROD_BROKEN', 'Your rod is broken! Repair it, or switch to your Old Rod.', { rodState: 'broken' });
 
 	const baitDoc = user.inventory.equippedBait ? await ItemData.findById(user.inventory.equippedBait) : null;
-	const equippedBait = plain(baitDoc);
-	const baitLocked = Boolean(equippedBait) && !meetsLevelRequirement(levelOfUserDoc(user), equippedBait);
-	const bait = baitLocked ? null : equippedBait;
+	const bait = plain(baitDoc);
 
 	const biomeKey = (user.currentBiome || 'ocean').toLowerCase();
 	const biome = world5b.canonBiome(biomeKey) || capitalize(biomeKey);
@@ -140,9 +132,10 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const season = (await Season.getCurrentSeason())?.season;
 
 	const activeBuffs = (await BuffData.find(activeBuffFilter(userId, now))).map(plain);
-	const baitApplies = Boolean(bait && (bait.biomes || []).includes(biomeKey));
+	// 5B bait: read by name, only where it works (biome and shop level), one unit per cast (b5/bait.js).
+	const baitSrc = bait5b.baitSource(bait, biome, gateLevel);
 	const modifiers = resolveModifiers5b({
-		profile, rod: rodProfile, bait: baitInput(bait, baitApplies), buffs: buffEffects(activeBuffs), event: activeEvent(now), user: plain(user), now,
+		profile, rod: rodProfile, bait: baitSrc, buffs: buffEffects(activeBuffs), event: activeEvent(now), user: plain(user), now,
 	});
 	base.competitiveEligible = modifiers.competitiveEligible;
 
@@ -222,7 +215,8 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		? { durability: rod.durability, state: rod.state, fishCaught: (rod.fishCaught || 0) + units }
 		: { durability: Math.max(0, (rod.durability || 0) - durabilityCost), state: rodState, fishCaught: (rod.fishCaught || 0) + units };
 	if (!rodProfile.unbreakable && rodAfter.durability <= 0) rodAfter.state = 'broken';
-	const baitAfter = bait ? Math.max(0, (bait.count || 0) - units) : null;
+	const baitUsed = bait5b.unitsUsed(baitSrc);
+	const baitAfter = bait ? Math.max(0, (bait.count || 0) - baitUsed) : null;
 
 	const questDocs = (await QuestData.find({ user: String(userId), status: 'in_progress' })).map(plain);
 	const rodName = (rod.name || '').toLowerCase();
@@ -292,10 +286,12 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		environment: { biome, weather, season },
 		rod: { id: String(rod._id), name: rod.name, type: rod.type, kind: rodProfile.kind, unbreakable: rodProfile.unbreakable, capabilities: rod.capabilities || [], before: { durability: rod.durability, state: rod.state, fishCaught: rod.fishCaught || 0 }, after: rodAfter, durabilityCost },
 		bait: bait
-			? { id: String(bait._id), name: bait.name, applied: baitApplies, before: { count: bait.count }, after: { count: baitAfter }, depleted: baitAfter === 0 }
-			: (baitLocked
-				? { id: String(equippedBait._id), name: equippedBait.name, applied: false, levelLocked: true, requiredLevel: requiredLevel(equippedBait), before: { count: equippedBait.count }, after: { count: equippedBait.count }, depleted: false }
-				: null),
+			? {
+				id: String(bait._id), name: bait.name, applied: baitSrc.applied, consumed: baitUsed, before: { count: bait.count }, after: { count: baitAfter }, depleted: baitUsed > 0 && baitAfter === 0,
+				...(baitSrc.reason === 'level' ? { levelLocked: true, requiredLevel: baitSrc.requiredLevel } : {}),
+				...(baitSrc.reason === 'biome' ? { wrongBiome: true } : {}),
+			}
+			: null,
 		buffs: activeBuffs.map((b) => ({ id: String(b._id), name: b.name, capabilities: b.capabilities || [] })),
 		modifiers: { ...modifiers, rarity: { base: toPercent(modifiers.rarity.base, 4), table: toPercent(modifiers.rarity.table, 4) } },
 		rarity: { table: toPercent(pity.table, 4), guarantee: pity.guarantee },

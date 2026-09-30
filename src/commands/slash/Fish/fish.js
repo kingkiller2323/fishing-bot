@@ -100,6 +100,9 @@ const followUpMessage = async (interaction, user, result) => {
 		if (result.bait?.depleted) {
 			warnings.push('You ran out of bait!');
 		}
+		else if (result.bait?.wrongBiome) {
+			warnings.push(`Your ${result.bait.name} has no effect in the ${result.environment.biome} and was not used.`);
+		}
 		else if (result.bait?.levelLocked) {
 			warnings.push(`Your ${result.bait.name} requires level ${result.bait.requiredLevel}: it had no effect and was not used.`);
 		}

@@ -240,6 +240,12 @@ function build() {
 				}, new Map())),
 				// The Old Rod is unbreakable (P-RODS-OLD-ROD).
 				'Old Rod': { unbreakable: rods.PARAMS.oldRod.unbreakable },
+				// Bait (P-BAIT-*): sold in packs; price is the pack price; the shop level, biomes and strong access
+				// are the roster's (the engine reads behaviour by name).
+				...Object.fromEntries(Object.entries(bait.prices()).map(([name, p]) => {
+					const b = bait.baits[name];
+					return [name, { price: p.packPrice, packSize: bait.PARAMS.pricing.packSize, requirements: { level: p.levelRequirement }, biomes: b.biomes.map((x) => x.toLowerCase()), capabilities: b.grantsStrong ? ['strong'] : ['weak'] }];
+				})),
 			},
 		},
 
