@@ -210,6 +210,9 @@ async function validate() {
 		if (unknown.length > 0) problems.push(`${unknown.length} weather pattern(s) reference unknown weather types`);
 	}
 
+	// The 5B release validates its own data (value per species, ...) only while its flag is on.
+	if (require('../engine/balance').isBalance5b()) problems.push(...await require('../engine/b5/validate').validate5b());
+
 	const summary = {
 		weatherTypes: weatherNames.size,
 		seasons: seasons.length,

@@ -34,6 +34,59 @@ function contentHash(data) {
 	return crypto.createHash('sha256').update(JSON.stringify(sorted(rest))).digest('hex').slice(0, 16);
 }
 
+const { FISH, currentValue, LUCKY_ITEM_SHARE } = require('../lib/catalog-model');
+
+const qualityOf = (f) => ((f.qualities || []).includes('weak') ? 'weak' : 'strong');
+const yearRound = (f) => (f.weather || 'all') === 'all' && (f.season || 'all') === 'all';
+const DONOR_BIOME = 'River';
+const COPIED = ['minSize', 'maxSize', 'minWeight', 'maxWeight', 'baseValue'];
+
+/**
+ * Species value data and the Mountain Stream ladder. New Mountain Stream species take size, weight and
+ * base value from a River donor of the same rarity and quality. Donor rule (stable, recorded here so a
+ * regeneration cannot silently pick another): the bucket's River species ordered year-round first, then
+ * by name; the k-th new species of the bucket (ladder order) takes candidate k mod n. New species are
+ * year-round (season 'all'); the premium salmon keep their weather. Flashfin, Shrouded and Zephyr stay
+ * as they are in the catalog. Value: the world design's ladder value (BIOME_VALUE['Mountain Stream'] ×
+ * rarity × quality × new-species factor; P-MS-VALUE, P-WORLD-MS-LADDER).
+ */
+function speciesData(F, world) {
+	const species = {};
+	const add = (f, proposed) => {
+		const key = `${f.biome}|${f.name}`;
+		const current = currentValue(f);
+		if (!(current > 0) || !(proposed > 0)) throw new Error(`species ${key}: value data must be positive (current ${current}, proposed ${proposed})`);
+		if (species[key] && (species[key].current !== current || species[key].proposed !== proposed)) throw new Error(`species ${key}: two catalog rows disagree`);
+		species[key] = { rarity: f.rarity, quality: qualityOf(f), current, proposed };
+	};
+	for (const f of FISH) add(f, F.proposedValue(f));
+
+	const buckets = new Map();
+	const donorsFor = (rarity, quality) => {
+		const key = `${rarity}|${quality}`;
+		if (!buckets.has(key)) {
+			const list = FISH.filter((f) => f.biome === DONOR_BIOME && f.rarity === rarity && qualityOf(f) === quality)
+				.sort((a, b) => (yearRound(b) - yearRound(a)) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+			if (!list.length) throw new Error(`Mountain Stream: no ${DONOR_BIOME} donor for ${key}`);
+			buckets.set(key, { list, used: 0 });
+		}
+		return buckets.get(key);
+	};
+	const ladder = world.ladderSpecies();
+	const params = new Map(world.PARAMS.mountainStream.ladder.map((s) => [s.name, s]));
+	const rows = ladder.map((s) => {
+		const p = params.get(s.name);
+		if (s.existing) return { name: s.name, rarity: s.rarity, quality: qualityOf(s), weather: s.weather, season: s.season, existing: true };
+		const bucket = donorsFor(p.rarity, p.quality);
+		const donor = bucket.list[bucket.used % bucket.list.length];
+		bucket.used++;
+		const row = { name: s.name, rarity: p.rarity, quality: p.quality, weather: p.weather || 'all', season: 'all', existing: false, donor: `${DONOR_BIOME}|${donor.name}`, ...pick(donor, COPIED) };
+		add({ ...row, biome: 'Mountain Stream', qualities: [p.quality] }, s.value);
+		return row;
+	});
+	return { species, mountainStream: { level: F.BIOME_LEVEL['Mountain Stream'], donorBiome: DONOR_BIOME, species: rows } };
+}
+
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]]));
 
 /** The 5B balance data, from the modules. */
@@ -55,6 +108,7 @@ function build() {
 
 	const hybrid = founder.solveHybrid();
 	const upgradeRows = upgrades.priceTable();
+	const { species: speciesValues, mountainStream } = speciesData(F, world);
 
 	const data = {
 		schema: SCHEMA,
@@ -73,7 +127,14 @@ function build() {
 			rarity: { ...F.RARITY_VALUE },
 			quality: { ...F.QUALITY_VALUE },
 			speciesClamp: [...F.SPECIES_CLAMP],
+			// Per species ('<biome>|<name>'): today's expected raw value (current) and the 5B expected value
+			// (proposed). A catch's raw roll is scaled by proposed / current (P-VALUE-MODEL; step C rule).
+			species: speciesValues,
 		},
+
+		// Engine rules the model runs (P-LUCKY: Lucky items pinned to the normal base rate; P-DURABILITY:
+		// n × (1 − efficiency) with stochastic rounding and no minimum).
+		rules: { luckyItems: F.RULES.luckyItems, durability: F.RULES.durability, luckyItemShare: LUCKY_ITEM_SHARE },
 
 		// XP per fish = the 10-25 roll (mean) × rarity weight (P-XP-RARITY).
 		xp: { perFishMean: F.XP_PER_FISH_MEAN, rarity: { ...F.XP_RARITY } },
@@ -81,7 +142,7 @@ function build() {
 		// Normal-player multi-catch chain and the global ceiling on the final mean (A-MULTICATCH).
 		multiCatch: { ...F.MULTI, ceilingMean: rods.PARAMS.multi.ceilingMean },
 
-		world: { biomeOrder: [...F.BIOME_ORDER], biomeLevel: { ...F.BIOME_LEVEL } },
+		world: { biomeOrder: [...F.BIOME_ORDER], biomeLevel: { ...F.BIOME_LEVEL }, mountainStream },
 
 		// Standard shop ladder (P-RODS-STANDARD-LADDER, P-RODS-STANDARD-PRICES) and the unbreakable Old Rod.
 		rods: {

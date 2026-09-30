@@ -7,7 +7,7 @@
 //
 // The active curve is chosen in exactly one place (activeCurve). Today it is the 100·L² curve, so
 // floor == curve for every account and nothing visible changes. Step C switches activeCurve by flag.
-const { levelForXp } = require('./balance');
+const { levelForXp, rules5b, curve5bData } = require('./balance');
 
 /** A level curve: level for a total XP, and the total XP at which a level starts. */
 const CURVES = {
@@ -17,14 +17,17 @@ const CURVES = {
 		levelForXp,
 		xpForLevel: (level) => 100 * level ** 2,
 	},
-	// Phase 5B curve (A-CURVE, approved): xp(L) = 100·L² + 0.0525·L⁴. Pure; NOT selected (Step C).
+	// Phase 5B curve (A-CURVE, approved): xp(L) = base·L² + quartic·L⁴ (from the generated 5B data).
 	'5b': {
 		name: '5b',
-		xpForLevel: (level) => 100 * level ** 2 + 0.0525 * level ** 4,
+		xpForLevel: (level) => {
+			const { base, quartic } = curve5b();
+			return base * level ** 2 + quartic * level ** 4;
+		},
 		levelForXp(xp) {
 			const x = Math.max(0, xp || 0);
-			const a = 0.0525;
-			let level = Math.max(1, Math.floor(Math.sqrt((-100 + Math.sqrt(10000 + 4 * a * x)) / (2 * a))));
+			const { base: b, quartic: a } = curve5b();
+			let level = Math.max(1, Math.floor(Math.sqrt((-b + Math.sqrt(b * b + 4 * a * x)) / (2 * a))));
 			// Exact at the boundaries despite floating-point error in the closed form.
 			while (CURVES['5b'].xpForLevel(level + 1) <= x) level++;
 			while (level > 1 && CURVES['5b'].xpForLevel(level) > x) level--;
@@ -33,9 +36,12 @@ const CURVES = {
 	},
 };
 
-/** The curve every level read uses. The ONE switch point for the curve change (Step C, by flag). */
+/** The 5B curve coefficients (the generated data; the curve is only SELECTED while the release is on). */
+const curve5b = () => curve5bData();
+
+/** The curve every level read uses. The ONE switch point for the curve change: the 5B release flag. */
 function activeCurve() {
-	return CURVES.current;
+	return rules5b() ? CURVES['5b'] : CURVES.current;
 }
 
 /** The active curve's level for a total XP (no floor). */

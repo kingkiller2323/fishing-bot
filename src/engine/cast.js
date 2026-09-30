@@ -28,7 +28,7 @@ const { Cast } = require('../schemas/CastSchema');
 const { WeatherPattern } = require('../class/WeatherPattern');
 const { Season } = require('../class/Season');
 const { rng } = require('./rng');
-const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, activeEvent } = require('./balance');
+const { BALANCE_VERSION, XP_PER_FISH, resolveProfile, activeEvent, isBalance5b } = require('./balance');
 const { resolveModifiers, rollDraws } = require('./modifiers');
 const { applyPity, roll, toPercent } = require('./rarity');
 const { oid, notApplied, guardPush, grantItem, buildFishDoc, rollFishStats, insertFishDocs } = require('./rewards');
@@ -153,7 +153,13 @@ function failure(base, code, message, extra = {}) {
  * @param {{ userId: string, guildId?: string, channelId?: string, now?: Date }} ctx
  * @returns {Promise<object>} CastResult (status 'ok' or 'failed')
  */
-async function castLine({ userId, guildId = null, channelId = null, now = new Date() }) {
+async function castLine(ctx) {
+	// The 5B release decides casts with its own engine (cast5b.js); with the flag off this is today's cast.
+	if (isBalance5b()) return require('./cast5b').castLine5b(ctx);
+	return castLineLegacy(ctx);
+}
+
+async function castLineLegacy({ userId, guildId = null, channelId = null, now = new Date() }) {
 	const castId = new ObjectId().toString();
 	const user = await UserModel.findOne({ userId: String(userId) });
 	const profile = resolveProfile(userId, user);
@@ -571,4 +577,7 @@ async function fishingStats(userId) {
 	};
 }
 
-module.exports = { castLine, applyCastResult, recoverPendingCasts, recoverPendingCastsDetailed, fishingStats, grantItem, NoCatchError, MAX_DRAW_ATTEMPTS };
+module.exports = {
+	// Shared with the 5B cast engine (cast5b.js).
+	drawTemplates, fallbackTemplate, questMatches, rewardBreakdown, failure, capitalize, plain, POND_WARNING_AT, RARITY_ORDER,
+	castLine, applyCastResult, recoverPendingCasts, recoverPendingCastsDetailed, fishingStats, grantItem, NoCatchError, MAX_DRAW_ATTEMPTS };

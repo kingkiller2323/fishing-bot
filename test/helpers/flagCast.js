@@ -36,7 +36,15 @@ async function main() {
 	for (let seed = 1; seed <= 25; seed++) {
 		for (const id of players) {
 			rng.seed(seed);
-			const r = await castLine({ userId: id, now });
+			let r;
+			try {
+				r = await castLine({ userId: id, now });
+			}
+			catch (error) {
+				// Only the 5B engine can refuse here (its test-pool fish have no 5B value data).
+				casts.push({ error: error.code || String(error.message) });
+				continue;
+			}
 			if (r.ok !== false) await applyCastResult(r);
 			casts.push(normalise(r));
 		}

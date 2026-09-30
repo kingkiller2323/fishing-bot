@@ -63,7 +63,8 @@ test('flag off: castLine and applyCastResult are identical with BALANCE_5B unset
 	assert.ok(unset.users[0].xp > 0 && unset.users[1].xp > unset.users[0].xp, 'normal and Founder players both progressed');
 	assert.deepEqual(off, unset);
 	assert.deepEqual(junk, unset);
-	// Step A only: no gameplay path reads the 5B numbers yet, so even the flag on changes nothing. Step C
-	// replaces this assertion with the 5B behaviour behind the flag.
-	assert.deepEqual({ ...on, flag: false }, unset);
+	// Flag on: the 5B engine decides the casts. Its value model has no data for the test-pool species, so
+	// it refuses them (never a guessed value) and nothing is written.
+	assert.ok(on.casts.every((c) => c.error === 'NO_VALUE_DATA'), 'the 5B engine never prices a species without value data');
+	assert.ok(on.users.every((u) => !u.xp), 'nothing was awarded');
 });

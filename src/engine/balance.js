@@ -193,6 +193,24 @@ function loadBalance5b() {
 	return balance5bCache;
 }
 
+/**
+ * The 5B rules while the flag is on, else null. Every 5B code path reads its numbers through this (or
+ * requires them with `need5b()`), so with the flag off no 5B number can reach the game.
+ */
+function rules5b(cfg = config) {
+	return isBalance5b(cfg) ? loadBalance5b() : null;
+}
+
+/** The 5B rules; throws when the flag is off (a 5B-only path reached with the flag off is a bug). */
+function need5b(cfg = config) {
+	const r = rules5b(cfg);
+	if (!r) throw new Error('a 5B rule was read with the 5B release switched off');
+	return r;
+}
+
+/** The 5B curve coefficients (pure data; levels.js selects the 5B curve only while the release is on). */
+const curve5bData = () => loadBalance5b().curve;
+
 /** Balance data by version: '5b' is the generated file. Today's numbers are the constants in this module. */
 function balanceData(version) {
 	if (version === BALANCE_VERSION_5B) return loadBalance5b();
@@ -248,6 +266,9 @@ module.exports = {
 	BALANCE_VERSION_5B,
 	isBalance5b,
 	loadBalance5b,
+	rules5b,
+	need5b,
+	curve5bData,
 	balanceData,
 	// Back-compat for Phase 2 callers.
 	BASE: { xpPerFish: XP_PER_FISH },

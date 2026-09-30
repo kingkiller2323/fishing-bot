@@ -116,7 +116,15 @@ test('a rod that is no longer broken at confirm time is not repaired and nothing
 
 test('two confirmations cannot repair twice or charge twice', async () => {
 	const rodId = await brokenCraftedRod('c1-double');
-	const [a, b] = await Promise.all([clickRepair('c1-double'), clickRepair('c1-double')]);
+	// Both prompts are open (the rod read as broken) before either confirms: a barrier, so the race is real.
+	let arrived = 0;
+	let release;
+	const barrier = new Promise((resolve) => { release = resolve; });
+	const beforeConfirm = async () => {
+		if (++arrived === 2) release();
+		await barrier;
+	};
+	const [a, b] = await Promise.all([clickRepair('c1-double', { beforeConfirm }), clickRepair('c1-double', { beforeConfirm })]);
 	const titles = [a.title, b.title].sort();
 	assert.deepEqual(titles, ['Congratulations!', 'Nothing to Repair']);
 	assert.equal((await ItemData.findById(rodId).lean()).repairs, 1);

@@ -18,7 +18,7 @@ const { activeBuffFilter } = require('./buffs');
 const { Biome } = require('../schemas/BiomeSchema');
 const { GachaOpen } = require('../schemas/GachaOpenSchema');
 const { rng } = require('./rng');
-const { BALANCE_VERSION, RARITIES, STAT_CAPS, resolveProfile, activeEvent } = require('./balance');
+const { BALANCE_VERSION, BALANCE_VERSION_5B, RARITIES, STAT_CAPS, resolveProfile, activeEvent, isBalance5b } = require('./balance');
 const { buildTable, applyPity, normalize, roll, toPercent } = require('./rarity');
 const { boxDefinition } = require('./gachaBoxes');
 const { oid, notApplied, appliedTo, guardPush, grantItem, buildFishDoc, insertFishDocs, rollFishStats } = require('./rewards');
@@ -123,7 +123,10 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 	const openId = new ObjectId().toString();
 	const user = await UserModel.findOne({ userId: String(userId) });
 	const profile = resolveProfile(userId, user);
-	const base = { openId, userId: String(userId), guildId, createdAt: now, profile: profile.name, balanceVersion: BALANCE_VERSION, competitiveEligible: Boolean(profile.competitiveEligible) };
+	// The 5B release scales box fish to the 5B species value (b5/value.js), once, here.
+	const release5b = isBalance5b();
+	const balanceVersion = release5b ? BALANCE_VERSION_5B : BALANCE_VERSION;
+	const base = { openId, userId: String(userId), guildId, createdAt: now, profile: profile.name, balanceVersion, competitiveEligible: Boolean(profile.competitiveEligible) };
 	if (!user) return failure(base, 'NO_USER', 'Player not found.');
 
 	const owned = (await ItemData.find({ _id: { $in: user.inventory.gacha || [] } })).map(plain);
@@ -202,7 +205,9 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 
 		if (entry.kind === 'fish') {
 			const t = entry.template;
-			const { size, weight, rawValue } = await rollFishStats(t);
+			const rolled = await rollFishStats(t);
+			const { size, weight } = rolled;
+			const rawValue = release5b ? require('./b5/value').scaleRaw(rolled.rawValue, t) : rolled.rawValue;
 			const sell = profile.multipliers.sell * (event?.multipliers?.sell || 1);
 			const sellBase = event?.multipliers?.sell || 1;
 			const value = Math.round(rawValue * sell);
@@ -212,7 +217,7 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 			// Box fish were not caught: never competitive, whatever the profile.
 			fishDocs.push(buildFishDoc({
 				template: t, id: fishId, userId, guildId, count: 1, size, weight, value, valueBase, now,
-				meta: { openId, source: 'gacha', profile: profile.name, balanceVersion: BALANCE_VERSION, competitiveEligible: false },
+				meta: { openId, source: 'gacha', profile: profile.name, balanceVersion, competitiveEligible: false },
 			}));
 		}
 		else {

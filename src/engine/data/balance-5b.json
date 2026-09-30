@@ -42,7 +42,1214 @@
 		"speciesClamp": [
 			0.8,
 			1.25
-		]
+		],
+		"species": {
+			"Ocean|Seabass": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 15.515,
+				"proposed": 18.72
+			},
+			"Ocean|Sardine": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 3.8103,
+				"proposed": 14.4
+			},
+			"River|Salmon": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 44.0325,
+				"proposed": 30.16
+			},
+			"River|Carp": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 82.2675,
+				"proposed": 29
+			},
+			"Lake|Bass": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 48.5175,
+				"proposed": 55.9
+			},
+			"Lake|Bluegill": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 4.0515,
+				"proposed": 34.4
+			},
+			"Pond|Guppy": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 0.90515,
+				"proposed": 63.44
+			},
+			"Pond|Frog": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 2.1765,
+				"proposed": 48.8
+			},
+			"Swamp|Swamp Eel": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 266.0175,
+				"proposed": 173.875
+			},
+			"Swamp|Mud Fish": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 22.8015,
+				"proposed": 85.6
+			},
+			"Coast|Crab": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 7.8015,
+				"proposed": 106.6
+			},
+			"Coast|Clam": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 2.000625,
+				"proposed": 65.6
+			},
+			"Ocean|Tuna": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 463.18875,
+				"proposed": 46.8
+			},
+			"Ocean|Anchovy": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 7.581405,
+				"proposed": 23.04
+			},
+			"River|Catfish": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 187.310625,
+				"proposed": 69.1275941026
+			},
+			"River|Rainbow Trout": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 36.4635,
+				"proposed": 37.12
+			},
+			"Lake|Walleye": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 79.748625,
+				"proposed": 71.552
+			},
+			"Lake|Perch": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 16.6959375,
+				"proposed": 55.04
+			},
+			"Pond|Betta": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 4.157025,
+				"proposed": 101.504
+			},
+			"Pond|Koi": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 27.248625,
+				"proposed": 78.08
+			},
+			"Swamp|Water Snake": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 229.748625,
+				"proposed": 222.56
+			},
+			"Swamp|Bullfrog": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 24.1959375,
+				"proposed": 136.96
+			},
+			"Coast|Lobster": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 46.6959375,
+				"proposed": 170.56
+			},
+			"Coast|Oyster": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 3.91959375,
+				"proposed": 104.96
+			},
+			"Ocean|Swordfish": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 601.03125,
+				"proposed": 87.75
+			},
+			"Ocean|Pufferfish": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 54.5728125,
+				"proposed": 43.2
+			},
+			"River|Sturgeon": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 474.495,
+				"proposed": 129.329917255
+			},
+			"River|Shad": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 32.0728125,
+				"proposed": 69.6
+			},
+			"Lake|Pike": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 133.228125,
+				"proposed": 134.16
+			},
+			"Lake|Loach": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 4.247475,
+				"proposed": 103.2
+			},
+			"Pond|Chub": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 24.5728125,
+				"proposed": 190.32
+			},
+			"Pond|Giant Frog": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 39.5728125,
+				"proposed": 183
+			},
+			"Swamp|Viperfish": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 114.5728125,
+				"proposed": 333.84
+			},
+			"Swamp|Bogfish": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 15.497475,
+				"proposed": 256.8
+			},
+			"Coast|Octopus": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 155.803875,
+				"proposed": 319.8
+			},
+			"Coast|Starfish": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 15.497475,
+				"proposed": 196.8
+			},
+			"Ocean|Azure Marlin": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 892.2,
+				"proposed": 118.941362465
+			},
+			"Ocean|Giant Shrimp": {
+				"rarity": "ultra",
+				"quality": "weak",
+				"current": 250.4422,
+				"proposed": 86.4
+			},
+			"River|Dorado": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 177.6375,
+				"proposed": 180.96
+			},
+			"River|Scorpion Carp": {
+				"rarity": "ultra",
+				"quality": "weak",
+				"current": 63.9885,
+				"proposed": 139.2
+			},
+			"Lake|Steelhead": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 177.6375,
+				"proposed": 268.32
+			},
+			"Lake|Golden Bass": {
+				"rarity": "ultra",
+				"quality": "weak",
+				"current": 1132.7385,
+				"proposed": 258
+			},
+			"Pond|Golden Guppy": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 87.56633,
+				"proposed": 380.64
+			},
+			"Pond|Golden Frog": {
+				"rarity": "ultra",
+				"quality": "weak",
+				"current": 188.1633,
+				"proposed": 366
+			},
+			"Swamp|Golden Eel": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1882.7385,
+				"proposed": 1043.25
+			},
+			"Swamp|Golden Mudfish": {
+				"rarity": "ultra",
+				"quality": "weak",
+				"current": 375.6633,
+				"proposed": 513.6
+			},
+			"Coast|Golden Crab": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 375.6633,
+				"proposed": 639.6
+			},
+			"Coast|Golden Clam": {
+				"rarity": "ultra",
+				"quality": "weak",
+				"current": 187.776375,
+				"proposed": 393.6
+			},
+			"Ocean|Albacore": {
+				"rarity": "giant",
+				"quality": "strong",
+				"current": 1162.6875,
+				"proposed": 280.8
+			},
+			"Ocean|Super Cucumber": {
+				"rarity": "giant",
+				"quality": "weak",
+				"current": 1018.53,
+				"proposed": 189.21892598
+			},
+			"River|Queen Salmon": {
+				"rarity": "giant",
+				"quality": "strong",
+				"current": 1692.65,
+				"proposed": 452.4
+			},
+			"River|King Salmon": {
+				"rarity": "giant",
+				"quality": "weak",
+				"current": 1692.65,
+				"proposed": 348
+			},
+			"Lake|Loch Ness Monster": {
+				"rarity": "giant",
+				"quality": "strong",
+				"current": 6011.25,
+				"proposed": 670.8
+			},
+			"Lake|Ogopogo": {
+				"rarity": "giant",
+				"quality": "weak",
+				"current": 4886.25,
+				"proposed": 419.43106675
+			},
+			"Pond|Jumbo Koi": {
+				"rarity": "giant",
+				"quality": "strong",
+				"current": 1537.6875,
+				"proposed": 951.6
+			},
+			"Pond|Zombie Fish": {
+				"rarity": "giant",
+				"quality": "weak",
+				"current": 573.0525,
+				"proposed": 585.6
+			},
+			"Swamp|Crocodile": {
+				"rarity": "giant",
+				"quality": "strong",
+				"current": 2180.25,
+				"proposed": 1669.2
+			},
+			"Swamp|Alligator": {
+				"rarity": "giant",
+				"quality": "weak",
+				"current": 2180.25,
+				"proposed": 1284
+			},
+			"Coast|Jellyfish": {
+				"rarity": "giant",
+				"quality": "strong",
+				"current": 116.26875,
+				"proposed": 1023.36
+			},
+			"Coast|Sea Serpent": {
+				"rarity": "giant",
+				"quality": "weak",
+				"current": 976.125,
+				"proposed": 984
+			},
+			"Ocean|Kraken": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 6388.125,
+				"proposed": 731.25
+			},
+			"Ocean|Anglerfish": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 119.535,
+				"proposed": 360
+			},
+			"River|Void Salmon": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 2272.86375,
+				"proposed": 942.5
+			},
+			"River|Woodskip": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 34.396875,
+				"proposed": 580
+			},
+			"Lake|Golden Pike": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 1731.46875,
+				"proposed": 1746.875
+			},
+			"Lake|Golden Loach": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 376.05525,
+				"proposed": 1035.63313373
+			},
+			"Pond|Golden Chub": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 754.396875,
+				"proposed": 1982.5
+			},
+			"Pond|Platinum Frog": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 282.30525,
+				"proposed": 1220
+			},
+			"Swamp|Golden Viperfish": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 754.396875,
+				"proposed": 3477.5
+			},
+			"Swamp|Golden Bogfish": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 376.05525,
+				"proposed": 2140
+			},
+			"Coast|Golden Octopus": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 2262.31125,
+				"proposed": 2665
+			},
+			"Coast|Golden Starfish": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 376.05525,
+				"proposed": 1640
+			},
+			"Ocean|Pearl": {
+				"rarity": "lucky",
+				"quality": "strong",
+				"current": 75.1206,
+				"proposed": 936
+			},
+			"Ocean|Magikarp": {
+				"rarity": "lucky",
+				"quality": "weak",
+				"current": 3502.211,
+				"proposed": 900
+			},
+			"River|Noxclate Fish": {
+				"rarity": "lucky",
+				"quality": "strong",
+				"current": 1589.07,
+				"proposed": 1885
+			},
+			"River|Lunafin Fish": {
+				"rarity": "lucky",
+				"quality": "weak",
+				"current": 755.025,
+				"proposed": 1160
+			},
+			"Lake|Lost Ring": {
+				"rarity": "lucky",
+				"quality": "strong",
+				"current": 75.1206,
+				"proposed": 2795
+			},
+			"Lake|Lost Necklace": {
+				"rarity": "lucky",
+				"quality": "weak",
+				"current": 75.1206,
+				"proposed": 2150
+			},
+			"Pond|Lost Wallet": {
+				"rarity": "lucky",
+				"quality": "strong",
+				"current": 38.706,
+				"proposed": 3172
+			},
+			"Pond|Lost Phone": {
+				"rarity": "lucky",
+				"quality": "weak",
+				"current": 376.206,
+				"proposed": 3050
+			},
+			"Swamp|Lost Boot": {
+				"rarity": "lucky",
+				"quality": "strong",
+				"current": 3.015,
+				"proposed": 6955
+			},
+			"Swamp|Lost Hat": {
+				"rarity": "lucky",
+				"quality": "weak",
+				"current": 1.206,
+				"proposed": 4280
+			},
+			"Coast|Lost Boot": {
+				"rarity": "lucky",
+				"quality": "strong",
+				"current": 3.015,
+				"proposed": 5330
+			},
+			"Coast|Lost Hat": {
+				"rarity": "lucky",
+				"quality": "weak",
+				"current": 1.206,
+				"proposed": 3280
+			},
+			"Swamp|Snowflake Carp": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 217.895625,
+				"proposed": 256.8
+			},
+			"River|Frostling Trout": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 76.6959375,
+				"proposed": 37.12
+			},
+			"Pond|Icefin Perch": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 28.77825,
+				"proposed": 48.8
+			},
+			"Ocean|Polar Pike": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1053.165,
+				"proposed": 140.4
+			},
+			"Lake|Blizzard Bass": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 289.9495,
+				"proposed": 193.226213053
+			},
+			"Ocean|Arctic Cod": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 234.28375,
+				"proposed": 28.8
+			},
+			"River|Frostscale Salmon": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 374.095125,
+				"proposed": 101.964597228
+			},
+			"Pond|Crystal Perch": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 28.77825,
+				"proposed": 48.8
+			},
+			"Swamp|Snowdrift Eel": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 528.7935,
+				"proposed": 667.68
+			},
+			"Lake|Glacier Carp": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 251.645625,
+				"proposed": 129
+			},
+			"River|Frostfin Trout": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 43.35675,
+				"proposed": 23.2
+			},
+			"Swamp|Frostback Pike": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 932.0595,
+				"proposed": 834.6
+			},
+			"Pond|Golden Sunfish": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 53.505,
+				"proposed": 70.5592217268
+			},
+			"Lake|Sunspot Bass": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 142.248625,
+				"proposed": 71.552
+			},
+			"River|Solar Pike": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 414.9495,
+				"proposed": 113.1
+			},
+			"Swamp|Sunbeam Carp": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 414.095125,
+				"proposed": 335.132314066
+			},
+			"River|Solaris Trout": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 824.321,
+				"proposed": 226.2
+			},
+			"River|Amberfin Salmon": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 204.49725,
+				"proposed": 75.4
+			},
+			"Pond|Citrus Carp": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 58.26,
+				"proposed": 76.25
+			},
+			"Ocean|Sunflare Bass": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 290.778625,
+				"proposed": 56.16
+			},
+			"River|Luminis Pike": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1165.9035,
+				"proposed": 282.75
+			},
+			"Ocean|Radiant Sturgeon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1174.7475,
+				"proposed": 156.608460213
+			},
+			"Ocean|Goldenfin Trout": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 287.028625,
+				"proposed": 43.2
+			},
+			"Swamp|Rainwater Bass": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 77.01,
+				"proposed": 107
+			},
+			"Pond|Stormfin Carp": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 156.677,
+				"proposed": 158.6
+			},
+			"River|Thunder Trout": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 371.60775,
+				"proposed": 101.28663012
+			},
+			"Swamp|Raincloud Pike": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 648.24075,
+				"proposed": 521.625
+			},
+			"Mountain Stream|Flashfin Salmon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 950.954,
+				"proposed": 1177.38102605
+			},
+			"Lake|Drenched Sturgeon": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 397.493125,
+				"proposed": 86
+			},
+			"Pond|Cloudfin Carp": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 46.25625,
+				"proposed": 61
+			},
+			"River|Tempest Pike": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 491.5825,
+				"proposed": 133.987342436
+			},
+			"Swamp|Monsoon Trout": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1216.431,
+				"proposed": 1043.25
+			},
+			"River|Splashfin Salmon": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 144.962125,
+				"proposed": 41.1528790222
+			},
+			"Pond|Cloudspike Trout": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 76.385,
+				"proposed": 76.25
+			},
+			"Swamp|Grayfin Carp": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 149.177,
+				"proposed": 178.048
+			},
+			"River|Misty Pike": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 374.516,
+				"proposed": 102.079312302
+			},
+			"Lake|Overcast Sturgeon": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 573.2155,
+				"proposed": 209.625
+			},
+			"Mountain Stream|Shrouded Salmon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 938.6925,
+				"proposed": 1162.2
+			},
+			"Pond|Silvercloud Carp": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 115.891875,
+				"proposed": 97.6
+			},
+			"River|Fogtail Trout": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 92.01,
+				"proposed": 32.4343148874
+			},
+			"Swamp|Mistscale Pike": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 468.661625,
+				"proposed": 493.081755962
+			},
+			"Lake|Grayfin Salmon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1192.775,
+				"proposed": 353.176602543
+			},
+			"River|Cloudwater Sturgeon": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 661.519375,
+				"proposed": 141.375
+			},
+			"Pond|Mistfin Trout": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 97.635,
+				"proposed": 76.25
+			},
+			"Pond|Breezefin Trout": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 82.01,
+				"proposed": 76.25
+			},
+			"River|Whirlwind Pike": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 209.962125,
+				"proposed": 75.4
+			},
+			"Lake|Gale Sturgeon": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 691.45625,
+				"proposed": 209.625
+			},
+			"Mountain Stream|Zephyr Salmon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 863.6925,
+				"proposed": 1069.34211523
+			},
+			"Swamp|Windcatcher Carp": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 305.995375,
+				"proposed": 333.84
+			},
+			"River|Skyfin Trout": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 140.891875,
+				"proposed": 39.9973875044
+			},
+			"Pond|Stormtail Pike": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 497.411625,
+				"proposed": 297.375
+			},
+			"Lake|Cyclone Salmon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1126.431,
+				"proposed": 333.532370799
+			},
+			"Swamp|Windwhisper Sturgeon": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 955.601875,
+				"proposed": 521.625
+			},
+			"Pond|Tempest Carp": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 143.552,
+				"proposed": 120.89436986
+			},
+			"River|Cherry Trout": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 142.7135,
+				"proposed": 40.5145233649
+			},
+			"Lake|Rainbloom Bass": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 225.803875,
+				"proposed": 150.47871322
+			},
+			"Pond|Dewfin Perch": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 57.50625,
+				"proposed": 75.8358329955
+			},
+			"River|Lily Pike": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 191.57025,
+				"proposed": 54.3843250263
+			},
+			"Swamp|Petal Flounder": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 190.8165,
+				"proposed": 256.8
+			},
+			"River|Blossom Carp": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 194.641875,
+				"proposed": 71.8332157098
+			},
+			"Pond|Emerald Minnow": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 15.3015,
+				"proposed": 48.8
+			},
+			"Swamp|Fogscale Eel": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 396.633,
+				"proposed": 417.3
+			},
+			"River|Clover Trout": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 169.5665,
+				"proposed": 69.6
+			},
+			"River|Willow Snapper": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 152.82025,
+				"proposed": 56.3988092649
+			},
+			"Ocean|Suncrest Marlin": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 534.45,
+				"proposed": 468
+			},
+			"Coast|Heatwave Tuna": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 589.019375,
+				"proposed": 399.75
+			},
+			"Ocean|Tropic Snapper": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 259.032375,
+				"proposed": 31.8422955071
+			},
+			"Coast|Sandshell Flounder": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 77.01,
+				"proposed": 102.5
+			},
+			"River|Sunspot Catfish": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 164.123625,
+				"proposed": 46.5925819196
+			},
+			"Ocean|Coral Grouper": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 402.436875,
+				"proposed": 70.2
+			},
+			"Ocean|Glowfin Barracuda": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 502.42425,
+				"proposed": 87.6415272582
+			},
+			"Lake|Scorch Pike": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 227.462125,
+				"proposed": 68.8
+			},
+			"Ocean|Sunshine Perch": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 51.88125,
+				"proposed": 18
+			},
+			"Lake|Firefly Minnow": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 90.7035,
+				"proposed": 860
+			},
+			"River|Crimson Salmon": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 372.436875,
+				"proposed": 78.0866301201
+			},
+			"Lake|Harvest Carp": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 138.5175,
+				"proposed": 53.75
+			},
+			"Ocean|Pumpkinseed Sunfish": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 57.2675625,
+				"proposed": 23.04
+			},
+			"Lake|Mapleleaf Bass": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 220.79125,
+				"proposed": 147.138233081
+			},
+			"Swamp|Fogtail Eel": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 278.1405,
+				"proposed": 207.259797964
+			},
+			"Pond|Acorn Perch": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 56.853,
+				"proposed": 74.9743656263
+			},
+			"River|Bonfire Snapper": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 504.29925,
+				"proposed": 137.453461626
+			},
+			"River|Fall Blue Trout": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 163.44525,
+				"proposed": 46.4
+			},
+			"Pond|Cider Minnow": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 17.75125,
+				"proposed": 48.8
+			},
+			"Lake|Thistle Pike": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 238.1405,
+				"proposed": 72.0298660711
+			},
+			"River|Icefin Salmon": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 469.92425,
+				"proposed": 128.084098607
+			},
+			"Ocean|Frostscale Cod": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 192.905,
+				"proposed": 22.5
+			},
+			"Lake|Crystal Perch": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 101.35675,
+				"proposed": 55.04
+			},
+			"Ocean|Glacier Grouper": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 1811.05,
+				"proposed": 585
+			},
+			"Pond|Snowflake Shad": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 34.40325,
+				"proposed": 48.8
+			},
+			"Lake|Icicle Pike": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 291.425625,
+				"proposed": 111.8
+			},
+			"Pond|Glacier Minnow": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 35.95665,
+				"proposed": 166.277465116
+			},
+			"River|Snowy Snapper": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 564.478125,
+				"proposed": 141.375
+			},
+			"Ocean|Frozen Herring": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 78.5175,
+				"proposed": 22.5
+			},
+			"Lake|Winterlight Bass": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 390.35,
+				"proposed": 1075
+			},
+			"Mountain Stream|Brook Minnow": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 82.2675,
+				"proposed": 152.021011104
+			},
+			"Mountain Stream|Stone Sculpin": {
+				"rarity": "common",
+				"quality": "weak",
+				"current": 92.01,
+				"proposed": 152.021011104
+			},
+			"Mountain Stream|Torrent Dace": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 44.0325,
+				"proposed": 182.400833333
+			},
+			"Mountain Stream|Creek Shiner": {
+				"rarity": "common",
+				"quality": "strong",
+				"current": 44.0325,
+				"proposed": 182.400833333
+			},
+			"Mountain Stream|Riffle Sucker": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 36.4635,
+				"proposed": 226.482020218
+			},
+			"Mountain Stream|Pebble Darter": {
+				"rarity": "uncommon",
+				"quality": "weak",
+				"current": 142.7135,
+				"proposed": 226.482020218
+			},
+			"Mountain Stream|Brook Trout": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 187.310625,
+				"proposed": 325.900293701
+			},
+			"Mountain Stream|Cutthroat Trout": {
+				"rarity": "uncommon",
+				"quality": "strong",
+				"current": 204.49725,
+				"proposed": 325.900293701
+			},
+			"Mountain Stream|Alpine Grayling": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 32.0728125,
+				"proposed": 384.745460736
+			},
+			"Mountain Stream|Mountain Whitefish": {
+				"rarity": "rare",
+				"quality": "weak",
+				"current": 169.5665,
+				"proposed": 384.745460736
+			},
+			"Mountain Stream|Bull Trout": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 474.495,
+				"proposed": 619.503180731
+			},
+			"Mountain Stream|Speckled Char": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 504.29925,
+				"proposed": 619.503180731
+			},
+			"Mountain Stream|Tiger Trout": {
+				"rarity": "rare",
+				"quality": "strong",
+				"current": 661.519375,
+				"proposed": 619.503180731
+			},
+			"Mountain Stream|Highland Grayling": {
+				"rarity": "ultra",
+				"quality": "weak",
+				"current": 63.9885,
+				"proposed": 774.8
+			},
+			"Mountain Stream|Sunrun Salmon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 177.6375,
+				"proposed": 1159.10377609
+			},
+			"Mountain Stream|Snowmelt Salmon": {
+				"rarity": "ultra",
+				"quality": "strong",
+				"current": 1165.9035,
+				"proposed": 1159.10377609
+			},
+			"Mountain Stream|Canyon Barbel": {
+				"rarity": "giant",
+				"quality": "weak",
+				"current": 1692.65,
+				"proposed": 1635.68160633
+			},
+			"Mountain Stream|Headwater Huchen": {
+				"rarity": "giant",
+				"quality": "strong",
+				"current": 1692.65,
+				"proposed": 2246.92
+			},
+			"Mountain Stream|Silverback Grayling": {
+				"rarity": "legendary",
+				"quality": "weak",
+				"current": 34.396875,
+				"proposed": 3149.19865385
+			},
+			"Mountain Stream|Cascade Taimen": {
+				"rarity": "legendary",
+				"quality": "strong",
+				"current": 2272.86375,
+				"proposed": 5024.09375
+			},
+			"Mountain Stream|Crystal Char": {
+				"rarity": "lucky",
+				"quality": "weak",
+				"current": 755.025,
+				"proposed": 6705
+			},
+			"Mountain Stream|Aurora Salmon": {
+				"rarity": "lucky",
+				"quality": "strong",
+				"current": 1589.07,
+				"proposed": 9039.33333333
+			}
+		}
+	},
+	"rules": {
+		"luckyItems": "pinned",
+		"durability": "stochastic",
+		"luckyItemShare": 0.2
 	},
 	"xp": {
 		"perFishMean": 17,
@@ -79,6 +1286,344 @@
 			"Coast": 40,
 			"Swamp": 50,
 			"Mountain Stream": 60
+		},
+		"mountainStream": {
+			"level": 60,
+			"donorBiome": "River",
+			"species": [
+				{
+					"name": "Brook Minnow",
+					"rarity": "common",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Carp",
+					"minSize": 30,
+					"maxSize": 60,
+					"minWeight": 2,
+					"maxWeight": 5,
+					"baseValue": 35
+				},
+				{
+					"name": "Stone Sculpin",
+					"rarity": "common",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Fogtail Trout",
+					"minSize": 30,
+					"maxSize": 60,
+					"minWeight": 1,
+					"maxWeight": 3,
+					"baseValue": 40
+				},
+				{
+					"name": "Torrent Dace",
+					"rarity": "common",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Salmon",
+					"minSize": 50,
+					"maxSize": 100,
+					"minWeight": 3,
+					"maxWeight": 10,
+					"baseValue": 10
+				},
+				{
+					"name": "Creek Shiner",
+					"rarity": "common",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Salmon",
+					"minSize": 50,
+					"maxSize": 100,
+					"minWeight": 3,
+					"maxWeight": 10,
+					"baseValue": 10
+				},
+				{
+					"name": "Riffle Sucker",
+					"rarity": "uncommon",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Rainbow Trout",
+					"minSize": 30,
+					"maxSize": 60,
+					"minWeight": 1,
+					"maxWeight": 3,
+					"baseValue": 15
+				},
+				{
+					"name": "Pebble Darter",
+					"rarity": "uncommon",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Cherry Trout",
+					"minSize": 25,
+					"maxSize": 45,
+					"minWeight": 1,
+					"maxWeight": 3,
+					"baseValue": 80
+				},
+				{
+					"name": "Brook Trout",
+					"rarity": "uncommon",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Catfish",
+					"minSize": 50,
+					"maxSize": 150,
+					"minWeight": 5,
+					"maxWeight": 50,
+					"baseValue": 30
+				},
+				{
+					"name": "Cutthroat Trout",
+					"rarity": "uncommon",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Amberfin Salmon",
+					"minSize": 50,
+					"maxSize": 80,
+					"minWeight": 4,
+					"maxWeight": 10,
+					"baseValue": 60
+				},
+				{
+					"name": "Alpine Grayling",
+					"rarity": "rare",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Shad",
+					"minSize": 20,
+					"maxSize": 40,
+					"minWeight": 0.5,
+					"maxWeight": 2,
+					"baseValue": 20
+				},
+				{
+					"name": "Mountain Whitefish",
+					"rarity": "rare",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Clover Trout",
+					"minSize": 25,
+					"maxSize": 45,
+					"minWeight": 1,
+					"maxWeight": 3,
+					"baseValue": 95
+				},
+				{
+					"name": "Bull Trout",
+					"rarity": "rare",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Sturgeon",
+					"minSize": 100,
+					"maxSize": 200,
+					"minWeight": 20,
+					"maxWeight": 100,
+					"baseValue": 50
+				},
+				{
+					"name": "Speckled Char",
+					"rarity": "rare",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Bonfire Snapper",
+					"minSize": 60,
+					"maxSize": 85,
+					"minWeight": 6,
+					"maxWeight": 12,
+					"baseValue": 135
+				},
+				{
+					"name": "Tiger Trout",
+					"rarity": "rare",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Cloudwater Sturgeon",
+					"minSize": 90,
+					"maxSize": 140,
+					"minWeight": 10,
+					"maxWeight": 25,
+					"baseValue": 110
+				},
+				{
+					"name": "Highland Grayling",
+					"rarity": "ultra",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Scorpion Carp",
+					"minSize": 30,
+					"maxSize": 60,
+					"minWeight": 2,
+					"maxWeight": 5,
+					"baseValue": 25
+				},
+				{
+					"name": "Flashfin Salmon",
+					"rarity": "ultra",
+					"quality": "strong",
+					"weather": "Rainy",
+					"season": "all",
+					"existing": true
+				},
+				{
+					"name": "Shrouded Salmon",
+					"rarity": "ultra",
+					"quality": "strong",
+					"weather": "Cloudy",
+					"season": "all",
+					"existing": true
+				},
+				{
+					"name": "Zephyr Salmon",
+					"rarity": "ultra",
+					"quality": "strong",
+					"weather": "Windy",
+					"season": "all",
+					"existing": true
+				},
+				{
+					"name": "Sunrun Salmon",
+					"rarity": "ultra",
+					"quality": "strong",
+					"weather": "Sunny",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Dorado",
+					"minSize": 50,
+					"maxSize": 100,
+					"minWeight": 5,
+					"maxWeight": 20,
+					"baseValue": 40
+				},
+				{
+					"name": "Snowmelt Salmon",
+					"rarity": "ultra",
+					"quality": "strong",
+					"weather": "Snowy",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Luminis Pike",
+					"minSize": 100,
+					"maxSize": 150,
+					"minWeight": 12,
+					"maxWeight": 25,
+					"baseValue": 180
+				},
+				{
+					"name": "Canyon Barbel",
+					"rarity": "giant",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|King Salmon",
+					"minSize": 70,
+					"maxSize": 120,
+					"minWeight": 5,
+					"maxWeight": 15,
+					"baseValue": 350
+				},
+				{
+					"name": "Headwater Huchen",
+					"rarity": "giant",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Queen Salmon",
+					"minSize": 70,
+					"maxSize": 120,
+					"minWeight": 5,
+					"maxWeight": 15,
+					"baseValue": 350
+				},
+				{
+					"name": "Silverback Grayling",
+					"rarity": "legendary",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Woodskip",
+					"minSize": 20,
+					"maxSize": 40,
+					"minWeight": 0.5,
+					"maxWeight": 2,
+					"baseValue": 20
+				},
+				{
+					"name": "Cascade Taimen",
+					"rarity": "legendary",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Void Salmon",
+					"minSize": 50,
+					"maxSize": 100,
+					"minWeight": 3,
+					"maxWeight": 10,
+					"baseValue": 600
+				},
+				{
+					"name": "Crystal Char",
+					"rarity": "lucky",
+					"quality": "weak",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Lunafin Fish",
+					"minSize": 20,
+					"maxSize": 40,
+					"minWeight": 0.5,
+					"maxWeight": 2,
+					"baseValue": 500
+				},
+				{
+					"name": "Aurora Salmon",
+					"rarity": "lucky",
+					"quality": "strong",
+					"weather": "all",
+					"season": "all",
+					"existing": false,
+					"donor": "River|Noxclate Fish",
+					"minSize": 30,
+					"maxSize": 60,
+					"minWeight": 2,
+					"maxWeight": 5,
+					"baseValue": 700
+				}
+			]
 		}
 	},
 	"rods": {
@@ -702,5 +2247,5 @@
 		"boxLuck": "non-buff",
 		"competitiveEligible": false
 	},
-	"contentHash": "ddebe71c47b08a0f"
+	"contentHash": "7e44d3c70363a2ed"
 }
