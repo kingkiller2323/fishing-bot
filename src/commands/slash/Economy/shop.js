@@ -14,6 +14,8 @@ module.exports = {
      * @param {ChatInputCommandInteraction} interaction
      */
 	run: async (client, interaction, analyticsObject) => {
+		// The 5B shop: tabs, the Rod Workshop, private replies (src/class/Shop5b.js).
+		if (require('../../../engine/balance').isBalance5b()) return require('../../../class/Shop5b').openShop(interaction);
 		try {
 			const embeds = [];
 			const shopItems = await Item.find({ shopItem: true });

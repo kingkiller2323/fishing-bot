@@ -9,6 +9,8 @@ const { purchase, replaceCollector } = require('../../engine/purchase');
 module.exports = {
 	customId: 'buy-rod',
 	run: async (client, interaction, analyticsObject) => {
+		// With the 5B release on, today's shop buttons (from an old /shop message) no longer sell anything.
+		if (require('../../engine/balance').isBalance5b()) return interaction.reply({ content: 'The shop has changed: open it again with /shop.', flags: require('discord.js').MessageFlags.Ephemeral });
 		const user = interaction.user;
 
 		try {
