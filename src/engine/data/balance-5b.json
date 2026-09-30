@@ -1805,7 +1805,5509 @@
 				"maxRepairs": null,
 				"repairCost": 42000
 			}
-		]
+		],
+		"custom": {
+			"minLevel": 10,
+			"qualities": [
+				"weak",
+				"strong"
+			],
+			"partLevel": {
+				"Common": 10,
+				"Uncommon": 20,
+				"Rare": 30,
+				"Ultra": 40,
+				"Legendary": 50,
+				"Lucky": 60
+			},
+			"tierOfRarity": {
+				"Common": 1,
+				"Uncommon": 1,
+				"Rare": 2,
+				"Ultra": 3,
+				"Legendary": 4,
+				"Lucky": 5
+			},
+			"slots": {
+				"rod": {
+					"family": "Multi-catch (mean fish per cast) and the durability base",
+					"meanFish": {
+						"Common": 1.05,
+						"Uncommon": 1.2,
+						"Rare": 1.3,
+						"Ultra": 1.5,
+						"Legendary": 1.65,
+						"Lucky": 1.8
+					}
+				},
+				"reel": {
+					"family": "Fishing speed (cooldown) and trophy/drag (Giant weight)",
+					"fishingSpeed": {
+						"Common": 0,
+						"Uncommon": 0.03,
+						"Rare": 0.05,
+						"Ultra": 0.1,
+						"Legendary": 0.15,
+						"Lucky": 0.2
+					},
+					"trophyChance": {
+						"Common": 0,
+						"Uncommon": 0.05,
+						"Rare": 0.1,
+						"Ultra": 0.3,
+						"Legendary": 0.5,
+						"Lucky": 0.7
+					}
+				},
+				"hook": {
+					"family": "Rarity targeting: Rare Find (Rare/Ultra) and Luck (Legendary/Lucky)",
+					"rareFind": {
+						"Common": 0.1,
+						"Uncommon": 0.2,
+						"Rare": 0.4,
+						"Ultra": 0.6,
+						"Legendary": 0.9,
+						"Lucky": 1.2
+					},
+					"luck": {
+						"Common": 0.05,
+						"Uncommon": 0.1,
+						"Rare": 0.2,
+						"Ultra": 0.4,
+						"Legendary": 0.6,
+						"Lucky": 0.8
+					}
+				},
+				"handle": {
+					"family": "Durability efficiency (casts per life, so upkeep per fish) and clean handling (sell bonus)",
+					"durabilityMult": {
+						"Common": 1,
+						"Uncommon": 1.1,
+						"Rare": 1.25,
+						"Ultra": 1.45,
+						"Legendary": 1.7,
+						"Lucky": 2
+					},
+					"sellBonus": {
+						"Common": 0,
+						"Uncommon": 0,
+						"Rare": 0.02,
+						"Ultra": 0.04,
+						"Legendary": 0.06,
+						"Lucky": 0.08
+					}
+				}
+			},
+			"variants": {
+				"Fiberglass Rod Piece": {
+					"label": "Fast action",
+					"meanDelta": 0.02,
+					"durability": 0.75
+				},
+				"Graphite Rod Piece": {
+					"label": "Backbone",
+					"meanDelta": -0.02,
+					"durability": 1.5
+				},
+				"Centerpin Reel": {
+					"label": "Free-spool",
+					"fishingSpeed": 1.2,
+					"trophyChance": 0.5
+				},
+				"Jigging Reel": {
+					"label": "Heavy drag",
+					"fishingSpeed": 0.8,
+					"trophyChance": 2.5
+				},
+				"Fly Fishing Reel": {
+					"label": "Light retrieve",
+					"fishingSpeed": 1.2,
+					"trophyChance": 0.5
+				},
+				"Trolling Reel": {
+					"label": "Trolling drag",
+					"fishingSpeed": 0.8,
+					"trophyChance": 2.5
+				},
+				"Swimbait Hook": {
+					"label": "Big bait",
+					"rareFind": 0.85,
+					"luck": 1.5
+				},
+				"Worm Hook": {
+					"label": "Natural bait",
+					"rareFind": 1.15,
+					"luck": 0.6
+				}
+			},
+			"durabilityBase": {
+				"Common": 1050,
+				"Uncommon": 1331.2788906,
+				"Rare": 1711.54285714,
+				"Ultra": 2190.6693712,
+				"Legendary": 2541.17647059,
+				"Lucky": 3696.25668449
+			},
+			"durabilityRoundTo": 50,
+			"repairCost": {
+				"Common": 2700,
+				"Uncommon": 3700,
+				"Rare": 7900,
+				"Ultra": 17000,
+				"Legendary": 34000,
+				"Lucky": 50000
+			},
+			"maxRepairs": null
+		},
+		"crates": [
+			{
+				"tier": 1,
+				"id": "fishing-crate",
+				"name": "Fishing Crate",
+				"slots": 3,
+				"strategy": "independent",
+				"pool": {
+					"types": [
+						"part_rod",
+						"part_reel",
+						"part_hook",
+						"part_handle"
+					],
+					"fish": false,
+					"exclude": [],
+					"featured": [
+						{
+							"names": [
+								"Wooden Rod Piece",
+								"Barbed Hook",
+								"Wooden Handle",
+								"Bamboo Rod Piece",
+								"Circle Hook",
+								"Cork Handle",
+								"Treble Hook",
+								"EVA Handle"
+							],
+							"weight": 2
+						},
+						{
+							"names": [
+								"Carbon Fiber Rod Piece",
+								"Jig Hook",
+								"Carbon Fiber Handle",
+								"Composite Rod Piece",
+								"Sage Green Reel",
+								"Composite Handle"
+							],
+							"weight": 3
+						}
+					]
+				},
+				"rarityTable": {
+					"common": 50,
+					"uncommon": 47,
+					"rare": 3,
+					"ultra": 0,
+					"giant": 0,
+					"legendary": 0,
+					"lucky": 0
+				},
+				"rarityFloor": null,
+				"guaranteedSlots": [
+					{
+						"slot": 0,
+						"minRarity": "uncommon"
+					}
+				],
+				"duplicates": "unique",
+				"pity": null,
+				"shop": {
+					"unlockLevel": 10,
+					"existingItem": true
+				},
+				"price": 4900
+			},
+			{
+				"tier": 2,
+				"id": "pro-tackle-crate",
+				"name": "Pro Tackle Crate",
+				"slots": 3,
+				"strategy": "independent",
+				"pool": {
+					"types": [
+						"part_rod",
+						"part_reel",
+						"part_hook",
+						"part_handle"
+					],
+					"fish": false,
+					"exclude": [],
+					"featured": [
+						{
+							"names": [
+								"Wooden Rod Piece",
+								"Barbed Hook",
+								"Wooden Handle",
+								"Bamboo Rod Piece",
+								"Circle Hook",
+								"Cork Handle",
+								"Treble Hook",
+								"EVA Handle"
+							],
+							"weight": 2
+						},
+						{
+							"names": [
+								"Carbon Fiber Rod Piece",
+								"Jig Hook",
+								"Carbon Fiber Handle",
+								"Composite Rod Piece",
+								"Sage Green Reel",
+								"Composite Handle"
+							],
+							"weight": 3
+						}
+					]
+				},
+				"rarityTable": {
+					"common": 0,
+					"uncommon": 45,
+					"rare": 52,
+					"ultra": 3,
+					"giant": 0,
+					"legendary": 0,
+					"lucky": 0
+				},
+				"rarityFloor": "uncommon",
+				"guaranteedSlots": [
+					{
+						"slot": 0,
+						"minRarity": "rare"
+					}
+				],
+				"duplicates": "unique",
+				"pity": null,
+				"shop": {
+					"unlockLevel": 20,
+					"existingItem": false
+				},
+				"price": 21000
+			},
+			{
+				"tier": 3,
+				"id": "expert-tackle-crate",
+				"name": "Expert Tackle Crate",
+				"slots": 3,
+				"strategy": "independent",
+				"pool": {
+					"types": [
+						"part_rod",
+						"part_reel",
+						"part_hook",
+						"part_handle"
+					],
+					"fish": false,
+					"exclude": [],
+					"featured": [
+						{
+							"names": [
+								"Wooden Rod Piece",
+								"Barbed Hook",
+								"Wooden Handle",
+								"Bamboo Rod Piece",
+								"Circle Hook",
+								"Cork Handle",
+								"Treble Hook",
+								"EVA Handle"
+							],
+							"weight": 2
+						},
+						{
+							"names": [
+								"Carbon Fiber Rod Piece",
+								"Jig Hook",
+								"Carbon Fiber Handle",
+								"Composite Rod Piece",
+								"Sage Green Reel",
+								"Composite Handle"
+							],
+							"weight": 3
+						}
+					]
+				},
+				"rarityTable": {
+					"common": 0,
+					"uncommon": 0,
+					"rare": 45,
+					"ultra": 52,
+					"giant": 0,
+					"legendary": 3,
+					"lucky": 0
+				},
+				"rarityFloor": "rare",
+				"guaranteedSlots": [
+					{
+						"slot": 0,
+						"minRarity": "ultra"
+					}
+				],
+				"duplicates": "unique",
+				"pity": null,
+				"shop": {
+					"unlockLevel": 30,
+					"existingItem": false
+				},
+				"price": 53000
+			},
+			{
+				"tier": 4,
+				"id": "master-tackle-crate",
+				"name": "Master Tackle Crate",
+				"slots": 3,
+				"strategy": "independent",
+				"pool": {
+					"types": [
+						"part_rod",
+						"part_reel",
+						"part_hook",
+						"part_handle"
+					],
+					"fish": false,
+					"exclude": [],
+					"featured": [
+						{
+							"names": [
+								"Wooden Rod Piece",
+								"Barbed Hook",
+								"Wooden Handle",
+								"Bamboo Rod Piece",
+								"Circle Hook",
+								"Cork Handle",
+								"Treble Hook",
+								"EVA Handle"
+							],
+							"weight": 2
+						},
+						{
+							"names": [
+								"Carbon Fiber Rod Piece",
+								"Jig Hook",
+								"Carbon Fiber Handle",
+								"Composite Rod Piece",
+								"Sage Green Reel",
+								"Composite Handle"
+							],
+							"weight": 3
+						}
+					]
+				},
+				"rarityTable": {
+					"common": 0,
+					"uncommon": 0,
+					"rare": 0,
+					"ultra": 45,
+					"giant": 0,
+					"legendary": 54,
+					"lucky": 1
+				},
+				"rarityFloor": "ultra",
+				"guaranteedSlots": [
+					{
+						"slot": 0,
+						"minRarity": "legendary"
+					}
+				],
+				"duplicates": "unique",
+				"pity": null,
+				"shop": {
+					"unlockLevel": 40,
+					"existingItem": false
+				},
+				"price": 140000
+			},
+			{
+				"tier": 5,
+				"id": "gilded-tackle-crate",
+				"name": "Gilded Tackle Crate",
+				"slots": 3,
+				"strategy": "independent",
+				"pool": {
+					"types": [
+						"part_rod",
+						"part_reel",
+						"part_hook",
+						"part_handle"
+					],
+					"fish": false,
+					"exclude": [],
+					"featured": [
+						{
+							"names": [
+								"Wooden Rod Piece",
+								"Barbed Hook",
+								"Wooden Handle",
+								"Bamboo Rod Piece",
+								"Circle Hook",
+								"Cork Handle",
+								"Treble Hook",
+								"EVA Handle"
+							],
+							"weight": 2
+						},
+						{
+							"names": [
+								"Carbon Fiber Rod Piece",
+								"Jig Hook",
+								"Carbon Fiber Handle",
+								"Composite Rod Piece",
+								"Sage Green Reel",
+								"Composite Handle"
+							],
+							"weight": 3
+						}
+					]
+				},
+				"rarityTable": {
+					"common": 0,
+					"uncommon": 0,
+					"rare": 0,
+					"ultra": 0,
+					"giant": 0,
+					"legendary": 80,
+					"lucky": 20
+				},
+				"rarityFloor": "legendary",
+				"guaranteedSlots": [],
+				"duplicates": "unique",
+				"pity": {
+					"lucky": {
+						"counter": "lucky",
+						"tiers": [
+							"lucky"
+						],
+						"softStart": 3,
+						"rampPerCast": 0.1,
+						"maxBonus": 0.5,
+						"hard": 8
+					}
+				},
+				"shop": {
+					"unlockLevel": 50,
+					"existingItem": false
+				},
+				"price": 590000
+			}
+		],
+		"salvage": {
+			"Common": 100,
+			"Uncommon": 410,
+			"Rare": 1800,
+			"Ultra": 4400,
+			"Legendary": 12000,
+			"Lucky": 49000
+		},
+		"legacy": {
+			"signatures": {
+				"n10|c5|d10000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n10|c5|d10500|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c5|d11000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c5|d12000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c5|d12500|q|s": [
+					"Fiberglass Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c5|d13000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c5|d14000|q|s": [
+					"Fiberglass Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c5|d15000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c5|d17000|q|s": [
+					"Fiberglass Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c5|d7500|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n10|c5|d8000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n10|c5|d8500|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n10|c5|d9000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n10|c5|d9500|q|s": [
+					"Fiberglass Rod Piece",
+					"Sage Green Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d10000|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d10500|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d10800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d11300|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d11500|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d11800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d12000|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d12500|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d12800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d13000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d13300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d13500|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d13800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c6|d14000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d14300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d14500|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c6|d14800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d15000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d15500|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d15800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c6|d16000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d16300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d16500|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c6|d16800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d17000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d17500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d17800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d18000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c6|d18500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d18800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c6|d19000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d19500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c6|d20000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c6|d20500|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d20800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c6|d21000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d21500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c6|d22000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c6|d23000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c6|d25000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c6|d8300|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d8800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d9000|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d9300|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n10|c6|d9500|q|s": [
+					"Composite Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n10|c6|d9800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n10|c7|d10000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n10|c7|d10500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n10|c7|d11000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n10|c7|d11500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n10|c7|d12000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c7|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n10|c7|d13000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n10|c7|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c7|d14000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n10|c7|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c7|d15000|q|s": [
+					"Composite Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n10|c7|d15500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n10|c7|d16000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n10|c7|d16500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c7|d17000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n10|c7|d18000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n10|c7|d18500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n10|c7|d19000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n10|c7|d20000|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n10|c7|d21000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n10|c7|d23000|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n10|c7|d9000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n10|c7|d9500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n11|c6|d12500|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n11|c6|d13000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n11|c6|d13500|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n11|c6|d14000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n11|c6|d15000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n11|c6|d15500|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n11|c6|d16000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n11|c6|d17000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n11|c6|d17500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n11|c6|d18000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n11|c6|d18500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n11|c6|d19000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n11|c6|d20000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n11|c6|d20500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n11|c6|d21000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n11|c6|d22000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n11|c6|d23000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n11|c6|d25000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n11|c7|d10000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n11|c7|d10500|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n11|c7|d11000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n11|c7|d12000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n11|c7|d12500|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n11|c7|d13000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n11|c7|d14000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n11|c7|d14500|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n11|c7|d15000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n11|c7|d15500|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n11|c7|d16000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n11|c7|d17000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n11|c7|d17500|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n11|c7|d18000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n11|c7|d19000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n11|c7|d20000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n11|c7|d22000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n11|c7|d9500|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d10500|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d11000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n12|c7|d11500|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d12000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n12|c7|d12500|q|s": [
+					"Composite Rod Piece",
+					"Sage Green Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d13000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n12|c7|d13500|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d14000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n12|c7|d15000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n12|c7|d15500|q|s": [
+					"Composite Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d16000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n12|c7|d16500|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d17000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n12|c7|d17500|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d18000|q|s": [
+					"Composite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n12|c7|d18500|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d19000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n12|c7|d20000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n12|c7|d20500|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n12|c7|d21000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n12|c7|d22000|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n12|c7|d23000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n12|c7|d25000|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n2|c2|d11000|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n2|c2|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n2|c2|d2300|-|-": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n2|c2|d2800|-|-": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n2|c2|d2800|-|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Wooden Handle"
+				],
+				"n2|c2|d3000|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n2|c2|d3300|-|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n2|c2|d3500|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n2|c2|d3800|-|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n2|c2|d4000|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n2|c2|d4300|-|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n2|c2|d4500|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n2|c2|d4800|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n2|c2|d5000|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n2|c2|d5300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n2|c2|d5500|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n2|c2|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n2|c2|d6500|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n2|c2|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Fly Fishing Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n2|c2|d6800|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n2|c2|d7000|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n2|c2|d7000|q|s": [
+					"Wooden Rod Piece",
+					"Fly Fishing Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n2|c2|d7300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n2|c2|d7500|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n2|c2|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n2|c2|d8000|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n2|c2|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n2|c2|d8500|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n2|c2|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Fly Fishing Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n2|c2|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n2|c2|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c2|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c2|d11000|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n3|c2|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n3|c2|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n3|c2|d2800|-|-": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n3|c2|d3300|-|-": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n3|c2|d3300|-|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Wooden Handle"
+				],
+				"n3|c2|d3500|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n3|c2|d3800|-|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n3|c2|d4000|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n3|c2|d4300|-|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n3|c2|d4500|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n3|c2|d4800|-|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c2|d5000|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n3|c2|d5300|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c2|d5500|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c2|d5800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c2|d6000|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c2|d6500|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n3|c2|d6500|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c2|d7000|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n3|c2|d7000|q|s": [
+					"Bamboo Rod Piece",
+					"Fly Fishing Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n3|c2|d7300|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n3|c2|d7500|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n3|c2|d7500|q|s": [
+					"Bamboo Rod Piece",
+					"Fly Fishing Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n3|c2|d7800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n3|c2|d8000|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n3|c2|d8000|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n3|c2|d8500|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c2|d8500|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n3|c2|d9000|-|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c2|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c2|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d10000|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d11000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d11500|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d12500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d13500|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d14000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d3500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n3|c3|d3800|-|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n3|c3|d4000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n3|c3|d4300|-|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n3|c3|d4500|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n3|c3|d4500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n3|c3|d4800|q|-": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n3|c3|d5000|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n3|c3|d5000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d5300|-|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d5300|q|-": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n3|c3|d5300|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Wooden Handle"
+				],
+				"n3|c3|d5500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d5800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n3|c3|d6000|-|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d6300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d6800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d7000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d7300|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d7500|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d7800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n3|c3|d8000|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n3|c3|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d8300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d8500|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n3|c3|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d9300|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n3|c3|d9500|-|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Fly Fishing Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n3|c3|d9800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c2|d10500|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c2|d11000|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c2|d11500|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d12500|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d13000|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d3800|q|-": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n4|c2|d4300|q|-": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n4|c2|d4300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Wooden Handle"
+				],
+				"n4|c2|d4500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n4|c2|d4800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n4|c2|d5000|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n4|c2|d5300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n4|c2|d5500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n4|c2|d5800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n4|c2|d6000|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n4|c2|d6300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c2|d6500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n4|c2|d6800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c2|d7000|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n4|c2|d7000|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c2|d7500|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n4|c2|d7500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c2|d8000|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n4|c2|d8000|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n4|c2|d8300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d8500|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n4|c2|d8500|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n4|c2|d8800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d9000|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n4|c2|d9000|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c2|d9500|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c3|d10000|-|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Fly Fishing Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c3|d11000|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c3|d12500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d13000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d13500|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d14000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d4000|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n4|c3|d4300|-|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n4|c3|d4500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n4|c3|d4800|-|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n4|c3|d5000|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n4|c3|d5000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n4|c3|d5500|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n4|c3|d5500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n4|c3|d5800|-|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d6500|-|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d6800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c3|d7000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c3|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c3|d8000|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n4|c3|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d8500|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n4|c3|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d8800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d9000|-|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n4|c3|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c3|d9500|-|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c3|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d10000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d10300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n4|c4|d10800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d11000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n4|c4|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c4|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d13500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d14000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d15000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d4800|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n4|c4|d5000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n4|c4|d5300|q|-": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n4|c4|d5300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n4|c4|d5500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n4|c4|d5800|q|-": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n4|c4|d5800|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Wooden Handle"
+				],
+				"n4|c4|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n4|c4|d6300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n4|c4|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c4|d6800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n4|c4|d7000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n4|c4|d7300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d7800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c4|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d8300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d8500|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n4|c4|d8800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n4|c4|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n4|c4|d9300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n4|c4|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n4|c4|d9800|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n5|c2|d10000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n5|c2|d10500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c2|d11000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c2|d12500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n5|c2|d13000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n5|c2|d8000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n5|c2|d8500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n5|c2|d9000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n5|c2|d9500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n5|c3|d10000|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n5|c3|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n5|c3|d10500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c3|d11000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c3|d11500|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n5|c3|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n5|c3|d13000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c3|d14000|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c3|d5000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n5|c3|d5300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n5|c3|d5500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n5|c3|d5800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n5|c3|d6000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n5|c3|d6500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n5|c3|d6800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n5|c3|d7000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n5|c3|d7500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c3|d7800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c3|d8000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c3|d8500|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n5|c3|d8500|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n5|c3|d9000|-|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n5|c3|d9000|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n5|c3|d9500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n5|c3|d9800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c4|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n5|c4|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c4|d11000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n5|c4|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c4|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c4|d12500|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c4|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c4|d13500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n5|c4|d14000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n5|c4|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n5|c4|d15000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c4|d5300|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n5|c4|d5500|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n5|c4|d5800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n5|c4|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n5|c4|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n5|c4|d6800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n5|c4|d7000|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n5|c4|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n5|c4|d7800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c4|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n5|c4|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c4|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n5|c4|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n5|c4|d9800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d10000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c5|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d11000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d11300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d11500|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n5|c5|d11800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n5|c5|d12500|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n5|c5|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c5|d14000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c5|d15500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d16000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n5|c5|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n5|c5|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n5|c5|d6800|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n5|c5|d7000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n5|c5|d7300|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n5|c5|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n5|c5|d7800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n5|c5|d8000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n5|c5|d8300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n5|c5|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c5|d8800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n5|c5|d9000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n5|c5|d9300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n5|c5|d9500|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n5|c5|d9800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c3|d10000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Cork Handle"
+				],
+				"n6|c3|d10500|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n6|c3|d11000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c3|d12000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c3|d12500|q|s": [
+					"Fiberglass Rod Piece",
+					"Sage Green Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n6|c3|d13000|q|s": [
+					"Fiberglass Rod Piece",
+					"Sage Green Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c3|d14000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n6|c3|d6000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Wooden Handle"
+				],
+				"n6|c3|d6500|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n6|c3|d7000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n6|c3|d7500|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n6|c3|d8000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n6|c3|d8500|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c3|d9000|q|s": [
+					"Fiberglass Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c3|d9500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d10000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d10800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d11000|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d11300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d11800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d12000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d12300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d12500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d12800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d13000|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d13300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d13500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d13800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d14000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d14300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d14500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d14800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d15000|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d15500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d16000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d16300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d16500|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d16800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d17000|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d17500|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d18000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d18500|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d19000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d20500|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d21000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c4|d3800|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d4300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d4500|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d4800|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d5000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d5300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d5500|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d6300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d6500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d6800|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d7000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d7300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n6|c4|d7800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d8300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d8800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n6|c4|d9300|q|s": [
+					"Wooden Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c4|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n6|c4|d9800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c5|d10000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n6|c5|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n6|c5|d11000|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n6|c5|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d13500|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d14000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c5|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d15000|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d15500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d16000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c5|d6500|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n6|c5|d7000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n6|c5|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n6|c5|d8000|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n6|c5|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n6|c5|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n6|c5|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c6|d10000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n6|c6|d10300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c6|d10500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c6|d11000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c6|d12000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n6|c6|d12300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c6|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n6|c6|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c6|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n6|c6|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n6|c6|d16500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n6|c6|d7800|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n6|c6|d8000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n6|c6|d8300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n6|c6|d8500|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n6|c6|d9000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n6|c6|d9300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n6|c6|d9500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d11000|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d11800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n7|c4|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d12500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d13000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d13500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c4|d14000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c4|d15000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n7|c4|d15500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n7|c4|d16000|q|s": [
+					"Bamboo Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n7|c4|d16500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d17000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d17500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d18000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d18500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c4|d19000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c4|d20500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n7|c4|d21000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n7|c4|d4300|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d4800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d5000|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d5300|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d5500|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d5800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d6000|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d6500|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d6800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d7300|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d7500|q|s": [
+					"Bamboo Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d7800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d8800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n7|c4|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n7|c4|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n7|c4|d9800|q|s": [
+					"Bamboo Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d10800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d11000|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d11500|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d11800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d12500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d12800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d13300|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d13500|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d13800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d14000|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d14500|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d14800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d15000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d15500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d15800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d16000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d16500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d17000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d17500|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d17800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d18000|q|s": [
+					"Graphite Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d18500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d19000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d20000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c5|d22000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n7|c5|d5000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d5500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n7|c5|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d6300|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n7|c5|d6800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n7|c5|d7000|q|s": [
+					"Graphite Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d7300|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d7800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n7|c5|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d8300|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n7|c5|d8800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d9000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d9300|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n7|c5|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n7|c5|d9800|q|s": [
+					"Graphite Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n7|c6|d10000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n7|c6|d10500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n7|c6|d11000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n7|c6|d11500|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n7|c6|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c6|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n7|c6|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n7|c6|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n7|c6|d14000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n7|c6|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c6|d15500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n7|c6|d16000|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n7|c6|d16500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n7|c6|d9000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n7|c6|d9500|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n7|c7|d10500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n7|c7|d11500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n7|c7|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n7|c7|d9000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n7|c7|d9500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d10500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c4|d10800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c4|d11000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n8|c4|d11500|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d12500|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d12800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c4|d13000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c4|d13500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c4|d14000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c4|d15000|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c4|d16000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c4|d17000|q|s": [
+					"Fiberglass Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c4|d5300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d5800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d6000|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d6300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d6500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d6800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d7000|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d7500|q|s": [
+					"Fiberglass Rod Piece",
+					"Aluminum Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d7800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n8|c4|d8300|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d8500|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d8800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d9000|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n8|c4|d9500|q|s": [
+					"Bamboo Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n8|c4|d9800|q|s": [
+					"Fiberglass Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c5|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c5|d10500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c5|d11000|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c5|d11500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c5|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c5|d12500|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c5|d13000|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d13500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d14000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n8|c5|d14500|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Cork Handle"
+				],
+				"n8|c5|d15000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c5|d15500|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d16000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c5|d16500|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c5|d17000|q|s": [
+					"Composite Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d17500|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n8|c5|d18000|q|s": [
+					"Graphite Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d18500|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d19000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d20000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c5|d20500|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Barbed Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d21000|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Circle Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d22000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n8|c5|d5500|q|s": [
+					"Bamboo Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c5|d6000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c5|d6500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n8|c5|d7000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n8|c5|d7500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c5|d8000|q|s": [
+					"Wooden Rod Piece",
+					"Sage Green Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c5|d8500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n8|c5|d9000|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c5|d9500|q|s": [
+					"Wooden Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d10000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d10300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d10500|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c6|d10800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d11000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d11300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d11500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d11800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d12300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d13800|q|s": [
+					"Composite Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d14000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c6|d14300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d14800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d15000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d15500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d15800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d16000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d16500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d16800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d17000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d17500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d18000|q|s": [
+					"Composite Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d18500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Titanium Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d18800|q|s": [
+					"Gold Rod Piece",
+					"Plastic Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d19000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d19500|q|s": [
+					"Gold Rod Piece",
+					"Aluminum Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d20000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d21000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c6|d23000|q|s": [
+					"Gold Rod Piece",
+					"Titanium Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n8|c6|d6800|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c6|d7300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d7500|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n8|c6|d7800|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n8|c6|d8000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d8300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d8500|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n8|c6|d9000|q|s": [
+					"Graphite Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n8|c6|d9300|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n8|c6|d9500|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n8|c6|d9800|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Plastic Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n8|c7|d10000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n8|c7|d10500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n8|c7|d11500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n8|c7|d12000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Wooden Handle"
+				],
+				"n8|c7|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n8|c7|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n8|c7|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Jigging Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n8|c7|d16500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Sage Green Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n9|c4|d10000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n9|c4|d10500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n9|c4|d11000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n9|c4|d12000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n9|c4|d12500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n9|c4|d13000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n9|c4|d14000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n9|c4|d15000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c4|d17000|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n9|c4|d9500|q|s": [
+					"Fiberglass Rod Piece",
+					"Trolling Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n9|c5|d10000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n9|c5|d11000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n9|c5|d11500|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n9|c5|d12000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c5|d13000|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n9|c5|d14000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n9|c5|d16000|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n9|c5|d6500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n9|c5|d7000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n9|c5|d7500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n9|c5|d8000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n9|c5|d8500|q|s": [
+					"Bamboo Rod Piece",
+					"Sage Green Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n9|c5|d9000|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n9|c5|d9500|q|s": [
+					"Bamboo Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n9|c6|d10000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n9|c6|d10500|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n9|c6|d11000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n9|c6|d11500|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n9|c6|d12000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n9|c6|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				],
+				"n9|c6|d13000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n9|c6|d13500|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n9|c6|d14000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c6|d14500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n9|c6|d15000|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n9|c6|d15500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n9|c6|d16000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n9|c6|d16500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c6|d17000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"EVA Handle"
+				],
+				"n9|c6|d17500|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Treble Hook",
+					"Wooden Handle"
+				],
+				"n9|c6|d18000|q|s": [
+					"Graphite Rod Piece",
+					"Sage Green Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n9|c6|d18500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Trolling Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n9|c6|d19000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n9|c6|d20000|q|s": [
+					"Gold Rod Piece",
+					"Jigging Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n9|c6|d21000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c6|d22000|q|s": [
+					"Gold Rod Piece",
+					"Sage Green Reel",
+					"Treble Hook",
+					"Composite Handle"
+				],
+				"n9|c6|d23000|q|s": [
+					"Gold Rod Piece",
+					"Trolling Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n9|c6|d8500|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n9|c6|d9000|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n9|c6|d9500|q|s": [
+					"Graphite Rod Piece",
+					"Jigging Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n9|c7|d10500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"EVA Handle"
+				],
+				"n9|c7|d11000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Wooden Handle"
+				],
+				"n9|c7|d11500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Cork Handle"
+				],
+				"n9|c7|d12000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n9|c7|d12500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"EVA Handle"
+				],
+				"n9|c7|d13000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c7|d13500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c7|d15000|q|s": [
+					"Composite Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n9|c7|d15500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Worm Hook",
+					"Composite Handle"
+				],
+				"n9|c7|d16000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Cork Handle"
+				],
+				"n9|c7|d17000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"EVA Handle"
+				],
+				"n9|c7|d18000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Carbon Fiber Handle"
+				],
+				"n9|c7|d20000|q|s": [
+					"Gold Rod Piece",
+					"Centerpin Reel",
+					"Jig Hook",
+					"Composite Handle"
+				],
+				"n9|c7|d8000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Wooden Handle"
+				],
+				"n9|c7|d8500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Swimbait Hook",
+					"Cork Handle"
+				],
+				"n9|c7|d9000|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Wooden Handle"
+				],
+				"n9|c7|d9500|q|s": [
+					"Carbon Fiber Rod Piece",
+					"Centerpin Reel",
+					"Octopus Hook",
+					"Cork Handle"
+				]
+			},
+			"defaultRarity": "Common"
+		},
+		"legacyCrate": {
+			"option": "b",
+			"marker": "legacyCount",
+			"opensAs": "legacy-definition-first",
+			"converted": false
+		}
 	},
 	"permits": {
 		"free": [
@@ -2235,6 +7737,26 @@
 			]
 		}
 	},
+	"catalog": {
+		"overlay": {
+			"Fishing Crate": {
+				"price": 4900,
+				"requirements": {
+					"level": 10
+				},
+				"shopItem": true,
+				"capabilities": [
+					"part_rod",
+					"part_reel",
+					"part_hook",
+					"part_handle"
+				]
+			},
+			"Old Rod": {
+				"unbreakable": true
+			}
+		}
+	},
 	"founder": {
 		"model": "hybrid",
 		"rolls": 7,
@@ -2247,5 +7769,5 @@
 		"boxLuck": "non-buff",
 		"competitiveEligible": false
 	},
-	"contentHash": "7e44d3c70363a2ed"
+	"contentHash": "7c6c6a177fe5357e"
 }

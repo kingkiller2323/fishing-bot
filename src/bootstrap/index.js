@@ -183,7 +183,8 @@ async function validate() {
 
 	// Every catalog box must have a valid Gacha V2 definition with non-empty reward pools.
 	const { validateBoxes } = require('../engine/gacha');
-	const boxNames = (await Item.find({ type: 'gacha', ...CATALOG }).select('name').lean()).map((b) => b.name);
+	const { visibleCatalog } = require('../engine/b5/catalog');
+	const boxNames = (await Item.find({ type: 'gacha', ...CATALOG, ...visibleCatalog() }).select('name').lean()).map((b) => b.name);
 	const gacha = await validateBoxes(boxNames);
 	problems.push(...gacha.problems);
 
@@ -236,6 +237,9 @@ async function bootstrap() {
 	log('Starting static data bootstrap...');
 	await normalizeLegacyData();
 	await seedStatic();
+	// Hidden 5B catalog rows (additive; never listed, drawn or awarded while the 5B flag is off).
+	const seeded5b = await require('../engine/b5/seedCatalog').seedCatalog5b();
+	if (seeded5b.inserted > 0) log(`5B catalog: ${seeded5b.inserted} hidden row(s) inserted.`, 'done');
 	await ensureActiveSeason();
 	await ensureWeatherPatterns();
 	await validate();

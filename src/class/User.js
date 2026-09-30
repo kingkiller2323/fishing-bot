@@ -191,6 +191,12 @@ class User {
 		const userId = await this.getUserId();
 		if (!user) user = await this.createUser(userId);
 		const rodId = user.inventory.equippedRod?.valueOf();
+		if (!rodId && require('../engine/balance').isBalance5b()) {
+			// 5B: re-equip the owned Old Rod; a new one only if none is owned (no free replacements).
+			const id = await require('../engine/b5/rodOps').ensureRod(userId);
+			this.user = await UserSchema.findOne({ userId: String(userId) });
+			return ItemData.findById(id);
+		}
 		if (!rodId) {
 			const rod = await Item.findOne({ name: 'Old Rod' });
 			const newRod = await this.sendToInventory(rod);

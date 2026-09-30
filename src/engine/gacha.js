@@ -21,6 +21,7 @@ const { rng } = require('./rng');
 const { BALANCE_VERSION, BALANCE_VERSION_5B, RARITIES, STAT_CAPS, resolveProfile, activeEvent, isBalance5b } = require('./balance');
 const { buildTable, applyPity, normalize, roll, toPercent } = require('./rarity');
 const { boxDefinition } = require('./gachaBoxes');
+const { LEGACY_ONLY, visibleCatalog } = require('./b5/catalog');
 const { oid, notApplied, appliedTo, guardPush, grantItem, buildFishDoc, insertFishDocs, rollFishStats } = require('./rewards');
 const { withUserLock } = require('./userLock');
 
@@ -45,8 +46,8 @@ const rarityIndex = (r) => RARITIES.indexOf(r);
 
 /** Fish that can actually be caught (their biome exists), for fish rewards. */
 async function catchableFish() {
-	const biomes = await Biome.distinct('name');
-	return FishTemplate.find({ user: null, biome: { $in: biomes } }).lean();
+	const biomes = await Biome.distinct('name', visibleCatalog());
+	return FishTemplate.find({ user: null, biome: { $in: biomes }, ...visibleCatalog() }).lean();
 }
 
 /**
@@ -59,7 +60,8 @@ async function buildPools(def) {
 	const featured = def.pool.featured || [];
 	const weightOf = (name) => featured.filter((f) => f.names.map((n) => n.toLowerCase()).includes(name.toLowerCase())).reduce((w, f) => w * f.weight, 1);
 
-	const items = def.pool.types.length ? await Item.find({ type: { $in: def.pool.types }, user: null }).lean() : [];
+	// Rows added by the 5B release (standard rods, new crates, the new bait roster) are never box rewards.
+	const items = def.pool.types.length ? await Item.find({ type: { $in: def.pool.types }, user: null, ...LEGACY_ONLY }).lean() : [];
 	const fish = def.pool.fish ? await catchableFish() : [];
 	for (const [kind, list] of [['item', items], ['fish', fish]]) {
 		for (const template of list) {
@@ -111,6 +113,15 @@ function pickReward(pool, taken, def) {
 	return rng.weighted(candidates, candidates.map((e) => e.weight)) || candidates[0];
 }
 
+/** The box definition the running release uses: the 5B tier crates while the 5B flag is on, else today's. */
+function definitionFor(name, owned = null) {
+	if (isBalance5b()) {
+		const def = require('./b5/crates').crateDefinition5b(name, owned);
+		if (def) return def;
+	}
+	return boxDefinition(name, owned);
+}
+
 function failure(base, code, message) {
 	return { ...base, status: 'failed', failure: { code, message } };
 }
@@ -133,7 +144,7 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 	const box = owned.find((b) => b.name.toLowerCase() === String(boxName).trim().toLowerCase() && (b.count || 0) >= 1 && !b.opened);
 	if (!box) return failure(base, 'NO_BOX', 'You do not have a box with that name!');
 
-	const def = boxDefinition(box.name, box);
+	const def = definitionFor(box.name, box);
 	if (!def) return failure(base, 'UNKNOWN_BOX', 'That box cannot be opened.');
 	const pools = await buildPools(def);
 	const boxBase = baseTable(def, pools);
@@ -237,7 +248,7 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 	return {
 		...base,
 		status: 'ok',
-		box: { id: String(box._id), name: def.name, definitionId: def.id, legacy: Boolean(def.legacy), countBefore: box.count, countAfter: box.count - 1, depleted: box.count - 1 <= 0 },
+		box: { id: String(box._id), name: def.name, definitionId: def.id, legacy: Boolean(def.legacy), countBefore: box.count, countAfter: box.count - 1, depleted: box.count - 1 <= 0, ...(def.legacyUnit ? { legacyUnit: true } : {}) },
 		modifiers: { sources, stats },
 		rarity: { base: toPercent(boxBase, 4), modified: toPercent(modified, 4), withPity: toPercent(pity.table, 4) },
 		pity: { before: pityBefore, after: pityAfter, applied: pity.applied, guarantee: pity.guarantee },
@@ -253,9 +264,11 @@ async function writeOpen(result, { session, fault }) {
 	const now = new Date();
 
 	await fault('consume');
+	// A 5B legacy Fishing Crate unit (opened under today's definition) also consumes one legacyCount.
+	const legacyUnit = result.box.legacyUnit === true;
 	const consumed = await ItemData.collection.updateOne(
-		{ _id: oid(result.box.id), ...notApplied(openId), count: { $gte: 1 } },
-		{ $inc: { count: -1 }, $set: { updatedAt: now }, $push: guardPush(openId) },
+		{ _id: oid(result.box.id), ...notApplied(openId), count: { $gte: 1 }, ...(legacyUnit ? { legacyCount: { $gte: 1 } } : {}) },
+		{ $inc: legacyUnit ? { count: -1, legacyCount: -1 } : { count: -1 }, $set: { updatedAt: now }, $push: guardPush(openId) },
 		opts,
 	);
 	if (consumed.matchedCount === 0) {
@@ -374,7 +387,7 @@ async function validateBoxes(names) {
 	const problems = [];
 	const tables = {};
 	for (const name of names) {
-		const def = boxDefinition(name);
+		const def = definitionFor(name);
 		if (!def) {
 			problems.push(`gacha box "${name}" has no Gacha V2 definition`);
 			continue;
@@ -393,4 +406,4 @@ async function validateBoxes(names) {
 	return { problems, tables };
 }
 
-module.exports = { openLine, applyGachaResult, recoverPendingOpens, recoverPendingOpensDetailed, openBox, validateBoxes, buildPools, baseTable, canonicalRarity, GachaDefinitionError, HIGH_TIER };
+module.exports = { definitionFor, openLine, applyGachaResult, recoverPendingOpens, recoverPendingOpensDetailed, openBox, validateBoxes, buildPools, baseTable, canonicalRarity, GachaDefinitionError, HIGH_TIER };

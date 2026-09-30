@@ -208,6 +208,12 @@ function need5b(cfg = config) {
 	return r;
 }
 
+/**
+ * The 5B data regardless of the flag, for the flag-neutral additive seeding of HIDDEN 5B catalog rows
+ * (b5/seedCatalog.js) only. Gameplay never reads this: it reads rules5b().
+ */
+const seedData5b = () => loadBalance5b();
+
 /** The 5B curve coefficients (pure data; levels.js selects the 5B curve only while the release is on). */
 const curve5bData = () => loadBalance5b().curve;
 
@@ -269,6 +275,7 @@ module.exports = {
 	rules5b,
 	need5b,
 	curve5bData,
+	seedData5b,
 	balanceData,
 	// Back-compat for Phase 2 callers.
 	BASE: { xpPerFish: XP_PER_FISH },

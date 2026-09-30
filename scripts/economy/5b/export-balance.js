@@ -160,6 +160,33 @@ function build() {
 				lifeHours: standardDesign[r.name].lifeHours,
 				...pick(r, rodFields),
 			})),
+			// The Rod Workshop (P-RODS-CUSTOM-LEVEL-RULE, P-RODS-SLOT-FAMILIES, P-RODS-VARIANTS, P-RODS-DURABILITY,
+			// P-RODS-REPAIR): part levels, slot stat families, variants, durability base and repair cost per
+			// rod-piece rarity (computed by the model), unlimited repairs.
+			custom: {
+				minLevel: rods.PARAMS.craft.minLevel,
+				qualities: [...rods.PARAMS.craft.qualities],
+				partLevel: { ...rods.PARAMS.partLevel },
+				tierOfRarity: { ...rods.PARAMS.tierOfRarity },
+				slots: JSON.parse(JSON.stringify(rods.PARAMS.slots)),
+				variants: JSON.parse(JSON.stringify(rods.PARAMS.variants)),
+				durabilityBase: Object.fromEntries(rods.RARITY_ORDER.map((r) => [r, rods.baseDurability(r)])),
+				durabilityRoundTo: rods.PARAMS.durability.roundTo,
+				repairCost: Object.fromEntries(rods.RARITY_ORDER.map((r) => [r, rods.repairCostFor(r)])),
+				maxRepairs: rods.PARAMS.repair.craftedMaxRepairs,
+			},
+			// Tier crates (P-RODS-CRATES, P-RODS-CRATE-PRICE): Gacha V2 definitions and prices.
+			crates: rods.crateDefinitions().map((c) => pick(c, ['tier', 'id', 'name', 'slots', 'strategy', 'pool', 'rarityTable', 'rarityFloor', 'guaranteedSlots', 'duplicates', 'pity', 'shop', 'price'])),
+			// Salvage value per part rarity (P-RODS-SALVAGE).
+			salvage: Object.fromEntries(rods.RARITY_ORDER.map((r) => [r, rods.salvageValue(r)])),
+			// Existing crafted rods (P-RODS-LEGACY-RODS, P-RODS-LEGACY-DURABILITY): legacy fingerprint -> the
+			// weakest catalog combination with it (Path B); unknown fingerprints use a matched Common set.
+			legacy: {
+				signatures: Object.fromEntries([...rods.legacyIndexMap().entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([sig, r]) => [sig, [...r.names]])),
+				defaultRarity: 'Common',
+			},
+			// Owned Fishing Crates (P-RODS-FISHING-CRATE, option b).
+			legacyCrate: { ...rods.PARAMS.legacyCrateStock },
 		},
 
 		// One-time biome permits (A-PERMITS, P-WORLD-PERMIT-PRICES).
@@ -198,6 +225,22 @@ function build() {
 		aquarium: {
 			licenses: aquarium.licenses().map((l) => pick(l, ['name', 'water', 'tier', 'prerequisite', 'level', 'tanks', 'tankSize', 'capacity', 'companionSlots', 'price'])),
 			display: { ...pick(aquarium.PARAMS.display, ['requires', 'perWaterType', 'tankSize']), prices: aquarium.displayTanks().tanks.map((t) => t.price) },
+		},
+
+		// Read-time overlay of EXISTING catalog rows while the 5B flag is on (stored rows are never rewritten):
+		// fields per row name.
+		catalog: {
+			overlay: {
+				// The Fishing Crate becomes the T1 part crate (rods catalogSync; P-RODS-FISHING-CRATE).
+				...Object.fromEntries(rods.catalogSync().updates.filter((u) => u.row !== 'Old Rod').reduce((m, u) => {
+					const row = m.get(u.row) || {};
+					if (u.field === 'requirements.level') row.requirements = { level: u.after };
+					else row[u.field] = u.after;
+					return m.set(u.row, row);
+				}, new Map())),
+				// The Old Rod is unbreakable (P-RODS-OLD-ROD).
+				'Old Rod': { unbreakable: rods.PARAMS.oldRod.unbreakable },
+			},
 		},
 
 		// The Founder stealth-hybrid (P-FOUNDER-HYBRID).

@@ -7,7 +7,7 @@ const branding = require('../../../branding');
 const { castLine, applyCastResult, recoverPendingCasts } = require('../../../engine/cast');
 const { withUserLock } = require('../../../engine/userLock');
 const { remainingMs, startCooldown } = require('../../../engine/cooldown');
-const { COOLDOWN } = require('../../../engine/balance');
+const { COOLDOWN, isBalance5b } = require('../../../engine/balance');
 const { formatMeasure } = require('../../../engine/presentation');
 
 /**
@@ -129,16 +129,17 @@ const followUpMessage = async (interaction, user, result) => {
 	];
 
 	if (rodState === 'broken') {
-		components = [
-			new ActionRowBuilder()
-				.addComponents(
-					new ButtonBuilder()
-						.setCustomId('repair-rod')
-						.setLabel('Repair Rod')
-						.setEmoji('🔧')
-						.setStyle(ButtonStyle.Primary),
-				),
-		];
+		const row = new ActionRowBuilder()
+			.addComponents(
+				new ButtonBuilder()
+					.setCustomId('repair-rod')
+					.setLabel('Repair Rod')
+					.setEmoji('🔧')
+					.setStyle(ButtonStyle.Primary),
+			);
+		// 5B: the unbreakable Old Rod is always there to keep fishing.
+		if (isBalance5b()) row.addComponents(new ButtonBuilder().setCustomId('use-old-rod').setLabel('Use Old Rod').setEmoji('🎣').setStyle(ButtonStyle.Secondary));
+		components = [row];
 	}
 
 	return await interaction.followUp({

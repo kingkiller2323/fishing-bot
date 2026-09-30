@@ -5,6 +5,7 @@ const { User } = require('../../class/User');
 const config = require('../../config');
 const { Interaction } = require('../../class/Interaction');
 const { purchase } = require('../../engine/purchase');
+const { isBalance5b } = require('../../engine/balance');
 
 /**
  * C1: repairs the rod through the base ItemData model. A crafted rod is a CustomRodData document, so the
@@ -23,6 +24,40 @@ async function repairRod(rod) {
 	if (res.matchedCount !== 1) throw Object.assign(new Error('The rod is no longer broken; nothing was repaired.'), { code: 'NOT_REPAIRABLE' });
 }
 
+/** 5B repair: the rule cost, unlimited repairs, to the effective max; confirm privately, then one guarded debit. */
+async function run5b(interaction) {
+	const rodOps = require('../../engine/b5/rodOps');
+	const rods5b = require('../../engine/b5/rods');
+	const user = await User.get(interaction.user.id);
+	const rod = user?.inventory?.equippedRod ? await ItemData.collection.findOne({ _id: new mongoose.Types.ObjectId(String(user.inventory.equippedRod)) }) : null;
+	const profile = rod ? await rods5b.resolveRod(rod) : null;
+	if (!rod || profile.unbreakable || rods5b.effectiveState(rod, profile) !== 'broken') {
+		return interaction.reply({ content: 'Your rod can\'t be repaired!', flags: MessageFlags.Ephemeral });
+	}
+	const row = new ActionRowBuilder().addComponents(
+		new ButtonBuilder().setCustomId('cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary),
+		new ButtonBuilder().setCustomId('confirm').setLabel('Confirm Repair').setStyle(ButtonStyle.Success),
+	);
+	const response = await interaction.reply({
+		embeds: [new EmbedBuilder().setTitle('Repair').addFields({ name: rod.name, value: `A repair costs $${profile.repairCost.toLocaleString()} and restores ${profile.maxDurability.toLocaleString()} durability. Repairs are unlimited.` })],
+		components: [row],
+		flags: MessageFlags.Ephemeral,
+		fetchReply: true,
+	});
+	try {
+		const confirmation = await response.awaitMessageComponent({ filter: (i) => i.user.id === interaction.user.id, time: 90_000 });
+		if (confirmation.customId !== 'confirm') return await confirmation.update({ embeds: [new EmbedBuilder().setTitle('Cancelled').setDescription('Your rod was not repaired.')], components: [] });
+		const result = await rodOps.repairRod(interaction.user.id, rod._id);
+		const embed = result.ok
+			? new EmbedBuilder().setTitle('Congratulations!').setDescription(`Your ${rod.name} is repaired for $${result.cost.toLocaleString()}.`)
+			: new EmbedBuilder().setTitle(result.code === 'INSUFFICIENT' ? 'Insufficient Balance' : 'Nothing to Repair').setDescription(result.message);
+		return await confirmation.update({ embeds: [embed], components: [] });
+	}
+	catch {
+		return await interaction.editReply({ components: [] }).catch(() => undefined);
+	}
+}
+
 module.exports = {
 	repairRod,
 	customId: 'repair-rod',
@@ -32,6 +67,7 @@ module.exports = {
 	 * @param {ButtonInteraction} interaction
 	 */
 	run: async (client, interaction, analyticsObject) => {
+		if (isBalance5b()) return run5b(interaction);
 		const user = new User(await User.get(interaction.user.id));
 		const rod = await user.getEquippedRod();
 		if (!rod) {

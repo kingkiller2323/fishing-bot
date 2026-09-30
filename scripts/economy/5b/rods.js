@@ -2763,7 +2763,7 @@ module.exports = {
 	PARAMS, RARITY_ORDER, SLOTS, CATALOG, ARCHETYPES, TARGETS, SYSTEM_DEFAULTS, SYSTEM_PARITY, ENGINE_VALIDATION, DECISIONS,
 	tierLevel, homeBiome, stageBiome, rodGate, partProfile, matchedSet, referenceSet, performance, craftRod, oldRod,
 	rodOutcome, rodHourly, upkeepShare, baseDurability, repairCostFor,
-	legacyCombine, legacyCraft, verifyLegacyParity, legacySignature, convertLegacyRod, evaluateAllCombos,
+	legacyCombine, legacyCraft, verifyLegacyParity, legacySignature, legacyIndexMap, convertLegacyRod, evaluateAllCombos,
 	crateDefinition, crateDefinitions, crateSlotOdds, openOutcomes, cratesDistribution, validateCratesWithEngine, cratePrice, stageIncome, assembly, salvageValue, slotBalanceFeatured,
 	crateOpenValue, legacyCrate, catalogSync, legacyDurability,
 	gearPath, customPath, ladderGuard, commonSetAssembly, LADDERS, STANDARD_TIERS, standardRod, standardRods, assemblyPlan, lifecycle, system, report, markdownTables,

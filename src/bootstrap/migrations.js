@@ -111,6 +111,8 @@ async function runMigrations(log) {
 	if (trout.corrected + trout.activeCopies > 0) log(`Migration troutQuestTarget: ${trout.corrected} catalog row(s) and ${trout.activeCopies} active player cop(ies) of "Catch 15 Trout" now target the River trout family.`, 'done');
 	const crate = await migrateDelistFishingCrate();
 	if (crate.delisted > 0) log(`Migration delistFishingCrate: ${crate.delisted} catalog row(s) removed from the shop (shopItem -> false); owned crates untouched.`, 'done');
+	// The 5B release's flag-on migrations (additive, marker-guarded, safe to rerun).
+	if (require('../engine/balance').isBalance5b()) await require('../engine/b5/migrations').runMigrations5b({ runOnce, log });
 }
 
 module.exports = { maskId, migrateTroutQuestTarget, runMigrations, runOnce, migrateAutoLockSpecies, migratePublicXp, migrateReconcilePublicXp, migrateLevelFloors, migrateDelistFishingCrate, PUBLIC_XP_RECONCILE };

@@ -28,7 +28,10 @@ test('bootstrap seeds a fresh database and passes validation', async () => {
 	assert.equal(c.seasons, 4);
 	assert.equal(c.biomes, 6);
 	assert.equal(c.fish, 178);
-	assert.equal(c.items, 53);
+	// Today's 53 catalog items plus the hidden 5B rows (6 standard rods, 4 tackle crates; release '5b', unlisted).
+	assert.equal(await mongoose.connection.db.collection('items').countDocuments({ release: { $exists: false } }), 53);
+	assert.equal(await mongoose.connection.db.collection('items').countDocuments({ release: '5b', shopItem: false }), 10);
+	assert.equal(c.items, 63);
 	assert.equal(c.quests, 13);
 	assert.equal(c.weatherpatterns, 7);
 	const active = await mongoose.connection.db.collection('seasons').countDocuments({ active: true });

@@ -35,6 +35,8 @@ const { oid, notApplied, guardPush, grantItem, buildFishDoc, rollFishStats, inse
 const { publicXpOf, publicXpOfResult, publicLevelOf } = require('./publicLevel');
 const { levelOf, levelWithFloor } = require('./levels');
 const { Utils } = require('../class/Utils');
+// Rows added by the 5B release (hidden catalog rows) never enter today's reward pools.
+const { LEGACY_ONLY } = require('./b5/catalog');
 const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
@@ -74,7 +76,7 @@ async function drawTemplates({ draws, qualities, table, guarantee = null, biome,
 
 			let candidates = catalog.filter((t) => t.rarity === draw);
 			if (draw === 'Lucky' && rng.weighted(['fish', 'item'], [80, 20]) === 'item') {
-				if (luckyItems === null) luckyItems = await Item.find({ rarity: draw, user: null });
+				if (luckyItems === null) luckyItems = await Item.find({ rarity: draw, user: null, ...LEGACY_ONLY });
 				// An empty Lucky item pool falls back to Lucky fish instead of crashing.
 				if (luckyItems.length > 0) candidates = [rng.pick(luckyItems)];
 			}

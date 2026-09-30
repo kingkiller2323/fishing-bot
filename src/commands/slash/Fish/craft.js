@@ -6,6 +6,7 @@ const { ItemData } = require('../../../schemas/ItemSchema');
 const { Utils } = require('../../../class/Utils');
 const config = require('../../../config');
 const { Interaction } = require('../../../class/Interaction');
+const { isBalance5b } = require('../../../engine/balance');
 
 const getSelectionOptions = async (parts, userId) => {
 	if (!parts) return [];
@@ -70,7 +71,14 @@ module.exports = {
 		const userData = new User(await User.get(user.id));
 		const userId = await userData.getUserId();
 		const items = await userData.getItems();
-		const parts = items.filter((item) => item.type.includes('part_'));
+		let parts = items.filter((item) => item.type.includes('part_'));
+		if (isBalance5b()) {
+			// The Rod Workshop opens at its level; only parts with a unit left can be used.
+			const minLevel = require('../../../engine/balance').need5b().rods.custom.minLevel;
+			const level = await userData.getGateLevel();
+			if (level < minLevel) return interaction.editReply(`🔒 The Rod Workshop opens at Lv ${minLevel}. You are Lv ${level}.`);
+			parts = parts.filter((p) => (p.count ?? 1) >= 1);
+		}
 
 		const rodParts = parts.filter((part) => part.type.includes('part_rod'));
 		const rodOptions = await getSelectionOptions(rodParts, userId);
@@ -185,6 +193,18 @@ module.exports = {
 					});
 					return collector.stop();
 				}
+				else if (i.customId === 'craft-rod-submit' && isBalance5b()) {
+					const result = await require('../../../engine/b5/rodOps').craftRod(user.id, { name, description: `Made by ${user.username}`, partIds: ['rod', 'reel', 'hook', 'handle'].map((k) => selectedParts[k].id) });
+					await i.update({
+						embeds: [
+							result.ok
+								? new EmbedBuilder().setTitle('Rod Workshop').setDescription(`Crafted **${name}**: requires Lv ${result.rod.requiredLevel}, ${result.rod.meanFish.toFixed(2)} fish per cast.`)
+								: new EmbedBuilder().setTitle('Rod Workshop').setColor('Red').setDescription(result.message),
+						],
+						components: [],
+					});
+					return collector.stop();
+				}
 				else if (i.customId === 'craft-rod-submit') {
 					const userData = new User(await User.get(user.id));
 					const rodObject = new CustomRodData({
@@ -252,6 +272,24 @@ module.exports = {
 								.setDescription('Select the handle piece of your choice!'),
 						],
 						components: [fourthActionRow],
+					});
+				}
+				else if (i.customId === 'craft-select-handle' && isBalance5b()) {
+					// 5B Rod Workshop preview: the required level (and the part that sets it) before confirming.
+					selectedParts.handle.id = i.values[0];
+					selectedParts.handle.object = await ItemData.findById(i.values[0]);
+					const rodOps = require('../../../engine/b5/rodOps');
+					const level = await new User(await User.get(user.id)).getGateLevel();
+					const preview = rodOps.craftPreview(['rod', 'reel', 'hook', 'handle'].map((k) => selectedParts[k].object.toObject()), level);
+					const r = preview.rod;
+					const statLine = `${r.meanFish.toFixed(2)} fish · Rare Find ${Math.round(r.stats.rareFind * 100)}% · Luck ${Math.round(r.stats.luck * 100)}% · Trophy ${Math.round(r.stats.trophyChance * 100)}% · Speed ${Math.round(r.stats.fishingSpeed * 100)}% · Sell ${Math.round(r.stats.sellBonus * 100)}%`;
+					await i.update({
+						embeds: [
+							new EmbedBuilder()
+								.setTitle('Rod Workshop')
+								.setDescription(`**Rod**: ${selectedParts.rod.object.name}\n**Reel**: ${selectedParts.reel.object.name}\n**Hook**: ${selectedParts.hook.object.name}\n**Handle**: ${selectedParts.handle.object.name}\n\nPreview: requires **Lv ${r.requiredLevel}** (T${r.tier}; set by ${r.setBy.map((p) => `${p.rarity} ${p.name}`).join(', ')})\n${statLine}\nDurability ${r.maxDurability.toLocaleString()} · repair $${r.repairCost.toLocaleString()} · unlimited repairs${preview.allowed ? '' : `\n\n${preview.reason}`}`),
+						],
+						components: [new ActionRowBuilder().addComponents(ButtonBuilder.from(submitButton).setDisabled(!preview.allowed).setLabel(preview.allowed ? 'Craft' : `Craft 🔒 Lv ${r.requiredLevel}`), cancelButton)],
 					});
 				}
 				else if (i.customId === 'craft-select-handle') {

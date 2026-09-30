@@ -209,7 +209,8 @@ module.exports = {
 
 			const data = new User(await User.get(interaction.user.id));
 			const equippedRod = await data.getEquippedRod();
-			if (!equippedRod || (equippedRod.name === 'Old Rod' && equippedRod.state === 'destroyed')) {
+			// 5B: the Old Rod is unbreakable, so a destroyed one still fishes (getEquippedRod re-equips it).
+			if (!require('../../engine/balance').isBalance5b() && (!equippedRod || (equippedRod.name === 'Old Rod' && equippedRod.state === 'destroyed'))) {
 				const rod = await Item.findOne({ name: 'Old Rod' });
 				await data.sendToInventory(rod)
 					.then(async (newRod) => {

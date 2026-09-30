@@ -6,7 +6,7 @@
 // XP per fish weighted by rarity. Later step C systems extend this file only.
 const { ObjectId } = require('mongoose').Types;
 const { User: UserModel } = require('../schemas/UserSchema');
-const { FishData } = require('../schemas/FishSchema');
+const { Fish: FishTemplate, FishData } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
 const { BuffData } = require('../schemas/BuffSchema');
 const { QuestData } = require('../schemas/QuestSchema');
@@ -15,15 +15,65 @@ const { WeatherPattern } = require('../class/WeatherPattern');
 const { Season } = require('../class/Season');
 const { activeBuffFilter } = require('./buffs');
 const { rng } = require('./rng');
-const { BALANCE_VERSION_5B, XP_PER_FISH, resolveProfile, activeEvent } = require('./balance');
-const { resolveModifiers, rollDraws } = require('./modifiers');
-const { applyPity, toPercent } = require('./rarity');
+const { BALANCE_VERSION_5B, XP_PER_FISH, NORMAL_RARITY_TABLE, resolveProfile, activeEvent, need5b } = require('./balance');
+const { baitStats, buffEffects } = require('./modifiers');
+const { applyPity, roll, toPercent, normalize } = require('./rarity');
 const { buildFishDoc, rollFishStats } = require('./rewards');
 const { publicXpOf, publicLevelOf } = require('./publicLevel');
 const { levelOf, levelWithFloor } = require('./levels');
 const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
 const value5b = require('./b5/value');
-const { drawTemplates, questMatches, rewardBreakdown, failure, capitalize, plain, POND_WARNING_AT } = require('./cast');
+const rods5b = require('./b5/rods');
+const { resolveModifiers5b } = require('./b5/modifiers');
+const { rollFishCount } = require('./b5/multicatch');
+const { LEGACY_ONLY } = require('./b5/catalog');
+const { fallbackTemplate, questMatches, rewardBreakdown, failure, capitalize, plain, POND_WARNING_AT, NoCatchError, MAX_DRAW_ATTEMPTS } = require('./cast');
+
+/**
+ * Share of Lucky rolls that are catalog items (P-LUCKY): the item rate per draw stays at the Normal base
+ * table's rate whatever raises the Lucky tier, so Lucky items stay rare; the rest become Lucky fish.
+ */
+function luckyItemShare(table) {
+	const base = need5b().rules.luckyItemShare;
+	const normalLucky = normalize(NORMAL_RARITY_TABLE).lucky;
+	if (!(table.lucky > 0)) return base;
+	return Math.min(base, (base * normalLucky) / table.lucky);
+}
+
+/** Today's draw (cast.js drawTemplates) with the pinned Lucky item share. */
+async function drawTemplates5b({ draws, qualities, table, guarantee = null, biome, weather, season }) {
+	const catalog = await FishTemplate.find({ biome, weather: { $in: [weather, 'all'] }, season: { $in: [season, 'all'] }, user: null });
+	const matches = (t) => qualities.some((c) => (t?.qualities || []).includes(c));
+	const itemShare = luckyItemShare(table);
+	let luckyItems = null;
+	const picked = [];
+	for (let i = 0; i < draws; i++) {
+		let template = null;
+		for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS && !template; attempt++) {
+			const restrict = i === 0 && guarantee ? guarantee : null;
+			const drawn = capitalize(roll(table, rng, restrict));
+			let candidates = catalog.filter((t) => t.rarity === drawn);
+			if (drawn === 'Lucky' && rng.random() < itemShare) {
+				if (luckyItems === null) luckyItems = await Item.find({ rarity: drawn, user: null, ...LEGACY_ONLY });
+				if (luckyItems.length > 0) candidates = [rng.pick(luckyItems)];
+			}
+			const valid = candidates.filter(matches);
+			if (valid.length > 0) template = rng.pick(valid);
+		}
+		if (!template) template = await fallbackTemplate(biome, qualities);
+		if (!template) throw new NoCatchError(`No catchable fish in ${biome} for qualities [${qualities.join(', ')}]`);
+		picked.push(template);
+	}
+	return picked;
+}
+
+/** Today's bait as a 5B source until the 5B bait roster (step C.4): its stats without legacy draw counts. */
+function baitInput(bait, applied) {
+	if (!bait) return null;
+	const { stats, qualities } = baitStats(bait);
+	const rest = Object.fromEntries(Object.entries(stats).filter(([k]) => k !== 'perDraw' && k !== 'multiCatch'));
+	return { id: String(bait._id), name: bait.name, applied, stats: rest, qualities };
+}
 
 /** One XP roll per fish unit (today's 10-25 roll), weighted by that unit's rarity and floored per fish. */
 function rollCatchXp(catches) {
@@ -66,8 +116,10 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const rodDoc = user.inventory.equippedRod ? await ItemData.findById(user.inventory.equippedRod) : null;
 	if (!rodDoc) return failure(base, 'NO_ROD', 'You have no fishing rod equipped.');
 	const rod = plain(rodDoc);
-	if (rod.state === 'broken') return failure(base, 'ROD_BROKEN', 'Your rod is broken! You can\'t catch any more fish until you repair it.', { rodState: 'broken' });
-	if (rod.state === 'destroyed') return failure(base, 'ROD_DESTROYED', 'Your rod is destroyed! You can\'t use it anymore.', { rodState: 'destroyed' });
+	// 5B rod: the Old Rod never breaks; a crafted rod is never destroyed (legacy destroyed = broken, repairable).
+	const rodProfile = await rods5b.resolveRod(rod);
+	const rodState = rods5b.effectiveState(rod, rodProfile);
+	if (rodState === 'broken') return failure(base, 'ROD_BROKEN', 'Your rod is broken! Repair it, or switch to your Old Rod.', { rodState: 'broken' });
 
 	const baitDoc = user.inventory.equippedBait ? await ItemData.findById(user.inventory.equippedBait) : null;
 	const equippedBait = plain(baitDoc);
@@ -80,10 +132,11 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const weather = capitalize(await weatherPattern.getWeather());
 	const season = (await Season.getCurrentSeason())?.season;
 
-	const rodParts = rod.type === 'customrod' ? (await ItemData.find({ _id: { $in: [rod.rod, rod.reel, rod.hook, rod.handle].filter(Boolean) } })).map(plain) : null;
 	const activeBuffs = (await BuffData.find(activeBuffFilter(userId, now))).map(plain);
 	const baitApplies = Boolean(bait && (bait.biomes || []).includes(biomeKey));
-	const modifiers = resolveModifiers({ profile, rod, rodParts, bait, baitApplies, buffs: activeBuffs, event: activeEvent(now), user: plain(user), now });
+	const modifiers = resolveModifiers5b({
+		profile, rod: rodProfile, bait: baitInput(bait, baitApplies), buffs: buffEffects(activeBuffs), event: activeEvent(now), user: plain(user), now,
+	});
 	base.competitiveEligible = modifiers.competitiveEligible;
 
 	const pityBefore = {
@@ -91,13 +144,16 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		castsSinceLucky: user.pity?.castsSinceLucky || 0,
 		gachaSinceHighTier: user.pity?.gachaSinceHighTier || 0,
 	};
-	const pity = applyPity(modifiers.rarity.table, pityBefore, profile.pity);
-	const { perDraw, qualities } = modifiers;
-	const { draws, bonus: bonusDraws } = rollDraws(modifiers, rng);
+	// The public cast has no pity (the Normal profile's); the Founder's pity belongs to its private rolls.
+	const pity = applyPity(modifiers.rarity.table, pityBefore, null);
+	const { qualities } = modifiers;
+	// Fish per cast: the multi-catch chain (each fish is one draw).
+	const draws = rollFishCount(modifiers.multi.chance, rng);
+	const perDraw = 1;
 
 	let templates;
 	try {
-		templates = await drawTemplates({ draws, qualities, table: pity.table, guarantee: pity.guarantee, biome, weather, season });
+		templates = await drawTemplates5b({ draws, qualities, table: pity.table, guarantee: pity.guarantee, biome, weather, season });
 	}
 	catch (error) {
 		if (error.code !== 'NO_CATCH') throw error;
@@ -152,12 +208,13 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const catchXp = Math.floor(baseXp * xpMultiplier);
 	const catchXpWithoutProfile = Math.floor(baseXp * modifiers.xp.withoutProfile);
 
-	const durabilityCost = units > 0 ? Math.max(1, Math.ceil(units * modifiers.durabilityCostPerFish)) : 0;
-	const rodAfter = { durability: rod.durability - durabilityCost, state: rod.state, fishCaught: (rod.fishCaught || 0) + units };
-	if (rodAfter.durability <= 0) {
-		rodAfter.durability = 0;
-		rodAfter.state = (rod.repairs || 0) >= (rod.maxRepairs ?? 3) ? 'destroyed' : 'broken';
-	}
+	// Durability (P-DURABILITY): n × (1 − efficiency), stochastic rounding, no minimum. The Old Rod is unbreakable;
+	// a 5B rod at 0 is broken (repairable, never destroyed).
+	const durabilityCost = rodProfile.unbreakable || units === 0 ? 0 : rods5b.durabilityCharge(units, modifiers.durabilityEfficiency, rng);
+	const rodAfter = rodProfile.unbreakable
+		? { durability: rod.durability, state: rod.state, fishCaught: (rod.fishCaught || 0) + units }
+		: { durability: Math.max(0, (rod.durability || 0) - durabilityCost), state: rodState, fishCaught: (rod.fishCaught || 0) + units };
+	if (!rodProfile.unbreakable && rodAfter.durability <= 0) rodAfter.state = 'broken';
 	const baitAfter = bait ? Math.max(0, (bait.count || 0) - units) : null;
 
 	const questDocs = (await QuestData.find({ user: String(userId), status: 'in_progress' })).map(plain);
@@ -226,7 +283,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		...base,
 		status: 'ok',
 		environment: { biome, weather, season },
-		rod: { id: String(rod._id), name: rod.name, type: rod.type, capabilities: rod.capabilities || [], before: { durability: rod.durability, state: rod.state, fishCaught: rod.fishCaught || 0 }, after: rodAfter, durabilityCost },
+		rod: { id: String(rod._id), name: rod.name, type: rod.type, kind: rodProfile.kind, unbreakable: rodProfile.unbreakable, capabilities: rod.capabilities || [], before: { durability: rod.durability, state: rod.state, fishCaught: rod.fishCaught || 0 }, after: rodAfter, durabilityCost },
 		bait: bait
 			? { id: String(bait._id), name: bait.name, applied: baitApplies, before: { count: bait.count }, after: { count: baitAfter }, depleted: baitAfter === 0 }
 			: (baitLocked
@@ -235,7 +292,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		buffs: activeBuffs.map((b) => ({ id: String(b._id), name: b.name, capabilities: b.capabilities || [] })),
 		modifiers: { ...modifiers, rarity: { base: toPercent(modifiers.rarity.base, 4), table: toPercent(modifiers.rarity.table, 4) } },
 		rarity: { table: toPercent(pity.table, 4), guarantee: pity.guarantee },
-		draws: { draws, bonusDraws, perDraw, qualities },
+		draws: { draws, bonusDraws: 0, perDraw, qualities, multiChance: modifiers.multi.chance, capped: modifiers.multi.capped },
 		cooldownMs: modifiers.cooldownMs,
 		catches,
 		units,

@@ -4,6 +4,7 @@ const { ItemData } = require('../../../schemas/ItemSchema');
 const config = require('../../../config');
 const { Interaction } = require('../../../class/Interaction');
 const { checkLevelGate } = require('../../../engine/levelGate');
+const { isBalance5b } = require('../../../engine/balance');
 
 const selectionOptions = async (inventoryPath, userData, allowNone = true) => {
 	const uniqueValues = new Set();
@@ -200,10 +201,19 @@ module.exports = {
 
 				const selection = await response.awaitMessageComponent({ filter: collectorFilter, time: 90_000 });
 				const rodChoice = selection.values[0];
-				// Rod level enforcement is held (hotfix L6B) until the rod progression redesign ships:
-				// only bait is level-gated here for now.
+				// L6B ships with the 5B release: a rod above the player's level is refused (it stays owned); the
+				// rod already equipped is never unequipped by the gate.
+				if (isBalance5b() && rodChoice !== 'none') {
+					const gate = await require('../../../engine/b5/rodOps').equipRod(user.id, rodChoice);
+					if (!gate.ok) {
+						await selection.update({ embeds: [new EmbedBuilder().setTitle('Equipment').setDescription('You do not meet the requirements to equip this rod.')], components: [] });
+						return await selection.followUp({ embeds: [new EmbedBuilder().setTitle('Equipment').setColor('Red').setDescription(gate.message)], flags: MessageFlags.Ephemeral });
+					}
+				}
 
-				const newRod = await userData.setEquippedRod(rodChoice);
+				const newRod = isBalance5b() && rodChoice !== 'none'
+					? await ItemData.findById(rodChoice)
+					: await userData.setEquippedRod(rodChoice);
 
 				if (newRod === null) {
 					if (process.env.ANALYTICS || config.client.analytics) {
