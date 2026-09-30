@@ -12,6 +12,7 @@ const { BALANCE_VERSION, isFounderId } = require('./balance');
 const { publicXpOf, publicLevelOf } = require('./publicLevel');
 const { levelOf, curveLevel, floorOf, levelWithFloor } = require('./levels');
 const { grantItem } = require('./cast');
+const { visibleCatalog } = require('./b5/catalog');
 const { Utils } = require('../class/Utils');
 
 class DevAuthError extends Error {
@@ -79,7 +80,8 @@ async function xp(actor, target, mode, amount) {
 /** Gives catalog items (stacks like normal inventory). */
 async function give(actor, target, itemName, count = 1) {
 	assertDeveloper(actor);
-	const template = await Item.findOne({ name: new RegExp(`^${escape(itemName)}$`, 'i'), user: null }).lean();
+	// Hidden 5B rows can be granted only while the 5B release is on.
+	const template = await Item.findOne({ name: new RegExp(`^${escape(itemName)}$`, 'i'), user: null, ...visibleCatalog() }).lean();
 	if (!template) throw new Error(`No catalog item named "${itemName}".`);
 	await targetDoc(target);
 	const owned = async () => (await ItemData.find({ user: String(target), name: template.name }).lean()).reduce((s, i) => s + (i.count || 0), 0);
@@ -94,7 +96,7 @@ async function give(actor, target, itemName, count = 1) {
 /** Spawns a specific fish into the target's inventory. Always non-competitive. */
 async function spawn(actor, target, fishName, { count = 1, size, weight } = {}) {
 	assertDeveloper(actor);
-	const template = await FishTemplate.findOne({ name: new RegExp(`^${escape(fishName)}$`, 'i'), user: null }).lean();
+	const template = await FishTemplate.findOne({ name: new RegExp(`^${escape(fishName)}$`, 'i'), user: null, ...visibleCatalog() }).lean();
 	if (!template) throw new Error(`No catalog fish named "${fishName}".`);
 	await targetDoc(target);
 	const s = Number.isFinite(size) ? size : parseFloat((await Utils.binomialRandomInRange(10, 0.5, template.minSize, template.maxSize)).toFixed(3));
