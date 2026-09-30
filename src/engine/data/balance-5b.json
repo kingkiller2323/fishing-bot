@@ -7737,6 +7737,1619 @@
 			]
 		}
 	},
+	"day": {
+		"startUtcHour": 0,
+		"week": "iso"
+	},
+	"quests": {
+		"rulesVersion": "quests-5b",
+		"boxName": "Daily Box",
+		"repeatable": {
+			"cooldownHours": 12,
+			"dailyCap": 2,
+			"maxActive": 1
+		},
+		"weeklyUnlockLevel": 10,
+		"legacyMap": {
+			"Catch 15 Trout": "story.river-trout",
+			"Catch 15 Carp": "story.river-carp",
+			"Find the Lucky Magikarp": "story.magikarp",
+			"Help the Village!": "repeatable.village",
+			"Lucky Fisher": "story.lucky-fisher",
+			"Catch 100 Fish": "daily.catch",
+			"Catch 250 Fish": "daily.catch",
+			"Catch 500 Fish": "daily.catch",
+			"Catch 750 Fish": "daily.catch",
+			"Professional Fisher": "story.swamp",
+			"Catch 1 Legendary Fish": "weekly.legend",
+			"Catch 5 Ultra Fish": "weekly.bigGame",
+			"Catch 15 Rare Fish": "daily.rare"
+		},
+		"retiredTitles": [
+			"Catch 100 Fish",
+			"Catch 250 Fish",
+			"Catch 500 Fish",
+			"Catch 750 Fish",
+			"Catch 1 Legendary Fish",
+			"Catch 5 Ultra Fish",
+			"Catch 15 Rare Fish"
+		],
+		"templates": [
+			{
+				"key": "daily.catch",
+				"title": "Daily Catch",
+				"kind": "daily",
+				"description": "Catch {n} fish today.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"bands": [
+					{
+						"band": "ocean",
+						"minLevel": 0,
+						"offered": true,
+						"progressMax": 20,
+						"xp": 370,
+						"cash": 430,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "river",
+						"minLevel": 10,
+						"offered": true,
+						"progressMax": 25,
+						"xp": 470,
+						"cash": 1100,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "lake",
+						"minLevel": 20,
+						"offered": true,
+						"progressMax": 30,
+						"xp": 560,
+						"cash": 1900,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "pond",
+						"minLevel": 30,
+						"offered": true,
+						"progressMax": 45,
+						"xp": 850,
+						"cash": 4100,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "coast",
+						"minLevel": 40,
+						"offered": true,
+						"progressMax": 60,
+						"xp": 1100,
+						"cash": 7800,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "swamp",
+						"minLevel": 50,
+						"offered": true,
+						"progressMax": 75,
+						"xp": 1400,
+						"cash": 14000,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "endgame",
+						"minLevel": 60,
+						"offered": true,
+						"progressMax": 90,
+						"xp": 1700,
+						"cash": 18000,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					}
+				]
+			},
+			{
+				"key": "daily.rare",
+				"title": "Daily Rare Hunt",
+				"kind": "daily",
+				"description": "Catch {n} Rare-or-better fish today.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"bands": [
+					{
+						"band": "ocean",
+						"minLevel": 0,
+						"offered": true,
+						"progressMax": 1,
+						"xp": 280,
+						"cash": 320,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "river",
+						"minLevel": 10,
+						"offered": true,
+						"progressMax": 2,
+						"xp": 520,
+						"cash": 1200,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "lake",
+						"minLevel": 20,
+						"offered": true,
+						"progressMax": 2,
+						"xp": 500,
+						"cash": 1700,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "pond",
+						"minLevel": 30,
+						"offered": true,
+						"progressMax": 4,
+						"xp": 910,
+						"cash": 4400,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "coast",
+						"minLevel": 40,
+						"offered": true,
+						"progressMax": 5,
+						"xp": 1000,
+						"cash": 7100,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "swamp",
+						"minLevel": 50,
+						"offered": true,
+						"progressMax": 8,
+						"xp": 1400,
+						"cash": 15000,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "endgame",
+						"minLevel": 60,
+						"offered": true,
+						"progressMax": 10,
+						"xp": 1700,
+						"cash": 17000,
+						"boxes": 1,
+						"progressType": {
+							"rarity": [
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					}
+				]
+			},
+			{
+				"key": "weekly.haul",
+				"title": "Weekly Haul",
+				"kind": "weekly",
+				"description": "Catch {n} fish this week.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"bands": [
+					{
+						"band": "ocean",
+						"minLevel": 0,
+						"offered": false,
+						"progressMax": 70,
+						"xp": 1300,
+						"cash": 1500,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "river",
+						"minLevel": 10,
+						"offered": true,
+						"progressMax": 90,
+						"xp": 1700,
+						"cash": 4000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "lake",
+						"minLevel": 20,
+						"offered": true,
+						"progressMax": 130,
+						"xp": 2400,
+						"cash": 8300,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "pond",
+						"minLevel": 30,
+						"offered": true,
+						"progressMax": 170,
+						"xp": 3200,
+						"cash": 15000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "coast",
+						"minLevel": 40,
+						"offered": true,
+						"progressMax": 230,
+						"xp": 4400,
+						"cash": 30000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "swamp",
+						"minLevel": 50,
+						"offered": true,
+						"progressMax": 295,
+						"xp": 5600,
+						"cash": 57000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "endgame",
+						"minLevel": 60,
+						"offered": true,
+						"progressMax": 355,
+						"xp": 6800,
+						"cash": 70000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					}
+				]
+			},
+			{
+				"key": "weekly.bigGame",
+				"title": "Weekly Big Game",
+				"kind": "weekly",
+				"description": "Catch {n} Ultra-or-better fish this week.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"bands": [
+					{
+						"band": "ocean",
+						"minLevel": 0,
+						"offered": false,
+						"progressMax": 1,
+						"xp": 1100,
+						"cash": 1300,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "river",
+						"minLevel": 10,
+						"offered": true,
+						"progressMax": 2,
+						"xp": 2100,
+						"cash": 5000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "lake",
+						"minLevel": 20,
+						"offered": true,
+						"progressMax": 2,
+						"xp": 2000,
+						"cash": 6900,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "pond",
+						"minLevel": 30,
+						"offered": true,
+						"progressMax": 3,
+						"xp": 2800,
+						"cash": 14000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "coast",
+						"minLevel": 40,
+						"offered": true,
+						"progressMax": 5,
+						"xp": 4300,
+						"cash": 29000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "swamp",
+						"minLevel": 50,
+						"offered": true,
+						"progressMax": 7,
+						"xp": 5300,
+						"cash": 53000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "endgame",
+						"minLevel": 60,
+						"offered": true,
+						"progressMax": 10,
+						"xp": 7100,
+						"cash": 73000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					}
+				]
+			},
+			{
+				"key": "weekly.legend",
+				"title": "Weekly Legend Hunt",
+				"kind": "weekly",
+				"description": "Catch {n} Legendary or Lucky fish this week.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"bands": [
+					{
+						"band": "ocean",
+						"minLevel": 0,
+						"offered": false,
+						"progressMax": 1,
+						"xp": 9100,
+						"cash": 10000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "river",
+						"minLevel": 10,
+						"offered": false,
+						"progressMax": 1,
+						"xp": 8800,
+						"cash": 21000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "lake",
+						"minLevel": 20,
+						"offered": false,
+						"progressMax": 1,
+						"xp": 8600,
+						"cash": 29000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "pond",
+						"minLevel": 30,
+						"offered": false,
+						"progressMax": 1,
+						"xp": 8200,
+						"cash": 39000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "coast",
+						"minLevel": 40,
+						"offered": false,
+						"progressMax": 1,
+						"xp": 7300,
+						"cash": 50000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "swamp",
+						"minLevel": 50,
+						"offered": true,
+						"progressMax": 1,
+						"xp": 6700,
+						"cash": 68000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "endgame",
+						"minLevel": 60,
+						"offered": true,
+						"progressMax": 1,
+						"xp": 6400,
+						"cash": 66000,
+						"boxes": 2,
+						"progressType": {
+							"rarity": [
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					}
+				]
+			},
+			{
+				"key": "repeatable.village",
+				"title": "Help the Village!",
+				"kind": "repeatable",
+				"description": "Assist the local village by catching {n} fish for them.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"bands": [
+					{
+						"band": "ocean",
+						"minLevel": 0,
+						"offered": true,
+						"progressMax": 100,
+						"xp": 93,
+						"cash": 320,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "river",
+						"minLevel": 10,
+						"offered": true,
+						"progressMax": 100,
+						"xp": 94,
+						"cash": 660,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "lake",
+						"minLevel": 20,
+						"offered": true,
+						"progressMax": 115,
+						"xp": 110,
+						"cash": 1100,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "pond",
+						"minLevel": 30,
+						"offered": true,
+						"progressMax": 135,
+						"xp": 130,
+						"cash": 1800,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "coast",
+						"minLevel": 40,
+						"offered": true,
+						"progressMax": 155,
+						"xp": 150,
+						"cash": 3000,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "swamp",
+						"minLevel": 50,
+						"offered": true,
+						"progressMax": 175,
+						"xp": 170,
+						"cash": 5000,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "endgame",
+						"minLevel": 60,
+						"offered": true,
+						"progressMax": 190,
+						"xp": 180,
+						"cash": 5600,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"any"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					}
+				]
+			},
+			{
+				"key": "repeatable.fishmonger",
+				"title": "Fishmonger's Order",
+				"kind": "repeatable",
+				"description": "The fishmonger wants {n} Uncommon-or-better fish.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"bands": [
+					{
+						"band": "ocean",
+						"minLevel": 0,
+						"offered": true,
+						"progressMax": 31,
+						"xp": 93,
+						"cash": 320,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"uncommon",
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "river",
+						"minLevel": 10,
+						"offered": true,
+						"progressMax": 32,
+						"xp": 95,
+						"cash": 670,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"uncommon",
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "lake",
+						"minLevel": 20,
+						"offered": true,
+						"progressMax": 37,
+						"xp": 110,
+						"cash": 1100,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"uncommon",
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "pond",
+						"minLevel": 30,
+						"offered": true,
+						"progressMax": 44,
+						"xp": 130,
+						"cash": 1800,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"uncommon",
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "coast",
+						"minLevel": 40,
+						"offered": true,
+						"progressMax": 51,
+						"xp": 150,
+						"cash": 3000,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"uncommon",
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "swamp",
+						"minLevel": 50,
+						"offered": true,
+						"progressMax": 60,
+						"xp": 170,
+						"cash": 5100,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"uncommon",
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					},
+					{
+						"band": "endgame",
+						"minLevel": 60,
+						"offered": true,
+						"progressMax": 66,
+						"xp": 180,
+						"cash": 5600,
+						"boxes": 0,
+						"progressType": {
+							"rarity": [
+								"uncommon",
+								"rare",
+								"ultra",
+								"giant",
+								"legendary",
+								"lucky"
+							],
+							"rod": "any",
+							"qualities": [
+								"any"
+							],
+							"fish": [
+								"any"
+							],
+							"biome": "any",
+							"kind": "fish"
+						}
+					}
+				]
+			},
+			{
+				"key": "story.magikarp",
+				"title": "Find the Lucky Magikarp",
+				"kind": "story",
+				"legacyTitle": "Find the Lucky Magikarp",
+				"description": "Embark on a journey to find and catch the lucky Magikarp in the Ocean.",
+				"requirements": {
+					"level": 0,
+					"previous": []
+				},
+				"progressMax": 1,
+				"progressType": {
+					"rarity": [
+						"any"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"magikarp"
+					],
+					"biome": "Ocean",
+					"kind": "fish"
+				},
+				"xp": 1200,
+				"cash": 1400,
+				"boxes": 1,
+				"pity": {
+					"softStart": 60,
+					"rampPerPoint": 0.0005,
+					"maxBonus": 0.05,
+					"hard": 200
+				},
+				"pityForces": "species"
+			},
+			{
+				"key": "story.river-carp",
+				"title": "Catch 15 Carp",
+				"kind": "story",
+				"legacyTitle": "Catch 15 Carp",
+				"description": "Catch 15 carp from the river.",
+				"requirements": {
+					"level": 10,
+					"previous": []
+				},
+				"progressMax": 15,
+				"progressType": {
+					"rarity": [
+						"any"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"blossom carp",
+						"carp",
+						"scorpion carp"
+					],
+					"biome": "River",
+					"kind": "fish"
+				},
+				"xp": 630,
+				"cash": 1500,
+				"boxes": 0,
+				"pity": null,
+				"pityForces": null
+			},
+			{
+				"key": "story.river-trout",
+				"title": "Catch 15 Trout",
+				"kind": "story",
+				"legacyTitle": "Catch 15 Trout",
+				"description": "Catch 15 trout from the river.",
+				"requirements": {
+					"level": 10,
+					"previous": []
+				},
+				"progressMax": 15,
+				"progressType": {
+					"rarity": [
+						"any"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"cherry trout",
+						"clover trout",
+						"fall blue trout",
+						"fogtail trout",
+						"frostfin trout",
+						"frostling trout",
+						"rainbow trout",
+						"skyfin trout",
+						"solaris trout",
+						"thunder trout"
+					],
+					"biome": "River",
+					"kind": "fish"
+				},
+				"xp": 630,
+				"cash": 1500,
+				"boxes": 0,
+				"pity": null,
+				"pityForces": null
+			},
+			{
+				"key": "story.lake",
+				"title": "Lake Explorer",
+				"kind": "story",
+				"legacyTitle": null,
+				"description": "Catch 175 fish in the Lake.",
+				"requirements": {
+					"level": 20,
+					"previous": []
+				},
+				"progressMax": 175,
+				"progressType": {
+					"rarity": [
+						"any"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"any"
+					],
+					"biome": "Lake",
+					"kind": "fish"
+				},
+				"xp": 1200,
+				"cash": 4000,
+				"boxes": 1,
+				"pity": null,
+				"pityForces": null
+			},
+			{
+				"key": "story.pond",
+				"title": "Pond Explorer",
+				"kind": "story",
+				"legacyTitle": null,
+				"description": "Catch 200 fish in the Pond.",
+				"requirements": {
+					"level": 30,
+					"previous": []
+				},
+				"progressMax": 200,
+				"progressType": {
+					"rarity": [
+						"any"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"any"
+					],
+					"biome": "Pond",
+					"kind": "fish"
+				},
+				"xp": 1300,
+				"cash": 6400,
+				"boxes": 1,
+				"pity": null,
+				"pityForces": null
+			},
+			{
+				"key": "story.lucky-fisher",
+				"title": "Lucky Fisher",
+				"kind": "story",
+				"legacyTitle": "Lucky Fisher",
+				"description": "Catch 5 Lucky fish (any biome).",
+				"requirements": {
+					"level": 30,
+					"previous": [
+						"story.magikarp"
+					]
+				},
+				"progressMax": 5,
+				"progressType": {
+					"rarity": [
+						"lucky"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"any"
+					],
+					"biome": "any",
+					"kind": "fish"
+				},
+				"xp": 5000,
+				"cash": 24000,
+				"boxes": 2,
+				"pity": {
+					"softStart": 260,
+					"rampPerPoint": 0.0001,
+					"maxBonus": 0.01,
+					"hard": 1030
+				},
+				"pityForces": "lucky-fish"
+			},
+			{
+				"key": "story.coast",
+				"title": "Coast Explorer",
+				"kind": "story",
+				"legacyTitle": null,
+				"description": "Catch 235 fish on the Coast.",
+				"requirements": {
+					"level": 40,
+					"previous": []
+				},
+				"progressMax": 235,
+				"progressType": {
+					"rarity": [
+						"any"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"any"
+					],
+					"biome": "Coast",
+					"kind": "fish"
+				},
+				"xp": 1600,
+				"cash": 11000,
+				"boxes": 1,
+				"pity": null,
+				"pityForces": null
+			},
+			{
+				"key": "story.swamp",
+				"title": "Professional Fisher",
+				"kind": "story",
+				"legacyTitle": "Professional Fisher",
+				"description": "Prove your dedication: catch 530 fish in the Swamp.",
+				"requirements": {
+					"level": 50,
+					"previous": []
+				},
+				"progressMax": 530,
+				"progressType": {
+					"rarity": [
+						"any"
+					],
+					"rod": "any",
+					"qualities": [
+						"any"
+					],
+					"fish": [
+						"any"
+					],
+					"biome": "Swamp",
+					"kind": "fish"
+				},
+				"xp": 2200,
+				"cash": 23000,
+				"boxes": 1,
+				"pity": null,
+				"pityForces": null
+			}
+		]
+	},
 	"catalog": {
 		"overlay": {
 			"Fishing Crate": {
@@ -7911,5 +9524,5 @@
 		"boxLuck": "non-buff",
 		"competitiveEligible": false
 	},
-	"contentHash": "dc7d8e4be427afaf"
+	"contentHash": "9d1fe90593c02de5"
 }

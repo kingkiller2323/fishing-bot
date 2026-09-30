@@ -19,6 +19,8 @@ module.exports = {
      */
 	async run(client, interaction, analyticsObject, user = null) {
 		if (user === null) user = interaction.user;
+		// 5B: story chapters and repeatables with their start rule (src/class/Quests5b.js).
+		if (require('../../../engine/balance').isBalance5b()) return require('../../../class/Quests5b').startQuest(interaction);
 
 		const questOptions = await QuestSchema.find({ daily: false });
 		const uniqueValues = new Set();

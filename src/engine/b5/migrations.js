@@ -61,6 +61,44 @@ async function migrateFounderBiome() {
 	return { moved };
 }
 
+/**
+ * P-QUESTS-LEGACY questLog backfill: each player's completed QuestData, by title mapped to its 5B key, is
+ * recorded in questLog with $max (completions, lastCompletedAt) and $min (firstCompletedAt). Nothing is
+ * deleted or rewritten; rerunning changes nothing.
+ */
+async function migrateQuestLog() {
+	const { QuestData } = require('../../schemas/QuestSchema');
+	const { logField } = require('./quests');
+	const map = need5b().quests.legacyMap;
+	const rows = await QuestData.collection.aggregate([
+		{ $match: { status: 'completed', user: { $ne: null }, kind: { $exists: false } } },
+		{ $group: { _id: { user: '$user', title: '$title' }, n: { $sum: 1 }, first: { $min: { $ifNull: ['$endDate', 0] } }, last: { $max: { $ifNull: ['$endDate', 0] } } } },
+	]).toArray();
+	const byUser = new Map();
+	for (const r of rows) {
+		const key = map[r._id.title];
+		if (!key) continue;
+		const u = byUser.get(r._id.user) || {};
+		const f = logField(key);
+		const cur = u[f] || { completions: 0, first: Infinity, last: 0 };
+		u[f] = { completions: cur.completions + r.n, first: Math.min(cur.first, r.first || 0), last: Math.max(cur.last, r.last || 0) };
+		byUser.set(r._id.user, u);
+	}
+	let written = 0;
+	for (const [userId, log] of byUser) {
+		const max = {};
+		const min = {};
+		for (const [f, v] of Object.entries(log)) {
+			max[`questLog.${f}.completions`] = v.completions;
+			max[`questLog.${f}.lastCompletedAt`] = v.last;
+			min[`questLog.${f}.firstCompletedAt`] = v.first;
+		}
+		const res = await UserModel.collection.updateOne({ userId }, { $max: max, $min: min });
+		written += res.modifiedCount;
+	}
+	return { players: byUser.size, written };
+}
+
 /** Runs the flag-on migrations (called by bootstrap runMigrations only while the 5B flag is on). */
 async function runMigrations5b({ runOnce, log }) {
 	const crates = await runOnce('5b-legacy-fishing-crates', migrateLegacyFishingCrates);
@@ -68,8 +106,10 @@ async function runMigrations5b({ runOnce, log }) {
 	// Permits before the Founder move: the move reads the grandfathered permits.
 	const permits = await migrateBiomePermits();
 	if (permits.written > 0) log(`Migration 5b-biome-permits: ${permits.written} account(s) received their grandfathered permits.`, 'done');
+	const questLog = await runOnce('5b-quest-log', migrateQuestLog);
+	if (!questLog.skipped) log(`Migration 5b-quest-log: ${questLog.result.players} player(s) have legacy completions recorded in questLog.`, 'done');
 	const founder = await migrateFounderBiome();
 	for (const m of founder.moved) log(`Migration 5b-founder-biome: a Founder account moved from ${m.from} to ${m.to} (gate level ${m.gateLevel}).`, 'done');
 }
 
-module.exports = { migrateLegacyFishingCrates, migrateBiomePermits, migrateFounderBiome, runMigrations5b };
+module.exports = { migrateQuestLog, migrateLegacyFishingCrates, migrateBiomePermits, migrateFounderBiome, runMigrations5b };

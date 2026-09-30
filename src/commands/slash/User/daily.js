@@ -17,6 +17,8 @@ module.exports = {
      * @param {ChatInputCommandInteraction} interaction
      */
 	run: async (client, interaction, analyticsObject) => {
+		// 5B: today's daily and the week's weekly (and the streak), privately (src/class/Quests5b.js).
+		if (require('../../../engine/balance').isBalance5b()) return require('../../../class/Quests5b').daily(interaction);
 		// A daily left unfinished for 24 hours no longer blocks: it is marked failed (kept for history).
 		await expireStaleDailies(interaction.user.id);
 		// check if user already has an incomplete daily quest

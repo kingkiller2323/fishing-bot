@@ -44,6 +44,11 @@ const UserSchema = new Schema ({
 	},
 	// 5B biome permits (A-PERMITS). No default: an account without the field is grandfathered by the 5B
 	// migration (the $exists guard finds it); new 5B accounts get [] at creation.
+	// 5B quest completion log (additive): { '<kind>:<name>': { completions, firstCompletedAt, lastCompletedAt } }.
+	questLog: {
+		type: Object,
+		default: undefined,
+	},
 	// 5B Angler Upgrades (additive; absent = level 0 in every upgrade).
 	upgrades: {
 		type: Object,
@@ -68,6 +73,11 @@ const UserSchema = new Schema ({
 		},
 		lastDailyQuest: {
 			type: Number,
+		},
+		// 5B: the DCC day and the repeatable quest completions in it (the daily cap).
+		questDay: {
+			type: Object,
+			default: undefined,
 		},
 		gachaBoxesOpened: {
 			type: Number,

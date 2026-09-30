@@ -53,7 +53,8 @@ const questSchema = new Schema({
 	},
 	status: {
 		type: String,
-		enum: ['pending', 'in_progress', 'completed', 'failed'],
+		// 'expired': a 5B daily/weekly past its period (kept, never deleted).
+		enum: ['pending', 'in_progress', 'completed', 'failed', 'expired'],
 		default: 'pending',
 	},
 	daily: {
@@ -96,7 +97,20 @@ const questSchema = new Schema({
 			type: String,
 			default: 'any',
 		},
+		// 5B (additive, no defaults): only fish caught in this biome progress; only fish entries progress.
+		biome: { type: String },
+		kind: { type: String },
 	},
+	// 5B typed quests (additive, no defaults, so today's documents are unchanged): the template key, its
+	// kind (story | daily | weekly | repeatable), the period and its end (daily/weekly), the level band the
+	// terms came from, the story pity meter and the rules version.
+	key: { type: String },
+	kind: { type: String },
+	period: { type: String },
+	expiresAt: { type: Number },
+	band: { type: String },
+	pityCount: { type: Number },
+	rulesVersion: { type: String },
 	type: {
 		type: String,
 		default: 'quest',

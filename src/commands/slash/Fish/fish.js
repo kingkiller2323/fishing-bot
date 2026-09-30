@@ -182,6 +182,8 @@ module.exports = {
 
 		const result = await cast(interaction, user.id);
 		const success = result.status === 'ok';
+		// 5B: the day's daily (and the week's weekly) is issued lazily after the first successful cast of the day.
+		if (success && isBalance5b()) await require('../../../engine/b5/quests').issueDaily(user.id).catch(() => undefined);
 
 		if (process.env.ANALYTICS || config.client.analytics) {
 			await analyticsObject.setStatus(success ? 'completed' : 'failed');

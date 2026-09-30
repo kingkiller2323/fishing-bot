@@ -27,10 +27,11 @@ const rods5b = require('./b5/rods');
 const world5b = require('./b5/world');
 const bait5b = require('./b5/bait');
 const upgrades5b = require('./b5/upgrades');
+const quests5b = require('./b5/quests');
 const { resolveModifiers5b } = require('./b5/modifiers');
 const { rollFishCount } = require('./b5/multicatch');
 const { LEGACY_ONLY } = require('./b5/catalog');
-const { fallbackTemplate, questMatches, rewardBreakdown, failure, capitalize, plain, POND_WARNING_AT, NoCatchError, MAX_DRAW_ATTEMPTS } = require('./cast');
+const { fallbackTemplate, rewardBreakdown, failure, capitalize, plain, POND_WARNING_AT, NoCatchError, MAX_DRAW_ATTEMPTS } = require('./cast');
 
 /**
  * Share of Lucky rolls that are catalog items (P-LUCKY): the item rate per draw stays at the Normal base
@@ -44,7 +45,7 @@ function luckyItemShare(table) {
 }
 
 /** Today's draw (cast.js drawTemplates) with the pinned Lucky item share. */
-async function drawTemplates5b({ draws, qualities, table, guarantee = null, biome, weather, season }) {
+async function drawTemplates5b({ draws, qualities, table, guarantee = null, biome, weather, season, questForce = null }) {
 	const catalog = await FishTemplate.find({ biome, weather: { $in: [weather, 'all'] }, season: { $in: [season, 'all'] }, user: null });
 	const matches = (t) => qualities.some((c) => (t?.qualities || []).includes(c));
 	const itemShare = luckyItemShare(table);
@@ -52,6 +53,12 @@ async function drawTemplates5b({ draws, qualities, table, guarantee = null, biom
 	const picked = [];
 	for (let i = 0; i < draws; i++) {
 		let template = null;
+		// Quest pity (P-QUESTS-PITY) on the first draw: the chased species, or a Lucky FISH of this biome;
+		// never the Lucky item branch. Falls through to the normal draw when nothing forced is catchable.
+		if (i === 0 && questForce) {
+			const forced = catalog.filter((t) => (questForce.forces === 'species' ? t.name.toLowerCase() === questForce.species : t.rarity === 'Lucky' && t.type === 'fish')).filter(matches);
+			if (forced.length) template = rng.pick(forced);
+		}
 		for (let attempt = 0; attempt < MAX_DRAW_ATTEMPTS && !template; attempt++) {
 			const restrict = i === 0 && guarantee ? guarantee : null;
 			const drawn = capitalize(roll(table, rng, restrict));
@@ -153,9 +160,14 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const draws = rollFishCount(modifiers.multi.chance, rng);
 	const perDraw = 1;
 
+	// Quests (b5/quests.js): expired dailies/weeklies are set aside; the story pity may force the first draw.
+	const questDocs = (await QuestData.find({ user: String(userId), status: 'in_progress' })).map(plain);
+	const { states: questStates, expired: questsExpired } = quests5b.prepare(questDocs, now.getTime());
+	const questForce = quests5b.questPityForce(questStates, biome);
+
 	let templates;
 	try {
-		templates = await drawTemplates5b({ draws, qualities, table: pity.table, guarantee: pity.guarantee, biome, weather, season });
+		templates = await drawTemplates5b({ draws, qualities, table: pity.table, guarantee: pity.guarantee, biome, weather, season, questForce });
 	}
 	catch (error) {
 		if (error.code !== 'NO_CATCH') throw error;
@@ -223,31 +235,26 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const baitUsed = baitSaved ? 0 : bait5b.unitsUsed(baitSrc);
 	const baitAfter = bait ? Math.max(0, (bait.count || 0) - baitUsed) : null;
 
-	const questDocs = (await QuestData.find({ user: String(userId), status: 'in_progress' })).map(plain);
 	const rodName = (rod.name || '').toLowerCase();
-	const questStates = questDocs.map((q) => ({ doc: q, progress: q.progress || 0, completed: false, touched: false }));
-	for (const entry of catches) {
-		for (const state of questStates) {
-			if (state.completed) continue;
-			const { found, progresses } = questMatches(state.doc, entry, rodName);
-			if (!found) continue;
-			state.touched = true;
-			if (progresses) state.progress += entry.count;
-			if (state.progress >= (state.doc.progressMax || 1)) state.completed = true;
-		}
-	}
+	quests5b.advance(questStates, catches, { rodName, luck: modifiers.stats.luck });
 	const quests = [];
 	let questXp = 0;
 	let questCash = 0;
-	for (const state of questStates.filter((s) => s.touched && (s.completed || s.progress !== (s.doc.progress || 0)))) {
+	const questBox = await quests5b.boxId();
+	for (const state of questStates.filter((s) => s.touched && (s.completed || s.progress !== (s.doc.progress || 0) || s.pityAfter !== s.pityBefore))) {
 		const q = state.doc;
-		const xp = state.completed ? Math.floor((q.xp || 0) * modifiers.quest.xp) : 0;
-		const cash = state.completed ? Math.floor((q.cash || 0) * modifiers.quest.cash) : 0;
-		const xpBase = state.completed ? Math.floor((q.xp || 0) * modifiers.quest.xpWithoutProfile) : 0;
-		const cashBase = state.completed ? Math.floor((q.cash || 0) * modifiers.quest.cashWithoutProfile) : 0;
+		const { terms } = state;
+		const xp = state.completed ? Math.floor(terms.xp * modifiers.quest.xp) : 0;
+		const cash = state.completed ? Math.floor(terms.cash * modifiers.quest.cash) : 0;
+		const xpBase = state.completed ? Math.floor(terms.xp * modifiers.quest.xpWithoutProfile) : 0;
+		const cashBase = state.completed ? Math.floor(terms.cash * modifiers.quest.cashWithoutProfile) : 0;
 		const rewards = [];
 		if (state.completed) {
-			for (const rewardId of (q.reward || []).filter(Boolean)) {
+			const ids = (q.reward || []).filter(Boolean).map(String);
+			// A legacy story completion also gets the chapter's boxes it lacks (the greater of stored and current).
+			const missingBoxes = terms.legacy && questBox ? Math.max(0, (terms.storyBoxes || 0) - ids.filter((id) => id === String(questBox)).length) : 0;
+			for (let b = 0; b < missingBoxes; b++) ids.push(String(questBox));
+			for (const rewardId of ids) {
 				const template = await Item.findById(rewardId).select('name').lean();
 				if (!template) continue;
 				const grant = { key: `${castId}:quest:${q._id}:${rewards.length}`, templateId: String(rewardId), count: 1, newId: new ObjectId().toString(), reason: 'quest' };
@@ -258,10 +265,12 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		questXp += xp;
 		questCash += cash;
 		quests.push({
-			questId: String(q._id), title: q.title, before: q.progress || 0, after: state.progress, max: q.progressMax, completed: state.completed, xp, cash, rewards,
+			questId: String(q._id), title: q.title, key: terms.key, kind: terms.kind, before: q.progress || 0, after: state.progress, max: terms.progressMax, completed: state.completed, xp, cash, rewards,
 			reward: { xp: { base: xpBase, profileBonus: xp - xpBase, final: xp }, cash: { base: cashBase, profileBonus: cash - cashBase, final: cash } },
+			...(terms.pity ? { pityBefore: state.pityBefore, pityAfter: state.pityAfter } : {}),
 		});
 	}
+	const questLog = quests5b.completionLog(questStates, user, now.getTime());
 
 	const xpTotal = catchXp + questXp;
 	const cashTotal = questCash;
@@ -308,6 +317,9 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		rewards: rewardBreakdown({ catches, catchXp, catchXpWithoutProfile, quests }),
 		cash: { quest: questCash, total: cashTotal },
 		quests,
+		...(questsExpired.length ? { questsExpired } : {}),
+		...(questLog.keys.length ? { questLog } : {}),
+		...(questForce ? { questPity: questForce } : {}),
 		level: {
 			before: levelBefore, after: levelAfter, levelUp: levelAfter > levelBefore,
 			public: { xpBefore: publicXpBefore, xpAfter: publicXpBefore + publicXpGain, before: publicBefore, after: publicAfter, levelUp: publicAfter > publicBefore },

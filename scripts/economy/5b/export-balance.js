@@ -87,6 +87,25 @@ function speciesData(F, world) {
 	return { species, mountainStream: { level: F.BIOME_LEVEL['Mountain Stream'], donorBiome: DONOR_BIOME, species: rows } };
 }
 
+/** The engine's quest catalog from the quests model (report().catalog, PARAMS). */
+function questData(quests, F = require('./framework')) {
+	const r = quests.report();
+	const P = quests.PARAMS;
+	const band = (b) => ({ band: b.band, minLevel: b.minLevel, offered: b.offered, progressMax: b.progressMax, xp: b.xp, cash: b.cash, boxes: b.boxes, progressType: b.progressType });
+	const pity = (p) => (p ? { softStart: p.softStart, rampPerPoint: p.rampPerPoint, maxBonus: p.maxBonus, hard: p.hard } : null);
+	return {
+		rulesVersion: 'quests-5b',
+		boxName: P.daily.boxName,
+		repeatable: { cooldownHours: P.repeatable.cooldownHours, dailyCap: P.repeatable.dailyCap, maxActive: P.repeatable.maxActive },
+		weeklyUnlockLevel: F.BIOME_LEVEL[P.weekly.unlockBiome],
+		legacyMap: { ...P.legacyMap },
+		retiredTitles: [...P.retiredDailyTitles],
+		templates: r.catalog.map((c) => (c.kind === 'story'
+			? { key: c.key, title: c.title, kind: c.kind, legacyTitle: c.legacyTitle || null, description: c.description, requirements: c.requirements, progressMax: c.progressMax, progressType: c.progressType, xp: c.xp, cash: c.cash, boxes: c.boxes, pity: pity(c.pity), pityForces: c.pity ? (c.progressType.fish[0] !== 'any' ? 'species' : 'lucky-fish') : null }
+			: { key: c.key, title: c.title, kind: c.kind, description: c.description, requirements: c.requirements, bands: c.bands.map(band) })),
+	};
+}
+
 const pick = (o, keys) => Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]]));
 
 /** The 5B balance data, from the modules. */
@@ -226,6 +245,14 @@ function build() {
 			licenses: aquarium.licenses().map((l) => pick(l, ['name', 'water', 'tier', 'prerequisite', 'level', 'tanks', 'tankSize', 'capacity', 'companionSlots', 'price'])),
 			display: { ...pick(aquarium.PARAMS.display, ['requires', 'perWaterType', 'tankSize']), prices: aquarium.displayTanks().tanks.map((t) => t.price) },
 		},
+
+		// The DCC day (P-DAY): one boundary for daily quests and the streak.
+		day: { startUtcHour: F.DAY.startUtcHour, week: 'iso' },
+
+		// Typed quests (P-QUESTS-*): the whole 5B quest catalog lives here (never written into today's catalog
+		// rows): kinds, per-band terms of daily/weekly/repeatable templates, story chapters with their pity,
+		// repeatable limits, the legacy title map and the retired legacy dailies.
+		quests: questData(require('./quests')),
 
 		// Read-time overlay of EXISTING catalog rows while the 5B flag is on (stored rows are never rewritten):
 		// fields per row name.

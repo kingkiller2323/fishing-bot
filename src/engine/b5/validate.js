@@ -40,6 +40,21 @@ async function mountainStreamProblems() {
 	return problems;
 }
 
+/** Quests: one template of every kind; the Daily Box exists; every species target is a catalog fish. */
+async function questProblems() {
+	const problems = [];
+	const q = need5b().quests;
+	for (const kind of ['story', 'daily', 'weekly', 'repeatable']) if (!q.templates.some((t) => t.kind === kind)) problems.push(`quests: no ${kind} template`);
+	const { Item } = require('../../schemas/ItemSchema');
+	if (!await Item.exists({ name: q.boxName, user: null })) problems.push(`quests: reward box "${q.boxName}" missing`);
+	const names = new Set((await Fish.find({ user: null }).select('name').lean()).map((f) => f.name.toLowerCase()));
+	for (const t of q.templates.filter((x) => x.kind === 'story')) {
+		const missing = (t.progressType.fish || []).filter((n) => n !== 'any' && !names.has(n));
+		if (missing.length) problems.push(`quests: ${t.key} targets unknown species ${missing.join(', ')}`);
+	}
+	return problems;
+}
+
 /** Returns a list of problems (empty = the 5B release can run on this database). */
 async function validate5b() {
 	const problems = [];
@@ -47,6 +62,7 @@ async function validate5b() {
 	const missing = value5b.missingValueData(fish);
 	if (missing.length > 0) problems.push(`5B value data missing for ${missing.length} species: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}`);
 	problems.push(...await mountainStreamProblems());
+	problems.push(...await questProblems());
 	return problems;
 }
 

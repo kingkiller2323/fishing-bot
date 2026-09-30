@@ -427,7 +427,13 @@ async function writeCast(result, { session, fault }) {
 	for (const q of result.quests) {
 		const set = { progress: q.after, updatedAt: now };
 		if (q.completed) Object.assign(set, { status: 'completed', endDate: now.getTime() });
+		// 5B story pity meter (present only on 5B journals).
+		if (Number.isFinite(q.pityAfter)) set.pityCount = q.pityAfter;
 		await QuestData.collection.updateOne({ _id: oid(q.questId), ...notApplied(castId) }, { $set: set, $push: guardPush(castId) }, opts);
+	}
+	// 5B: dailies/weeklies past their period are marked expired (guarded on in_progress; documents kept).
+	if (result.questsExpired?.length) {
+		await QuestData.collection.updateMany({ _id: { $in: result.questsExpired.map(oid) }, status: 'in_progress' }, { $set: { status: 'expired', endDate: now.getTime(), updatedAt: now } }, opts);
 	}
 
 	await fault('pond');
@@ -468,6 +474,17 @@ async function writeCast(result, { session, fault }) {
 	const max = { level: result.level.after, levelFloor: result.level.after };
 	if (Number.isFinite(result.level.public?.after)) max.publicLevelFloor = result.level.public.after;
 	const update = { $inc: inc, $set: set, $max: max, $push: { 'inventory.fish': { $each: fishIds }, ...guardPush(castId) } };
+	// 5B quest completion log (present only on 5B journals): completions, first/last completion, the daily
+	// repeatable count. Part of the atomic commit.
+	if (result.questLog?.keys?.length) {
+		update.$min = {};
+		for (const k of result.questLog.keys) {
+			inc[`questLog.${k}.completions`] = (inc[`questLog.${k}.completions`] || 0) + 1;
+			max[`questLog.${k}.lastCompletedAt`] = result.questLog.at;
+			update.$min[`questLog.${k}.firstCompletedAt`] = result.questLog.at;
+		}
+		if (result.questLog.questDay) set['stats.questDay'] = result.questLog.questDay;
+	}
 	if (result.bait?.depleted) {
 		set['inventory.equippedBait'] = null;
 		update.$pull = { 'inventory.baits': oid(result.bait.id) };

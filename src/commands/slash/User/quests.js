@@ -16,6 +16,7 @@ module.exports = {
      * @param {ChatInputCommandInteraction} interaction
      */
 	run: async (client, interaction, analyticsObject) => {
+		if (require('../../../engine/balance').isBalance5b()) return require('../../../class/Quests5b').questsView(interaction);
 		try {
 			const embeds = [];
 			const quests = await QuestData.find({ status: 'in_progress', user: interaction.user.id });
