@@ -44,6 +44,11 @@ const UserSchema = new Schema ({
 	},
 	// 5B biome permits (A-PERMITS). No default: an account without the field is grandfathered by the 5B
 	// migration (the $exists guard finds it); new 5B accounts get [] at creation.
+	// 5B Angler Upgrades (additive; absent = level 0 in every upgrade).
+	upgrades: {
+		type: Object,
+		default: undefined,
+	},
 	permits: {
 		type: [{ _id: false, biome: String, source: String, acquiredAt: Date, pricePaid: Number }],
 		default: undefined,

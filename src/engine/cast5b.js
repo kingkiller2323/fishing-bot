@@ -26,6 +26,7 @@ const value5b = require('./b5/value');
 const rods5b = require('./b5/rods');
 const world5b = require('./b5/world');
 const bait5b = require('./b5/bait');
+const upgrades5b = require('./b5/upgrades');
 const { resolveModifiers5b } = require('./b5/modifiers');
 const { rollFishCount } = require('./b5/multicatch');
 const { LEGACY_ONLY } = require('./b5/catalog');
@@ -136,6 +137,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const baitSrc = bait5b.baitSource(bait, biome, gateLevel);
 	const modifiers = resolveModifiers5b({
 		profile, rod: rodProfile, bait: baitSrc, buffs: buffEffects(activeBuffs), event: activeEvent(now), user: plain(user), now,
+		extraSources: [upgrades5b.upgradeSource(user)].filter(Boolean),
 	});
 	base.competitiveEligible = modifiers.competitiveEligible;
 
@@ -215,7 +217,10 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		? { durability: rod.durability, state: rod.state, fishCaught: (rod.fishCaught || 0) + units }
 		: { durability: Math.max(0, (rod.durability || 0) - durabilityCost), state: rodState, fishCaught: (rod.fishCaught || 0) + units };
 	if (!rodProfile.unbreakable && rodAfter.durability <= 0) rodAfter.state = 'broken';
-	const baitUsed = bait5b.unitsUsed(baitSrc);
+	// Bait Conservation: one roll per bait use; on success the unit is not used up (the bait still applied).
+	const baitSave = upgrades5b.upgradeStats(user).baitSave || 0;
+	const baitSaved = bait5b.unitsUsed(baitSrc) > 0 && baitSave > 0 && rng.random() < baitSave;
+	const baitUsed = baitSaved ? 0 : bait5b.unitsUsed(baitSrc);
 	const baitAfter = bait ? Math.max(0, (bait.count || 0) - baitUsed) : null;
 
 	const questDocs = (await QuestData.find({ user: String(userId), status: 'in_progress' })).map(plain);
@@ -287,7 +292,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		rod: { id: String(rod._id), name: rod.name, type: rod.type, kind: rodProfile.kind, unbreakable: rodProfile.unbreakable, capabilities: rod.capabilities || [], before: { durability: rod.durability, state: rod.state, fishCaught: rod.fishCaught || 0 }, after: rodAfter, durabilityCost },
 		bait: bait
 			? {
-				id: String(bait._id), name: bait.name, applied: baitSrc.applied, consumed: baitUsed, before: { count: bait.count }, after: { count: baitAfter }, depleted: baitUsed > 0 && baitAfter === 0,
+				id: String(bait._id), name: bait.name, applied: baitSrc.applied, consumed: baitUsed, ...(baitSaved ? { saved: true } : {}), before: { count: bait.count }, after: { count: baitAfter }, depleted: baitUsed > 0 && baitAfter === 0,
 				...(baitSrc.reason === 'level' ? { levelLocked: true, requiredLevel: baitSrc.requiredLevel } : {}),
 				...(baitSrc.reason === 'biome' ? { wrongBiome: true } : {}),
 			}
