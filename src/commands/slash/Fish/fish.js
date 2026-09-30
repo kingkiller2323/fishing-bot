@@ -77,7 +77,15 @@ const followUpMessage = async (interaction, user, result) => {
 		// Public level-ups only: the card shows base XP, so the level it announces must come from base XP
 		// too (a Founder's real level rises faster and would contradict the XP on the card).
 		if (result.level.public.levelUp) {
-			fields.push({ name: '⭐ Level up!', value: `You reached level **${result.level.public.after}**.` });
+			let value = `You reached level **${result.level.public.after}**.`;
+			// 5B: name the biome the new level opens and its permit (the public level is every player's gate
+			// level except a Founder's, whose gate IS its public level).
+			if (isBalance5b()) {
+				for (const u of require('../../../engine/b5/world').unlockedBetween(result.level.public.before, result.level.public.after)) {
+					value += `\n🗺️ ${u.biome} unlocked · ${u.price ? `permit $${u.price.toLocaleString()}` : 'free'} · /biome`;
+				}
+			}
+			fields.push({ name: '⭐ Level up!', value });
 		}
 
 		if (rodState === 'broken') {

@@ -3,11 +3,13 @@
 // A rod or bait whose `requirements.level` is above the player's level cannot be bought, crafted or
 // equipped, and an equipped bait above the player's level has no effect at cast time and is not
 // consumed. Every gate reads gateLevelOf: keyed on identity (FOUNDER_IDS), never on a /dev founder profile
-// override, so an override cannot change what an account may access (P-FOUNDER-DEV-OVERRIDE). Today both
-// branches are the real level (max(levelFloor, curve(xp))); step C switches the Founder branch to the
-// public level together with P-FOUNDER-GATE's biome migration. Equipped gear is never unequipped by a gate.
+// override, so an override cannot change what an account may access (P-FOUNDER-DEV-OVERRIDE). With the 5B
+// release off both branches are the real level (max(levelFloor, curve(xp))); with it on, a real Founder's gate
+// is its public level (P-FOUNDER-GATE, with the P-FOUNDER-MIGRATION biome move). Equipped gear is never
+// unequipped by a gate.
 const { levelOf } = require('./levels');
-const { isFounderId } = require('./balance');
+const { isFounderId, isBalance5b } = require('./balance');
+const { publicLevelOf } = require('./publicLevel');
 
 /** The level an item requires (0 when it has none). Works for mongoose documents and plain objects. */
 function requiredLevel(item) {
@@ -22,8 +24,11 @@ function meetsLevelRequirement(level, item) {
 	return (Number(level) || 0) >= requiredLevel(item);
 }
 
-/** A real Founder's gate level. The step C switch point (P-FOUNDER-GATE: public level); the real level until then. */
-const founderGateLevel = (userDoc) => levelOf(userDoc);
+/**
+ * A real Founder's gate level (P-FOUNDER-GATE): the public level while the 5B release is on (so every gate a
+ * Founder meets is a Normal player's at the same public level), today's real level otherwise.
+ */
+const founderGateLevel = (userDoc) => (isBalance5b() ? publicLevelOf(userDoc) : levelOf(userDoc));
 
 /**
  * The level every gate compares against. Decided by identity (FOUNDER_IDS) only: devOverrides.profile

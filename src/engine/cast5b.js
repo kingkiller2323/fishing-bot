@@ -24,6 +24,7 @@ const { levelOf, levelWithFloor } = require('./levels');
 const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
 const value5b = require('./b5/value');
 const rods5b = require('./b5/rods');
+const world5b = require('./b5/world');
 const { resolveModifiers5b } = require('./b5/modifiers');
 const { rollFishCount } = require('./b5/multicatch');
 const { LEGACY_ONLY } = require('./b5/catalog');
@@ -110,6 +111,12 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 
 	if (!user) return failure(base, 'NO_USER', 'Player not found.');
 
+	// Access guard (A-PERMITS) before anything else: no roll, durability, bait, pity or pond effect.
+	const gateLevel = levelOfUserDoc(user);
+	if (!world5b.canFish(gateLevel, user.permits, user.currentBiome || 'ocean')) {
+		return failure(base, 'BIOME_LOCKED', `You can't fish the ${world5b.canonBiome(user.currentBiome) || capitalize(user.currentBiome || 'ocean')} yet. Use /biome to pick a biome you have access to.`);
+	}
+
 	const pond = channelId ? await Pond.findOne({ id: channelId }) : null;
 	if (pond && pond.count <= 0) return failure(base, 'POND_EMPTY', 'The pond is empty!');
 
@@ -127,7 +134,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const bait = baitLocked ? null : equippedBait;
 
 	const biomeKey = (user.currentBiome || 'ocean').toLowerCase();
-	const biome = capitalize(biomeKey);
+	const biome = world5b.canonBiome(biomeKey) || capitalize(biomeKey);
 	const weatherPattern = await WeatherPattern.getCurrentWeather();
 	const weather = capitalize(await weatherPattern.getWeather());
 	const season = (await Season.getCurrentSeason())?.season;

@@ -63,8 +63,8 @@ test('flag off: castLine and applyCastResult are identical with BALANCE_5B unset
 	assert.ok(unset.users[0].xp > 0 && unset.users[1].xp > unset.users[0].xp, 'normal and Founder players both progressed');
 	assert.deepEqual(off, unset);
 	assert.deepEqual(junk, unset);
-	// Flag on: the 5B engine decides the casts. Its value model has no data for the test-pool species, so
-	// it refuses them (never a guessed value) and nothing is written.
-	assert.ok(on.casts.every((c) => c.error === 'NO_VALUE_DATA'), 'the 5B engine never prices a species without value data');
+	// Flag on: the 5B engine decides the casts. The test pool is not a 5B biome (and its species have no 5B
+	// value data), so every cast is refused before any roll and nothing is written.
+	assert.ok(on.casts.every((c) => c.error === 'NO_VALUE_DATA' || c.failure?.code === 'BIOME_LOCKED'), 'the 5B engine refuses the test pool');
 	assert.ok(on.users.every((u) => !u.xp), 'nothing was awarded');
 });

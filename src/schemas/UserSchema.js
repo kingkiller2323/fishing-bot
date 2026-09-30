@@ -42,6 +42,12 @@ const UserSchema = new Schema ({
 		type: String,
 		default: 'ocean',
 	},
+	// 5B biome permits (A-PERMITS). No default: an account without the field is grandfathered by the 5B
+	// migration (the $exists guard finds it); new 5B accounts get [] at creation.
+	permits: {
+		type: [{ _id: false, biome: String, source: String, acquiredAt: Date, pricePaid: Number }],
+		default: undefined,
+	},
 	stats: {
 		fishCaught: {
 			type: Number,

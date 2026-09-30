@@ -26,8 +26,11 @@ test('bootstrap seeds a fresh database and passes validation', async () => {
 	const c = await counts();
 	assert.equal(c.weathertypes, 5);
 	assert.equal(c.seasons, 4);
-	assert.equal(c.biomes, 6);
-	assert.equal(c.fish, 178);
+	// Today's world plus the hidden 5B Mountain Stream (biome row and its 22 new species; release '5b').
+	assert.equal(await mongoose.connection.db.collection('biomes').countDocuments({ release: { $exists: false } }), 6);
+	assert.equal(await mongoose.connection.db.collection('fish').countDocuments({ release: { $exists: false } }), 178);
+	assert.equal(c.biomes, 7);
+	assert.equal(c.fish, 200);
 	// Today's 53 catalog items plus the hidden 5B rows (6 standard rods, 4 tackle crates; release '5b', unlisted).
 	assert.equal(await mongoose.connection.db.collection('items').countDocuments({ release: { $exists: false } }), 53);
 	assert.equal(await mongoose.connection.db.collection('items').countDocuments({ release: '5b', shopItem: false }), 10);

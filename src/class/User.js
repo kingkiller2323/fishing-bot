@@ -635,6 +635,8 @@ class User {
 		const user = new User(data);
 		await user.sendToInventory(rod._id);
 		await user.setEquippedRod((await user.getInventory()).rods[0]);
+		// 5B: a new account holds no permits (Ocean is free); the field marks it as not to be grandfathered.
+		if (require('../engine/balance').isBalance5b()) await UserSchema.collection.updateOne({ userId, permits: { $exists: false } }, { $set: { permits: [] } });
 	
 		return await UserSchema.findOne({ userId: userId });
 	};

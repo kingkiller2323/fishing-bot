@@ -153,7 +153,9 @@ async function validate() {
 	const weatherNames = new Set((await WeatherType.find({ type: 'weather' }).lean()).map((w) => w.weather));
 	const seasons = await SeasonSchema.find({ type: 'season' }).lean();
 	const seasonNames = new Set(seasons.map((s) => s.season));
-	const biomeNames = new Set((await Biome.find({}).lean()).map((b) => b.name));
+	// Today's world: rows added by the 5B release (Mountain Stream) are validated by validate5b only.
+	const { LEGACY_ONLY } = require('../engine/b5/catalog');
+	const biomeNames = new Set((await Biome.find(LEGACY_ONLY).lean()).map((b) => b.name));
 
 	const activeSeasons = seasons.filter((s) => s.active);
 	if (activeSeasons.length !== 1) problems.push(`expected exactly 1 active season, found ${activeSeasons.length}`);
@@ -162,7 +164,7 @@ async function validate() {
 		if (unknown.length > 0) problems.push(`season ${season.season} references unknown weather type(s): ${unknown.join(', ')}`);
 	}
 
-	const fish = await Fish.find(CATALOG).select('name rarity biome weather season qualities').lean();
+	const fish = await Fish.find({ ...CATALOG, ...LEGACY_ONLY }).select('name rarity biome weather season qualities').lean();
 	const badFish = fish.filter((f) => !biomeNames.has(f.biome)
 		|| (f.weather !== 'all' && !weatherNames.has(f.weather))
 		|| (f.season !== 'all' && !seasonNames.has(f.season)));

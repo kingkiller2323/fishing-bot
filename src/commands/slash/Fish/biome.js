@@ -4,6 +4,56 @@ const { User } = require('../../../class/User');
 const { Interaction } = require('../../../class/Interaction');
 const config = require('../../../config');
 const { Icons } = require('../../../class/Icons');
+const { isBalance5b } = require('../../../engine/balance');
+const { visibleCatalog } = require('../../../engine/b5/catalog');
+
+/**
+ * 5B /biome: every biome with its status for the player ("Open", "Permit $X", "Requires Lv N"). Selecting an
+ * open biome switches to it; a biome whose level is reached but whose permit is missing offers a private
+ * "Buy permit" button (engine/b5/permitOps: one guarded write), then switches.
+ */
+/** One field write (a whole-document save could overwrite a concurrent cast). */
+const setBiome = (userId, name) => require('../../../schemas/UserSchema').User.updateOne({ userId: String(userId) }, { $set: { currentBiome: name } });
+
+async function run5b(interaction, user) {
+	const world = require('../../../engine/b5/world');
+	const { buyPermit } = require('../../../engine/b5/permitOps');
+	const { ButtonBuilder, ButtonStyle } = require('discord.js');
+	const userData = new User(await User.get(user.id));
+	const level = await userData.getGateLevel();
+	const permits = userData.user.permits || [];
+	const biomes = (await Biome.find(visibleCatalog()).lean()).filter((b) => world.canonBiome(b.name));
+	biomes.sort((a, b) => world.biomeLevel(a.name) - world.biomeLevel(b.name));
+	const describe = (b) => ({ open: 'Open', permit: `Permit $${world.permitPrice(b.name).toLocaleString()}`, level: `Requires Lv ${world.biomeLevel(b.name)}` })[world.biomeStatus(level, permits, b.name)];
+	const select = new StringSelectMenuBuilder().setCustomId('switch-biome').setPlaceholder('Make a selection!').addOptions(biomes.map((b) => new StringSelectMenuOptionBuilder().setLabel(b.name).setDescription(describe(b)).setEmoji(Icons.component(b)).setValue(b.name)));
+	const response = await interaction.reply({ content: 'Which biome would you like to switch to?', components: [new ActionRowBuilder().addComponents(select)], flags: MessageFlags.Ephemeral, fetchReply: true });
+	const collector = response.createMessageComponentCollector({ filter: (i) => i.user.id === user.id, time: 60_000 });
+	collector.on('collect', async (i) => {
+		const fresh = await User.get(user.id);
+		const gate = await new User(fresh).getGateLevel();
+		if (i.customId === 'switch-biome') {
+			const name = i.values[0];
+			const status = world.biomeStatus(gate, fresh.permits || [], name);
+			if (status === 'open') {
+				await setBiome(user.id, name);
+				return i.update({ content: `You switched to the **${name}**!`, components: [] });
+			}
+			if (status === 'level') return i.update({ content: `The ${name} opens at Lv ${world.biomeLevel(name)}. You are Lv ${gate}.`, components: [] });
+			const buy = new ButtonBuilder().setCustomId(`buy-permit:${name}`).setLabel(`Buy permit ($${world.permitPrice(name).toLocaleString()})`).setStyle(ButtonStyle.Success);
+			return i.update({ content: `The ${name} needs a one-time permit: $${world.permitPrice(name).toLocaleString()}. It never expires.`, components: [new ActionRowBuilder().addComponents(buy)] });
+		}
+		if (i.customId.startsWith('buy-permit:')) {
+			const name = i.customId.slice('buy-permit:'.length);
+			const result = await buyPermit(user.id, name);
+			if (!result.ok) return i.update({ content: result.message, components: [] });
+			await setBiome(user.id, name);
+			return i.update({ content: `🎫 You bought the ${name} permit for $${result.price.toLocaleString()} and switched to the **${name}**!`, components: [] });
+		}
+	});
+	collector.on('end', async () => {
+		await interaction.editReply({ components: [] }).catch(() => undefined);
+	});
+}
 
 module.exports = {
 	structure: new SlashCommandBuilder()
@@ -19,7 +69,9 @@ module.exports = {
 	async run(client, interaction, analyticsObject, user = null) {
 		if (user === null) user = interaction.user;
 
-		const biomes = await Biome.find({});
+		if (isBalance5b()) return run5b(interaction, user);
+		// Rows added by the 5B release (Mountain Stream) are not part of today's world.
+		const biomes = await Biome.find(visibleCatalog());
 		
 		// sort biomes by level requirement
 		biomes.sort((a, b) => {
