@@ -36,7 +36,8 @@ module.exports = {
 			// 	return;
 			// }
 
-			const catchFish = (await userData.getFish()).filter(fish => fish.castId === catchKey || (catchKey !== '0' && fish.catchId != null && String(fish.catchId) === catchKey));
+			// The public catch only: a 5B Founder's private fish (same cast) are never sold or totalled here.
+			const catchFish = (await userData.getFish()).filter(fish => fish.private !== true && (fish.castId === catchKey || (catchKey !== '0' && fish.catchId != null && String(fish.catchId) === catchKey)));
 			const { allowed: fishArray, protected: lockedFish } = partitionProtected(catchFish);
 
 			if (fishArray.length === 0 && lockedFish.length > 0) {

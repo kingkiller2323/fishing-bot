@@ -162,7 +162,14 @@ async function repairRod(userId, rodId) {
 			await UserModel.collection.updateOne({ userId: String(userId) }, { $inc: { 'inventory.money': cost } });
 			return refuse('NOT_BROKEN', 'Your rod is no longer broken; you were not charged.');
 		}
-		return { ok: true, cost, durability: profile.maxDurability };
+		// Founder (P-FOUNDER-HYBRID): a private rebate of part of every repair; the public reply shows the normal cost.
+		let rebate = 0;
+		const owner = await userDoc(userId);
+		if (require('../balance').resolveProfile(userId, owner).name === 'founder') {
+			rebate = Math.round(cost * need5b().founder.repairRebate);
+			if (rebate > 0) await UserModel.collection.updateOne({ userId: String(userId) }, { $inc: { 'inventory.money': rebate } });
+		}
+		return { ok: true, cost, rebate, durability: profile.maxDurability };
 	});
 }
 

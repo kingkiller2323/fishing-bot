@@ -202,6 +202,12 @@ module.exports = {
 
 		const followUp = await followUpMessage(interaction, user, result);
 
+		// 5B Founder: the private reward rolls are delivered in an ephemeral follow-up, never on the public card.
+		if (success && result.private?.catches?.length) {
+			const lines = result.private.catches.map((c) => `${Icons.of(c)} ${c.name} · ${c.rarity}`);
+			await interaction.followUp({ content: `🔒 Private rewards: ${lines.join(', ')}\n-# +${result.private.xp.final.toLocaleString()} XP · fish value $${result.private.value.final.toLocaleString()}`.slice(0, 1900), flags: MessageFlags.Ephemeral }).catch(() => undefined);
+		}
+
 		if (success && result.pond?.warn) {
 			await interaction.followUp({
 				embeds: [

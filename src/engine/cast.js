@@ -463,7 +463,8 @@ async function writeCast(result, { session, fault }) {
 		inc[key] = (inc[key] || 0) + c.count;
 	}
 	const set = {
-		'stats.latestFish': fishIds,
+		// The catch card's Sell button sells the PUBLIC catch only (a 5B Founder's private fish are never on it).
+		'stats.latestFish': result.private ? result.catches.filter((c) => c.kind === 'fish').map((c) => oid(c.id)) : fishIds,
 		'stats.soldLatestFish': false,
 		'pity.castsSinceLegendary': result.pity.after.castsSinceLegendary,
 		'pity.castsSinceLucky': result.pity.after.castsSinceLucky,

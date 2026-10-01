@@ -14,7 +14,7 @@ const { WeatherPattern } = require('../class/WeatherPattern');
 const { Season } = require('../class/Season');
 const { rng } = require('./rng');
 const { BALANCE_VERSION_5B, XP_PER_FISH, NORMAL_RARITY_TABLE, resolveProfile, activeEvent, need5b } = require('./balance');
-const { applyPity, roll, toPercent, normalize } = require('./rarity');
+const { applyPity, roll, toPercent, normalize, buildTable } = require('./rarity');
 const { buildFishDoc, rollFishStats } = require('./rewards');
 const { publicXpOf, publicLevelOf } = require('./publicLevel');
 const { levelOf, levelWithFloor } = require('./levels');
@@ -93,6 +93,49 @@ function rollCatchXp(catches) {
 }
 
 /**
+ * The Founder's private reward rolls for one cast (P-FOUNDER-HYBRID): `rolls` draws from today's Founder rarity
+ * table with the cast's rarity stats and today's Founder pity (counters = casts since a private Legendary+ /
+ * Lucky), Lucky items pinned (P-LUCKY). Fish are stored privately (never competitive) at the private sell
+ * multiplier on their base value; XP = the rarity-weighted rolls x the private XP multiplier. Appends the fish
+ * documents and item grants to the cast's writes.
+ */
+async function founderRolls({ castId, userId, guildId, now, profile, modifiers, qualities, biome, weather, season, pityBefore, autoLockSpecies, founder, fishDocs, grants }) {
+	const table = applyPity(buildTable(profile.rarityTable, modifiers.stats), pityBefore, profile.pity);
+	const templates = await drawTemplates5b({ draws: founder.rolls, qualities, table: table.table, guarantee: table.guarantee, biome, weather, season });
+	const catches = [];
+	for (const template of templates) {
+		const t = plain(template);
+		if (t.type === 'fish') {
+			const rolled = await rollFishStats(t);
+			const rawValue = value5b.scaleRaw(rolled.rawValue, t);
+			const valueBase = Math.round(rawValue * modifiers.sell.withoutProfile);
+			const value = Math.round(rawValue * modifiers.sell.multiplier * founder.sell);
+			const id = new ObjectId().toString();
+			const locked = autoLockSpecies.includes(t.name.toLowerCase());
+			catches.push({ kind: 'fish', id, name: t.name, rarity: t.rarity, count: 1, size: rolled.size, weight: rolled.weight, value, valueBase, icon: t.icon });
+			fishDocs.push(buildFishDoc({
+				template: t, id, userId, guildId, count: 1, size: rolled.size, weight: rolled.weight, value, valueBase, locked, now,
+				meta: { castId, profile: profile.name, balanceVersion: BALANCE_VERSION_5B, competitiveEligible: false, private: true },
+			}));
+		}
+		else {
+			const grant = { key: `${castId}:private:${grants.length}`, templateId: String(t._id), count: 1, newId: new ObjectId().toString(), reason: 'private' };
+			grants.push(grant);
+			catches.push({ kind: 'item', id: grant.newId, name: t.name, rarity: t.rarity, count: 1, icon: t.icon });
+		}
+	}
+	const { base } = rollCatchXp(catches);
+	const xpBase = Math.floor(base * modifiers.xp.withoutProfile);
+	return {
+		rolls: founder.rolls,
+		catches,
+		xp: { base: xpBase, final: Math.floor(base * modifiers.xp.multiplier * founder.xp) },
+		value: { base: catches.reduce((sum, c) => sum + (c.valueBase || 0), 0), final: catches.reduce((sum, c) => sum + (c.value || 0), 0) },
+		pity: { applied: table.applied, guarantee: table.guarantee },
+	};
+}
+
+/**
  * Decides a complete cast under the 5B rules without writing to MongoDB.
  * @param {{ userId: string, guildId?: string, channelId?: string, now?: Date }} ctx
  */
@@ -148,6 +191,9 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		extraSources: [upgrades5b.upgradeSource(user), await require('./b5/aquarium').companionSource(plain(user), now.getTime())].filter(Boolean),
 	});
 	base.competitiveEligible = modifiers.competitiveEligible;
+	// The Founder stealth-hybrid (P-FOUNDER-HYBRID): the public cast above is a normal player's; the account
+	// also receives private multipliers and private reward rolls (founderPrivate below), never shown publicly.
+	const founder5b = profile.name === 'founder' ? need5b().founder : null;
 
 	const pityBefore = {
 		castsSinceLegendary: user.pity?.castsSinceLegendary || 0,
@@ -196,7 +242,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 			const { size, weight } = rolled;
 			// The 5B value: today's raw roll scaled once to the species' 5B expectation (b5/value.js).
 			const rawValue = value5b.scaleRaw(rolled.rawValue, t);
-			const value = Math.round(rawValue * modifiers.sell.multiplier);
+			const value = Math.round(rawValue * modifiers.sell.multiplier * (founder5b?.sell || 1));
 			const valueBase = Math.round(rawValue * modifiers.sell.withoutProfile);
 			const reward = { base: valueBase, profileBonus: value - valueBase, final: value };
 			const fishId = new ObjectId().toString();
@@ -220,7 +266,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	// XP: one roll per fish unit, weighted by its rarity and floored per fish; then modifiers once.
 	const { rolls: xpRolls, perFish, base: baseXp } = rollCatchXp(catches);
 	const xpMultiplier = modifiers.xp.multiplier;
-	const catchXp = Math.floor(baseXp * xpMultiplier);
+	const catchXp = Math.floor(baseXp * xpMultiplier * (founder5b?.xp || 1));
 	const catchXpWithoutProfile = Math.floor(baseXp * modifiers.xp.withoutProfile);
 
 	// Durability (P-DURABILITY): n × (1 − efficiency), stochastic rounding, no minimum. The Old Rod is unbreakable;
@@ -245,8 +291,9 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	for (const state of questStates.filter((s) => s.touched && (s.completed || s.progress !== (s.doc.progress || 0) || s.pityAfter !== s.pityBefore))) {
 		const q = state.doc;
 		const { terms } = state;
-		const xp = state.completed ? Math.floor(terms.xp * modifiers.quest.xp) : 0;
-		const cash = state.completed ? Math.floor(terms.cash * modifiers.quest.cash) : 0;
+		// The Founder's quest multipliers (P-FOUNDER-QUEST-MULT, x5 / x5) are private: the public line shows the base.
+		const xp = state.completed ? Math.floor(terms.xp * modifiers.quest.xp * (founder5b ? profile.multipliers.questXp : 1)) : 0;
+		const cash = state.completed ? Math.floor(terms.cash * modifiers.quest.cash * (founder5b ? profile.multipliers.questCash : 1)) : 0;
 		const xpBase = state.completed ? Math.floor(terms.xp * modifiers.quest.xpWithoutProfile) : 0;
 		const cashBase = state.completed ? Math.floor(terms.cash * modifiers.quest.cashWithoutProfile) : 0;
 		const rewards = [];
@@ -286,7 +333,12 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		}
 	}
 
-	const xpTotal = catchXp + questXp;
+	// Founder private layer, AFTER every public roll (so the public cast's random draws are a normal player's):
+	// the hidden reward rolls from today's Founder table and pity, their XP and value with the private
+	// multipliers. Never counted by quests, the streak, bait, pond or public stats.
+	const founderPrivate = founder5b ? await founderRolls({ castId, userId, guildId, now, profile, modifiers, qualities, biome, weather, season, pityBefore, autoLockSpecies, founder: founder5b, fishDocs, grants }) : null;
+
+	const xpTotal = catchXp + questXp + (founderPrivate?.xp.final || 0);
 	const cashTotal = questCash;
 	const levelBefore = levelOf(user);
 	const levelAfter = levelWithFloor(user.levelFloor, (user.xp || 0) + xpTotal);
@@ -295,7 +347,9 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const publicBefore = publicLevelOf(user);
 	const publicAfter = levelWithFloor(user.publicLevelFloor, publicXpBefore + publicXpGain);
 
-	const hit = (rarity) => catches.some((c) => c.rarity === rarity);
+	// Pity counters: the Founder's count its PRIVATE rolls; everyone else's the catch (no public pity applies).
+	const pityCatches = founderPrivate ? founderPrivate.catches : catches;
+	const hit = (rarity) => pityCatches.some((c) => c.rarity === rarity);
 	const pityAfter = {
 		castsSinceLegendary: hit('Legendary') || hit('Lucky') ? 0 : pityBefore.castsSinceLegendary + 1,
 		castsSinceLucky: hit('Lucky') ? 0 : pityBefore.castsSinceLucky + 1,
@@ -334,6 +388,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		...(questsExpired.length ? { questsExpired } : {}),
 		...(questLog.keys.length ? { questLog } : {}),
 		...(streak ? { streak } : {}),
+		...(founderPrivate ? { private: founderPrivate } : {}),
 		...(questForce ? { questPity: questForce } : {}),
 		level: {
 			before: levelBefore, after: levelAfter, levelUp: levelAfter > levelBefore,

@@ -275,8 +275,10 @@ class User {
 	async getInventoryValue() {
 		let totalValue = 0;
 		const fishList = await this.getFish();
+		// 5B (P-FOUNDER-WALLET): the inventory is valued on the public basis (valueBase), the same for every player.
+		const release5b = require('../engine/balance').isBalance5b();
 		fishList.forEach(async (f) => {
-			totalValue += f.value * f.count;
+			totalValue += (release5b ? (f.valueBase ?? f.value) : f.value) * f.count;
 		});
 
 		return totalValue;

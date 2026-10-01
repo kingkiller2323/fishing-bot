@@ -182,7 +182,10 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 		.filter((b) => (b.capabilities || [])[0] === 'gacha');
 	const luckyDraw = release5b ? require('./b5/buffs').luckyDrawFor(plain(user), def.name) : null;
 	const sources = [{ source: 'box', name: def.name, id: def.id }, { source: 'profile', name: profile.name, stats: { ...(profile.gacha?.stats || {}) } }];
-	const total = { ...(profile.gacha?.stats || {}) };
+	// 5B (P-FOUNDER-HYBRID boxLuck 'non-buff'): every slot first rolls a normal player's table; only a non-buff
+	// result is re-rolled with the Founder's box stats and pity over the box's non-buff pool (founderLuck below).
+	const founderLuck = release5b && profile.name === 'founder' ? profile.gacha : null;
+	const total = release5b ? {} : { ...(profile.gacha?.stats || {}) };
 	for (const buff of buffs) {
 		const bonus = (parseFloat(buff.capabilities[1]) || 1) - 1;
 		const stats = { rareFind: bonus, trophyChance: bonus, luck: bonus };
@@ -199,7 +202,7 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 
 	// Pity: box rules for everyone + profile rules; counters per box. Rules for tiers this box can
 	// never award are skipped.
-	const rules = { ...(def.pity || {}), ...(profile.gacha?.pity || {}) };
+	const rules = { ...(def.pity || {}), ...(release5b ? {} : profile.gacha?.pity || {}) };
 	const counterKey = (rule) => `${def.id}:${rule.counter}`;
 	const pityConfig = Object.fromEntries(Object.entries(rules)
 		.filter(([, rule]) => rule.tiers.some((t) => boxBase[t] > 0))
@@ -207,6 +210,19 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 	const counterMap = user.pity?.gacha instanceof Map ? Object.fromEntries(user.pity.gacha) : { ...(user.pity?.gacha || {}) };
 	const pityBefore = Object.fromEntries(Object.values(pityConfig).map((r) => [r.counter, counterMap[r.counter] || 0]));
 	const pity = applyPity(modified, pityBefore, Object.keys(pityConfig).length ? pityConfig : null);
+
+	// 5B Founder luck on non-buff slots: the non-buff pools, the Founder table over them and its own pity.
+	let founder = null;
+	if (founderLuck) {
+		const nonBuff = Object.fromEntries(RARITIES.map((r) => [r, pools[r].filter((e) => e.template.type !== 'buff')]));
+		const nbBase = baseTable(def, nonBuff);
+		const fRules = Object.fromEntries(Object.entries(founderLuck.pity || {})
+			.filter(([, rule]) => rule.tiers.some((t) => nbBase[t] > 0))
+			.map(([name, rule]) => [name, { ...rule, counter: counterKey(rule) }]));
+		const fBefore = Object.fromEntries(Object.values(fRules).map((r) => [r.counter, counterMap[r.counter] || 0]));
+		const fPity = applyPity(buildTable(nbBase, clampRarityStats({ ...(founderLuck.stats || {}) })), fBefore, Object.keys(fRules).length ? fRules : null);
+		founder = { nonBuff, rules: fRules, before: fBefore, table: fPity.table, guarantee: fPity.guarantee, rarities: [] };
+	}
 
 	// Slots.
 	const slots = [];
@@ -231,7 +247,19 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 
 		// The table only contains rarities with rewards; this guard is for corrupted definitions.
 		if (!pools[rarity]?.length) throw new GachaDefinitionError(`Box "${def.name}" rolled ${rarity} with no rewards.`);
-		const entry = pickReward(pools[rarity], taken, def);
+		let entry = pickReward(pools[rarity], taken, def);
+		if (founder && entry.template.type !== 'buff') {
+			// The normal roll was not a buff: this slot is a Founder-luck draw over the non-buff pool.
+			let ftable = founder.table;
+			if (guaranteedSlot) {
+				const masked = maskBelow(ftable, guaranteedSlot.minRarity);
+				if (RARITIES.some((r) => masked[r] > 0)) ftable = normalize(masked);
+			}
+			const fGuarantee = founder.rarities.length === 0 && founder.guarantee ? founder.guarantee.filter((t) => ftable[t] > 0) : null;
+			rarity = roll(ftable, rng, fGuarantee && fGuarantee.length ? fGuarantee : null);
+			founder.rarities.push(rarity);
+			entry = pickReward(founder.nonBuff[rarity], taken, def);
+		}
 		taken.add(String(entry.template._id));
 
 		const slot = {
@@ -248,7 +276,9 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 			const rolled = await rollFishStats(t);
 			const { size, weight } = rolled;
 			const rawValue = release5b ? require('./b5/value').scaleRaw(rolled.rawValue, t) : rolled.rawValue;
-			const sell = profile.multipliers.sell * (event?.multipliers?.sell || 1);
+			// 5B: the Founder's private sell multiplier is the hybrid's (P-FOUNDER-HYBRID); everyone else x1.
+			const profileSell = release5b ? (profile.name === 'founder' ? require('./balance').need5b().founder.sell : 1) : profile.multipliers.sell;
+			const sell = profileSell * (event?.multipliers?.sell || 1);
 			const sellBase = event?.multipliers?.sell || 1;
 			const value = Math.round(rawValue * sell);
 			const valueBase = Math.round(rawValue * sellBase);
@@ -274,6 +304,13 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 	for (const rule of Object.values(pityConfig)) {
 		const hit = slots.some((s) => rule.tiers.includes(s.rarity));
 		pityAfter[rule.counter] = hit ? 0 : (pityBefore[rule.counter] || 0) + 1;
+	}
+	// 5B Founder box pity: counts opens since a Founder-luck Legendary+ (stored with the other box counters).
+	if (founder) {
+		for (const rule of Object.values(founder.rules)) {
+			const hit = founder.rarities.some((r) => rule.tiers.includes(r));
+			pityAfter[rule.counter] = hit ? 0 : (founder.before[rule.counter] || 0) + 1;
+		}
 	}
 
 	return {

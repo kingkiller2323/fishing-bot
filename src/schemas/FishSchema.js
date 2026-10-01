@@ -110,6 +110,8 @@ const FishSchema = new Schema({
 	castId: {
 		type: String,
 	},
+	// 5B: a Founder's private reward fish (never on the public catch card or its Sell button). No default.
+	private: { type: Boolean },
 	profile: {
 		type: String,
 	},
