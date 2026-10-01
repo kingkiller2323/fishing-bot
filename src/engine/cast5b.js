@@ -28,6 +28,8 @@ const world5b = require('./b5/world');
 const bait5b = require('./b5/bait');
 const upgrades5b = require('./b5/upgrades');
 const quests5b = require('./b5/quests');
+const streak5b = require('./b5/streak');
+const day5b = require('./b5/day');
 const { resolveModifiers5b } = require('./b5/modifiers');
 const { rollFishCount } = require('./b5/multicatch');
 const { LEGACY_ONLY } = require('./b5/catalog');
@@ -272,6 +274,19 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	}
 	const questLog = quests5b.completionLog(questStates, user, now.getTime());
 
+	// Streak (P-STREAK-GATE): a successful cast counts toward today's gate; the qualifying cast credits the day
+	// and grants its box through the idempotent grant list. Persisted in the commit (writeCast).
+	let streak = null;
+	if (units > 0) {
+		const before = streak5b.readState(user);
+		const step = streak5b.onSuccessfulCast(before, day5b.dayIndex(now.getTime()));
+		streak = { before, after: step.state, credit: step.credit };
+		if (step.credit?.box) {
+			const boxRow = await Item.findOne({ name: step.credit.box, user: null }).select('_id').lean();
+			if (boxRow) grants.push({ key: `${castId}:streak`, templateId: String(boxRow._id), count: 1, newId: new ObjectId().toString(), reason: 'streak' });
+		}
+	}
+
 	const xpTotal = catchXp + questXp;
 	const cashTotal = questCash;
 	const levelBefore = levelOf(user);
@@ -319,6 +334,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 		quests,
 		...(questsExpired.length ? { questsExpired } : {}),
 		...(questLog.keys.length ? { questLog } : {}),
+		...(streak ? { streak } : {}),
 		...(questForce ? { questPity: questForce } : {}),
 		level: {
 			before: levelBefore, after: levelAfter, levelUp: levelAfter > levelBefore,

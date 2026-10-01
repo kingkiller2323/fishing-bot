@@ -254,6 +254,19 @@ function build() {
 		// repeatable limits, the legacy title map and the retired legacy dailies.
 		quests: questData(require('./quests')),
 
+		// The daily streak (P-STREAK-*): the play gate, the 7-day ladder, grace and decay, badges, the Streak Crate /
+		// Streak Chest definitions, bait packs in streak boxes, the Voter's Crate without the Old Rod, /vote retired.
+		streak: (() => {
+			const st = require('./streak');
+			const P = st.PARAMS;
+			return {
+				gate: { ...P.gate }, ladder: { ...P.ladder }, grace: { ...P.grace }, decay: { ...P.decay }, badges: [...P.badges],
+				boxes: st.boxDefinitions(), baitGrant: P.baitGrant,
+				votersCrateExclude: st.legacyVotersCrate().pool.exclude,
+				topgg: { retire: P.topgg.retire, vote: P.topgg.vote, transitionDays: P.topgg.transitionDays },
+			};
+		})(),
+
 		// Read-time overlay of EXISTING catalog rows while the 5B flag is on (stored rows are never rewritten):
 		// fields per row name.
 		catalog: {

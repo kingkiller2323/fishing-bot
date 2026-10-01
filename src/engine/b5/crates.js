@@ -12,6 +12,14 @@ const legacyUnits = (owned) => Math.max(0, Math.min(Number(owned?.legacyCount) |
 /** The 5B definition for a box name (and owned stack), or null when the 5B release does not define it. */
 function crateDefinition5b(name, owned = null) {
 	const key = String(name).trim().toLowerCase();
+	// Streak boxes (P-STREAK-LADDER) and the legacy Voter's Crate without the Old Rod (P-STREAK-VOTERS-CRATE).
+	const streak = Object.entries(need5b().streak.boxes).find(([n]) => n.toLowerCase() === key);
+	if (streak) return { name: streak[0], ...structuredClone(streak[1]), baitGrant: need5b().streak.baitGrant, release5b: true };
+	if (key === 'voter\'s crate') {
+		const def = structuredClone(BOXES['Voter\'s Crate']);
+		def.pool.exclude = [...new Set([...(def.pool.exclude || []), ...need5b().streak.votersCrateExclude])];
+		return { name: 'Voter\'s Crate', ...def };
+	}
 	const crate = need5b().rods.crates.find((c) => c.name.toLowerCase() === key);
 	if (!crate) return null;
 	if (crate.name === LEGACY_CRATE && legacyUnits(owned) > 0) return { name: LEGACY_CRATE, ...structuredClone(BOXES[LEGACY_CRATE]), legacyUnit: true };

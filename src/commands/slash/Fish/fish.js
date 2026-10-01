@@ -88,6 +88,11 @@ const followUpMessage = async (interaction, user, result) => {
 			fields.push({ name: '⭐ Level up!', value });
 		}
 
+		// 5B streak: one public line, identical for every profile.
+		if (result.streak?.credit?.box) {
+			fields.push({ name: '🔥 Streak', value: `Day ${result.streak.credit.streakDay} streak! ${result.streak.credit.box} added (/open)` });
+		}
+
 		if (rodState === 'broken') {
 			fishAgainDisabled = true;
 			warnings.push('Your fishing rod has broken! Repair it to keep fishing.');

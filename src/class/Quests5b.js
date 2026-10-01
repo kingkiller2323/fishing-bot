@@ -26,8 +26,27 @@ async function dailyEmbed(userId, now = Date.now(), extra = []) {
 	return new EmbedBuilder().setTitle('Daily').setColor('Green').setDescription([...extra, ...lines].join('\n\n'));
 }
 
+/** The streak lines of /daily (P-STREAK: the hub shows the streak; there is nothing to claim). */
+async function streakLines(userId, now = Date.now()) {
+	const streak5b = require('../engine/b5/streak');
+	const day = require('../engine/b5/day');
+	const { need5b } = require('../engine/balance');
+	const user = await require('../schemas/UserSchema').User.collection.findOne({ userId: String(userId) });
+	const s = streak5b.readState(user);
+	const today = day.dayIndex(now);
+	const gate = need5b().streak.gate.successfulCasts;
+	const casts = s.castsDay === today ? s.castsToday : 0;
+	const done = s.lastDay === today;
+	const badges = need5b().streak.badges.filter((b) => s.best >= b);
+	return [
+		`🔥 **Streak:** ${s.count} day${s.count === 1 ? '' : 's'} (best ${s.best}) · grace tokens ${s.grace}${badges.length ? ` · badges ${badges.join(', ')}` : ''}`,
+		done ? '-# Today is credited. Come back tomorrow.' : `-# Today: ${casts}/${gate} successful casts · next: ${streak5b.boxForDay(s.count + 1)} · ${streak5b.daysToChest(s.count)} day(s) to the Streak Chest`,
+	];
+}
+
 async function daily(interaction) {
-	return interaction.reply({ embeds: [await dailyEmbed(interaction.user.id)], flags: MessageFlags.Ephemeral });
+	const extra = [(await streakLines(interaction.user.id)).join('\n')];
+	return interaction.reply({ embeds: [await dailyEmbed(interaction.user.id, Date.now(), extra)], flags: MessageFlags.Ephemeral });
 }
 
 async function startQuest(interaction) {
@@ -58,4 +77,4 @@ async function questsView(interaction, now = Date.now()) {
 	return interaction.reply({ embeds: [new EmbedBuilder().setTitle('Quests').setColor('Green').setDescription(text.slice(0, 4000))], flags: MessageFlags.Ephemeral });
 }
 
-module.exports = { dailyEmbed, daily, startQuest, questsView };
+module.exports = { streakLines, dailyEmbed, daily, startQuest, questsView };

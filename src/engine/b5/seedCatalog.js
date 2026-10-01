@@ -29,6 +29,12 @@ function itemRows(data = seedData5b()) {
 			icon: { animated: false, data: 'Treasure_Chest' },
 		});
 	}
+	for (const [name, b] of Object.entries(data.streak.boxes)) {
+		rows.push({
+			__t: 'Gacha', name, description: name === data.streak.ladder.milestoneBox ? 'The weekly streak reward: more slots and an Ultra-or-better first slot.' : 'Your daily streak reward.',
+			rarity: 'Common', type: 'gacha', price: 0, capabilities: [...b.pool.types, 'fish'], items: b.slots, icon: { animated: false, data: 'Treasure_Chest' },
+		});
+	}
 	return rows.map((row) => ({ ...row, user: null, shopItem: false, release: RELEASE }));
 }
 

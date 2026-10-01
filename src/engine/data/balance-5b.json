@@ -9350,6 +9350,153 @@
 			}
 		]
 	},
+	"streak": {
+		"gate": {
+			"successfulCasts": 20
+		},
+		"ladder": {
+			"cycle": 7,
+			"dailyBox": "Streak Crate",
+			"milestoneBox": "Streak Chest"
+		},
+		"grace": {
+			"start": 1,
+			"perCycle": 1,
+			"max": 2
+		},
+		"decay": {
+			"perUncoveredMiss": 7,
+			"resetAfterMissedDays": 7
+		},
+		"badges": [
+			7,
+			30,
+			100,
+			365
+		],
+		"boxes": {
+			"Streak Crate": {
+				"id": "streak-crate",
+				"slots": 3,
+				"strategy": "independent",
+				"pool": {
+					"types": [
+						"bait",
+						"buff",
+						"part_rod",
+						"part_reel",
+						"part_hook",
+						"part_handle"
+					],
+					"fish": "highestUnlocked",
+					"fishShare": 0.75,
+					"exclude": [
+						"Fiberglass Rod Piece",
+						"Graphite Rod Piece",
+						"Carbon Fiber Rod Piece",
+						"Composite Rod Piece",
+						"Gold Rod Piece",
+						"Titanium Reel",
+						"Trolling Reel",
+						"Fly Fishing Reel",
+						"Sage Green Reel",
+						"Centerpin Reel",
+						"Jigging Reel",
+						"Treble Hook",
+						"Jig Hook",
+						"Swimbait Hook",
+						"Octopus Hook",
+						"Worm Hook",
+						"EVA Handle",
+						"Carbon Fiber Handle",
+						"Composite Handle",
+						"Lucky Draw"
+					],
+					"featured": []
+				},
+				"rarityTable": {
+					"common": 0,
+					"uncommon": 2500,
+					"rare": 500,
+					"ultra": 100,
+					"giant": 50,
+					"legendary": 20,
+					"lucky": 1
+				},
+				"rarityFloor": "uncommon",
+				"guaranteedSlots": [],
+				"duplicates": "unique",
+				"pity": null
+			},
+			"Streak Chest": {
+				"id": "streak-chest",
+				"slots": 5,
+				"strategy": "independent",
+				"pool": {
+					"types": [
+						"bait",
+						"buff",
+						"part_rod",
+						"part_reel",
+						"part_hook",
+						"part_handle"
+					],
+					"fish": "highestUnlocked",
+					"fishShare": 0.75,
+					"exclude": [
+						"Fiberglass Rod Piece",
+						"Graphite Rod Piece",
+						"Carbon Fiber Rod Piece",
+						"Composite Rod Piece",
+						"Gold Rod Piece",
+						"Titanium Reel",
+						"Trolling Reel",
+						"Fly Fishing Reel",
+						"Sage Green Reel",
+						"Centerpin Reel",
+						"Jigging Reel",
+						"Treble Hook",
+						"Jig Hook",
+						"Swimbait Hook",
+						"Octopus Hook",
+						"Worm Hook",
+						"EVA Handle",
+						"Carbon Fiber Handle",
+						"Composite Handle",
+						"Lucky Draw"
+					],
+					"featured": []
+				},
+				"rarityTable": {
+					"common": 0,
+					"uncommon": 2500,
+					"rare": 500,
+					"ultra": 100,
+					"giant": 50,
+					"legendary": 20,
+					"lucky": 1
+				},
+				"rarityFloor": "uncommon",
+				"guaranteedSlots": [
+					{
+						"slot": 0,
+						"minRarity": "ultra"
+					}
+				],
+				"duplicates": "unique",
+				"pity": null
+			}
+		},
+		"baitGrant": "pack",
+		"votersCrateExclude": [
+			"Old Rod"
+		],
+		"topgg": {
+			"retire": true,
+			"vote": "notice-then-unregister",
+			"transitionDays": 30
+		}
+	},
 	"catalog": {
 		"overlay": {
 			"Fishing Crate": {
@@ -9524,5 +9671,5 @@
 		"boxLuck": "non-buff",
 		"competitiveEligible": false
 	},
-	"contentHash": "9d1fe90593c02de5"
+	"contentHash": "017fd7d8dfd88854"
 }

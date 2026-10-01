@@ -54,7 +54,7 @@ async function catchableFish() {
  * Reward pools per canonical rarity for a definition. Each entry: { kind, template, weight }.
  * Exclusions remove rewards; featured rewards get a higher pick weight within their rarity.
  */
-async function buildPools(def) {
+async function buildPools(def, ctx = {}) {
 	const pools = Object.fromEntries(RARITIES.map((r) => [r, []]));
 	const exclude = new Set((def.pool.exclude || []).map((n) => n.toLowerCase()));
 	const featured = def.pool.featured || [];
@@ -62,7 +62,9 @@ async function buildPools(def) {
 
 	// Rows added by the 5B release (standard rods, new crates, the new bait roster) are never box rewards.
 	const items = def.pool.types.length ? await Item.find({ type: { $in: def.pool.types }, user: null, ...LEGACY_ONLY }).lean() : [];
-	const fish = def.pool.fish ? await catchableFish() : [];
+	// 5B streak boxes (pool.fish 'highestUnlocked', P-STREAK-FISH-POOL): per rarity, fish of the opener's
+	// highest accessible biome that has one. Today's boxes use `true` (every catchable fish).
+	const fish = def.pool.fish === 'highestUnlocked' ? await highestUnlockedFish(ctx.accessibleBiomes || []) : def.pool.fish ? await catchableFish() : [];
 	for (const [kind, list] of [['item', items], ['fish', fish]]) {
 		for (const template of list) {
 			const rarity = canonicalRarity(template.rarity);
@@ -103,9 +105,30 @@ function baseTable(def, pools) {
 	return normalize(weights);
 }
 
+/** Fish per rarity from the highest biome (in `biomes`, ladder order) that has one of that rarity. */
+async function highestUnlockedFish(biomes) {
+	const all = await FishTemplate.find({ user: null, biome: { $in: biomes } }).lean();
+	const out = [];
+	for (const r of RARITIES) {
+		for (const b of [...biomes].reverse()) {
+			const list = all.filter((f) => f.biome === b && canonicalRarity(f.rarity) === r);
+			if (list.length) {
+				out.push(...list);
+				break;
+			}
+		}
+	}
+	return out;
+}
+
 /** Picks a reward from a rarity pool (featured-weighted), avoiding duplicates when asked. */
 function pickReward(pool, taken, def) {
 	let candidates = pool;
+	// 5B pool.fishShare: within a rarity holding both fish and items, the kind first (fish with this chance).
+	if (Number.isFinite(def.pool?.fishShare) && pool.some((e) => e.kind === 'fish') && pool.some((e) => e.kind !== 'fish')) {
+		const wantFish = rng.random() < def.pool.fishShare;
+		candidates = pool.filter((e) => (e.kind === 'fish') === wantFish);
+	}
 	if (def.duplicates === 'unique') {
 		const fresh = pool.filter((e) => !taken.has(String(e.template._id)));
 		if (fresh.length) candidates = fresh;
@@ -146,7 +169,10 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 
 	const def = definitionFor(box.name, box);
 	if (!def) return failure(base, 'UNKNOWN_BOX', 'That box cannot be opened.');
-	const pools = await buildPools(def);
+	const poolCtx = def.pool.fish === 'highestUnlocked'
+		? { accessibleBiomes: require('./b5/world').accessibleBiomes(require('./levelGate').gateLevelOf(plain(user)), user.permits) }
+		: {};
+	const pools = await buildPools(def, poolCtx);
 	const boxBase = baseTable(def, pools);
 
 	// Modifiers: profile gacha stats + gacha buffs (legacy ['gacha', '1.5'] = +50% to every
@@ -232,7 +258,9 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 			}));
 		}
 		else {
-			const grant = { key: `${openId}:slot:${i}`, templateId: String(entry.template._id), count: 1, newId: new ObjectId().toString(), reason: 'gacha' };
+			// 5B streak boxes grant a bait as one pack (P-STREAK-BAIT-PACK).
+			const count = def.baitGrant === 'pack' && entry.template.type === 'bait' ? require('./balance').need5b().bait.packSize : 1;
+			const grant = { key: `${openId}:slot:${i}`, templateId: String(entry.template._id), count, newId: new ObjectId().toString(), reason: 'gacha' };
 			grants.push(grant);
 			slot.reward.id = grant.newId;
 		}

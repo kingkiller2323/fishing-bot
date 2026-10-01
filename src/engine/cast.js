@@ -485,6 +485,8 @@ async function writeCast(result, { session, fault }) {
 		}
 		if (result.questLog.questDay) set['stats.questDay'] = result.questLog.questDay;
 	}
+	// 5B streak state (present only on 5B journals): the day's cast count and, on credit, the streak.
+	if (result.streak?.after) set.streak = result.streak.after;
 	if (result.bait?.depleted) {
 		set['inventory.equippedBait'] = null;
 		update.$pull = { 'inventory.baits': oid(result.bait.id) };

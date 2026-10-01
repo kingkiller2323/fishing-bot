@@ -13,6 +13,10 @@ module.exports = {
      * @param {ChatInputCommandInteraction} interaction
      */
 	run: async (client, interaction) => {
+		// 5B (P-STREAK-VOTE): voting rewards are retired; no Top.gg call is made. Private notice.
+		if (require('../../../engine/balance').isBalance5b()) {
+			return interaction.reply({ content: 'Voting rewards have ended. Your daily reward is now your streak: fish a little every day. See /daily. Your Voter\'s Crates still open with /open.', flags: require('discord.js').MessageFlags.Ephemeral });
+		}
 
 		await interaction.deferReply();
 

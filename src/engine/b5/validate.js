@@ -63,6 +63,10 @@ async function validate5b() {
 	if (missing.length > 0) problems.push(`5B value data missing for ${missing.length} species: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}`);
 	problems.push(...await mountainStreamProblems());
 	problems.push(...await questProblems());
+	const { Item } = require('../../schemas/ItemSchema');
+	for (const name of [...Object.keys(need5b().streak.boxes), ...need5b().rods.crates.map((c) => c.name)]) {
+		if (!await Item.exists({ name, user: null, type: 'gacha' })) problems.push(`5B box "${name}" missing from the catalog`);
+	}
 	return problems;
 }
 
