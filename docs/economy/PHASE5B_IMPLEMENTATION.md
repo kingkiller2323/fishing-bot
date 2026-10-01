@@ -70,6 +70,20 @@ Naming: these are "Step B: privacy", "Step B: rods", "Step B: quests" and "Step 
     - the Rod Workshop preview keeps showing the resulting required level before crafting.
 
 ### Step C: the balance release (built dark behind `BALANCE_5B`, one PR per system, merged in this order)
+
+**Status: built, dark.** Every system below is implemented behind the flag, in this order, with its tests
+(`test/step-c1-value.test.js` … `test/step-c11-founder.test.js`); flag-off golden parity is exact. Structure:
+- `balance.rules5b()` / `need5b()` are the only readers of the 5B data; `cast.js castLine` forks to
+  `cast5b.castLine5b` under the flag; pure engine modules live in `src/engine/b5/`.
+- The 5B catalog additions (standard rods, tackle crates, streak boxes, Mountain Stream and its species) are
+  hidden rows (`release: '5b'`, unlisted), excluded from today's pools and lists; prices, levels and listings of
+  existing rows come from the read-time overlay (`b5/catalog.js`); the quest catalog is generated data only.
+- Flag-on migrations (`b5/migrations.js`, marker-guarded, safe to rerun): legacy Fishing Crate counts, biome
+  permits, quest log, ended buff activations, the audited Founder biome move. Boot validation (`b5/validate.js`)
+  refuses to start with the flag on if value data, the Mountain Stream grid, quests or 5B boxes are incomplete.
+- Journals stay compatible: 5B result sections (quest log, expiries, pity, streak, Lucky Draw charge, private
+  rolls) are written only when a journal carries them.
+
 1. **Curve, value model, XP per rarity** (`balance.js`, `cast.js`, `rewards.js`, `publicLevel.js`): the new curve behind the flag, with the floors from step A.
 2. **Rods and Rod Workshop:**
    - standard ladder catalog rows (catalog sync `rods-5b`), with prices, stats, durability and repair from the data file;
