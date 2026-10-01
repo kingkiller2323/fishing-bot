@@ -20,7 +20,8 @@
 // token; BALANCE_5B must be off at start (the rehearsal flips it in-process exactly as the restart would).
 // The rehearsal database (STAGING_DB_D, default fishing_stepd_rehearsal) is dropped and rebuilt on every run.
 const FIXTURE_FOUNDERS = ['stgd-founder'];
-if (process.env.FOUNDER_IDS === undefined) process.env.FOUNDER_IDS = FIXTURE_FOUNDERS.join(',');
+// The fixture Founder joins FOUNDER_IDS for this staging process only (before config loads).
+process.env.FOUNDER_IDS = [...new Set([...String(process.env.FOUNDER_IDS || '').split(',').map((x) => x.trim()).filter(Boolean), ...FIXTURE_FOUNDERS])].join(',');
 
 const fs = require('node:fs');
 const path = require('node:path');
