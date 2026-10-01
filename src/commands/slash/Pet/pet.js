@@ -7,6 +7,9 @@ const buttonPagination = require('../../../buttonPagination');
 const config = require('../../../config');
 const { Icons } = require('../../../class/Icons');
 
+const { isBalance5b } = require('../../../engine/balance');
+const aq5b = () => require('../../../engine/b5/aquarium');
+
 module.exports = {
 	structure: new SlashCommandBuilder()
 		.setName('pet')
@@ -111,6 +114,11 @@ module.exports = {
 				return await interaction.followUp('You do not own a pet with that name.');
 			}
 
+			// 5B: per-pet cooldown and capped bond (b5/aquarium.js); on cooldown nothing changes.
+			if (isBalance5b()) {
+				const r = await aq5b().care(petData._id, 'feed');
+				return await interaction.followUp(r.ok ? `Successfully fed ${name}.` : r.message);
+			}
 			const pet = new Pet(petData);
 			await pet.feed();
 
@@ -133,6 +141,10 @@ module.exports = {
 				return await interaction.followUp('You do not own a pet with that name.');
 			}
 
+			if (isBalance5b()) {
+				const r = await aq5b().care(petData._id, 'play');
+				return await interaction.followUp(r.ok ? `Successfully played with ${name}.` : r.message);
+			}
 			const pet = new Pet(petData);
 			await pet.play();
 
@@ -155,6 +167,11 @@ module.exports = {
 				return await interaction.followUp('You do not own a pet with that name.');
 			}
 
+			// 5B: species value × age × origin × condition × attraction (never XP), a few sales a week.
+			if (isBalance5b()) {
+				const r = await aq5b().sellPet(interaction.user.id, petData._id);
+				return await interaction.followUp(r.ok ? `Successfully sold ${name} for $${r.amount.toLocaleString()}.` : r.message);
+			}
 			const pet = new Pet(petData);
 			const habitat = await pet.getHabitat();
 			const aquarium = habitat ? new Aquarium(habitat) : null;

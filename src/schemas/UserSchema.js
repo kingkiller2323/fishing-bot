@@ -44,6 +44,11 @@ const UserSchema = new Schema ({
 	},
 	// 5B biome permits (A-PERMITS). No default: an account without the field is grandfathered by the 5B
 	// migration (the $exists guard finds it); new 5B accounts get [] at creation.
+	// 5B aquarium (additive): pet sale times (weekly limit) and display tanks per water type.
+	aquarium5b: {
+		type: Object,
+		default: undefined,
+	},
 	// 5B buff activations (additive; read-time expiry): { xp, cash, gacha }.
 	activeBuffs: {
 		type: Object,

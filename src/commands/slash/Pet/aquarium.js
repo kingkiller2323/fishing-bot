@@ -164,6 +164,12 @@ module.exports = {
 			const aquarium = new Aquarium(aquariumData);
 			const fishIds = await aquarium.getFish();
 			const fish = await Promise.all(fishIds.map(async fishId => { return await PetFish.findById(fishId); }));
+			if (require('../../../engine/balance').isBalance5b()) {
+				// 5B: feeds every pet off its cooldown; the others are left as they are.
+				let fed = 0;
+				for (const f of fish.filter(Boolean)) if ((await require('../../../engine/b5/aquarium').care(f._id, 'feed')).ok) fed++;
+				return await interaction.followUp(`You fed ${fed} of ${fish.filter(Boolean).length} fish in **${aquariumName}** (the others were fed recently).`);
+			}
 			for (const f of fish) {
 				const pet = new Pet(f);
 				await pet.feed();

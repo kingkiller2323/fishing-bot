@@ -145,7 +145,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const baitSrc = bait5b.baitSource(bait, biome, gateLevel);
 	const modifiers = resolveModifiers5b({
 		profile, rod: rodProfile, bait: baitSrc, buffs, event: activeEvent(now), user: plain(user), now,
-		extraSources: [upgrades5b.upgradeSource(user)].filter(Boolean),
+		extraSources: [upgrades5b.upgradeSource(user), await require('./b5/aquarium').companionSource(plain(user), now.getTime())].filter(Boolean),
 	});
 	base.competitiveEligible = modifiers.competitiveEligible;
 

@@ -7735,6 +7735,72 @@
 				870000,
 				1700000
 			]
+		},
+		"waterOf": {
+			"Ocean": "Saltwater",
+			"Coast": "Saltwater",
+			"River": "Freshwater",
+			"Lake": "Freshwater",
+			"Pond": "Freshwater",
+			"Swamp": "Freshwater",
+			"Mountain Stream": "Freshwater"
+		},
+		"tierOrder": [
+			"basic",
+			"advanced",
+			"expert"
+		],
+		"secondWaterAddsSlots": false,
+		"companion": {
+			"stat": "sellBonus",
+			"perPet": {
+				"common": 0.0025,
+				"uncommon": 0.003,
+				"rare": 0.0035,
+				"ultra": 0.004,
+				"giant": 0.0045,
+				"legendary": 0.005,
+				"lucky": 0.0055
+			},
+			"bond": {
+				"minFactor": 0.5,
+				"maxXp": 700,
+				"xpPerCare": 50
+			},
+			"thrive": {
+				"fedWithinH": 30,
+				"minCleanliness": 50,
+				"temperatureBandC": 3
+			}
+		},
+		"care": {
+			"feedCooldownH": 8,
+			"playCooldownH": 8
+		},
+		"temperature": {
+			"idealC": 25,
+			"adjustRangeC": [
+				-30,
+				30
+			],
+			"newTankC": 25
+		},
+		"cleanliness": {
+			"decayPerHour": 1
+		},
+		"sale": {
+			"fullValueAgeDays": 28,
+			"minAgeFactor": 0.25,
+			"bredFactor": 0.5,
+			"notThrivingFactor": 0.5,
+			"attractionPerPoint": 0.01,
+			"maxAttraction": 25,
+			"maxPerWeek": 3
+		},
+		"breeding": {
+			"minAgeDays": 20,
+			"minHealth": 50,
+			"cooldownDays": 7
 		}
 	},
 	"day": {
@@ -9512,6 +9578,42 @@
 					"part_handle"
 				]
 			},
+			"Basic Freshwater Aquarium License": {
+				"price": 30000,
+				"requirements": {
+					"level": 15
+				}
+			},
+			"Advanced Freshwater Aquarium License": {
+				"price": 120000,
+				"requirements": {
+					"level": 30
+				}
+			},
+			"Expert Freshwater Aquarium License": {
+				"price": 260000,
+				"requirements": {
+					"level": 45
+				}
+			},
+			"Basic Saltwater Aquarium License": {
+				"price": 30000,
+				"requirements": {
+					"level": 15
+				}
+			},
+			"Advanced Saltwater Aquarium License": {
+				"price": 120000,
+				"requirements": {
+					"level": 30
+				}
+			},
+			"Expert Saltwater Aquarium License": {
+				"price": 260000,
+				"requirements": {
+					"level": 45
+				}
+			},
 			"Old Rod": {
 				"unbreakable": true
 			},
@@ -9671,5 +9773,5 @@
 		"boxLuck": "non-buff",
 		"competitiveEligible": false
 	},
-	"contentHash": "017fd7d8dfd88854"
+	"contentHash": "3c4de60cec553399"
 }

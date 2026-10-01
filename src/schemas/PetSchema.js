@@ -68,6 +68,8 @@ const PetSchema = new Schema({
 		required: true,
 		default: Date.now,
 	},
+	// 5B: a bred pet (half sale value, P-AQUARIUM-PET-SALE). No default.
+	bred: { type: Boolean },
 	species: {
 		type: String,
 		required: true,

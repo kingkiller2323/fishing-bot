@@ -244,6 +244,16 @@ function build() {
 		aquarium: {
 			licenses: aquarium.licenses().map((l) => pick(l, ['name', 'water', 'tier', 'prerequisite', 'level', 'tanks', 'tankSize', 'capacity', 'companionSlots', 'price'])),
 			display: { ...pick(aquarium.PARAMS.display, ['requires', 'perWaterType', 'tankSize']), prices: aquarium.displayTanks().tanks.map((t) => t.price) },
+			// Rules (P-AQUARIUM-*): companion bonus, bond, thriving, care cooldowns, sale value and limit, breeding.
+			waterOf: { ...aquarium.PARAMS.waterOf },
+			tierOrder: [...aquarium.PARAMS.licenses.order],
+			secondWaterAddsSlots: aquarium.PARAMS.licenses.secondWaterAddsSlots,
+			companion: JSON.parse(JSON.stringify(aquarium.PARAMS.companion)),
+			care: pick(aquarium.PARAMS.care, ['feedCooldownH', 'playCooldownH']),
+			temperature: pick(aquarium.PARAMS.temperature, ['idealC', 'adjustRangeC', 'newTankC']),
+			cleanliness: { ...aquarium.PARAMS.cleanliness },
+			sale: { ...aquarium.PARAMS.sale },
+			breeding: { ...aquarium.PARAMS.breeding },
 		},
 
 		// The DCC day (P-DAY): one boundary for daily quests and the streak.
@@ -278,6 +288,8 @@ function build() {
 					else row[u.field] = u.after;
 					return m.set(u.row, row);
 				}, new Map())),
+				// Aquarium licences at the approved prices and gates (P-AQUARIUM-LICENSE-PRICE, P-AQUARIUM-LICENSE-GATES).
+				...Object.fromEntries(aquarium.licenses().map((l) => [l.name, { price: l.price, requirements: { level: l.level } }])),
 				// The Old Rod is unbreakable (P-RODS-OLD-ROD).
 				'Old Rod': { unbreakable: rods.PARAMS.oldRod.unbreakable },
 				// Bait (P-BAIT-*): sold in packs; price is the pack price; the shop level, biomes and strong access

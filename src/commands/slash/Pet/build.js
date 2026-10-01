@@ -70,6 +70,14 @@ module.exports = {
 			});
 		}
 
+		// 5B (A6): licences grant a number of tanks; existing tanks are kept but count toward it.
+		let size5b = null;
+		if (require('../../../engine/balance').isBalance5b()) {
+			const check = await require('../../../engine/b5/aquarium').canBuild(interaction.user.id, waterType);
+			if (!check.ok) return interaction.followUp({ content: check.message, flags: MessageFlags.Ephemeral });
+			size5b = check.tankSize;
+		}
+
 		const license = await user.getAquariumLicense(waterType);
 		if (!license) {
 			if (process.env.ANALYTICS || config.client.analytics) {
@@ -84,7 +92,7 @@ module.exports = {
 			if (license) {
 				newAquarium = new Aquarium({
 					name,
-					size: license.aquarium.size,
+					size: size5b ?? license.aquarium.size,
 					waterType,
 					owner: await user.getUserId(),
 				});

@@ -687,7 +687,9 @@ class Pet {
 	
 		// Add a random factor to the success rate
 		const successRate = Math.max(Math.min(0.65, (50 - stress) / 50), Math.max(Math.min(0.6, health / 100 - 0.5), 0.1));
-		const randomFactor = rng.random() * 100;
+		// 5B (A2): the rate is a probability; today's code compared it with a percentage.
+		const release5b = require('../engine/balance').isBalance5b();
+		const randomFactor = release5b ? rng.random() : rng.random() * 100;
 		if (randomFactor < successRate) success = true;
 		if (!success) return { success, reason: 'Unlucky. You can try improving the health of your pets and reducing their stress.' };
 	
@@ -740,6 +742,7 @@ class Pet {
 			attraction: 0,
 			aquarium: aquariumId,
 			species: species.name,
+			...(release5b ? { bred: true } : {}),
 		});
 	
 		// A5: a successful breed gives the parents the success XP (it used to give the failure XP).
