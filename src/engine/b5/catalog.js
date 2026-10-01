@@ -5,7 +5,7 @@
 // could reach them (box reward pools, the Lucky item pool, biome lists) exclude them with LEGACY_ONLY, so
 // with the 5B flag off nothing new is visible. Prices, levels and listings of EXISTING catalog rows are never
 // rewritten: while the flag is on, `effective(row)` overlays the 5B values at read time.
-const { rules5b } = require('../balance');
+const { rules5b, seedData5b } = require('../balance');
 
 /** Filter clause: rows that exist in today's game (not added by the 5B release). */
 const LEGACY_ONLY = Object.freeze({ release: { $exists: false } });
@@ -14,6 +14,14 @@ const LEGACY_ONLY = Object.freeze({ release: { $exists: false } });
 const visibleCatalog = () => (rules5b() ? {} : { ...LEGACY_ONLY });
 
 const isRelease5b = (row) => row?.release === '5b';
+
+// Today's biomes (the static catalog). A biome outside it exists only in the 5B release (Mountain Stream).
+const LEGACY_BIOMES = new Set(require('../../bootstrap/data/biomes').map((b) => String(b.name).toLowerCase()));
+/** True for a biome only the 5B release has: after a rollback (flag off) a player left there fishes the Ocean. */
+function isRelease5bBiome(name) {
+	const key = String(name || 'ocean').toLowerCase();
+	return !LEGACY_BIOMES.has(key) && seedData5b().world.biomeOrder.some((b) => b.toLowerCase() === key);
+}
 
 /** The 5B overlay of a catalog row by name (price, requirements.level, shopItem, capabilities, flags). */
 function overlayFor(name) {
@@ -40,4 +48,4 @@ function effective(row) {
 	return out;
 }
 
-module.exports = { LEGACY_ONLY, visibleCatalog, isRelease5b, overlayFor, effective };
+module.exports = { LEGACY_ONLY, visibleCatalog, isRelease5b, isRelease5bBiome, overlayFor, effective };

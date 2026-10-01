@@ -36,7 +36,7 @@ const { publicXpOf, publicXpOfResult, publicLevelOf } = require('./publicLevel')
 const { levelOf, levelWithFloor } = require('./levels');
 const { Utils } = require('../class/Utils');
 // Rows added by the 5B release (hidden catalog rows) never enter today's reward pools.
-const { LEGACY_ONLY } = require('./b5/catalog');
+const { LEGACY_ONLY, isRelease5bBiome } = require('./b5/catalog');
 const { requiredLevel, meetsLevelRequirement, levelOfUserDoc } = require('./levelGate');
 
 // Rarity re-rolls allowed per draw before falling back (see drawTemplates).
@@ -194,7 +194,9 @@ async function castLineLegacy({ userId, guildId = null, channelId = null, now = 
 	const baitLocked = Boolean(equippedBait) && !meetsLevelRequirement(levelOfUserDoc(user), equippedBait);
 	const bait = baitLocked ? null : equippedBait;
 
-	const biomeKey = (user.currentBiome || 'ocean').toLowerCase();
+	// Rollback safety: a biome only the 5B release has (a player left there when the flag went off) is fished as
+	// the Ocean, read-time only. Today no account can be in one, so today's casts are unchanged.
+	const biomeKey = isRelease5bBiome(user.currentBiome) ? 'ocean' : (user.currentBiome || 'ocean').toLowerCase();
 	const biome = capitalize(biomeKey);
 	const weatherPattern = await WeatherPattern.getCurrentWeather();
 	const weather = capitalize(await weatherPattern.getWeather());

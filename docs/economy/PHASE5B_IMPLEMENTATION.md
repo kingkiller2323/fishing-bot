@@ -163,6 +163,53 @@ Each PR brings its module's "tests to add" list (in the module docs) and an engi
 - **Production flip:** set `BALANCE_5B=on` in Railway and restart, then check the migration logs and bootstrap validation.
 - **Rollback:** flag off. Migrations are additive, so turning the flag off restores today's rules without touching data.
 
+**The rehearsal** (`scripts/staging/stepD-rehearsal.js`, run by the staging runner; parity helper
+`scripts/staging/lib/parity5b.js`) builds today's production state with the real startup path (flag off; the
+pseudonymized production accounts when `SNAPSHOT_DB` is set, synthetic accounts for every migration case, 3.2.0
+cast and box journals pending at the flip), then checks:
+- **the flip:** both flag-on boots pass validation (incl. `validate5b`); pass two changes nothing; the flip is
+  additive only (no document or field removed; player documents gain only `permits`, `questLog` and the audited
+  Founder `currentBiome`, besides the replayed journals' own writes); the run-once markers exist once;
+- **migrations:** permits equal the model's grandfathering rule for every account; Fishing Crate `legacyCount`;
+  `questLog` backfilled; the Founder moved once and audited; legacy tanks kept;
+- **journals:** pending 3.2.0 journals replay exactly as written (never rescaled);
+- **catalog:** Mountain Stream (22 new species, the 3 salmon untouched), 5B boxes, standard rods equal the model;
+- **engine = model:** per rod in its home biome (Old Rod … Summit Rod, and the Summit Rod in the Mountain
+  Stream), fish, value, XP and durability per cast within |z| ≤ 4.5 of the model's exact expectation over the
+  steady-state weather/season mix, and the cooldown exactly;
+- **Founder:** same seed and state → identical public cast (two states); independent samples → the same public
+  rarity distribution (chi-square, p > 0.001); public XP and the Sell button get the public catch only;
+- **gates:** each standard rod refused below its level, sold once at its price with its 5B durability; each permit
+  refused below its level, cast refused without it, sold at its price; the L6B equip gate;
+- **archetypes:** Casual (3 days), Regular (2), Active (1) and Grinder (1) play real casts, sell their catch and
+  follow the integrated model's own purchase plan; casts within 10%, XP within 15% on the last day (35% on
+  earlier days, as quest rewards arrive in lumps) and the level within 2 every day;
+- **rollback:** with a player in the Mountain Stream, a 5B box owned and a 5B cast journal pending, the flag-off
+  boot replays the journal and changes nothing else; today's game is served (balance 3.2.0, no 5B row reachable);
+  the flag back on changes nothing and play resumes.
+
+**Rollback safety (flag off after a flip)**, read-time only and unreachable from today's states:
+- a player in a biome only the 5B release has (Mountain Stream) fishes the Ocean;
+- a 5B box (tier crate, Streak Crate or Chest) stays unopened and owned;
+- 5B rods keep working under today's rules (their rows carry only `weak`/`strong`);
+- 5B fields (`permits`, `upgrades`, `questLog`, `streak`, `activeBuffs`, `aquarium5b`, `legacyCount`) are ignored.
+
+**Production activation plan** (after approval):
+1. Confirm production is healthy on the commit that passed the rehearsal (boot log: Validation passed, Logged in).
+2. Note the time and the latest deployment id (the rollback target is that same deployment with the flag off).
+3. In Railway (fishing-bot, production) set `BALANCE_5B=on`; the variable change redeploys the service.
+4. Check the boot log: `5B catalog: …`, each `Migration 5b-…` line (crates, permits, quest log, buffs, Founder
+   move), `Validation passed`, `Bootstrap complete`, `Logged in`. A validation problem with the flag on stops the
+   boot; then go to rollback step 1.
+5. Smoke test in Discord: `/fish` (balance 5b card, biome guard), `/shop` (tabs), `/quests`, `/biome`.
+6. Watch the first hour: errors in the deployment log, pending journals (none should stay pending).
+
+**Rollback plan:**
+1. Set `BALANCE_5B=off` (or remove it); the service redeploys with today's rules.
+2. Check the boot log: Validation passed, Logged in, no pending journal left behind.
+3. Nothing is deleted or rewritten: 5B fields stay stored and unused; turning the flag on again later re-runs the
+   guarded migrations, which change nothing already done.
+
 ### Step E: telemetry (after the flip)
 Track:
 - equal-level XP per active hour by play pattern (`P-DAILY-FACTOR`);

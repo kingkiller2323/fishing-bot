@@ -166,6 +166,8 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 	const owned = (await ItemData.find({ _id: { $in: user.inventory.gacha || [] } })).map(plain);
 	const box = owned.find((b) => b.name.toLowerCase() === String(boxName).trim().toLowerCase() && (b.count || 0) >= 1 && !b.opened);
 	if (!box) return failure(base, 'NO_BOX', 'You do not have a box with that name!');
+	// Rollback safety: a box of the 5B release (granted while the flag was on) stays unopened with the flag off.
+	if (!release5b && require('./b5/catalog').isRelease5b(box)) return failure(base, 'UNKNOWN_BOX', 'That box cannot be opened right now. It stays in your inventory.');
 
 	const def = definitionFor(box.name, box);
 	if (!def) return failure(base, 'UNKNOWN_BOX', 'That box cannot be opened.');
