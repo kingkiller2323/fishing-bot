@@ -99,6 +99,13 @@ async function migrateQuestLog() {
 	return { players: byUser.size, written };
 }
 
+/** Clears legacy activations that already ended (display only; counts untouched; P-BUFFS migration 1). */
+async function migrateStaleBuffActivations(now = Date.now()) {
+	const { BuffData } = require('../../schemas/BuffSchema');
+	const res = await BuffData.collection.updateMany({ active: true, endTime: { $lte: now } }, { $set: { active: false } });
+	return { cleared: res.modifiedCount };
+}
+
 /** Runs the flag-on migrations (called by bootstrap runMigrations only while the 5B flag is on). */
 async function runMigrations5b({ runOnce, log }) {
 	const crates = await runOnce('5b-legacy-fishing-crates', migrateLegacyFishingCrates);
@@ -108,8 +115,10 @@ async function runMigrations5b({ runOnce, log }) {
 	if (permits.written > 0) log(`Migration 5b-biome-permits: ${permits.written} account(s) received their grandfathered permits.`, 'done');
 	const questLog = await runOnce('5b-quest-log', migrateQuestLog);
 	if (!questLog.skipped) log(`Migration 5b-quest-log: ${questLog.result.players} player(s) have legacy completions recorded in questLog.`, 'done');
+	const stale = await migrateStaleBuffActivations();
+	if (stale.cleared > 0) log(`Migration 5b-stale-buffs: ${stale.cleared} ended booster activation(s) marked inactive (counts untouched).`, 'done');
 	const founder = await migrateFounderBiome();
 	for (const m of founder.moved) log(`Migration 5b-founder-biome: a Founder account moved from ${m.from} to ${m.to} (gate level ${m.gateLevel}).`, 'done');
 }
 
-module.exports = { migrateQuestLog, migrateLegacyFishingCrates, migrateBiomePermits, migrateFounderBiome, runMigrations5b };
+module.exports = { migrateStaleBuffActivations, migrateQuestLog, migrateLegacyFishingCrates, migrateBiomePermits, migrateFounderBiome, runMigrations5b };

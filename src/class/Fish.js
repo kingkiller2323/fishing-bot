@@ -23,10 +23,13 @@ class Fish {
 	static async sellByRarity(userId, targetRarity) {
 		const user = new User(await User.get(userId));
 
-		// check for buffs
-		const activeBuffs = await BuffData.find(activeBuffFilter(userId, Date.now()));
-		const cashBuff = activeBuffs.find((buff) => buff.capabilities.includes('cash'));
-		const cashMultiplier = cashBuff ? parseFloat(cashBuff.capabilities[1]) : 1;
+		// check for buffs (5B: Double Cash is stamped at catch, so a sale always pays the stored value; P-DOUBLE-CASH)
+		let cashMultiplier = 1;
+		if (!require('../engine/balance').isBalance5b()) {
+			const activeBuffs = await BuffData.find(activeBuffFilter(userId, Date.now()));
+			const cashBuff = activeBuffs.find((buff) => buff.capabilities.includes('cash'));
+			cashMultiplier = cashBuff ? parseFloat(cashBuff.capabilities[1]) : 1;
+		}
 
 		const target = targetRarity.toLowerCase();
 		const matching = (await user.getFish()).filter((f) => target === 'all' || f.rarity.toLowerCase() === target);

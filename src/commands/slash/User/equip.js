@@ -363,8 +363,17 @@ module.exports = {
 
 				let newBooster = {};
 				let description = '';
-				newBooster = await userData.startBooster(chosenBooster);
-				description = `Equipped booster: **${newBooster.name}**`;
+				if (isBalance5b()) {
+					// 5B: one unit per activation, real time, queued per kind (b5/buffs.js).
+					const r = await require('../../../engine/b5/buffs').activate(user.id, chosenBooster);
+					description = !r.ok ? r.message
+						: r.kind === 'gacha' ? `Booster active: **${r.state.name}** · bonus slot on your next ${r.state.chargesLeft} box opens`
+							: `Booster active: **${r.state.name}** · ends <t:${Math.floor(r.state.endsAt / 1000)}:R>${r.extended ? ' (queued: time added)' : ''}`;
+				}
+				else {
+					newBooster = await userData.startBooster(chosenBooster);
+					description = `Equipped booster: **${newBooster.name}**`;
+				}
 
 				if (process.env.ANALYTICS || config.client.analytics) {
 					await analyticsObject.setStatus('completed');

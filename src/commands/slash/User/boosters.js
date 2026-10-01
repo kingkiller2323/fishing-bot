@@ -40,8 +40,20 @@ module.exports = {
 
 			const chunkSize = 1;
 
-			const activeBuffs = await BuffData.find({ user: interaction.user.id, active: true });
-			if (activeBuffs.length > 0) {
+			if (require('../../../engine/balance').isBalance5b()) {
+				// 5B: the activations on the account (time left, Lucky Draw charges).
+				const e = require('../../../engine/b5/buffs').effectsAt(user.user);
+				const lines = [
+					...[e.xp, e.cash].filter(Boolean).map((b) => `${b.name} ×${b.multiplier} · ends <t:${Math.floor(b.endsAt / 1000)}:R>`),
+					...(e.gacha ? [`${e.gacha.name} · ${e.gacha.chargesLeft} bonus slot(s) left`] : []),
+				];
+				fields.push(lines.length ? { name: 'Active Boosters', value: lines.join('\n') } : { name: 'No Active Boosters', value: 'You have no active boosters.' });
+			}
+			const activeBuffs = require('../../../engine/balance').isBalance5b() ? [] : await BuffData.find({ user: interaction.user.id, active: true });
+			if (require('../../../engine/balance').isBalance5b()) {
+				// shown above
+			}
+			else if (activeBuffs.length > 0) {
 				const activeBuffNames = activeBuffs.map((buff) => buff.name);
 				fields.push({ name: 'Active Boosters', value: activeBuffNames.join('\n') });
 			}

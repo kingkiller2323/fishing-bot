@@ -8,15 +8,12 @@ const { ObjectId } = require('mongoose').Types;
 const { User: UserModel } = require('../schemas/UserSchema');
 const { Fish: FishTemplate, FishData } = require('../schemas/FishSchema');
 const { Item, ItemData } = require('../schemas/ItemSchema');
-const { BuffData } = require('../schemas/BuffSchema');
 const { QuestData } = require('../schemas/QuestSchema');
 const { Pond } = require('../schemas/PondSchema');
 const { WeatherPattern } = require('../class/WeatherPattern');
 const { Season } = require('../class/Season');
-const { activeBuffFilter } = require('./buffs');
 const { rng } = require('./rng');
 const { BALANCE_VERSION_5B, XP_PER_FISH, NORMAL_RARITY_TABLE, resolveProfile, activeEvent, need5b } = require('./balance');
-const { buffEffects } = require('./modifiers');
 const { applyPity, roll, toPercent, normalize } = require('./rarity');
 const { buildFishDoc, rollFishStats } = require('./rewards');
 const { publicXpOf, publicLevelOf } = require('./publicLevel');
@@ -28,6 +25,7 @@ const world5b = require('./b5/world');
 const bait5b = require('./b5/bait');
 const upgrades5b = require('./b5/upgrades');
 const quests5b = require('./b5/quests');
+const buffs5b = require('./b5/buffs');
 const streak5b = require('./b5/streak');
 const day5b = require('./b5/day');
 const { resolveModifiers5b } = require('./b5/modifiers');
@@ -141,11 +139,12 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 	const weather = capitalize(await weatherPattern.getWeather());
 	const season = (await Season.getCurrentSeason())?.season;
 
-	const activeBuffs = (await BuffData.find(activeBuffFilter(userId, now))).map(plain);
+	// 5B buffs: read from the user's activations at cast time (endsAt > now), never from the legacy stacks.
+	const buffs = buffs5b.castBuffs(plain(user), now.getTime());
 	// 5B bait: read by name, only where it works (biome and shop level), one unit per cast (b5/bait.js).
 	const baitSrc = bait5b.baitSource(bait, biome, gateLevel);
 	const modifiers = resolveModifiers5b({
-		profile, rod: rodProfile, bait: baitSrc, buffs: buffEffects(activeBuffs), event: activeEvent(now), user: plain(user), now,
+		profile, rod: rodProfile, bait: baitSrc, buffs, event: activeEvent(now), user: plain(user), now,
 		extraSources: [upgrades5b.upgradeSource(user)].filter(Boolean),
 	});
 	base.competitiveEligible = modifiers.competitiveEligible;
@@ -321,7 +320,7 @@ async function castLine5b({ userId, guildId = null, channelId = null, now = new 
 				...(baitSrc.reason === 'biome' ? { wrongBiome: true } : {}),
 			}
 			: null,
-		buffs: activeBuffs.map((b) => ({ id: String(b._id), name: b.name, capabilities: b.capabilities || [] })),
+		buffs: buffs.list,
 		modifiers: { ...modifiers, rarity: { base: toPercent(modifiers.rarity.base, 4), table: toPercent(modifiers.rarity.table, 4) } },
 		rarity: { table: toPercent(pity.table, 4), guarantee: pity.guarantee },
 		draws: { draws, bonusDraws: 0, perDraw, qualities, multiChance: modifiers.multi.chance, capped: modifiers.multi.capped },

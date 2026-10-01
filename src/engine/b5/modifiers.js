@@ -73,8 +73,10 @@ function resolveModifiers5b({ profile, rod, bait = null, buffs = { xp: 0, list: 
 
 	const stats = clampStats(total);
 	const eventMult = event?.multipliers || {};
-	const xp = (1 + stats.xpBonus) * (1 + (buffs.xp || 0)) * (eventMult.xp || 1);
-	const sell = (1 + stats.sellBonus) * (eventMult.sell || 1);
+	// Temporary boosts in one category add (P-BUFFS-EVENT-STACKING): 1 + (buff - 1) + (event - 1); gear multiplies.
+	// Double Cash is a normal-player mechanic stamped at catch, so it is part of the public base (P-BUFFS-PUBLIC).
+	const xp = (1 + stats.xpBonus) * (1 + (buffs.xp || 0) + ((eventMult.xp || 1) - 1));
+	const sell = (1 + stats.sellBonus) * (1 + (buffs.cash || 0) + ((eventMult.sell || 1) - 1));
 	const multi = cappedChance(stats.multiChance);
 	const qualities = [...new Set([...rod.qualities, ...(bait?.applied ? bait.qualities || [] : [])])];
 	const rarityBase = pub.rarityTable || NORMAL_RARITY_TABLE;
@@ -89,7 +91,7 @@ function resolveModifiers5b({ profile, rod, bait = null, buffs = { xp: 0, list: 
 		multi: { chance: multi.chance, capped: multi.capped, raw: stats.multiChance },
 		// Every public multiplier is the Normal player's: the profile adds nothing to the public cast.
 		xp: { gear: stats.xpBonus, buff: buffs.xp || 0, event: eventMult.xp || 1, withoutProfile: xp, multiplier: xp },
-		sell: { gear: stats.sellBonus, event: eventMult.sell || 1, withoutProfile: sell, multiplier: sell },
+		sell: { gear: stats.sellBonus, buff: buffs.cash || 0, event: eventMult.sell || 1, withoutProfile: sell, multiplier: sell },
 		quest: { xp: eventMult.questXp || 1, cash: eventMult.questCash || 1, xpWithoutProfile: eventMult.questXp || 1, cashWithoutProfile: eventMult.questCash || 1 },
 		durabilityEfficiency: stats.durabilityEfficiency,
 		cooldownMs: Math.max(COOLDOWN.minMs, Math.round(COOLDOWN.fishMs * (1 - stats.fishingSpeed))),

@@ -88,6 +88,11 @@ const followUpMessage = async (interaction, user, result) => {
 			fields.push({ name: '⭐ Level up!', value });
 		}
 
+		// 5B buffs: one public line while a buff runs (its effect is already in the base values above).
+		for (const b of (Array.isArray(result.buffs) ? result.buffs : []).filter((x) => x.endsAt)) {
+			fields.push({ name: '⚡ Booster', value: `${b.name} ×${b.multiplier} · ${Math.max(1, Math.ceil((b.endsAt - Date.now()) / 60000))} min left` });
+		}
+
 		// 5B streak: one public line, identical for every profile.
 		if (result.streak?.credit?.box) {
 			fields.push({ name: '🔥 Streak', value: `Day ${result.streak.credit.streakDay} streak! ${result.streak.credit.box} added (/open)` });

@@ -177,8 +177,10 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 
 	// Modifiers: profile gacha stats + gacha buffs (legacy ['gacha', '1.5'] = +50% to every
 	// Rare-and-above tier) + event gacha stats. Stats add, then feed the RarityEngine.
-	const buffs = (await BuffData.find(activeBuffFilter(userId, now))).map(plain)
+	// 5B: the Lucky Draw is a bonus slot on the next opens (b5/buffs.js), never a rarity boost.
+	const buffs = release5b ? [] : (await BuffData.find(activeBuffFilter(userId, now))).map(plain)
 		.filter((b) => (b.capabilities || [])[0] === 'gacha');
+	const luckyDraw = release5b ? require('./b5/buffs').luckyDrawFor(plain(user), def.name) : null;
 	const sources = [{ source: 'box', name: def.name, id: def.id }, { source: 'profile', name: profile.name, stats: { ...(profile.gacha?.stats || {}) } }];
 	const total = { ...(profile.gacha?.stats || {}) };
 	for (const buff of buffs) {
@@ -212,7 +214,8 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 	const grants = [];
 	const taken = new Set();
 	let sharedRarity = null;
-	for (let i = 0; i < def.slots; i++) {
+	const slotCount = def.slots + (luckyDraw?.bonusSlots || 0);
+	for (let i = 0; i < slotCount; i++) {
 		let table = pity.table;
 		const guaranteedSlot = (def.guaranteedSlots || []).find((g) => g.slot === i);
 		if (guaranteedSlot) {
@@ -281,6 +284,7 @@ async function openLine({ userId, guildId = null, boxName, now = new Date() }) {
 		rarity: { base: toPercent(boxBase, 4), modified: toPercent(modified, 4), withPity: toPercent(pity.table, 4) },
 		pity: { before: pityBefore, after: pityAfter, applied: pity.applied, guarantee: pity.guarantee },
 		slots,
+		...(luckyDraw ? { luckyDraw } : {}),
 		best: slots.reduce((b, s) => (rarityIndex(s.rarity) > rarityIndex(b) ? s.rarity : b), 'common'),
 		writes: { fishDocs, grants },
 	};
@@ -317,6 +321,8 @@ async function writeOpen(result, { session, fault }) {
 		$push: { 'inventory.fish': { $each: result.writes.fishDocs.map((d) => oid(d._id)) }, ...guardPush(openId) },
 	};
 	if (result.box.depleted) update.$pull = { 'inventory.gacha': oid(result.box.id) };
+	// 5B Lucky Draw: the charge this open used, in the same guarded commit (exactly once on recovery).
+	if (result.luckyDraw) set['activeBuffs.gacha.chargesLeft'] = result.luckyDraw.chargesAfter;
 	await UserModel.collection.updateOne({ userId, ...notApplied(openId) }, update, opts);
 
 	await fault('grants');
